@@ -71,7 +71,7 @@
 
     const severityLevels = [0, 1, 2, 3, 4, 5];
     const severityColors = {
-      0: '#64748b',
+      0: '#22c55e',
       1: '#4ade80',
       2: '#a3e635',
       3: '#facc15',
@@ -79,6 +79,9 @@
       5: '#ef4444',
     };
     const severityLabels = ['None', 'Minimal', 'Mild', 'Moderate', 'Severe', 'Extreme'];
+
+    const STORAGE_KEY_SYMPTOMS = 'symptomTracker_symptoms';
+    const STORAGE_KEY_ENTRIES = 'symptomTracker_entries';
 
     const generateSampleData = (symptoms) => {
       const entries = {};
@@ -99,7 +102,7 @@
             
             shuffledPeriods.forEach(period => {
               let baseSeverity = Math.floor(Math.random() * 5) + 1;
-              if (symptom.id === 'daytime-fatigue') baseSeverity = Math.min(5, baseSeverity + 1);
+              if (symptom.id === 'fatigue') baseSeverity = Math.min(5, baseSeverity + 1);
               if (symptom.id === 'headache' && period.id === 'morning') baseSeverity = Math.min(5, baseSeverity + 1);
               
               const key = `${dateKey}-${symptom.id}-${period.id}`;
@@ -117,38 +120,17 @@
       return entries;
     };
 
-    // LocalStorage helpers
-    const STORAGE_KEYS = {
-      SYMPTOMS: 'symptomTracker_symptoms',
-      ENTRIES: 'symptomTracker_entries',
-    };
-
-    const loadFromStorage = (key, defaultValue) => {
-      try {
-        const stored = localStorage.getItem(key);
-        return stored ? JSON.parse(stored) : defaultValue;
-      } catch (e) {
-        console.error('Error loading from storage:', e);
-        return defaultValue;
-      }
-    };
-
-    const saveToStorage = (key, value) => {
-      try {
-        localStorage.setItem(key, JSON.stringify(value));
-      } catch (e) {
-        console.error('Error saving to storage:', e);
-      }
-    };
-
     function SymptomTrackerMobile() {
-      const [symptoms, setSymptoms] = useState(() => 
-        loadFromStorage(STORAGE_KEYS.SYMPTOMS, defaultSymptoms)
-      );
+      const [symptoms, setSymptoms] = useState(() => {
+        const saved = localStorage.getItem(STORAGE_KEY_SYMPTOMS);
+        return saved ? JSON.parse(saved) : defaultSymptoms;
+      });
       const [selectedDate, setSelectedDate] = useState(new Date());
-      const [entries, setEntries] = useState(() => 
-        loadFromStorage(STORAGE_KEYS.ENTRIES, {})
-      );
+      const [entries, setEntries] = useState(() => {
+        const saved = localStorage.getItem(STORAGE_KEY_ENTRIES);
+        return saved ? JSON.parse(saved) : {};
+      });
+      const [hasSampleData, setHasSampleData] = useState(false);
       
       const [activeSymptom, setActiveSymptom] = useState(null);
       const [dragPosition, setDragPosition] = useState({ x: 2, y: 2 });
@@ -165,16 +147,18 @@
       const [historySort, setHistorySort] = useState({ column: 'date', direction: 'desc' });
       const containerRef = useRef(null);
       const startPosRef = useRef({ x: 0, y: 0 });
+      const holdTimerRef = useRef(null);
+      const pendingSymptomRef = useRef(null);
 
-      const DRAG_SENSITIVITY = 12;
+      const DRAG_SENSITIVITY = 19;
+      const HOLD_DELAY = 200;
 
-      // Save to localStorage when data changes
       useEffect(() => {
-        saveToStorage(STORAGE_KEYS.SYMPTOMS, symptoms);
+        localStorage.setItem(STORAGE_KEY_SYMPTOMS, JSON.stringify(symptoms));
       }, [symptoms]);
 
       useEffect(() => {
-        saveToStorage(STORAGE_KEYS.ENTRIES, entries);
+        localStorage.setItem(STORAGE_KEY_ENTRIES, JSON.stringify(entries));
       }, [entries]);
 
       const getDateKey = (date) => date.toISOString().split('T')[0];
@@ -209,12 +193,14 @@
       const loadSampleData = () => {
         const sampleEntries = generateSampleData(symptoms);
         setEntries(sampleEntries);
+        setHasSampleData(true);
         setShowSettings(false);
         setLastAction(`Loaded ${Object.keys(sampleEntries).length} sample entries`);
       };
 
       const clearAllData = () => {
         setEntries({});
+        setHasSampleData(false);
         setShowSettings(false);
         setLastAction('All data cleared');
       };
@@ -232,16 +218,9 @@
         setLastAction('');
       };
 
-      const handleTouchStart = (e, symptomId) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const startY = touch.clientY;
-        startPosRef.current = { x: touch.clientX, y: startY };
-        setFingerPosition({ x: touch.clientX, y: startY });
-        setActiveSymptom(symptomId);
-        
+      const enterEditMode = (symptomId, clientX, clientY) => {
         const screenHeight = window.innerHeight;
-        const relativeY = startY / screenHeight;
+        const relativeY = clientY / screenHeight;
         let initialSeverity;
         if (relativeY < 0.25) {
           initialSeverity = 5;
@@ -252,40 +231,56 @@
         }
         
         const screenWidth = window.innerWidth;
-        const timeIndex = Math.floor((touch.clientX / screenWidth) * 5);
+        const timeIndex = Math.floor((clientX / screenWidth) * 5);
         const clampedTimeIndex = Math.max(0, Math.min(4, timeIndex));
         
+        setActiveSymptom(symptomId);
         setDragPosition({ x: clampedTimeIndex, y: initialSeverity });
         setIsDragging(true);
+        pendingSymptomRef.current = null;
+      };
+
+      const handleTouchStart = (e, symptomId) => {
+        const touch = e.touches[0];
+        startPosRef.current = { x: touch.clientX, y: touch.clientY };
+        setFingerPosition({ x: touch.clientX, y: touch.clientY });
+        pendingSymptomRef.current = symptomId;
+        
+        holdTimerRef.current = setTimeout(() => {
+          if (pendingSymptomRef.current === symptomId) {
+            enterEditMode(symptomId, touch.clientX, touch.clientY);
+          }
+        }, HOLD_DELAY);
       };
 
       const handleMouseDown = (e, symptomId) => {
         e.preventDefault();
-        const startY = e.clientY;
-        startPosRef.current = { x: e.clientX, y: startY };
-        setFingerPosition({ x: e.clientX, y: startY });
-        setActiveSymptom(symptomId);
+        startPosRef.current = { x: e.clientX, y: e.clientY };
+        setFingerPosition({ x: e.clientX, y: e.clientY });
+        pendingSymptomRef.current = symptomId;
         
-        const screenHeight = window.innerHeight;
-        const relativeY = startY / screenHeight;
-        let initialSeverity;
-        if (relativeY < 0.25) {
-          initialSeverity = 5;
-        } else if (relativeY > 0.75) {
-          initialSeverity = 0;
-        } else {
-          initialSeverity = 2;
-        }
-        
-        const screenWidth = window.innerWidth;
-        const timeIndex = Math.floor((e.clientX / screenWidth) * 5);
-        const clampedTimeIndex = Math.max(0, Math.min(4, timeIndex));
-        
-        setDragPosition({ x: clampedTimeIndex, y: initialSeverity });
-        setIsDragging(true);
+        holdTimerRef.current = setTimeout(() => {
+          if (pendingSymptomRef.current === symptomId) {
+            enterEditMode(symptomId, e.clientX, e.clientY);
+          }
+        }, HOLD_DELAY);
       };
 
       const handleMove = (clientX, clientY) => {
+        if (pendingSymptomRef.current && !isDragging) {
+          const deltaX = Math.abs(clientX - startPosRef.current.x);
+          const deltaY = Math.abs(clientY - startPosRef.current.y);
+          
+          if (deltaX > 10 || deltaY > 10) {
+            if (holdTimerRef.current) {
+              clearTimeout(holdTimerRef.current);
+              holdTimerRef.current = null;
+            }
+            pendingSymptomRef.current = null;
+          }
+          return;
+        }
+        
         if (!isDragging || !activeSymptom) return;
         
         setFingerPosition({ x: clientX, y: clientY });
@@ -324,6 +319,12 @@
       };
 
       const handleEnd = () => {
+        if (holdTimerRef.current) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        pendingSymptomRef.current = null;
+        
         if (isDragging && activeSymptom) {
           const dateKey = getDateKey(selectedDate);
           const timeId = timePeriods[dragPosition.x].id;
@@ -550,21 +551,31 @@
           onTouchMove={handleTouchMove}
           onTouchEnd={handleEnd}
           style={{
-            minHeight: '100vh',
+            height: '100vh',
             background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
-            padding: '20px 16px',
             fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif",
             userSelect: 'none',
-            touchAction: 'none',
+            WebkitUserSelect: 'none',
+            WebkitTouchCallout: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
           }}
         >
-          {/* Date Navigation Header */}
+          {/* Fixed Header Area */}
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '16px',
+            flexShrink: 0,
+            padding: '20px 16px 16px',
+            background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
+            zIndex: 100,
           }}>
+            {/* Date Navigation Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px',
+            }}>
             <button
               onClick={() => changeDate(-1)}
               style={{
@@ -602,7 +613,18 @@
                 fontSize: '22px',
                 fontWeight: '700',
                 margin: 0,
-              }}>{formatDate(selectedDate)}</h1>
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'center',
+                gap: '8px',
+              }}>
+                {formatDate(selectedDate)}
+                <span style={{
+                  fontSize: '10px',
+                  color: '#64748b',
+                  fontWeight: '400',
+                }}>v0.9</span>
+              </h1>
               <p style={{
                 color: '#6366f1',
                 fontSize: '12px',
@@ -636,7 +658,6 @@
           <div style={{
             display: 'flex',
             gap: '8px',
-            marginBottom: '16px',
           }}>
             <button
               onClick={() => setShowHistory(true)}
@@ -684,13 +705,21 @@
               ⚙
             </button>
           </div>
+          </div>
 
-          {/* Symptom List */}
+          {/* Scrollable Symptom List Area */}
           <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: '0 16px 100px 16px',
+            WebkitOverflowScrolling: 'touch',
           }}>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            }}>
             {activeSymptoms.map((symptom) => {
               const symptomEntries = getSymptomEntries(symptom.id);
               const isActive = activeSymptom === symptom.id;
@@ -788,6 +817,7 @@
             >
               + Add Symptoms
             </button>
+            </div>
           </div>
 
           {/* 2D Drag Picker Overlay - Simplified Full Screen */}
@@ -795,20 +825,22 @@
             <div style={{
               position: 'fixed',
               inset: 0,
-              background: `rgba(0, 0, 0, 0.5)`,
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
+              background: '#0a1628',
               display: 'flex',
               flexDirection: 'column',
               zIndex: 1000,
+              touchAction: 'none',
             }}>
-              {/* Colored gradient overlay */}
+              {/* Severity color bar at very top */}
               <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: `linear-gradient(180deg, ${severityColors[dragPosition.y]}20 0%, transparent 50%)`,
-                pointerEvents: 'none',
-                transition: 'background 0.15s ease',
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '5px',
+                background: severityColors[dragPosition.y],
+                zIndex: 1002,
+                transition: 'background 0.1s ease',
               }} />
 
               {/* Screen zone indicators - 5 vertical sections */}
@@ -831,9 +863,53 @@
                 ))}
               </div>
 
-              {/* Top Section - Symptom Name */}
+              {/* Top zone - Time period icons across full width */}
               <div style={{
-                padding: '60px 24px 20px',
+                position: 'fixed',
+                top: 5,
+                left: 0,
+                right: 0,
+                display: 'flex',
+                background: 'linear-gradient(180deg, #0a1628 0%, #0c1929 100%)',
+              }}>
+                {timePeriods.map((period, idx) => (
+                  <div 
+                    key={period.id}
+                    style={{
+                      flex: 1,
+                      padding: '24px 8px 16px',
+                      textAlign: 'center',
+                      background: dragPosition.x === idx ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+                      borderRight: idx < 4 ? '1px solid rgba(99, 102, 241, 0.1)' : 'none',
+                      transition: 'background 0.1s ease',
+                    }}
+                  >
+                    <div style={{
+                      fontSize: '28px',
+                      marginBottom: '4px',
+                      opacity: dragPosition.x === idx ? 1 : 0.6,
+                      transition: 'opacity 0.1s',
+                      color: dragPosition.x === idx ? '#fff' : '#a5b4fc',
+                    }}>
+                      {period.icon}
+                    </div>
+                    <div style={{
+                      fontSize: '11px',
+                      color: dragPosition.x === idx ? '#fff' : '#94a3b8',
+                      fontWeight: dragPosition.x === idx ? '700' : '500',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      transition: 'all 0.1s',
+                    }}>
+                      {period.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Symptom Name - below time icons */}
+              <div style={{
+                paddingTop: '120px',
                 textAlign: 'center',
               }}>
                 <h1 style={{
@@ -841,40 +917,17 @@
                   fontSize: '28px',
                   fontWeight: '700',
                   margin: 0,
+                  padding: '0 24px',
                 }}>
                   {currentSymptomName}
                 </h1>
               </div>
 
-              {/* Time Period Display - Fixed below title */}
-              <div style={{
-                textAlign: 'center',
-                padding: '10px 24px 30px',
-              }}>
-                <div style={{
-                  fontSize: '48px',
-                  marginBottom: '4px',
-                  transition: 'all 0.1s ease',
-                  color: '#a5b4fc',
-                }}>
-                  {timePeriods[dragPosition.x].icon}
-                </div>
-                <div style={{
-                  color: '#a5b4fc',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: '2px',
-                }}>
-                  {timePeriods[dragPosition.x].label}
-                </div>
-              </div>
-
-              {/* Big Floating Number - Follows finger */}
+              {/* Big Floating Number - Follows finger, stays below header */}
               <div style={{
                 position: 'fixed',
                 left: `${Math.max(60, Math.min(window.innerWidth - 60, fingerPosition.x))}px`,
-                top: `${Math.max(200, Math.min(window.innerHeight - 300, fingerPosition.y - 80))}px`,
+                top: `${Math.max(230, Math.min(window.innerHeight - 150, fingerPosition.y - 130))}px`,
                 transform: 'translate(-50%, -50%)',
                 pointerEvents: 'none',
                 zIndex: 1001,
@@ -900,96 +953,6 @@
                 }}>
                   {severityLabels[dragPosition.y]}
                 </div>
-                <div style={{
-                  color: '#64748b',
-                  fontSize: '12px',
-                  marginTop: '16px',
-                  letterSpacing: '0.5px',
-                }}>
-                  Release to log
-                </div>
-              </div>
-
-              {/* Bottom zone - Time period icons across full width */}
-              <div style={{
-                position: 'fixed',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                display: 'flex',
-                background: 'rgba(15, 12, 35, 0.9)',
-                borderTop: '1px solid rgba(99, 102, 241, 0.2)',
-              }}>
-                {timePeriods.map((period, idx) => (
-                  <div 
-                    key={period.id}
-                    style={{
-                      flex: 1,
-                      padding: '16px 8px 24px',
-                      textAlign: 'center',
-                      background: dragPosition.x === idx ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                      borderRight: idx < 4 ? '1px solid rgba(99, 102, 241, 0.1)' : 'none',
-                      transition: 'background 0.1s ease',
-                    }}
-                  >
-                    <div style={{
-                      fontSize: '24px',
-                      marginBottom: '4px',
-                      opacity: dragPosition.x === idx ? 1 : 0.4,
-                      transition: 'opacity 0.1s',
-                      color: '#a5b4fc',
-                    }}>
-                      {period.icon}
-                    </div>
-                    <div style={{
-                      fontSize: '10px',
-                      color: dragPosition.x === idx ? '#e2e8f0' : '#64748b',
-                      fontWeight: dragPosition.x === idx ? '600' : '400',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      transition: 'all 0.1s',
-                    }}>
-                      {period.label}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Vertical severity scale on the side */}
-              <div style={{
-                position: 'fixed',
-                right: 16,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                display: 'flex',
-                flexDirection: 'column-reverse',
-                gap: '8px',
-                background: 'rgba(30, 27, 75, 0.8)',
-                padding: '12px 8px',
-                borderRadius: '12px',
-                border: '1px solid rgba(99, 102, 241, 0.2)',
-              }}>
-                {severityLevels.map((sev) => (
-                  <div 
-                    key={sev}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '14px',
-                      fontWeight: '700',
-                      background: dragPosition.y === sev ? severityColors[sev] : 'transparent',
-                      color: dragPosition.y === sev ? (sev >= 3 ? '#000' : '#fff') : '#64748b',
-                      border: dragPosition.y === sev ? 'none' : '1px solid rgba(99, 102, 241, 0.2)',
-                      transition: 'all 0.1s ease',
-                    }}
-                  >
-                    {sev}
-                  </div>
-                ))}
               </div>
             </div>
           )}
@@ -1608,25 +1571,27 @@
                 </h2>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <button
-                    onClick={loadSampleData}
-                    style={{
-                      background: 'rgba(74, 222, 128, 0.15)',
-                      border: '2px solid rgba(74, 222, 128, 0.3)',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      color: '#86efac',
-                      fontSize: '15px',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>Load Sample Data</div>
-                    <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                      Generate 3 months of example entries
-                    </div>
-                  </button>
+                  {!hasSampleData && (
+                    <button
+                      onClick={loadSampleData}
+                      style={{
+                        background: 'rgba(74, 222, 128, 0.15)',
+                        border: '2px solid rgba(74, 222, 128, 0.3)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        color: '#86efac',
+                        fontSize: '15px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>Load Sample Data</div>
+                      <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                        Generate 3 months of example entries
+                      </div>
+                    </button>
+                  )}
 
                   <button
                     onClick={clearAllData}
@@ -1698,13 +1663,22 @@
             input::placeholder, textarea::placeholder {
               color: #64748b;
             }
+            * {
+              -webkit-user-select: none;
+              -webkit-touch-callout: none;
+              -webkit-tap-highlight-color: transparent;
+              user-select: none;
+            }
+            input, textarea {
+              -webkit-user-select: text;
+              user-select: text;
+            }
           `}</style>
         </div>
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<SymptomTrackerMobile />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<SymptomTrackerMobile />);
   </script>
 </body>
 </html>
