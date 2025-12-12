@@ -257,11 +257,8 @@ const generateSampleData = (symptoms, mode = 'detailed') => {
 };
 
 function SymptomTrackerMobile() {
-  // App mode: 'symptoms' or 'stack'
-  const [appMode, setAppMode] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_APP_MODE);
-    return saved || 'symptoms';
-  });
+  // App mode: 'symptoms' or 'stack' - always start on symptoms
+  const [appMode, setAppMode] = useState('symptoms');
   
   const [symptoms, setSymptoms] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY_SYMPTOMS);
@@ -318,6 +315,8 @@ function SymptomTrackerMobile() {
   const [showHistory, setShowHistory] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [openedFromSettings, setOpenedFromSettings] = useState(false);
+  const [confirmClearData, setConfirmClearData] = useState(false);
   const [editingSymptomId, setEditingSymptomId] = useState(null);
   const [editingSymptomName, setEditingSymptomName] = useState('');
   const [bulkSymptomInput, setBulkSymptomInput] = useState('');
@@ -336,6 +335,23 @@ function SymptomTrackerMobile() {
   useEffect(() => {
     isDraggingRef.current = isDragging;
   }, [isDragging]);
+
+  // Auto-clear lastAction after 3 seconds
+  useEffect(() => {
+    if (lastAction) {
+      const timer = setTimeout(() => {
+        setLastAction('');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastAction]);
+
+  // Reset confirmClearData when leaving Settings
+  useEffect(() => {
+    if (!showSettings) {
+      setConfirmClearData(false);
+    }
+  }, [showSettings]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_SYMPTOMS, JSON.stringify(symptoms));
@@ -616,12 +632,90 @@ function SymptomTrackerMobile() {
   };
 
   const clearAllData = () => {
+    if (!confirmClearData) {
+      setConfirmClearData(true);
+      return;
+    }
     setEntries({});
     setStackEntries({});
     setHasSampleData(false);
+    setConfirmClearData(false);
     setShowSettings(false);
     setLastAction('All data cleared');
   };
+
+  // Helper to close History and return to Settings if opened from there
+  const closeHistory = () => {
+    setShowHistory(false);
+    if (openedFromSettings) {
+      setOpenedFromSettings(false);
+      setShowSettings(true);
+    }
+  };
+
+  // Helper to close Export and return to Settings if opened from there
+  const closeExport = () => {
+    setShowExport(false);
+    if (openedFromSettings) {
+      setOpenedFromSettings(false);
+      setShowSettings(true);
+    }
+  };
+
+  // Backup all data to a JSON file (save to iCloud via Files app)
+  const backupToFile = () => {
+    const backup = {
+      version: '1.6',
+      exportedAt: new Date().toISOString(),
+      symptoms,
+      entries,
+      stackItems,
+      stackEntries,
+      trackingMode,
+    };
+    
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `symptom-tracker-backup-${getDateKey(new Date())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setLastAction('Backup downloaded - save to iCloud Drive');
+  };
+
+  // Restore data from a JSON backup file
+  const restoreFromFile = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const backup = JSON.parse(e.target.result);
+        
+        if (backup.symptoms) setSymptoms(backup.symptoms);
+        if (backup.entries) setEntries(backup.entries);
+        if (backup.stackItems) setStackItems(backup.stackItems);
+        if (backup.stackEntries) setStackEntries(backup.stackEntries);
+        if (backup.trackingMode) setTrackingMode(backup.trackingMode);
+        
+        setLastAction(`Restored backup from ${backup.exportedAt ? new Date(backup.exportedAt).toLocaleDateString() : 'file'}`);
+        setShowSettings(false);
+      } catch (err) {
+        setLastAction('Error: Invalid backup file');
+      }
+    };
+    reader.readAsText(file);
+    // Reset the input so the same file can be selected again
+    event.target.value = '';
+  };
+
+  // Hidden file input ref for restore
+  const fileInputRef = useRef(null);
 
   // Generate sample stack entries for past 180 days
   const generateSampleStackData = (items) => {
@@ -1251,7 +1345,7 @@ function SymptomTrackerMobile() {
   };
 
   const generateAIPrompt = (insights, topCluster, daysOfData, windowDays) => {
-    let prompt = `Analyze my ${daysOfData}-day symptom tracking data. Be cautious and avoid prescriptive medical advice.\n\n`;
+    let prompt = `Analyze my symptom tracking data. Be cautious and avoid prescriptive medical advice.\n\n`;
     
     if (insights.length > 0) {
       prompt += `Significant changes (last ${windowDays} days vs prior ${windowDays} days):\n`;
@@ -1265,9 +1359,100 @@ function SymptomTrackerMobile() {
       prompt += `• "${topCluster.names[0]}" often appears with "${topCluster.names[1]}"\n`;
     }
     
-    prompt += `\nPlease identify potential patterns and what might be worth discussing with a healthcare provider.`;
+    // Add last 60 days of raw data
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+    
+    const recentEntries = Object.values(entries)
+      .filter(e => new Date(e.date) >= sixtyDaysAgo)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    
+    if (recentEntries.length > 0) {
+      prompt += `\n\n--- RAW DATA (Last 60 days) ---\n`;
+      prompt += `Date,Symptom,Time,Severity\n`;
+      recentEntries.forEach(e => {
+        const symptomName = symptoms.find(s => s.id === e.symptomId)?.name || e.symptomId;
+        const timePeriod = timePeriods.find(t => t.id === e.time)?.label || e.time;
+        prompt += `${e.date},${symptomName},${timePeriod},${e.severity}\n`;
+      });
+    }
+    
+    // Add stack data for last 60 days
+    const recentStackEntries = Object.values(stackEntries)
+      .filter(e => {
+        const entryDate = new Date(e.date);
+        return entryDate >= sixtyDaysAgo;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+    
+    if (recentStackEntries.length > 0) {
+      prompt += `\n--- SUPPLEMENT DATA (Last 60 days) ---\n`;
+      prompt += `Date,Supplement,Dose,Taken\n`;
+      recentStackEntries.forEach(e => {
+        const item = stackItems.find(i => i.id === e.itemId);
+        if (item) {
+          prompt += `${e.date},${item.name},${e.dose}${item.unit},${e.taken ? 'yes' : 'no'}\n`;
+        }
+      });
+    }
+    
+    prompt += `\n--- END DATA ---\n\nPlease identify potential patterns, correlations between symptoms and supplements, and what might be worth discussing with a healthcare provider.`;
     
     return prompt;
+  };
+
+  // Generate AI-ready data export for a specific number of days
+  const generateAIDataExport = (days) => {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    let prompt = `Analyze my health tracking data from the last ${days} days. Be cautious and avoid prescriptive medical advice.\n\n`;
+    
+    // Symptom data
+    const recentEntries = Object.values(entries)
+      .filter(e => new Date(e.date) >= cutoffDate)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    
+    if (recentEntries.length > 0) {
+      prompt += `--- SYMPTOM DATA (Last ${days} days) ---\n`;
+      prompt += `Date,Symptom,Time,Severity (0-5)\n`;
+      recentEntries.forEach(e => {
+        const symptomName = symptoms.find(s => s.id === e.symptomId)?.name || e.symptomId;
+        const timePeriod = timePeriods.find(t => t.id === e.time)?.label || e.time;
+        prompt += `${e.date},${symptomName},${timePeriod},${e.severity}\n`;
+      });
+    } else {
+      prompt += `No symptom data in the last ${days} days.\n`;
+    }
+    
+    // Supplement data
+    const recentStackEntries = Object.values(stackEntries)
+      .filter(e => new Date(e.date) >= cutoffDate)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    
+    if (recentStackEntries.length > 0) {
+      prompt += `\n--- SUPPLEMENT DATA (Last ${days} days) ---\n`;
+      prompt += `Date,Supplement,Dose,Taken\n`;
+      recentStackEntries.forEach(e => {
+        const item = stackItems.find(i => i.id === e.itemId);
+        if (item) {
+          prompt += `${e.date},${item.name},${e.dose}${item.unit},${e.taken ? 'yes' : 'no'}\n`;
+        }
+      });
+    } else {
+      prompt += `\nNo supplement data in the last ${days} days.\n`;
+    }
+    
+    prompt += `\n--- END DATA ---\n\nPlease identify potential patterns, correlations between symptoms and supplements, and what might be worth discussing with a healthcare provider.`;
+    
+    return prompt;
+  };
+
+  const copyAIData = (days) => {
+    const data = generateAIDataExport(days);
+    navigator.clipboard.writeText(data);
+    closeExport();
+    setLastAction(`Copied ${days} days for AI analysis`);
   };
 
   const exportCSV = (days) => {
@@ -1298,9 +1483,11 @@ function SymptomTrackerMobile() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `symptoms-${days}days-${getDateKey(new Date())}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setShowExport(false);
+    closeExport();
     setLastAction(`Exported ${rows.length - 1} entries`);
   };
 
@@ -1363,59 +1550,6 @@ function SymptomTrackerMobile() {
         background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
         zIndex: 100,
       }}>
-      {/* Action Bar */}
-      <div style={{
-        display: 'flex',
-        gap: '6px',
-        marginBottom: '20px',
-      }}>
-        <button
-          onClick={() => setShowHistory(true)}
-          style={{
-            flex: 1,
-            background: 'rgba(99, 102, 241, 0.1)',
-            border: '1px solid rgba(99, 102, 241, 0.2)',
-            borderRadius: '8px',
-            padding: '8px 6px',
-            color: '#a5b4fc',
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          History
-        </button>
-        <button
-          onClick={() => setShowExport(true)}
-          style={{
-            flex: 1,
-            background: 'rgba(99, 102, 241, 0.1)',
-            border: '1px solid rgba(99, 102, 241, 0.2)',
-            borderRadius: '8px',
-            padding: '8px 6px',
-            color: '#a5b4fc',
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
-        >
-          Export
-        </button>
-        <button
-          onClick={() => setShowSettings(true)}
-          style={{
-            width: '36px',
-            background: 'rgba(99, 102, 241, 0.1)',
-            border: '1px solid rgba(99, 102, 241, 0.2)',
-            borderRadius: '8px',
-            padding: '8px',
-            color: '#a5b4fc',
-            fontSize: '14px',
-            cursor: 'pointer',
-          }}
-        >
-          ⚙
-        </button>
-      </div>
-
         {/* Date Navigation Header */}
         <div style={{
           display: 'flex',
@@ -1469,7 +1603,7 @@ function SymptomTrackerMobile() {
               fontSize: '9px',
               color: '#64748b',
               fontWeight: '400',
-            }}>v1.4</span>
+            }}>v1.5</span>
           </h1>
         </button>
 
@@ -1835,10 +1969,10 @@ function SymptomTrackerMobile() {
         zIndex: 200,
       }}>
         <button
-          onClick={() => { setAppMode('symptoms'); setShowInsights(false); }}
+          onClick={() => { setAppMode('symptoms'); setShowInsights(false); setShowSettings(false); }}
           style={{
             flex: 1,
-            background: appMode === 'symptoms' && !showInsights ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+            background: appMode === 'symptoms' && !showInsights && !showSettings ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
             border: 'none',
             borderRadius: '12px',
             padding: '12px 8px',
@@ -1849,20 +1983,20 @@ function SymptomTrackerMobile() {
             gap: '4px',
           }}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={appMode === 'symptoms' && !showInsights ? '#a5b4fc' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={appMode === 'symptoms' && !showInsights && !showSettings ? '#a5b4fc' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
           </svg>
           <span style={{
-            color: appMode === 'symptoms' && !showInsights ? '#a5b4fc' : '#64748b',
+            color: appMode === 'symptoms' && !showInsights && !showSettings ? '#a5b4fc' : '#64748b',
             fontSize: '11px',
-            fontWeight: appMode === 'symptoms' && !showInsights ? '600' : '400',
+            fontWeight: appMode === 'symptoms' && !showInsights && !showSettings ? '600' : '400',
           }}>Symptoms</span>
         </button>
         <button
-          onClick={() => { setAppMode('stack'); setShowInsights(false); }}
+          onClick={() => { setAppMode('stack'); setShowInsights(false); setShowSettings(false); }}
           style={{
             flex: 1,
-            background: appMode === 'stack' && !showInsights ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+            background: appMode === 'stack' && !showInsights && !showSettings ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
             border: 'none',
             borderRadius: '12px',
             padding: '12px 8px',
@@ -1873,18 +2007,18 @@ function SymptomTrackerMobile() {
             gap: '4px',
           }}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={appMode === 'stack' && !showInsights ? '#a5b4fc' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={appMode === 'stack' && !showInsights && !showSettings ? '#a5b4fc' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M10.5 20.5L3.5 13.5a4.95 4.95 0 1 1 7-7l7 7a4.95 4.95 0 1 1-7 7z"/>
             <line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/>
           </svg>
           <span style={{
-            color: appMode === 'stack' && !showInsights ? '#a5b4fc' : '#64748b',
+            color: appMode === 'stack' && !showInsights && !showSettings ? '#a5b4fc' : '#64748b',
             fontSize: '11px',
-            fontWeight: appMode === 'stack' && !showInsights ? '600' : '400',
+            fontWeight: appMode === 'stack' && !showInsights && !showSettings ? '600' : '400',
           }}>Stack</span>
         </button>
         <button
-          onClick={() => setShowInsights(true)}
+          onClick={() => { setShowInsights(true); setShowSettings(false); }}
           style={{
             flex: 1,
             background: showInsights ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
@@ -1908,6 +2042,31 @@ function SymptomTrackerMobile() {
             fontSize: '11px',
             fontWeight: showInsights ? '600' : '400',
           }}>Insights</span>
+        </button>
+        <button
+          onClick={() => { setShowSettings(true); setShowInsights(false); }}
+          style={{
+            flex: 1,
+            background: showSettings ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '12px 8px',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={showSettings ? '#a5b4fc' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span style={{
+            color: showSettings ? '#a5b4fc' : '#64748b',
+            fontSize: '11px',
+            fontWeight: showSettings ? '600' : '400',
+          }}>Settings</span>
         </button>
       </div>
 
@@ -2017,36 +2176,48 @@ function SymptomTrackerMobile() {
           </div>
 
           {/* Big Floating Number - Follows finger, stays below header */}
-          <div style={{
-            position: 'fixed',
-            left: `${Math.max(60, Math.min(window.innerWidth - 60, fingerPosition.x))}px`,
-            top: `${Math.max(230, Math.min(window.innerHeight - 150, fingerPosition.y - 130))}px`,
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'none',
-            zIndex: 1001,
-            textAlign: 'center',
-          }}>
-            <div style={{
-              fontSize: '120px',
-              fontWeight: '800',
-              color: severityColors[dragPosition.y],
-              textShadow: `0 0 30px ${severityColors[dragPosition.y]}80`,
-              lineHeight: 1,
-              transition: 'color 0.1s ease, text-shadow 0.1s ease',
-            }}>
-              {dragPosition.y}
-            </div>
-            <div style={{
-              color: '#94a3b8',
-              fontSize: '14px',
-              fontWeight: '500',
-              marginTop: '8px',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-            }}>
-              {severityLabels[dragPosition.y]}
-            </div>
-          </div>
+          {(() => {
+            // Calculate horizontal offset for AM/PM mode to avoid finger
+            let xOffset = 0;
+            if (timePeriods.length === 2) {
+              // AM/PM mode: offset away from finger
+              xOffset = dragPosition.x === 0 ? 80 : -80; // AM=right offset, PM=left offset
+            }
+            const baseX = Math.max(60, Math.min(window.innerWidth - 60, fingerPosition.x + xOffset));
+            
+            return (
+              <div style={{
+                position: 'fixed',
+                left: `${baseX}px`,
+                top: `${Math.max(230, Math.min(window.innerHeight - 150, fingerPosition.y - 130))}px`,
+                transform: 'translate(-50%, -50%)',
+                pointerEvents: 'none',
+                zIndex: 1001,
+                textAlign: 'center',
+              }}>
+                <div style={{
+                  fontSize: '120px',
+                  fontWeight: '800',
+                  color: severityColors[dragPosition.y],
+                  textShadow: `0 0 30px ${severityColors[dragPosition.y]}80`,
+                  lineHeight: 1,
+                  transition: 'color 0.1s ease, text-shadow 0.1s ease',
+                }}>
+                  {dragPosition.y}
+                </div>
+                <div style={{
+                  color: '#94a3b8',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  marginTop: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                }}>
+                  {severityLabels[dragPosition.y]}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -2580,7 +2751,7 @@ function SymptomTrackerMobile() {
       {/* History Modal with Sortable Table */}
       {showHistory && (
         <div 
-          onClick={() => setShowHistory(false)}
+          onClick={closeHistory}
           style={{
             position: 'fixed',
             inset: 0,
@@ -2615,7 +2786,7 @@ function SymptomTrackerMobile() {
                 </p>
               </div>
               <button
-                onClick={() => setShowHistory(false)}
+                onClick={closeHistory}
                 style={{
                   background: 'rgba(99, 102, 241, 0.2)',
                   border: 'none',
@@ -2721,7 +2892,7 @@ function SymptomTrackerMobile() {
       {/* Export Modal */}
       {showExport && (
         <div 
-          onClick={() => setShowExport(false)}
+          onClick={closeExport}
           style={{
             position: 'fixed',
             inset: 0,
@@ -2750,46 +2921,100 @@ function SymptomTrackerMobile() {
               color: '#f8fafc',
               fontSize: '20px',
               fontWeight: '700',
-              margin: '0 0 20px 0',
+              margin: '0 0 16px 0',
               textAlign: 'center',
             }}>
-              Export to CSV
+              Export
             </h2>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {[
-                { label: 'Last 7 days', days: 7 },
-                { label: 'Last 30 days', days: 30 },
-                { label: 'Last 3 months', days: 90 },
-                { label: 'Last 6 months', days: 180 },
-                { label: 'Last 12 months', days: 365 },
-                { label: 'Last 2 years', days: 730 },
-                { label: 'Last 3 years', days: 1095 },
-                { label: 'Last 4 years', days: 1460 },
-                { label: 'All time', days: 99999 },
-              ].map(({ label, days }) => (
-                <button
-                  key={days}
-                  onClick={() => exportCSV(days)}
-                  style={{
-                    background: 'rgba(99, 102, 241, 0.15)',
-                    border: '1px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '10px',
-                    padding: '12px 16px',
-                    color: '#e2e8f0',
-                    fontSize: '15px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
+            {/* Copy for AI Section */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                color: '#94a3b8',
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                display: 'block',
+                marginBottom: '10px',
+              }}>Copy for AI Analysis</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {[
+                  { label: '7 days', days: 7 },
+                  { label: '14 days', days: 14 },
+                  { label: '30 days', days: 30 },
+                  { label: '60 days', days: 60 },
+                ].map(({ label, days }) => (
+                  <button
+                    key={days}
+                    onClick={() => copyAIData(days)}
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%)',
+                      border: '1px solid rgba(139, 92, 246, 0.4)',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      color: '#c4b5fd',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                    }}
+                  >
+                    🤖 {label}
+                  </button>
+                ))}
+              </div>
+              <p style={{ 
+                color: '#64748b', 
+                fontSize: '11px', 
+                margin: '8px 0 0 0',
+                textAlign: 'center',
+              }}>
+                Copies symptoms + supplements data
+              </p>
+            </div>
+            
+            {/* CSV Export Section */}
+            <div>
+              <label style={{
+                color: '#94a3b8',
+                fontSize: '11px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                display: 'block',
+                marginBottom: '10px',
+              }}>Download CSV</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {[
+                  { label: 'Last 7 days', days: 7 },
+                  { label: 'Last 30 days', days: 30 },
+                  { label: 'Last 3 months', days: 90 },
+                  { label: 'Last 6 months', days: 180 },
+                  { label: 'Last 12 months', days: 365 },
+                  { label: 'All time', days: 99999 },
+                ].map(({ label, days }) => (
+                  <button
+                    key={days}
+                    onClick={() => exportCSV(days)}
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.15)',
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      color: '#e2e8f0',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button
-              onClick={() => setShowExport(false)}
+              onClick={closeExport}
               style={{
                 width: '100%',
                 marginTop: '16px',
@@ -3040,19 +3265,51 @@ function SymptomTrackerMobile() {
               }}>
                 Settings
               </h2>
+            </div>
+            
+            {/* History & Export Row */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
               <button
-                onClick={() => setShowSettings(false)}
+                onClick={() => {
+                  setShowSettings(false);
+                  setOpenedFromSettings(true);
+                  setShowHistory(true);
+                }}
                 style={{
+                  flex: 1,
                   background: 'rgba(99, 102, 241, 0.15)',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '8px',
-                  padding: '8px 16px',
+                  border: '2px solid rgba(99, 102, 241, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
                   color: '#a5b4fc',
-                  fontSize: '14px',
+                  fontSize: '15px',
+                  fontWeight: '600',
                   cursor: 'pointer',
+                  textAlign: 'center',
                 }}
               >
-                Done
+                📋 History
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  setOpenedFromSettings(true);
+                  setShowExport(true);
+                }}
+                style={{
+                  flex: 1,
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  border: '2px solid rgba(99, 102, 241, 0.3)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  color: '#a5b4fc',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                }}
+              >
+                📤 Export
               </button>
             </div>
             
@@ -3145,6 +3402,76 @@ function SymptomTrackerMobile() {
                     {trackingMode === key && <span style={{ fontSize: '16px' }}>✓</span>}
                   </button>
                 ))}
+              </div>
+            </div>
+            
+            {/* iCloud / File Backup */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{
+                color: '#94a3b8',
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                display: 'block',
+                marginBottom: '12px',
+              }}>iCloud Backup</label>
+              
+              <div style={{
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '12px',
+                padding: '14px',
+              }}>
+                <p style={{ 
+                  color: '#94a3b8', 
+                  fontSize: '12px', 
+                  margin: '0 0 12px 0',
+                  lineHeight: '1.4',
+                }}>
+                  Save backup to Files → iCloud Drive to sync between devices
+                </p>
+                
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={backupToFile}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(74, 222, 128, 0.15)',
+                      border: '1px solid rgba(74, 222, 128, 0.3)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      color: '#86efac',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ↓ Save Backup
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(99, 102, 241, 0.15)',
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      color: '#a5b4fc',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ↑ Load Backup
+                  </button>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={restoreFromFile}
+                  style={{ display: 'none' }}
+                />
               </div>
             </div>
             
@@ -3310,25 +3637,72 @@ function SymptomTrackerMobile() {
                 </button>
               )}
 
-              <button
-                onClick={clearAllData}
-                style={{
-                  background: 'rgba(239, 68, 68, 0.15)',
-                  border: '2px solid rgba(239, 68, 68, 0.3)',
+              {!confirmClearData ? (
+                <button
+                  onClick={clearAllData}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '2px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    color: '#fca5a5',
+                    fontSize: '15px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>Clear All Data</div>
+                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                    Remove all recorded entries
+                  </div>
+                </button>
+              ) : (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '2px solid rgba(239, 68, 68, 0.5)',
                   borderRadius: '12px',
                   padding: '16px',
-                  color: '#fca5a5',
-                  fontSize: '15px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>Clear All Data</div>
-                <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                  Remove all recorded entries
+                }}>
+                  <div style={{ color: '#fca5a5', fontWeight: '600', marginBottom: '12px', textAlign: 'center' }}>
+                    ⚠️ Are you sure? This cannot be undone.
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={() => setConfirmClearData(false)}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(99, 102, 241, 0.2)',
+                        border: '1px solid rgba(99, 102, 241, 0.4)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        color: '#a5b4fc',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={clearAllData}
+                      style={{
+                        flex: 1,
+                        background: 'rgba(239, 68, 68, 0.3)',
+                        border: '1px solid rgba(239, 68, 68, 0.5)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        color: '#fca5a5',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Yes, Clear All
+                    </button>
+                  </div>
                 </div>
-              </button>
+              )}
             </div>
           </div>
         </div>
@@ -3525,16 +3899,18 @@ function SymptomTrackerMobile() {
           fontSize: '13px',
           fontWeight: '500',
           boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
-          animation: 'slideUp 0.3s ease',
+          animation: 'slideUpFade 3s ease forwards',
         }}>
           ✓ {lastAction}
         </div>
       )}
 
       <style>{`
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-          to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        @keyframes slideUpFade {
+          0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+          10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
         }
         input::placeholder, textarea::placeholder {
           color: #64748b;
