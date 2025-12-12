@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0c0a1d">
+  <title>Symptom Tracker</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body, #root {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background: #0c0a1d;
+    }
+    body {
+      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    const defaultSymptoms = [
+      { id: 'red-neck-chest', name: 'Red neck/chest, blotchy skin tone', active: true },
+      { id: 'penile-retraction', name: 'Penile retraction', active: true },
+      { id: 'pee-dribble', name: 'Pee dribble', active: true },
+      { id: 'urinary-urgency', name: 'Urinary urgency', active: true },
+      { id: 'daytime-fatigue', name: 'Daytime fatigue', active: true },
+      { id: 'irritability', name: 'Irritability', active: true },
+      { id: 'social-withdrawal', name: 'Social withdrawal', active: true },
+      { id: 'air-hunger-am', name: 'Air hunger AM', active: true },
+      { id: 'anxiety-mental', name: 'Anxiety (mental: racing thoughts etc.)', active: true },
+      { id: 'anxiety-physical', name: 'Anxiety (physical: chest pressure etc.)', active: true },
+      { id: 'low-sexual-drive', name: 'Low sexual drive', active: true },
+      { id: 'nerve-pain', name: 'Nerve pain / neuropathy', active: true },
+      { id: 'headache', name: 'Headache', active: true },
+      { id: 'dysphagia', name: 'Dysphagia', active: true },
+      { id: 'fascial-tightness', name: 'Fascial and tendon tightness', active: true },
+      { id: 'psoriasis', name: 'Psoriasis', active: true },
+      { id: 'diarrhea', name: 'Diarrhea / Loose stool', active: true },
+      { id: 'brain-fog', name: 'Brain fog', active: true },
+      { id: 'sugar-alcohol-cravings', name: 'Sugar / alcohol cravings', active: true },
+      { id: 'heartburn', name: 'Heartburn / bile reflux', active: true },
+      { id: 'oral-thrush', name: 'Oral thrush', active: true },
+      { id: 'farting-burping', name: 'Farting, burping', active: true },
+      { id: 'air-hunger-pm', name: 'Air hunger PM', active: true },
+    ];
+
+    const timePeriods = [
+      { id: 'night', label: 'Night', icon: '☽' },
+      { id: 'morning', label: 'Morning', icon: '◐' },
+      { id: 'allday', label: 'All Day', icon: '○' },
+      { id: 'midday', label: 'Midday', icon: '●' },
+      { id: 'evening', label: 'Evening', icon: '◑' },
+    ];
+
+    const severityLevels = [0, 1, 2, 3, 4, 5];
+    const severityColors = {
+      0: '#64748b',
+      1: '#4ade80',
+      2: '#a3e635',
+      3: '#facc15',
+      4: '#fb923c',
+      5: '#ef4444',
+    };
+    const severityLabels = ['None', 'Minimal', 'Mild', 'Moderate', 'Severe', 'Extreme'];
+
+    const generateSampleData = (symptoms) => {
+      const entries = {};
+      const today = new Date();
+      
+      for (let daysAgo = 0; daysAgo < 90; daysAgo++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - daysAgo);
+        const dateKey = date.toISOString().split('T')[0];
+        
+        if (Math.random() < 0.8) {
+          const numSymptoms = Math.floor(Math.random() * 3) + 2;
+          const shuffledSymptoms = [...symptoms].sort(() => Math.random() - 0.5).slice(0, numSymptoms);
+          
+          shuffledSymptoms.forEach(symptom => {
+            const numPeriods = Math.random() < 0.7 ? 1 : 2;
+            const shuffledPeriods = [...timePeriods].sort(() => Math.random() - 0.5).slice(0, numPeriods);
+            
+            shuffledPeriods.forEach(period => {
+              let baseSeverity = Math.floor(Math.random() * 5) + 1;
+              if (symptom.id === 'daytime-fatigue') baseSeverity = Math.min(5, baseSeverity + 1);
+              if (symptom.id === 'headache' && period.id === 'morning') baseSeverity = Math.min(5, baseSeverity + 1);
+              
+              const key = `${dateKey}-${symptom.id}-${period.id}`;
+              entries[key] = {
+                time: period.id,
+                severity: Math.min(5, Math.max(0, baseSeverity)),
+                date: dateKey,
+                symptomId: symptom.id
+              };
+            });
+          });
+        }
+      }
+      
+      return entries;
+    };
+
+    // LocalStorage helpers
+    const STORAGE_KEYS = {
+      SYMPTOMS: 'symptomTracker_symptoms',
+      ENTRIES: 'symptomTracker_entries',
+    };
+
+    const loadFromStorage = (key, defaultValue) => {
+      try {
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : defaultValue;
+      } catch (e) {
+        console.error('Error loading from storage:', e);
+        return defaultValue;
+      }
+    };
+
+    const saveToStorage = (key, value) => {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch (e) {
+        console.error('Error saving to storage:', e);
+      }
+    };
+
+    function SymptomTrackerMobile() {
+      const [symptoms, setSymptoms] = useState(() => 
+        loadFromStorage(STORAGE_KEYS.SYMPTOMS, defaultSymptoms)
+      );
+      const [selectedDate, setSelectedDate] = useState(new Date());
+      const [entries, setEntries] = useState(() => 
+        loadFromStorage(STORAGE_KEYS.ENTRIES, {})
+      );
+      
+      const [activeSymptom, setActiveSymptom] = useState(null);
+      const [dragPosition, setDragPosition] = useState({ x: 2, y: 2 });
+      const [isDragging, setIsDragging] = useState(false);
+      const [fingerPosition, setFingerPosition] = useState({ x: 0, y: 0 });
+      const [lastAction, setLastAction] = useState('');
+      const [showAddSymptom, setShowAddSymptom] = useState(false);
+      const [showCalendar, setShowCalendar] = useState(false);
+      const [showHistory, setShowHistory] = useState(false);
+      const [showExport, setShowExport] = useState(false);
+      const [showSettings, setShowSettings] = useState(false);
+      const [bulkSymptomInput, setBulkSymptomInput] = useState('');
+      const [calendarMonth, setCalendarMonth] = useState(new Date());
+      const [historySort, setHistorySort] = useState({ column: 'date', direction: 'desc' });
+      const containerRef = useRef(null);
+      const startPosRef = useRef({ x: 0, y: 0 });
+
+      const DRAG_SENSITIVITY = 12;
+
+      // Save to localStorage when data changes
+      useEffect(() => {
+        saveToStorage(STORAGE_KEYS.SYMPTOMS, symptoms);
+      }, [symptoms]);
+
+      useEffect(() => {
+        saveToStorage(STORAGE_KEYS.ENTRIES, entries);
+      }, [entries]);
+
+      const getDateKey = (date) => date.toISOString().split('T')[0];
+
+      const formatDate = (date) => {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        if (date.toDateString() === today.toDateString()) return 'Today';
+        if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+        if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
+        
+        return date.toLocaleDateString('en-US', { 
+          weekday: 'short', 
+          month: 'short', 
+          day: 'numeric' 
+        });
+      };
+
+      const formatTableDate = (dateStr) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          year: '2-digit'
+        });
+      };
+
+      const loadSampleData = () => {
+        const sampleEntries = generateSampleData(symptoms);
+        setEntries(sampleEntries);
+        setShowSettings(false);
+        setLastAction(`Loaded ${Object.keys(sampleEntries).length} sample entries`);
+      };
+
+      const clearAllData = () => {
+        setEntries({});
+        setShowSettings(false);
+        setLastAction('All data cleared');
+      };
+
+      const changeDate = (days) => {
+        const newDate = new Date(selectedDate);
+        newDate.setDate(newDate.getDate() + days);
+        setSelectedDate(newDate);
+        setLastAction('');
+      };
+
+      const selectDate = (date) => {
+        setSelectedDate(date);
+        setShowCalendar(false);
+        setLastAction('');
+      };
+
+      const handleTouchStart = (e, symptomId) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const startY = touch.clientY;
+        startPosRef.current = { x: touch.clientX, y: startY };
+        setFingerPosition({ x: touch.clientX, y: startY });
+        setActiveSymptom(symptomId);
+        
+        const screenHeight = window.innerHeight;
+        const relativeY = startY / screenHeight;
+        let initialSeverity;
+        if (relativeY < 0.25) {
+          initialSeverity = 5;
+        } else if (relativeY > 0.75) {
+          initialSeverity = 0;
+        } else {
+          initialSeverity = 2;
+        }
+        
+        const screenWidth = window.innerWidth;
+        const timeIndex = Math.floor((touch.clientX / screenWidth) * 5);
+        const clampedTimeIndex = Math.max(0, Math.min(4, timeIndex));
+        
+        setDragPosition({ x: clampedTimeIndex, y: initialSeverity });
+        setIsDragging(true);
+      };
+
+      const handleMouseDown = (e, symptomId) => {
+        e.preventDefault();
+        const startY = e.clientY;
+        startPosRef.current = { x: e.clientX, y: startY };
+        setFingerPosition({ x: e.clientX, y: startY });
+        setActiveSymptom(symptomId);
+        
+        const screenHeight = window.innerHeight;
+        const relativeY = startY / screenHeight;
+        let initialSeverity;
+        if (relativeY < 0.25) {
+          initialSeverity = 5;
+        } else if (relativeY > 0.75) {
+          initialSeverity = 0;
+        } else {
+          initialSeverity = 2;
+        }
+        
+        const screenWidth = window.innerWidth;
+        const timeIndex = Math.floor((e.clientX / screenWidth) * 5);
+        const clampedTimeIndex = Math.max(0, Math.min(4, timeIndex));
+        
+        setDragPosition({ x: clampedTimeIndex, y: initialSeverity });
+        setIsDragging(true);
+      };
+
+      const handleMove = (clientX, clientY) => {
+        if (!isDragging || !activeSymptom) return;
+        
+        setFingerPosition({ x: clientX, y: clientY });
+        
+        const screenWidth = window.innerWidth;
+        let timeIndex = Math.floor((clientX / screenWidth) * 5);
+        timeIndex = Math.max(0, Math.min(4, timeIndex));
+        
+        const deltaY = startPosRef.current.y - clientY;
+        let severityDelta = Math.round(deltaY / DRAG_SENSITIVITY);
+        
+        const screenHeight = window.innerHeight;
+        const relativeStartY = startPosRef.current.y / screenHeight;
+        let baseSeverity;
+        if (relativeStartY < 0.25) {
+          baseSeverity = 5;
+        } else if (relativeStartY > 0.75) {
+          baseSeverity = 0;
+        } else {
+          baseSeverity = 2;
+        }
+        
+        let severityIndex = baseSeverity + severityDelta;
+        severityIndex = Math.max(0, Math.min(5, severityIndex));
+        
+        setDragPosition({ x: timeIndex, y: severityIndex });
+      };
+
+      const handleTouchMove = (e) => {
+        const touch = e.touches[0];
+        handleMove(touch.clientX, touch.clientY);
+      };
+
+      const handleMouseMove = (e) => {
+        handleMove(e.clientX, e.clientY);
+      };
+
+      const handleEnd = () => {
+        if (isDragging && activeSymptom) {
+          const dateKey = getDateKey(selectedDate);
+          const timeId = timePeriods[dragPosition.x].id;
+          const severity = dragPosition.y;
+          const key = `${dateKey}-${activeSymptom}-${timeId}`;
+          
+          setEntries({
+            ...entries,
+            [key]: { time: timeId, severity, date: dateKey, symptomId: activeSymptom }
+          });
+          
+          const symptom = symptoms.find(s => s.id === activeSymptom);
+          setLastAction(`${symptom?.name}: ${timePeriods[dragPosition.x].label}, ${severity}`);
+        }
+        setIsDragging(false);
+        setActiveSymptom(null);
+      };
+
+      const getSymptomEntries = (symptomId) => {
+        const dateKey = getDateKey(selectedDate);
+        return Object.entries(entries)
+          .filter(([key]) => key.startsWith(`${dateKey}-${symptomId}`))
+          .map(([key, value]) => value);
+      };
+
+      const getDaysWithEntries = () => {
+        const days = new Set();
+        Object.keys(entries).forEach(key => {
+          const dateKey = key.split('-').slice(0, 3).join('-');
+          days.add(dateKey);
+        });
+        return days;
+      };
+
+      const parseBulkSymptoms = (input) => {
+        return input
+          .split(/[,\t\n\r;]+/)
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+      };
+
+      const addBulkSymptoms = () => {
+        const names = parseBulkSymptoms(bulkSymptomInput);
+        if (names.length === 0) return;
+
+        const newSymptoms = [...symptoms];
+        let addedCount = 0;
+
+        names.forEach(name => {
+          const existing = newSymptoms.find(s => s.name.toLowerCase() === name.toLowerCase());
+          if (existing) {
+            if (!existing.active) {
+              existing.active = true;
+              addedCount++;
+            }
+          } else {
+            const id = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now() + Math.random();
+            newSymptoms.push({ id, name, active: true });
+            addedCount++;
+          }
+        });
+
+        setSymptoms(newSymptoms);
+        setBulkSymptomInput('');
+        setLastAction(`Added ${addedCount} symptom${addedCount !== 1 ? 's' : ''}`);
+      };
+
+      const removeSymptom = (symptomId) => {
+        setSymptoms(symptoms.map(s => 
+          s.id === symptomId ? { ...s, active: false } : s
+        ));
+        setLastAction('Symptom hidden (history preserved)');
+      };
+
+      const reactivateSymptom = (symptomId) => {
+        setSymptoms(symptoms.map(s => 
+          s.id === symptomId ? { ...s, active: true } : s
+        ));
+        setLastAction('Symptom restored');
+      };
+
+      const clearEntry = (symptomId, timeId) => {
+        const dateKey = getDateKey(selectedDate);
+        const key = `${dateKey}-${symptomId}-${timeId}`;
+        const newEntries = { ...entries };
+        delete newEntries[key];
+        setEntries(newEntries);
+        setLastAction('Entry cleared');
+      };
+
+      const getCalendarDays = () => {
+        const year = calendarMonth.getFullYear();
+        const month = calendarMonth.getMonth();
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const daysInMonth = lastDay.getDate();
+        const startingDay = firstDay.getDay();
+        
+        const days = [];
+        for (let i = 0; i < startingDay; i++) {
+          days.push(null);
+        }
+        for (let i = 1; i <= daysInMonth; i++) {
+          days.push(new Date(year, month, i));
+        }
+        return days;
+      };
+
+      const getSortedHistory = () => {
+        const history = Object.entries(entries).map(([key, value]) => ({
+          ...value,
+          key,
+          symptomName: symptoms.find(s => s.id === value.symptomId)?.name || value.symptomId,
+          timePeriodLabel: timePeriods.find(t => t.id === value.time)?.label || value.time,
+        }));
+
+        return history.sort((a, b) => {
+          let comparison = 0;
+          
+          switch (historySort.column) {
+            case 'date':
+              comparison = a.date.localeCompare(b.date);
+              break;
+            case 'symptom':
+              comparison = a.symptomName.localeCompare(b.symptomName);
+              break;
+            case 'time':
+              const timeOrder = { night: 0, morning: 1, allday: 2, midday: 3, evening: 4 };
+              comparison = (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0);
+              break;
+            case 'severity':
+              comparison = a.severity - b.severity;
+              break;
+            default:
+              comparison = 0;
+          }
+          
+          return historySort.direction === 'asc' ? comparison : -comparison;
+        });
+      };
+
+      const toggleSort = (column) => {
+        if (historySort.column === column) {
+          setHistorySort({
+            column,
+            direction: historySort.direction === 'asc' ? 'desc' : 'asc'
+          });
+        } else {
+          setHistorySort({ column, direction: 'desc' });
+        }
+      };
+
+      const getSortIndicator = (column) => {
+        if (historySort.column !== column) return '';
+        return historySort.direction === 'asc' ? ' ↑' : ' ↓';
+      };
+
+      const exportCSV = (days) => {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        
+        const rows = [['Date', 'Symptom', 'Time Period', 'Severity', 'Severity Label']];
+        
+        Object.entries(entries).forEach(([key, entry]) => {
+          const entryDate = new Date(entry.date);
+          if (entryDate >= startDate && entryDate <= endDate) {
+            const symptomName = symptoms.find(s => s.id === entry.symptomId)?.name || entry.symptomId;
+            const timePeriod = timePeriods.find(t => t.id === entry.time)?.label || entry.time;
+            rows.push([entry.date, symptomName, timePeriod, entry.severity, severityLabels[entry.severity]]);
+          }
+        });
+        
+        rows.sort((a, b) => {
+          if (a[0] === 'Date') return -1;
+          if (b[0] === 'Date') return 1;
+          return b[0].localeCompare(a[0]);
+        });
+        
+        const csv = rows.map(row => row.join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `symptoms-${days}days-${getDateKey(new Date())}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setShowExport(false);
+        setLastAction(`Exported ${rows.length - 1} entries`);
+      };
+
+      const daysWithEntries = getDaysWithEntries();
+      const activeSymptoms = symptoms.filter(s => s.active);
+      const inactiveSymptoms = symptoms.filter(s => !s.active);
+      const sortedHistory = getSortedHistory();
+      const currentSymptomName = symptoms.find(s => s.id === activeSymptom)?.name || '';
+
+      const tableHeaderStyle = {
+        padding: '12px 8px',
+        textAlign: 'left',
+        color: '#94a3b8',
+        fontSize: '11px',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        cursor: 'pointer',
+        borderBottom: '2px solid rgba(99, 102, 241, 0.3)',
+        whiteSpace: 'nowrap',
+        userSelect: 'none',
+      };
+
+      const tableCellStyle = {
+        padding: '10px 8px',
+        fontSize: '13px',
+        borderBottom: '1px solid rgba(99, 102, 241, 0.1)',
+      };
+
+      return (
+        <div 
+          ref={containerRef}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleEnd}
+          onMouseLeave={handleEnd}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleEnd}
+          style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
+            padding: '20px 16px',
+            fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif",
+            userSelect: 'none',
+            touchAction: 'none',
+          }}
+        >
+          {/* Date Navigation Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '16px',
+          }}>
+            <button
+              onClick={() => changeDate(-1)}
+              style={{
+                background: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '12px',
+                width: '44px',
+                height: '44px',
+                color: '#a5b4fc',
+                fontSize: '20px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              ‹
+            </button>
+            
+            <button
+              onClick={() => {
+                setCalendarMonth(new Date(selectedDate));
+                setShowCalendar(true);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'center',
+                padding: '4px 12px',
+              }}
+            >
+              <h1 style={{
+                color: '#f8fafc',
+                fontSize: '22px',
+                fontWeight: '700',
+                margin: 0,
+              }}>{formatDate(selectedDate)}</h1>
+              <p style={{
+                color: '#6366f1',
+                fontSize: '12px',
+                margin: '2px 0 0 0',
+              }}>
+                Tap for calendar
+              </p>
+            </button>
+
+            <button
+              onClick={() => changeDate(1)}
+              style={{
+                background: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '12px',
+                width: '44px',
+                height: '44px',
+                color: '#a5b4fc',
+                fontSize: '20px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              ›
+            </button>
+          </div>
+
+          {/* Action Bar */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            marginBottom: '16px',
+          }}>
+            <button
+              onClick={() => setShowHistory(true)}
+              style={{
+                flex: 1,
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+                borderRadius: '10px',
+                padding: '10px',
+                color: '#a5b4fc',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              History
+            </button>
+            <button
+              onClick={() => setShowExport(true)}
+              style={{
+                flex: 1,
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+                borderRadius: '10px',
+                padding: '10px',
+                color: '#a5b4fc',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              Export
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              style={{
+                width: '44px',
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+                borderRadius: '10px',
+                padding: '10px',
+                color: '#a5b4fc',
+                fontSize: '16px',
+                cursor: 'pointer',
+              }}
+            >
+              ⚙
+            </button>
+          </div>
+
+          {/* Symptom List */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}>
+            {activeSymptoms.map((symptom) => {
+              const symptomEntries = getSymptomEntries(symptom.id);
+              const isActive = activeSymptom === symptom.id;
+              
+              return (
+                <div
+                  key={symptom.id}
+                  onTouchStart={(e) => handleTouchStart(e, symptom.id)}
+                  onMouseDown={(e) => handleMouseDown(e, symptom.id)}
+                  style={{
+                    background: isActive 
+                      ? 'rgba(99, 102, 241, 0.15)' 
+                      : 'rgba(30, 27, 75, 0.6)',
+                    borderRadius: '14px',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    border: isActive 
+                      ? '2px solid rgba(99, 102, 241, 0.5)' 
+                      : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    transform: isActive ? 'scale(1.02)' : 'scale(1)',
+                  }}
+                >
+                  <span style={{
+                    color: '#e2e8f0',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                  }}>{symptom.name}</span>
+                  
+                  <div style={{
+                    display: 'flex',
+                    gap: '5px',
+                    flexWrap: 'wrap',
+                    justifyContent: 'flex-end',
+                    maxWidth: '180px',
+                  }}>
+                    {symptomEntries.length === 0 ? (
+                      <span style={{ color: '#475569', fontSize: '12px' }}>
+                        Hold to log
+                      </span>
+                    ) : (
+                      symptomEntries.map((entry, idx) => (
+                        <div 
+                          key={idx} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearEntry(symptom.id, entry.time);
+                          }}
+                          style={{
+                            background: `${severityColors[entry.severity]}20`,
+                            border: `1.5px solid ${severityColors[entry.severity]}`,
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span style={{
+                            fontSize: '12px',
+                            color: '#a5b4fc',
+                          }}>
+                            {timePeriods.find(t => t.id === entry.time)?.icon}
+                          </span>
+                          <span style={{
+                            color: severityColors[entry.severity],
+                            fontSize: '13px',
+                            fontWeight: '700',
+                          }}>{entry.severity}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              onClick={() => setShowAddSymptom(true)}
+              style={{
+                background: 'transparent',
+                border: '2px dashed rgba(99, 102, 241, 0.3)',
+                borderRadius: '14px',
+                padding: '16px',
+                color: '#6366f1',
+                fontSize: '15px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                marginTop: '4px',
+              }}
+            >
+              + Add Symptoms
+            </button>
+          </div>
+
+          {/* 2D Drag Picker Overlay - Simplified Full Screen */}
+          {isDragging && activeSymptom && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: `rgba(0, 0, 0, 0.5)`,
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 1000,
+            }}>
+              {/* Colored gradient overlay */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                background: `linear-gradient(180deg, ${severityColors[dragPosition.y]}20 0%, transparent 50%)`,
+                pointerEvents: 'none',
+                transition: 'background 0.15s ease',
+              }} />
+
+              {/* Screen zone indicators - 5 vertical sections */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                pointerEvents: 'none',
+              }}>
+                {timePeriods.map((period, idx) => (
+                  <div 
+                    key={period.id}
+                    style={{
+                      flex: 1,
+                      borderRight: idx < 4 ? '1px solid rgba(99, 102, 241, 0.15)' : 'none',
+                      background: dragPosition.x === idx ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                      transition: 'background 0.1s ease',
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Top Section - Symptom Name */}
+              <div style={{
+                padding: '60px 24px 20px',
+                textAlign: 'center',
+              }}>
+                <h1 style={{
+                  color: '#f8fafc',
+                  fontSize: '28px',
+                  fontWeight: '700',
+                  margin: 0,
+                }}>
+                  {currentSymptomName}
+                </h1>
+              </div>
+
+              {/* Time Period Display - Fixed below title */}
+              <div style={{
+                textAlign: 'center',
+                padding: '10px 24px 30px',
+              }}>
+                <div style={{
+                  fontSize: '48px',
+                  marginBottom: '4px',
+                  transition: 'all 0.1s ease',
+                  color: '#a5b4fc',
+                }}>
+                  {timePeriods[dragPosition.x].icon}
+                </div>
+                <div style={{
+                  color: '#a5b4fc',
+                  fontSize: '18px',
+                  fontWeight: '600',
+                  textTransform: 'uppercase',
+                  letterSpacing: '2px',
+                }}>
+                  {timePeriods[dragPosition.x].label}
+                </div>
+              </div>
+
+              {/* Big Floating Number - Follows finger */}
+              <div style={{
+                position: 'fixed',
+                left: `${Math.max(60, Math.min(window.innerWidth - 60, fingerPosition.x))}px`,
+                top: `${Math.max(200, Math.min(window.innerHeight - 300, fingerPosition.y - 80))}px`,
+                transform: 'translate(-50%, -50%)',
+                pointerEvents: 'none',
+                zIndex: 1001,
+                textAlign: 'center',
+              }}>
+                <div style={{
+                  fontSize: '120px',
+                  fontWeight: '800',
+                  color: severityColors[dragPosition.y],
+                  textShadow: `0 0 60px ${severityColors[dragPosition.y]}80`,
+                  lineHeight: 1,
+                  transition: 'color 0.1s ease, text-shadow 0.1s ease',
+                }}>
+                  {dragPosition.y}
+                </div>
+                <div style={{
+                  color: '#94a3b8',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  marginTop: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                }}>
+                  {severityLabels[dragPosition.y]}
+                </div>
+                <div style={{
+                  color: '#64748b',
+                  fontSize: '12px',
+                  marginTop: '16px',
+                  letterSpacing: '0.5px',
+                }}>
+                  Release to log
+                </div>
+              </div>
+
+              {/* Bottom zone - Time period icons across full width */}
+              <div style={{
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                display: 'flex',
+                background: 'rgba(15, 12, 35, 0.9)',
+                borderTop: '1px solid rgba(99, 102, 241, 0.2)',
+              }}>
+                {timePeriods.map((period, idx) => (
+                  <div 
+                    key={period.id}
+                    style={{
+                      flex: 1,
+                      padding: '16px 8px 24px',
+                      textAlign: 'center',
+                      background: dragPosition.x === idx ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                      borderRight: idx < 4 ? '1px solid rgba(99, 102, 241, 0.1)' : 'none',
+                      transition: 'background 0.1s ease',
+                    }}
+                  >
+                    <div style={{
+                      fontSize: '24px',
+                      marginBottom: '4px',
+                      opacity: dragPosition.x === idx ? 1 : 0.4,
+                      transition: 'opacity 0.1s',
+                      color: '#a5b4fc',
+                    }}>
+                      {period.icon}
+                    </div>
+                    <div style={{
+                      fontSize: '10px',
+                      color: dragPosition.x === idx ? '#e2e8f0' : '#64748b',
+                      fontWeight: dragPosition.x === idx ? '600' : '400',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      transition: 'all 0.1s',
+                    }}>
+                      {period.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Vertical severity scale on the side */}
+              <div style={{
+                position: 'fixed',
+                right: 16,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                display: 'flex',
+                flexDirection: 'column-reverse',
+                gap: '8px',
+                background: 'rgba(30, 27, 75, 0.8)',
+                padding: '12px 8px',
+                borderRadius: '12px',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+              }}>
+                {severityLevels.map((sev) => (
+                  <div 
+                    key={sev}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      background: dragPosition.y === sev ? severityColors[sev] : 'transparent',
+                      color: dragPosition.y === sev ? (sev >= 3 ? '#000' : '#fff') : '#64748b',
+                      border: dragPosition.y === sev ? 'none' : '1px solid rgba(99, 102, 241, 0.2)',
+                      transition: 'all 0.1s ease',
+                    }}
+                  >
+                    {sev}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Calendar Modal */}
+          {showCalendar && (
+            <div 
+              onClick={() => setShowCalendar(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.92)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+              }}
+            >
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: '#1a1333',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  width: '100%',
+                  maxWidth: '380px',
+                  border: '2px solid rgba(99, 102, 241, 0.3)',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '20px',
+                }}>
+                  <button
+                    onClick={() => {
+                      const newMonth = new Date(calendarMonth);
+                      newMonth.setMonth(newMonth.getMonth() - 1);
+                      setCalendarMonth(newMonth);
+                    }}
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.2)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      width: '52px',
+                      height: '52px',
+                      color: '#a5b4fc',
+                      fontSize: '24px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ‹
+                  </button>
+                  
+                  <h2 style={{
+                    color: '#f8fafc',
+                    fontSize: '20px',
+                    fontWeight: '700',
+                    margin: 0,
+                  }}>
+                    {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </h2>
+                  
+                  <button
+                    onClick={() => {
+                      const newMonth = new Date(calendarMonth);
+                      newMonth.setMonth(newMonth.getMonth() + 1);
+                      setCalendarMonth(newMonth);
+                    }}
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.2)',
+                      border: 'none',
+                      borderRadius: '12px',
+                      width: '52px',
+                      height: '52px',
+                      color: '#a5b4fc',
+                      fontSize: '24px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ›
+                  </button>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
+                  gap: '4px',
+                  marginBottom: '8px',
+                }}>
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+                    <div key={idx} style={{
+                      textAlign: 'center',
+                      color: '#64748b',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      padding: '8px 0',
+                    }}>
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
+                  gap: '4px',
+                }}>
+                  {getCalendarDays().map((day, idx) => {
+                    if (!day) return <div key={idx} style={{ aspectRatio: '1' }} />;
+                    
+                    const dateKey = getDateKey(day);
+                    const hasEntries = daysWithEntries.has(dateKey);
+                    const isSelected = dateKey === getDateKey(selectedDate);
+                    const isToday = dateKey === getDateKey(new Date());
+                    
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => selectDate(day)}
+                        style={{
+                          aspectRatio: '1',
+                          borderRadius: '12px',
+                          border: isSelected ? '2px solid #6366f1' : isToday ? '2px solid rgba(99, 102, 241, 0.4)' : '2px solid transparent',
+                          background: isSelected ? 'rgba(99, 102, 241, 0.3)' : hasEntries ? 'rgba(74, 222, 128, 0.15)' : 'rgba(30, 27, 75, 0.5)',
+                          color: isSelected ? '#fff' : hasEntries ? '#4ade80' : '#94a3b8',
+                          fontSize: '16px',
+                          fontWeight: isSelected || isToday ? '700' : '500',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative',
+                        }}
+                      >
+                        {day.getDate()}
+                        {hasEntries && !isSelected && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '6px',
+                            width: '4px',
+                            height: '4px',
+                            borderRadius: '50%',
+                            background: '#4ade80',
+                          }} />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => selectDate(new Date())}
+                  style={{
+                    width: '100%',
+                    marginTop: '16px',
+                    padding: '14px',
+                    background: 'rgba(99, 102, 241, 0.2)',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '12px',
+                    color: '#a5b4fc',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Go to Today
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Add Symptom Modal */}
+          {showAddSymptom && (
+            <div 
+              onClick={() => setShowAddSymptom(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.92)',
+                zIndex: 1000,
+                overflowY: 'auto',
+                padding: '20px',
+              }}
+            >
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                style={{ maxWidth: '400px', margin: '0 auto' }}
+              >
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '20px',
+                }}>
+                  <h2 style={{ color: '#f8fafc', fontSize: '22px', fontWeight: '700', margin: 0 }}>
+                    Add Symptoms
+                  </h2>
+                  <button
+                    onClick={() => setShowAddSymptom(false)}
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.2)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      width: '44px',
+                      height: '44px',
+                      color: '#a5b4fc',
+                      fontSize: '20px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{
+                  background: 'rgba(30, 27, 75, 0.6)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '20px',
+                }}>
+                  <label style={{
+                    color: '#94a3b8',
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                  }}>Add Multiple Symptoms</label>
+                  <p style={{
+                    color: '#64748b',
+                    fontSize: '12px',
+                    margin: '4px 0 10px 0',
+                  }}>
+                    Paste or type symptoms separated by commas, tabs, or new lines
+                  </p>
+                  <textarea
+                    value={bulkSymptomInput}
+                    onChange={(e) => setBulkSymptomInput(e.target.value)}
+                    placeholder="Headache, Fatigue, Nausea&#10;Back Pain&#10;Insomnia, Anxiety"
+                    rows={4}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '10px',
+                      padding: '12px 14px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      outline: 'none',
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                    <span style={{ color: '#64748b', fontSize: '12px' }}>
+                      {parseBulkSymptoms(bulkSymptomInput).length} symptom(s) detected
+                    </span>
+                    <button
+                      onClick={addBulkSymptoms}
+                      disabled={parseBulkSymptoms(bulkSymptomInput).length === 0}
+                      style={{
+                        background: parseBulkSymptoms(bulkSymptomInput).length > 0 ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '10px 20px',
+                        color: '#fff',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: parseBulkSymptoms(bulkSymptomInput).length > 0 ? 'pointer' : 'not-allowed',
+                      }}
+                    >
+                      Add All
+                    </button>
+                  </div>
+                </div>
+
+                {activeSymptoms.length > 0 && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{
+                      color: '#94a3b8',
+                      fontSize: '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                    }}>Active Symptoms (tap to hide)</label>
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      marginTop: '12px',
+                    }}>
+                      {activeSymptoms.map((symptom) => (
+                        <button
+                          key={symptom.id}
+                          onClick={() => removeSymptom(symptom.id)}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '2px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '10px',
+                            padding: '10px 14px',
+                            color: '#fca5a5',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {symptom.name} ✕
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {inactiveSymptoms.length > 0 && (
+                  <div>
+                    <label style={{
+                      color: '#94a3b8',
+                      fontSize: '12px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                    }}>Hidden Symptoms (tap to restore)</label>
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      marginTop: '12px',
+                    }}>
+                      {inactiveSymptoms.map((symptom) => (
+                        <button
+                          key={symptom.id}
+                          onClick={() => reactivateSymptom(symptom.id)}
+                          style={{
+                            background: 'rgba(74, 222, 128, 0.15)',
+                            border: '2px solid rgba(74, 222, 128, 0.3)',
+                            borderRadius: '10px',
+                            padding: '10px 14px',
+                            color: '#86efac',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {symptom.name} +
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* History Modal with Sortable Table */}
+          {showHistory && (
+            <div 
+              onClick={() => setShowHistory(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.92)',
+                zIndex: 1000,
+                overflowY: 'auto',
+                padding: '20px',
+              }}
+            >
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                style={{ maxWidth: '600px', margin: '0 auto' }}
+              >
+                {/* Header */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '16px',
+                  position: 'sticky',
+                  top: 0,
+                  background: 'rgba(12, 10, 29, 0.98)',
+                  padding: '10px 0',
+                  zIndex: 10,
+                }}>
+                  <div>
+                    <h2 style={{ color: '#f8fafc', fontSize: '22px', fontWeight: '700', margin: 0 }}>
+                      History
+                    </h2>
+                    <p style={{ color: '#64748b', fontSize: '12px', margin: '4px 0 0 0' }}>
+                      {sortedHistory.length} entries • Tap column headers to sort
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowHistory(false)}
+                    style={{
+                      background: 'rgba(99, 102, 241, 0.2)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      width: '44px',
+                      height: '44px',
+                      color: '#a5b4fc',
+                      fontSize: '20px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {sortedHistory.length === 0 ? (
+                  <p style={{ color: '#64748b', textAlign: 'center', padding: '40px 0' }}>
+                    No entries recorded yet
+                  </p>
+                ) : (
+                  <div style={{
+                    background: 'rgba(30, 27, 75, 0.5)',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                  }}>
+                    <table style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                    }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(30, 27, 75, 0.8)' }}>
+                          <th 
+                            onClick={() => toggleSort('date')}
+                            style={tableHeaderStyle}
+                          >
+                            Date{getSortIndicator('date')}
+                          </th>
+                          <th 
+                            onClick={() => toggleSort('symptom')}
+                            style={tableHeaderStyle}
+                          >
+                            Symptom{getSortIndicator('symptom')}
+                          </th>
+                          <th 
+                            onClick={() => toggleSort('time')}
+                            style={tableHeaderStyle}
+                          >
+                            Time{getSortIndicator('time')}
+                          </th>
+                          <th 
+                            onClick={() => toggleSort('severity')}
+                            style={{...tableHeaderStyle, textAlign: 'center'}}
+                          >
+                            Severity{getSortIndicator('severity')}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedHistory.map((entry, idx) => (
+                          <tr 
+                            key={entry.key}
+                            style={{
+                              background: idx % 2 === 0 ? 'transparent' : 'rgba(99, 102, 241, 0.03)',
+                            }}
+                          >
+                            <td style={{...tableCellStyle, color: '#94a3b8', whiteSpace: 'nowrap'}}>
+                              {formatTableDate(entry.date)}
+                            </td>
+                            <td style={{...tableCellStyle, color: '#e2e8f0', fontWeight: '500'}}>
+                              {entry.symptomName}
+                            </td>
+                            <td style={{...tableCellStyle, color: '#94a3b8'}}>
+                              <span style={{ marginRight: '6px', color: '#a5b4fc' }}>
+                                {timePeriods.find(t => t.id === entry.time)?.icon}
+                              </span>
+                              {entry.timePeriodLabel}
+                            </td>
+                            <td style={{...tableCellStyle, textAlign: 'center'}}>
+                              <span style={{
+                                display: 'inline-block',
+                                minWidth: '28px',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                background: `${severityColors[entry.severity]}20`,
+                                color: severityColors[entry.severity],
+                                fontWeight: '700',
+                                fontSize: '13px',
+                              }}>
+                                {entry.severity}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Export Modal */}
+          {showExport && (
+            <div 
+              onClick={() => setShowExport(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.92)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+              }}
+            >
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: '#1a1333',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  width: '100%',
+                  maxWidth: '320px',
+                  maxHeight: '80vh',
+                  overflowY: 'auto',
+                  border: '2px solid rgba(99, 102, 241, 0.3)',
+                }}
+              >
+                <h2 style={{
+                  color: '#f8fafc',
+                  fontSize: '20px',
+                  fontWeight: '700',
+                  margin: '0 0 20px 0',
+                  textAlign: 'center',
+                }}>
+                  Export to CSV
+                </h2>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[
+                    { label: 'Last 7 days', days: 7 },
+                    { label: 'Last 30 days', days: 30 },
+                    { label: 'Last 3 months', days: 90 },
+                    { label: 'Last 6 months', days: 180 },
+                    { label: 'Last 12 months', days: 365 },
+                    { label: 'Last 2 years', days: 730 },
+                    { label: 'Last 3 years', days: 1095 },
+                    { label: 'Last 4 years', days: 1460 },
+                    { label: 'All time', days: 99999 },
+                  ].map(({ label, days }) => (
+                    <button
+                      key={days}
+                      onClick={() => exportCSV(days)}
+                      style={{
+                        background: 'rgba(99, 102, 241, 0.15)',
+                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '10px',
+                        padding: '12px 16px',
+                        color: '#e2e8f0',
+                        fontSize: '15px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setShowExport(false)}
+                  style={{
+                    width: '100%',
+                    marginTop: '16px',
+                    padding: '14px',
+                    background: 'transparent',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '12px',
+                    color: '#94a3b8',
+                    fontSize: '15px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Settings Modal */}
+          {showSettings && (
+            <div 
+              onClick={() => setShowSettings(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.92)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+              }}
+            >
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  background: '#1a1333',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  width: '100%',
+                  maxWidth: '320px',
+                  border: '2px solid rgba(99, 102, 241, 0.3)',
+                }}
+              >
+                <h2 style={{
+                  color: '#f8fafc',
+                  fontSize: '20px',
+                  fontWeight: '700',
+                  margin: '0 0 20px 0',
+                  textAlign: 'center',
+                }}>
+                  Settings
+                </h2>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button
+                    onClick={loadSampleData}
+                    style={{
+                      background: 'rgba(74, 222, 128, 0.15)',
+                      border: '2px solid rgba(74, 222, 128, 0.3)',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      color: '#86efac',
+                      fontSize: '15px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>Load Sample Data</div>
+                    <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                      Generate 3 months of example entries
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={clearAllData}
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '2px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      color: '#fca5a5',
+                      fontSize: '15px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ fontWeight: '600', marginBottom: '4px' }}>Clear All Data</div>
+                    <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                      Remove all recorded entries
+                    </div>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setShowSettings(false)}
+                  style={{
+                    width: '100%',
+                    marginTop: '16px',
+                    padding: '14px',
+                    background: 'transparent',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '12px',
+                    color: '#94a3b8',
+                    fontSize: '15px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Success Toast */}
+          {lastAction && !isDragging && !showAddSymptom && !showCalendar && !showHistory && !showExport && !showSettings && (
+            <div style={{
+              position: 'fixed',
+              bottom: '28px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(30, 27, 75, 0.95)',
+              border: '1px solid rgba(99, 102, 241, 0.4)',
+              borderRadius: '10px',
+              padding: '10px 18px',
+              color: '#a5b4fc',
+              fontSize: '13px',
+              fontWeight: '500',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+              animation: 'slideUp 0.3s ease',
+            }}>
+              ✓ {lastAction}
+            </div>
+          )}
+
+          <style>{`
+            @keyframes slideUp {
+              from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+              to { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+            input::placeholder, textarea::placeholder {
+              color: #64748b;
+            }
+          `}</style>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<SymptomTrackerMobile />);
+  </script>
+</body>
+</html>
