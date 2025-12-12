@@ -6,6 +6,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0c0a1d">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230c0a1d' width='100' height='100' rx='20'/><text y='.9em' font-size='90' x='10'>📊</text></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230c0a1d' width='100' height='100' rx='20'/><text y='.9em' font-size='90' x='10'>📊</text></svg>">
   <title>Symptom Tracker</title>
   <style>
     * {
@@ -17,6 +19,7 @@
       padding: 0;
       height: 100%;
       background: #0c0a1d;
+      overflow: hidden;
     }
     body {
       margin: 0;
@@ -34,14 +37,20 @@
     #root {
       margin: 0;
       padding: 0;
-      min-height: 100%;
-      min-height: 100dvh;
+      height: 100%;
+      height: 100dvh;
       background: #0c0a1d;
       overflow-y: auto;
+      overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior: none;
+    }
+    body.no-scroll {
+      touch-action: none;
     }
     body.no-scroll #root {
       overflow: hidden;
+      touch-action: none;
     }
   </style>
 </head>
@@ -244,9 +253,10 @@
       const [hasSampleData, setHasSampleData] = useState(false);
       const [trackingMode, setTrackingMode] = useState(() => {
         const saved = localStorage.getItem(STORAGE_KEY_MODE);
-        return saved || 'detailed';
+        return saved || 'ampm';
       });
       const [showInsights, setShowInsights] = useState(false);
+      const [insightsWindow, setInsightsWindow] = useState(60);
       
       // Derived time periods based on mode
       const timePeriods = trackingModes[trackingMode].periods;
@@ -270,9 +280,15 @@
       const startPosRef = useRef({ x: 0, y: 0 });
       const holdTimerRef = useRef(null);
       const pendingSymptomRef = useRef(null);
+      const isDraggingRef = useRef(false);
 
       const DRAG_SENSITIVITY = 19;
       const HOLD_DELAY = 200;
+
+      // Keep ref in sync with state
+      useEffect(() => {
+        isDraggingRef.current = isDragging;
+      }, [isDragging]);
 
       useEffect(() => {
         localStorage.setItem(STORAGE_KEY_SYMPTOMS, JSON.stringify(symptoms));
@@ -286,14 +302,37 @@
         localStorage.setItem(STORAGE_KEY_MODE, trackingMode);
       }, [trackingMode]);
 
-      // Lock body scroll when dragging
+      // Lock body scroll when dragging - iOS Safari fix
+      useEffect(() => {
+        const preventScroll = (e) => {
+          if (isDraggingRef.current) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        };
+        
+        // Add listener once with passive: false
+        document.addEventListener('touchmove', preventScroll, { passive: false });
+        
+        return () => {
+          document.removeEventListener('touchmove', preventScroll);
+        };
+      }, []);
+
+      // Manage body class for scroll lock
       useEffect(() => {
         if (isDragging) {
           document.body.classList.add('no-scroll');
+          document.documentElement.style.overflow = 'hidden';
         } else {
           document.body.classList.remove('no-scroll');
+          document.documentElement.style.overflow = '';
         }
-        return () => document.body.classList.remove('no-scroll');
+        return () => {
+          document.body.classList.remove('no-scroll');
+          document.documentElement.style.overflow = '';
+        };
       }, [isDragging]);
 
       const getDateKey = (date) => date.toISOString().split('T')[0];
@@ -376,6 +415,7 @@
         
         setActiveSymptom(symptomId);
         setDragPosition({ x: clampedTimeIndex, y: initialSeverity });
+        isDraggingRef.current = true;
         setIsDragging(true);
         pendingSymptomRef.current = null;
       };
@@ -455,6 +495,9 @@
       };
 
       const handleTouchMove = (e) => {
+        if (isDragging) {
+          e.preventDefault();
+        }
         const touch = e.touches[0];
         handleMove(touch.clientX, touch.clientY);
       };
@@ -484,15 +527,18 @@
           const symptom = symptoms.find(s => s.id === activeSymptom);
           setLastAction(`${symptom?.name}: ${timePeriods[dragPosition.x].label}, ${severity}`);
         }
+        isDraggingRef.current = false;
         setIsDragging(false);
         setActiveSymptom(null);
       };
 
       const getSymptomEntries = (symptomId) => {
         const dateKey = getDateKey(selectedDate);
+        const timeOrder = { night: 0, morning: 1, allday: 2, midday: 3, evening: 4, daily: 2 };
         return Object.entries(entries)
           .filter(([key]) => key.startsWith(`${dateKey}-${symptomId}`))
-          .map(([key, value]) => value);
+          .map(([key, value]) => value)
+          .sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
       };
 
       const getDaysWithEntries = () => {
@@ -648,12 +694,17 @@
         return historySort.direction === 'asc' ? ' ↑' : ' ↓';
       };
 
-      const getInsights = () => {
+      const getInsights = (windowDays = 60) => {
         const today = new Date();
         const entryList = Object.values(entries);
         
-        if (entryList.length < 7) {
-          return { hasEnoughData: false };
+        // Need at least some data for meaningful insights
+        const oldestEntry = entryList.reduce((min, e) => e.date < min ? e.date : min, entryList[0]?.date || '');
+        const daysOfData = oldestEntry ? Math.floor((today - new Date(oldestEntry)) / (1000 * 60 * 60 * 24)) : 0;
+        
+        const minDaysNeeded = Math.floor(windowDays * 1.5);
+        if (entryList.length < 20 || daysOfData < minDaysNeeded) {
+          return { hasEnoughData: false, daysOfData, entriesCount: entryList.length, minDaysNeeded };
         }
         
         // Group entries by symptom
@@ -663,59 +714,55 @@
           bySymptom[entry.symptomId].push(entry);
         });
         
-        // Calculate trends for each symptom
-        const trends = [];
+        const insights = [];
+        
+        // Calculate trends: last windowDays vs prior windowDays
         Object.entries(bySymptom).forEach(([symptomId, symptomEntries]) => {
-          if (symptomEntries.length < 3) return;
-          
           const symptom = symptoms.find(s => s.id === symptomId);
           if (!symptom) return;
           
-          // Split into recent (last 30 days) vs earlier
           const recentEntries = symptomEntries.filter(e => {
             const daysAgo = Math.floor((today - new Date(e.date)) / (1000 * 60 * 60 * 24));
-            return daysAgo <= 30;
+            return daysAgo <= windowDays;
           });
           const earlierEntries = symptomEntries.filter(e => {
             const daysAgo = Math.floor((today - new Date(e.date)) / (1000 * 60 * 60 * 24));
-            return daysAgo > 30 && daysAgo <= 90;
+            return daysAgo > windowDays && daysAgo <= windowDays * 2;
           });
           
-          if (recentEntries.length < 2 || earlierEntries.length < 2) return;
+          // Need enough data in both periods
+          if (recentEntries.length < 3 || earlierEntries.length < 3) return;
           
           const recentAvg = recentEntries.reduce((sum, e) => sum + e.severity, 0) / recentEntries.length;
           const earlierAvg = earlierEntries.reduce((sum, e) => sum + e.severity, 0) / earlierEntries.length;
           
-          const change = recentAvg - earlierAvg;
-          const percentChange = ((recentAvg - earlierAvg) / earlierAvg) * 100;
+          // Only show if there's meaningful change (>20%)
+          if (earlierAvg === 0) return;
+          const percentChange = Math.round(((recentAvg - earlierAvg) / earlierAvg) * 100);
           
-          let trend = 'stable';
-          if (change < -0.3) trend = 'improving';
-          if (change > 0.3) trend = 'worsening';
-          
-          trends.push({
-            symptomId,
-            name: symptom.name,
-            recentAvg: recentAvg.toFixed(1),
-            earlierAvg: earlierAvg.toFixed(1),
-            change: change.toFixed(1),
-            percentChange: percentChange.toFixed(0),
-            trend,
-            entryCount: symptomEntries.length,
-          });
+          if (Math.abs(percentChange) >= 20) {
+            insights.push({
+              symptomId,
+              name: symptom.name,
+              percentChange,
+              direction: percentChange < 0 ? 'improving' : 'worsening',
+              recentAvg: recentAvg.toFixed(1),
+              earlierAvg: earlierAvg.toFixed(1),
+            });
+          }
         });
         
-        // Sort by absolute change
-        trends.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+        // Sort by absolute percent change (biggest changes first)
+        insights.sort((a, b) => Math.abs(b.percentChange) - Math.abs(a.percentChange));
         
-        // Find symptom clusters (co-occurrence)
-        const coOccurrence = {};
+        // Find most common symptom cluster (symptoms appearing together)
         const dateGroups = {};
         entryList.forEach(entry => {
           if (!dateGroups[entry.date]) dateGroups[entry.date] = new Set();
           dateGroups[entry.date].add(entry.symptomId);
         });
         
+        const coOccurrence = {};
         Object.values(dateGroups).forEach(symptomSet => {
           const symptomArray = Array.from(symptomSet);
           for (let i = 0; i < symptomArray.length; i++) {
@@ -726,99 +773,48 @@
           }
         });
         
-        const clusters = Object.entries(coOccurrence)
-          .filter(([_, count]) => count >= 5)
+        // Only show cluster if it appears frequently (>30% of days)
+        const totalDays = Object.keys(dateGroups).length;
+        const topCluster = Object.entries(coOccurrence)
           .map(([pair, count]) => {
             const [id1, id2] = pair.split('|');
             const name1 = symptoms.find(s => s.id === id1)?.name || id1;
             const name2 = symptoms.find(s => s.id === id2)?.name || id2;
-            return { pair: [name1, name2], count };
+            return { names: [name1, name2], count, percent: Math.round((count / totalDays) * 100) };
           })
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5);
+          .filter(c => c.percent >= 30)
+          .sort((a, b) => b.count - a.count)[0] || null;
         
-        // Time of day patterns
-        const timePatterns = {};
-        entryList.forEach(entry => {
-          if (!timePatterns[entry.time]) timePatterns[entry.time] = { total: 0, count: 0 };
-          timePatterns[entry.time].total += entry.severity;
-          timePatterns[entry.time].count++;
-        });
-        
-        const timeInsights = Object.entries(timePatterns)
-          .map(([time, data]) => ({
-            time,
-            label: allTimePeriods.find(t => t.id === time)?.label || time,
-            avgSeverity: (data.total / data.count).toFixed(1),
-            count: data.count,
-          }))
-          .sort((a, b) => b.avgSeverity - a.avgSeverity);
-        
-        // Weekly patterns
-        const dayOfWeekData = Array(7).fill(null).map(() => ({ total: 0, count: 0 }));
-        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        entryList.forEach(entry => {
-          const day = new Date(entry.date).getDay();
-          dayOfWeekData[day].total += entry.severity;
-          dayOfWeekData[day].count++;
-        });
-        
-        const weeklyInsights = dayOfWeekData
-          .map((data, idx) => ({
-            day: dayNames[idx],
-            avgSeverity: data.count > 0 ? (data.total / data.count).toFixed(1) : null,
-            count: data.count,
-          }))
-          .filter(d => d.avgSeverity !== null);
-        
-        // Generate AI prompt
-        const aiPrompt = generateAIPrompt(trends, clusters, timeInsights, weeklyInsights);
+        // Generate simplified AI prompt
+        const aiPrompt = generateAIPrompt(insights, topCluster, daysOfData, windowDays);
         
         return {
           hasEnoughData: true,
-          trends,
-          clusters,
-          timeInsights,
-          weeklyInsights,
+          insights: insights.slice(0, 5), // Top 5 only
+          topCluster,
+          daysOfData,
+          entriesCount: entryList.length,
           aiPrompt,
-          totalEntries: entryList.length,
-          dateRange: {
-            start: entryList.reduce((min, e) => e.date < min ? e.date : min, entryList[0].date),
-            end: entryList.reduce((max, e) => e.date > max ? e.date : max, entryList[0].date),
-          },
+          windowDays,
         };
       };
 
-      const generateAIPrompt = (trends, clusters, timeInsights, weeklyInsights) => {
-        let prompt = `Please analyze my symptom tracking data and provide insights. Be cautious with language and avoid prescriptive medical advice.\n\n`;
+      const generateAIPrompt = (insights, topCluster, daysOfData, windowDays) => {
+        let prompt = `Analyze my ${daysOfData}-day symptom tracking data. Be cautious and avoid prescriptive medical advice.\n\n`;
         
-        prompt += `## Symptom Trends (Last 30 days vs prior 60 days)\n`;
-        trends.forEach(t => {
-          prompt += `- ${t.name}: ${t.trend} (${t.earlierAvg} → ${t.recentAvg}, ${t.change > 0 ? '+' : ''}${t.change})\n`;
-        });
-        
-        if (clusters.length > 0) {
-          prompt += `\n## Symptom Clusters (frequently occur together)\n`;
-          clusters.forEach(c => {
-            prompt += `- "${c.pair[0]}" and "${c.pair[1]}" appeared together ${c.count} times\n`;
+        if (insights.length > 0) {
+          prompt += `Significant changes (last ${windowDays} days vs prior ${windowDays} days):\n`;
+          insights.forEach(i => {
+            prompt += `• ${i.name}: ${i.percentChange > 0 ? '+' : ''}${i.percentChange}% (${i.direction})\n`;
           });
         }
         
-        if (timeInsights.length > 0) {
-          prompt += `\n## Time of Day Patterns\n`;
-          timeInsights.forEach(t => {
-            prompt += `- ${t.label}: avg severity ${t.avgSeverity} (${t.count} entries)\n`;
-          });
+        if (topCluster) {
+          prompt += `\nFrequent co-occurrence (${topCluster.percent}% of days):\n`;
+          prompt += `• "${topCluster.names[0]}" often appears with "${topCluster.names[1]}"\n`;
         }
         
-        if (weeklyInsights.length > 0) {
-          prompt += `\n## Weekly Patterns\n`;
-          weeklyInsights.forEach(w => {
-            prompt += `- ${w.day}: avg severity ${w.avgSeverity}\n`;
-          });
-        }
-        
-        prompt += `\nPlease identify:\n1. Any concerning patterns\n2. Potential symptom groupings that might share underlying causes\n3. Suggestions for what to discuss with a healthcare provider\n4. Any positive trends worth noting`;
+        prompt += `\nPlease identify potential patterns and what might be worth discussing with a healthcare provider.`;
         
         return prompt;
       };
@@ -892,7 +888,8 @@
           onTouchMove={handleTouchMove}
           onTouchEnd={handleEnd}
           style={{
-            height: '100vh',
+            height: '100dvh',
+            minHeight: '100vh',
             background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
             fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif",
             userSelect: 'none',
@@ -901,12 +898,17 @@
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
           }}
         >
           {/* Fixed Header Area */}
           <div style={{
             flexShrink: 0,
-            padding: '20px 16px 16px',
+            padding: '20px 16px 32px',
             background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
             zIndex: 100,
           }}>
@@ -964,7 +966,7 @@
                   fontSize: '10px',
                   color: '#64748b',
                   fontWeight: '400',
-                }}>v1.0</span>
+                }}>v1.2</span>
               </h1>
               <p style={{
                 color: '#6366f1',
@@ -1019,11 +1021,11 @@
               onClick={() => setShowInsights(true)}
               style={{
                 flex: 1,
-                background: 'rgba(74, 222, 128, 0.1)',
-                border: '1px solid rgba(74, 222, 128, 0.2)',
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
                 borderRadius: '10px',
                 padding: '10px',
-                color: '#86efac',
+                color: '#a5b4fc',
                 fontSize: '13px',
                 cursor: 'pointer',
               }}
@@ -1068,7 +1070,7 @@
             flex: 1,
             overflowY: 'auto',
             overflowX: 'hidden',
-            padding: '0 16px 100px 16px',
+            padding: '16px 16px 100px 16px',
             WebkitOverflowScrolling: 'touch',
           }}>
             <div style={{
@@ -2070,7 +2072,7 @@
 
           {/* Insights Modal */}
           {showInsights && (() => {
-            const insights = getInsights();
+            const data = getInsights(insightsWindow);
             
             return (
               <div 
@@ -2086,14 +2088,14 @@
               >
                 <div 
                   onClick={(e) => e.stopPropagation()}
-                  style={{ maxWidth: '500px', margin: '0 auto' }}
+                  style={{ maxWidth: '400px', margin: '0 auto' }}
                 >
                   {/* Header */}
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: '20px',
+                    marginBottom: '16px',
                   }}>
                     <h2 style={{ color: '#f8fafc', fontSize: '24px', fontWeight: '700', margin: 0 }}>
                       Insights
@@ -2112,286 +2114,171 @@
                     </button>
                   </div>
 
-                  {!insights.hasEnoughData ? (
+                  {/* Window Selector */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    marginBottom: '20px',
+                  }}>
+                    {[30, 60, 90].map(days => (
+                      <button
+                        key={days}
+                        onClick={() => setInsightsWindow(days)}
+                        style={{
+                          flex: 1,
+                          padding: '10px',
+                          borderRadius: '10px',
+                          border: insightsWindow === days 
+                            ? '2px solid rgba(99, 102, 241, 0.6)' 
+                            : '1px solid rgba(99, 102, 241, 0.2)',
+                          background: insightsWindow === days 
+                            ? 'rgba(99, 102, 241, 0.2)' 
+                            : 'rgba(99, 102, 241, 0.05)',
+                          color: insightsWindow === days ? '#fff' : '#94a3b8',
+                          fontSize: '13px',
+                          fontWeight: insightsWindow === days ? '600' : '400',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {days} days
+                      </button>
+                    ))}
+                  </div>
+
+                  {!data.hasEnoughData ? (
                     <div style={{
                       background: 'rgba(99, 102, 241, 0.1)',
                       border: '1px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '16px',
-                      padding: '24px',
+                      borderRadius: '20px',
+                      padding: '32px 24px',
                       textAlign: 'center',
                     }}>
-                      <div style={{ fontSize: '48px', marginBottom: '12px' }}>📊</div>
-                      <p style={{ color: '#e2e8f0', fontSize: '16px', margin: 0 }}>
-                        Need more data for insights
+                      <div style={{ fontSize: '56px', marginBottom: '16px' }}>📊</div>
+                      <p style={{ color: '#e2e8f0', fontSize: '18px', fontWeight: '600', margin: '0 0 8px 0' }}>
+                        Keep tracking
                       </p>
-                      <p style={{ color: '#94a3b8', fontSize: '14px', marginTop: '8px' }}>
-                        Keep tracking for at least a week to see patterns emerge.
+                      <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
+                        {data.daysOfData < data.minDaysNeeded 
+                          ? `${data.minDaysNeeded - data.daysOfData} more days needed for ${insightsWindow}-day insights`
+                          : `${20 - data.entriesCount} more entries needed`
+                        }
+                      </p>
+                    </div>
+                  ) : data.insights.length === 0 && !data.topCluster ? (
+                    <div style={{
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '20px',
+                      padding: '32px 24px',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: '56px', marginBottom: '16px' }}>📈</div>
+                      <p style={{ color: '#e2e8f0', fontSize: '18px', fontWeight: '600', margin: '0 0 8px 0' }}>
+                        No major changes
+                      </p>
+                      <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
+                        Your symptoms have been relatively stable over the past {insightsWindow} days.
                       </p>
                     </div>
                   ) : (
                     <>
-                      {/* Summary */}
-                      <div style={{
-                        background: 'rgba(99, 102, 241, 0.1)',
-                        borderRadius: '12px',
-                        padding: '16px',
-                        marginBottom: '20px',
-                      }}>
-                        <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
-                          Analyzing {insights.totalEntries} entries from {insights.dateRange.start} to {insights.dateRange.end}
-                        </p>
-                      </div>
-
-                      {/* Trends Section */}
-                      {insights.trends.length > 0 && (
-                        <div style={{ marginBottom: '24px' }}>
-                          <h3 style={{
-                            color: '#94a3b8',
-                            fontSize: '12px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '1px',
-                            marginBottom: '12px',
-                          }}>
-                            Symptom Trends (30 days vs prior)
-                          </h3>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {insights.trends.map(t => (
-                              <div
-                                key={t.symptomId}
-                                style={{
-                                  background: t.trend === 'improving' 
-                                    ? 'rgba(74, 222, 128, 0.15)'
-                                    : t.trend === 'worsening'
-                                    ? 'rgba(239, 68, 68, 0.15)'
-                                    : 'rgba(148, 163, 184, 0.15)',
-                                  border: `1px solid ${
-                                    t.trend === 'improving' 
-                                      ? 'rgba(74, 222, 128, 0.3)'
-                                      : t.trend === 'worsening'
-                                      ? 'rgba(239, 68, 68, 0.3)'
-                                      : 'rgba(148, 163, 184, 0.3)'
-                                  }`,
-                                  borderRadius: '12px',
-                                  padding: '14px 16px',
-                                }}
-                              >
-                                <div style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                }}>
-                                  <span style={{
-                                    color: '#e2e8f0',
-                                    fontSize: '14px',
-                                    fontWeight: '500',
-                                  }}>
-                                    {t.name}
-                                  </span>
-                                  <span style={{
-                                    color: t.trend === 'improving' 
-                                      ? '#86efac'
-                                      : t.trend === 'worsening'
-                                      ? '#fca5a5'
-                                      : '#94a3b8',
-                                    fontSize: '13px',
-                                    fontWeight: '600',
-                                  }}>
-                                    {t.trend === 'improving' ? '↓' : t.trend === 'worsening' ? '↑' : '→'} {t.trend}
-                                  </span>
+                      {/* Big number tiles for significant changes */}
+                      {data.insights.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                          {data.insights.map(insight => (
+                            <div
+                              key={insight.symptomId}
+                              style={{
+                                background: insight.direction === 'improving' 
+                                  ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(74, 222, 128, 0.1) 100%)'
+                                  : 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%)',
+                                border: `2px solid ${insight.direction === 'improving' ? 'rgba(74, 222, 128, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                                borderRadius: '16px',
+                                padding: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '16px',
+                              }}
+                            >
+                              <div style={{
+                                fontSize: '36px',
+                                fontWeight: '800',
+                                color: insight.direction === 'improving' ? '#4ade80' : '#f87171',
+                                minWidth: '90px',
+                              }}>
+                                {insight.direction === 'improving' ? '↓' : '↑'}{Math.abs(insight.percentChange)}%
+                              </div>
+                              <div>
+                                <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '600' }}>
+                                  {insight.name}
                                 </div>
-                                <div style={{
-                                  color: '#94a3b8',
-                                  fontSize: '12px',
-                                  marginTop: '6px',
-                                }}>
-                                  {t.earlierAvg} → {t.recentAvg} avg severity ({t.change > 0 ? '+' : ''}{t.change})
+                                <div style={{ color: '#94a3b8', fontSize: '13px', marginTop: '4px' }}>
+                                  {insight.direction === 'improving' ? 'Improved' : 'Increased'} over {insightsWindow} days
                                 </div>
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          ))}
                         </div>
                       )}
 
-                      {/* Clusters Section */}
-                      {insights.clusters.length > 0 && (
-                        <div style={{ marginBottom: '24px' }}>
-                          <h3 style={{
-                            color: '#94a3b8',
-                            fontSize: '12px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '1px',
-                            marginBottom: '12px',
-                          }}>
-                            Symptom Clusters
-                          </h3>
+                      {/* Symptom cluster if significant */}
+                      {data.topCluster && (
+                        <div style={{
+                          background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.15) 0%, rgba(251, 191, 36, 0.1) 100%)',
+                          border: '2px solid rgba(251, 146, 60, 0.4)',
+                          borderRadius: '16px',
+                          padding: '20px',
+                          marginBottom: '20px',
+                        }}>
                           <div style={{
-                            background: 'rgba(251, 146, 60, 0.1)',
-                            border: '1px solid rgba(251, 146, 60, 0.3)',
-                            borderRadius: '12px',
-                            padding: '16px',
+                            fontSize: '28px',
+                            fontWeight: '800',
+                            color: '#fbbf24',
+                            marginBottom: '8px',
                           }}>
-                            <p style={{
-                              color: '#fed7aa',
-                              fontSize: '13px',
-                              margin: '0 0 12px 0',
-                            }}>
-                              These symptoms frequently appear together:
-                            </p>
-                            {insights.clusters.map((c, idx) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  color: '#e2e8f0',
-                                  fontSize: '14px',
-                                  padding: '8px 0',
-                                  borderTop: idx > 0 ? '1px solid rgba(251, 146, 60, 0.2)' : 'none',
-                                }}
-                              >
-                                <strong>{c.pair[0]}</strong> + <strong>{c.pair[1]}</strong>
-                                <span style={{ color: '#94a3b8', marginLeft: '8px' }}>
-                                  ({c.count} days)
-                                </span>
-                              </div>
-                            ))}
+                            {data.topCluster.percent}% of days
                           </div>
-                        </div>
-                      )}
-
-                      {/* Time Patterns */}
-                      {insights.timeInsights.length > 1 && (
-                        <div style={{ marginBottom: '24px' }}>
-                          <h3 style={{
-                            color: '#94a3b8',
-                            fontSize: '12px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '1px',
-                            marginBottom: '12px',
-                          }}>
-                            Time of Day Patterns
-                          </h3>
-                          <div style={{
-                            display: 'flex',
-                            gap: '8px',
-                            flexWrap: 'wrap',
-                          }}>
-                            {insights.timeInsights.map(t => (
-                              <div
-                                key={t.time}
-                                style={{
-                                  background: 'rgba(99, 102, 241, 0.15)',
-                                  border: '1px solid rgba(99, 102, 241, 0.3)',
-                                  borderRadius: '10px',
-                                  padding: '12px 16px',
-                                  textAlign: 'center',
-                                  flex: '1',
-                                  minWidth: '80px',
-                                }}
-                              >
-                                <div style={{ color: '#a5b4fc', fontSize: '12px', marginBottom: '4px' }}>
-                                  {t.label}
-                                </div>
-                                <div style={{
-                                  color: severityColors[Math.round(t.avgSeverity)],
-                                  fontSize: '20px',
-                                  fontWeight: '700',
-                                }}>
-                                  {t.avgSeverity}
-                                </div>
-                              </div>
-                            ))}
+                          <div style={{ color: '#f8fafc', fontSize: '14px' }}>
+                            <strong>{data.topCluster.names[0]}</strong> and <strong>{data.topCluster.names[1]}</strong> appear together
                           </div>
-                        </div>
-                      )}
-
-                      {/* Weekly Patterns */}
-                      {insights.weeklyInsights.length > 0 && (
-                        <div style={{ marginBottom: '24px' }}>
-                          <h3 style={{
-                            color: '#94a3b8',
-                            fontSize: '12px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '1px',
-                            marginBottom: '12px',
-                          }}>
-                            Weekly Patterns
-                          </h3>
-                          <div style={{
-                            display: 'flex',
-                            gap: '6px',
-                          }}>
-                            {insights.weeklyInsights.map(w => (
-                              <div
-                                key={w.day}
-                                style={{
-                                  flex: 1,
-                                  background: 'rgba(99, 102, 241, 0.1)',
-                                  borderRadius: '8px',
-                                  padding: '10px 4px',
-                                  textAlign: 'center',
-                                }}
-                              >
-                                <div style={{ color: '#64748b', fontSize: '10px', marginBottom: '4px' }}>
-                                  {w.day}
-                                </div>
-                                <div style={{
-                                  color: severityColors[Math.round(w.avgSeverity)],
-                                  fontSize: '14px',
-                                  fontWeight: '600',
-                                }}>
-                                  {w.avgSeverity}
-                                </div>
-                              </div>
-                            ))}
+                          <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '6px' }}>
+                            These symptoms may be related
                           </div>
                         </div>
                       )}
 
                       {/* AI Analysis Button */}
-                      <div style={{ marginBottom: '24px' }}>
-                        <h3 style={{
-                          color: '#94a3b8',
-                          fontSize: '12px',
-                          textTransform: 'uppercase',
-                          letterSpacing: '1px',
-                          marginBottom: '12px',
-                        }}>
-                          AI Analysis
-                        </h3>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(insights.aiPrompt);
-                            setLastAction('Copied to clipboard - paste into Claude for AI analysis');
-                            setShowInsights(false);
-                          }}
-                          style={{
-                            width: '100%',
-                            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
-                            border: '2px solid rgba(139, 92, 246, 0.4)',
-                            borderRadius: '12px',
-                            padding: '16px',
-                            color: '#c4b5fd',
-                            fontSize: '15px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            textAlign: 'center',
-                          }}
-                        >
-                          <div style={{ fontSize: '24px', marginBottom: '8px' }}>🤖</div>
-                          <div style={{ fontWeight: '600' }}>Copy for AI Analysis</div>
-                          <div style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>
-                            Paste into Claude for deeper pattern recognition
-                          </div>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(data.aiPrompt);
+                          setLastAction('Copied — paste into Claude for AI analysis');
+                          setShowInsights(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%)',
+                          border: '2px solid rgba(139, 92, 246, 0.4)',
+                          borderRadius: '16px',
+                          padding: '20px',
+                          color: '#c4b5fd',
+                          fontSize: '15px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          marginBottom: '20px',
+                        }}
+                      >
+                        <span style={{ fontSize: '20px', marginRight: '8px' }}>🤖</span>
+                        Copy for AI Analysis
+                      </button>
 
                       <p style={{
                         color: '#64748b',
                         fontSize: '11px',
                         textAlign: 'center',
                         margin: 0,
-                        fontStyle: 'italic',
                       }}>
-                        These insights are for informational purposes only and should not be considered medical advice.
+                        Based on {data.entriesCount} entries over {data.daysOfData} days. For informational purposes only.
                       </p>
                     </>
                   )}
@@ -2435,6 +2322,32 @@
                 }}>
                   Settings
                 </h2>
+                
+                {/* Manage Symptoms Button */}
+                <button
+                  onClick={() => {
+                    setShowSettings(false);
+                    setShowAddSymptom(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    color: '#a5b4fc',
+                    fontSize: '15px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    marginBottom: '20px',
+                  }}
+                >
+                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>Manage Symptoms</div>
+                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                    Add, edit, hide, or restore symptoms
+                  </div>
+                </button>
                 
                 {/* Tracking Mode Selection */}
                 <div style={{ marginBottom: '20px' }}>
