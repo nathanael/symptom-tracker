@@ -1,71 +1,71 @@
-# Symptom Tracker
+# Symptom Tracker v2.7
 
-A mobile-first web app for tracking daily symptoms with an intuitive press-and-drag interface.
+A mobile-first health tracking app for daily symptom and supplement logging.
 
 ## Features
-
-- **Ultra-low friction logging**: Press and hold any symptom, drag to select time of day and severity, release to log
-- **5 time periods**: Night, Morning, All Day, Midday, Evening
-- **6 severity levels**: 0 (None) to 5 (Extreme) with color coding
-- **Smart starting position**: Severity defaults based on where you tap (near top starts at 5, near bottom starts at 0)
-- **Calendar navigation**: Jump to any date, see which days have entries
-- **History table**: Sortable by date, symptom, time, or severity
-- **CSV export**: Export data for any time range (7 days to all time)
-- **Persistent storage**: All data saved to localStorage
-- **Bulk symptom import**: Add multiple symptoms at once
-- **Soft delete**: Hide symptoms while preserving historical data
-
-## Demo
-
-Visit: `https://[your-username].github.io/symptom-tracker/`
+- 2D gesture interface for quick severity logging
+- AM/PM tracking mode
+- Stack (supplement) tracking with multipliers
+- Insights and trends visualization
+- CSV export
+- iCloud backup via Files app
+- **Cloud Sync** via Firebase (when self-hosted)
 
 ## Deployment to GitHub Pages
 
-1. Create a new repository on GitHub
-2. Upload `index.html` to the repository
-3. Go to Settings → Pages
-4. Set Source to "Deploy from a branch"
-5. Select `main` branch and `/ (root)` folder
-6. Click Save
-7. Your site will be available at `https://[username].github.io/[repo-name]/`
+### Quick Setup:
 
-## Usage
+1. **Create a new GitHub repository**
 
-### Logging a symptom
-1. Find the symptom in the list
-2. Press and hold on the symptom
-3. Drag left/right to change time of day (screen is divided into 5 zones)
-4. Drag up/down to change severity (0-5)
-5. Release to log
+2. **Upload these files to the repo:**
+   - `index.html`
+   - `manifest.json`
 
-### Viewing history
-- Tap "History" to see all entries in a sortable table
-- Tap column headers to sort
+3. **Enable GitHub Pages:**
+   - Go to repo Settings → Pages
+   - Source: Deploy from branch
+   - Branch: `main` (or `master`), folder: `/ (root)`
+   - Click Save
 
-### Exporting data
-- Tap "Export" to download a CSV file
-- Choose a time range
+4. **Enable Cloud Sync (Firebase):**
+   - Go to [Firebase Console](https://console.firebase.google.com)
+   - Select project: `symptoms-dae26`
+   - Go to Authentication → Settings → Authorized domains
+   - Add: `yourusername.github.io`
 
-### Managing symptoms
-- Tap "+ Add Symptoms" to add new ones
-- You can paste a list separated by commas, tabs, or new lines
-- Tap a symptom to hide it (history is preserved)
+5. **Access your app:**
+   - `https://yourusername.github.io/repo-name/`
+
+### Add to Home Screen (iOS):
+1. Open the URL in Safari
+2. Tap Share → Add to Home Screen
+3. Name it "Symptoms"
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `index.html` | Complete app (single file, runs in browser) |
+| `manifest.json` | PWA manifest for home screen install |
+| `SymptomTracker.jsx` | Source component (for reference/editing) |
+
+## v2.7 Changes
+- Fixed AM/PM entry overwrite bug
+- Added "Logging to AM/PM" indicator in quick picker
+- Fixed "Copy Yesterday" for Stack (now includes unchecked items)
+- Removed unreliable auto-detect (was using server timezone)
 
 ## Data Storage
+- **Local**: All data saved to localStorage (works offline)
+- **Cloud**: Optional Firebase sync when signed in (requires self-hosting)
 
-All data is stored in your browser's localStorage:
-- `symptomTracker_symptoms` - Your symptom list
-- `symptomTracker_entries` - All logged entries
+## Cloud Sync Notes
 
-Data persists across sessions but is local to your device/browser.
+Cloud sync will work on:
+- ✅ GitHub Pages
+- ✅ Firebase Hosting
+- ✅ Vercel / Netlify
+- ✅ Any custom domain
+- ❌ Claude artifact preview (sandbox blocks external scripts)
 
-## Tech Stack
-
-- React 18 (via CDN)
-- Vanilla CSS-in-JS
-- No build step required
-- Single HTML file deployment
-
-## License
-
-MIT
+Just add your domain to Firebase's authorized domains list.
