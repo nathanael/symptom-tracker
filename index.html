@@ -2535,6 +2535,13 @@ function SymptomTrackerMobile() {
                   }}>
                     {[0, 1, 2, 3, 4, 5].map(severity => {
                       const logTime = quickLogTime || getCurrentTimePeriod();
+                      // Check yesterday's entry for this symptom/time
+                      const yesterday = new Date(selectedDate);
+                      yesterday.setDate(yesterday.getDate() - 1);
+                      const yesterdayKey = getDateKey(yesterday);
+                      const yesterdayEntry = entries[`${yesterdayKey}-${symptom.id}-${logTime}`];
+                      const isYesterdaySeverity = yesterdayEntry?.severity === severity;
+                      
                       return (
                         <button
                           key={severity}
@@ -2546,7 +2553,7 @@ function SymptomTrackerMobile() {
                             flex: 1,
                             padding: '12px 0',
                             background: `${severityColors[severity]}20`,
-                            border: 'none',
+                            border: isYesterdaySeverity ? `1px solid ${severityColors[severity]}35` : '1px solid transparent',
                             borderRadius: '8px',
                             color: severityColors[severity],
                             fontSize: '18px',
