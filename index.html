@@ -117,7 +117,7 @@ const initFirebase = async () => {
 };
 
 // ============================================================================
-// SYMPTOM TRACKER v2.8
+// SYMPTOM TRACKER v3.0
 // ============================================================================
 // A mobile-first health tracking app for symptoms and supplements.
 //
@@ -402,6 +402,8 @@ function SymptomTrackerMobile() {
   const [confirmFullReset, setConfirmFullReset] = useState(false);
   const [editingSymptomId, setEditingSymptomId] = useState(null);
   const [editingSymptomName, setEditingSymptomName] = useState('');
+  const [editingStackItemId, setEditingStackItemId] = useState(null);
+  const [editingStackItemData, setEditingStackItemData] = useState({ name: '', defaultDose: '', unit: 'mg' });
   const [bulkSymptomInput, setBulkSymptomInput] = useState('');
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [historySort, setHistorySort] = useState({ column: 'date', direction: 'desc' });
@@ -410,6 +412,16 @@ function SymptomTrackerMobile() {
   const [isLoading, setIsLoading] = useState(false); // For loading states
   const [quickLogSymptom, setQuickLogSymptom] = useState(null); // For tap-to-log quick picker
   const [quickLogTime, setQuickLogTime] = useState(null); // Selected time period in quick picker (null = first period)
+  
+  // Drag-to-reorder state
+  const [draggedItem, setDraggedItem] = useState(null); // { id, type: 'symptom' | 'stack', startIndex }
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [dragY, setDragY] = useState(0); // Current Y offset for dragged item
+  const dragStartY = useRef(0);
+  const dragItemHeight = useRef(48); // Approximate item height
+  
+  // Swipe-to-delete state
+  const [swipeOffsets, setSwipeOffsets] = useState({}); // { [itemId]: offsetX }
   
   // Firebase Auth State
   const [user, setUser] = useState(null);
@@ -424,7 +436,7 @@ function SymptomTrackerMobile() {
   const holdTimerRef = useRef(null);
   const pendingSymptomRef = useRef(null);
   const isDraggingRef = useRef(false);
-  const swipeStartRef = useRef({ x: 0, y: 0, time: 0 });
+  const swipeStartRef = useRef({ x: 0, y: 0, time: 0, id: null }); // Combined: time for nav swipe, id for delete swipe
   const notesTextareaRef = useRef(null);
 
   // Constants
@@ -675,6 +687,58 @@ function SymptomTrackerMobile() {
     localStorage.setItem(STORAGE_KEY_PINNED, JSON.stringify([...pinnedSymptoms]));
   }, [pinnedSymptoms]);
 
+  // Auto-sync to cloud when data changes (debounced)
+  const syncTimeoutRef = useRef(null);
+  const lastSyncDataRef = useRef('');
+  
+  useEffect(() => {
+    // Only auto-sync if user is signed in and Firebase is ready
+    if (!user || !firebaseDb || syncing) return;
+    
+    // Create a hash of current data to detect changes
+    const currentData = JSON.stringify({
+      symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms: [...pinnedSymptoms], trackingMode
+    });
+    
+    // Skip if data hasn't changed since last sync
+    if (currentData === lastSyncDataRef.current) return;
+    
+    // Clear existing timeout
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+    
+    // Debounce: sync 30 seconds after last change
+    syncTimeoutRef.current = setTimeout(async () => {
+      try {
+        const docRef = firebaseDb.collection('users').doc(user.uid);
+        await docRef.set({
+          symptoms,
+          entries,
+          dailyNotes,
+          stackItems,
+          stackEntries,
+          pinnedSymptoms: [...pinnedSymptoms],
+          trackingMode,
+          version: '3.0',
+          updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        lastSyncDataRef.current = currentData;
+        setLastSynced(new Date());
+        setSyncError(null);
+      } catch (err) {
+        console.error('Auto-sync error:', err);
+        // Don't show error for auto-sync failures
+      }
+    }, 30000); // 30 second delay
+    
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, [user, firebaseDb, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode, syncing]);
+
   // Lock body scroll when dragging - iOS Safari fix
   useEffect(() => {
     const preventScroll = (e) => {
@@ -729,7 +793,7 @@ function SymptomTrackerMobile() {
         trackingMode,
         pinnedSymptoms: [...pinnedSymptoms],
         updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
-        version: '2.8',
+        version: '3.0',
       };
       
       await firebaseDb.collection('users').doc(user.uid).set(userData);
@@ -906,19 +970,8 @@ function SymptomTrackerMobile() {
       setConfirmFullReset(true);
       return;
     }
-    // Clear all state
-    setSymptoms(defaultSymptoms);
-    setEntries({});
-    setDailyNotes({});
-    setStackItems(defaultStackItems);
-    setStackEntries({});
-    setPinnedSymptoms(new Set());
-    setHasSampleData(false);
-    setTrackingMode('ampm');
-    setConfirmFullReset(false);
-    setShowSettings(false);
     
-    // Clear all localStorage
+    // Clear all localStorage first
     localStorage.removeItem(STORAGE_KEY_SYMPTOMS);
     localStorage.removeItem(STORAGE_KEY_ENTRIES);
     localStorage.removeItem(STORAGE_KEY_NOTES);
@@ -928,7 +981,8 @@ function SymptomTrackerMobile() {
     localStorage.removeItem(STORAGE_KEY_APP_MODE);
     localStorage.removeItem(STORAGE_KEY_PINNED);
     
-    setLastAction('Full reset complete - all data removed');
+    // Force a full page reload to reset all state
+    window.location.reload();
   };
 
   // Helper to close History and return to Settings if opened from there
@@ -952,7 +1006,7 @@ function SymptomTrackerMobile() {
   // Backup all data to a JSON file (save to iCloud via Files app)
   const backupToFile = () => {
     const backup = {
-      version: '2.8',
+      version: '3.0',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -1532,6 +1586,197 @@ function SymptomTrackerMobile() {
   const cancelEditingSymptom = () => {
     setEditingSymptomId(null);
     setEditingSymptomName('');
+  };
+
+  // Stack item editing functions
+  const startEditingStackItem = (item) => {
+    setEditingStackItemId(item.id);
+    setEditingStackItemData({ name: item.name, defaultDose: item.defaultDose, unit: item.unit });
+  };
+
+  const saveStackItemEdit = () => {
+    if (editingStackItemData.name.trim() && editingStackItemId) {
+      setStackItems(stackItems.map(item => 
+        item.id === editingStackItemId 
+          ? { ...item, name: editingStackItemData.name.trim(), defaultDose: editingStackItemData.defaultDose, unit: editingStackItemData.unit } 
+          : item
+      ));
+    }
+    setEditingStackItemId(null);
+    setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg' });
+  };
+
+  const cancelEditingStackItem = () => {
+    setEditingStackItemId(null);
+    setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg' });
+  };
+
+  const deleteStackItem = (itemId) => {
+    setStackItems(stackItems.filter(item => item.id !== itemId));
+  };
+
+  // Drag-to-reorder handlers (touch-based with animation)
+  const handleReorderStart = (e, item, type, index, itemsList) => {
+    e.stopPropagation();
+    const touch = e.touches ? e.touches[0] : e;
+    dragStartY.current = touch.clientY;
+    dragItemHeight.current = e.currentTarget.closest('[data-reorder-item]')?.offsetHeight || 52;
+    setDraggedItem({ id: item.id, type, startIndex: index, itemsList });
+    setDragOverIndex(index);
+    setDragY(0);
+    haptic('medium');
+  };
+
+  const handleReorderMove = (e) => {
+    if (!draggedItem) return;
+    e.preventDefault();
+    
+    const touch = e.touches ? e.touches[0] : e;
+    const deltaY = touch.clientY - dragStartY.current;
+    setDragY(deltaY);
+    
+    // Calculate which index we're hovering over
+    const indexOffset = Math.round(deltaY / dragItemHeight.current);
+    const newIndex = Math.max(0, Math.min(
+      draggedItem.itemsList.length - 1, 
+      draggedItem.startIndex + indexOffset
+    ));
+    
+    if (newIndex !== dragOverIndex) {
+      setDragOverIndex(newIndex);
+      haptic('light');
+    }
+  };
+
+  const handleReorderEnd = () => {
+    if (!draggedItem || dragOverIndex === null) {
+      setDraggedItem(null);
+      setDragOverIndex(null);
+      setDragY(0);
+      return;
+    }
+    
+    const { type, startIndex, itemsList } = draggedItem;
+    
+    if (startIndex !== dragOverIndex) {
+      if (type === 'symptom') {
+        // Reorder symptoms
+        const newSymptoms = [...symptoms];
+        const activeIds = itemsList.map(s => s.id);
+        const [movedId] = activeIds.splice(startIndex, 1);
+        activeIds.splice(dragOverIndex, 0, movedId);
+        
+        activeIds.forEach((id, idx) => {
+          const symptomIdx = newSymptoms.findIndex(s => s.id === id);
+          if (symptomIdx !== -1) {
+            newSymptoms[symptomIdx] = { ...newSymptoms[symptomIdx], order: idx };
+          }
+        });
+        setSymptoms(newSymptoms);
+      } else if (type === 'stack') {
+        // Reorder stack items
+        const newStackItems = [...stackItems];
+        const activeIds = itemsList.map(s => s.id);
+        const [movedId] = activeIds.splice(startIndex, 1);
+        activeIds.splice(dragOverIndex, 0, movedId);
+        
+        activeIds.forEach((id, idx) => {
+          const itemIdx = newStackItems.findIndex(s => s.id === id);
+          if (itemIdx !== -1) {
+            newStackItems[itemIdx] = { ...newStackItems[itemIdx], order: idx };
+          }
+        });
+        setStackItems(newStackItems);
+      }
+      haptic('medium');
+    }
+    
+    setDraggedItem(null);
+    setDragOverIndex(null);
+    setDragY(0);
+  };
+
+  // Calculate transform for reorder animation
+  const getReorderTransform = (index, type) => {
+    if (!draggedItem || draggedItem.type !== type) return {};
+    
+    const { startIndex } = draggedItem;
+    const height = dragItemHeight.current;
+    
+    if (index === startIndex) {
+      // This is the dragged item - follow the finger
+      return {
+        transform: `translateY(${dragY}px)`,
+        zIndex: 100,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        transition: 'box-shadow 0.2s ease',
+      };
+    }
+    
+    // Other items shift to make room
+    if (dragOverIndex !== null && dragOverIndex !== startIndex) {
+      if (startIndex < dragOverIndex) {
+        // Dragging down - items between start and target shift up
+        if (index > startIndex && index <= dragOverIndex) {
+          return {
+            transform: `translateY(-${height}px)`,
+            transition: 'transform 0.2s ease',
+          };
+        }
+      } else {
+        // Dragging up - items between target and start shift down
+        if (index >= dragOverIndex && index < startIndex) {
+          return {
+            transform: `translateY(${height}px)`,
+            transition: 'transform 0.2s ease',
+          };
+        }
+      }
+    }
+    
+    return {
+      transform: 'translateY(0)',
+      transition: 'transform 0.2s ease',
+    };
+  };
+
+  // Swipe-to-delete handlers
+  const handleItemSwipeStart = (e, itemId) => {
+    const touch = e.touches ? e.touches[0] : e;
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY, id: itemId };
+  };
+
+  const handleItemSwipeMove = (e, itemId) => {
+    if (swipeStartRef.current.id !== itemId) return;
+    
+    const touch = e.touches ? e.touches[0] : e;
+    const deltaX = touch.clientX - swipeStartRef.current.x;
+    const deltaY = Math.abs(touch.clientY - swipeStartRef.current.y);
+    
+    // Only track horizontal swipes (not vertical scrolling)
+    if (deltaY > 30) {
+      swipeStartRef.current = { x: 0, y: 0, id: null };
+      setSwipeOffsets(prev => ({ ...prev, [itemId]: 0 }));
+      return;
+    }
+    
+    // Only allow left swipes (negative deltaX), cap at -100
+    if (deltaX < 0) {
+      setSwipeOffsets(prev => ({ ...prev, [itemId]: Math.max(deltaX, -100) }));
+    }
+  };
+
+  const handleItemSwipeEnd = (itemId, onDelete) => {
+    const offset = swipeOffsets[itemId] || 0;
+    
+    if (offset < -60) {
+      // Swiped far enough - trigger delete
+      onDelete();
+    }
+    
+    // Reset swipe
+    setSwipeOffsets(prev => ({ ...prev, [itemId]: 0 }));
+    swipeStartRef.current = { x: 0, y: 0, id: null };
   };
 
   const clearEntry = (symptomId, timeId) => {
@@ -2386,7 +2631,7 @@ function SymptomTrackerMobile() {
                           return `${currentPeriod?.icon} ${currentPeriod?.label}`;
                         })()}
                       </button>
-                    )}}
+                    )}
                     
                     {/* Pin button */}
                     <button
@@ -2762,7 +3007,7 @@ function SymptomTrackerMobile() {
               marginTop: '4px',
             }}
           >
-            + Manage Stack
+            + Add to Stack
           </button>
         </div>
         )}
@@ -3401,26 +3646,38 @@ function SymptomTrackerMobile() {
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
                 }}>Active Symptoms</label>
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  marginTop: '12px',
-                }}>
-                  {activeSymptoms.map((symptom) => (
+                <p style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 12px 0' }}>
+                  Hold ≡ to reorder • Swipe left to hide • Tap to edit
+                </p>
+                <div 
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    position: 'relative',
+                  }}
+                  onTouchMove={handleReorderMove}
+                  onTouchEnd={handleReorderEnd}
+                  onMouseMove={handleReorderMove}
+                  onMouseUp={handleReorderEnd}
+                  onMouseLeave={handleReorderEnd}
+                >
+                  {activeSymptoms.map((symptom, index) => (
                     <div
                       key={symptom.id}
+                      data-reorder-item
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
+                        position: 'relative',
+                        overflow: draggedItem?.id === symptom.id ? 'visible' : 'hidden',
+                        borderRadius: '10px',
+                        ...getReorderTransform(index, 'symptom'),
                       }}
                     >
                       {editingSymptomId === symptom.id ? (
                         <div style={{
-                          flex: 1,
                           display: 'flex',
                           gap: '8px',
+                          padding: '4px',
                         }}>
                           <input
                             type="text"
@@ -3473,41 +3730,70 @@ function SymptomTrackerMobile() {
                         </div>
                       ) : (
                         <>
-                          <button
-                            onClick={() => startEditingSymptom(symptom)}
-                            style={{
-                              background: 'rgba(99, 102, 241, 0.15)',
-                              border: '2px solid rgba(99, 102, 241, 0.3)',
-                              borderRadius: '8px',
-                              padding: '10px 12px',
-                              color: '#a5b4fc',
-                              fontSize: '14px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            ✎
-                          </button>
-                          <span style={{
-                            flex: 1,
-                            color: '#e2e8f0',
-                            fontSize: '14px',
+                          {/* Delete action revealed on swipe */}
+                          <div style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '80px',
+                            background: '#ef4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '10px',
                           }}>
-                            {symptom.name}
-                          </span>
-                          <button
-                            onClick={() => removeSymptom(symptom.id)}
+                            <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Hide</span>
+                          </div>
+                          {/* Swipeable content */}
+                          <div
+                            onTouchStart={(e) => {
+                              if (!draggedItem) handleItemSwipeStart(e, symptom.id);
+                            }}
+                            onTouchMove={(e) => {
+                              if (!draggedItem) handleItemSwipeMove(e, symptom.id);
+                            }}
+                            onTouchEnd={() => {
+                              if (!draggedItem) handleItemSwipeEnd(symptom.id, () => removeSymptom(symptom.id));
+                            }}
                             style={{
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              border: '2px solid rgba(239, 68, 68, 0.3)',
-                              borderRadius: '8px',
-                              padding: '10px 14px',
-                              color: '#fca5a5',
-                              fontSize: '14px',
-                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              background: draggedItem?.id === symptom.id ? '#2d2875' : '#1e1b4b',
+                              borderRadius: '10px',
+                              transform: `translateX(${swipeOffsets[symptom.id] || 0}px)`,
+                              transition: swipeStartRef.current.id === symptom.id ? 'none' : 'transform 0.2s ease',
                             }}
                           >
-                            ✕
-                          </button>
+                            {/* Drag handle */}
+                            <div
+                              onTouchStart={(e) => handleReorderStart(e, symptom, 'symptom', index, activeSymptoms)}
+                              onMouseDown={(e) => handleReorderStart(e, symptom, 'symptom', index, activeSymptoms)}
+                              style={{
+                                padding: '12px 8px 12px 12px',
+                                color: draggedItem?.id === symptom.id ? '#a5b4fc' : '#64748b',
+                                fontSize: '16px',
+                                cursor: 'grab',
+                                touchAction: 'none',
+                              }}
+                            >
+                              ≡
+                            </div>
+                            {/* Clickable text to edit */}
+                            <div
+                              onClick={() => !draggedItem && startEditingSymptom(symptom)}
+                              style={{
+                                flex: 1,
+                                cursor: 'pointer',
+                                padding: '12px 12px 12px 0',
+                                color: '#e2e8f0',
+                                fontSize: '14px',
+                              }}
+                            >
+                              {symptom.name}
+                            </div>
+                          </div>
                         </>
                       )}
                     </div>
@@ -3524,26 +3810,29 @@ function SymptomTrackerMobile() {
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
                 }}>Hidden Symptoms</label>
+                <p style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 12px 0' }}>
+                  Swipe left to delete • Tap + to restore
+                </p>
                 <div style={{
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '8px',
-                  marginTop: '12px',
                 }}>
                   {inactiveSymptoms.map((symptom) => (
                     <div
                       key={symptom.id}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        borderRadius: '10px',
+                        opacity: 0.7,
                       }}
                     >
                       {editingSymptomId === symptom.id ? (
                         <div style={{
-                          flex: 1,
                           display: 'flex',
                           gap: '8px',
+                          padding: '4px',
                         }}>
                           <input
                             type="text"
@@ -3596,41 +3885,66 @@ function SymptomTrackerMobile() {
                         </div>
                       ) : (
                         <>
-                          <button
-                            onClick={() => startEditingSymptom(symptom)}
-                            style={{
-                              background: 'rgba(99, 102, 241, 0.15)',
-                              border: '2px solid rgba(99, 102, 241, 0.3)',
-                              borderRadius: '8px',
-                              padding: '10px 12px',
-                              color: '#a5b4fc',
-                              fontSize: '14px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            ✎
-                          </button>
-                          <span style={{
-                            flex: 1,
-                            color: '#94a3b8',
-                            fontSize: '14px',
+                          {/* Delete action revealed on swipe */}
+                          <div style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '80px',
+                            background: '#ef4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '10px',
                           }}>
-                            {symptom.name}
-                          </span>
-                          <button
-                            onClick={() => reactivateSymptom(symptom.id)}
+                            <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Delete</span>
+                          </div>
+                          {/* Swipeable content */}
+                          <div
+                            onTouchStart={(e) => handleItemSwipeStart(e, `inactive-${symptom.id}`)}
+                            onTouchMove={(e) => handleItemSwipeMove(e, `inactive-${symptom.id}`)}
+                            onTouchEnd={() => handleItemSwipeEnd(`inactive-${symptom.id}`, () => setSymptoms(symptoms.filter(s => s.id !== symptom.id)))}
                             style={{
-                              background: 'rgba(74, 222, 128, 0.15)',
-                              border: '2px solid rgba(74, 222, 128, 0.3)',
-                              borderRadius: '8px',
-                              padding: '10px 14px',
-                              color: '#86efac',
-                              fontSize: '14px',
-                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              background: 'rgba(15, 23, 42, 0.6)',
+                              borderRadius: '10px',
+                              transform: `translateX(${swipeOffsets[`inactive-${symptom.id}`] || 0}px)`,
+                              transition: swipeStartRef.current.id === `inactive-${symptom.id}` ? 'none' : 'transform 0.2s ease',
                             }}
                           >
-                            +
-                          </button>
+                            {/* Clickable text to edit */}
+                            <div
+                              onClick={() => startEditingSymptom(symptom)}
+                              style={{
+                                flex: 1,
+                                cursor: 'pointer',
+                                padding: '12px',
+                                color: '#94a3b8',
+                                fontSize: '14px',
+                              }}
+                            >
+                              {symptom.name}
+                            </div>
+                            {/* Restore button */}
+                            <button
+                              onClick={() => reactivateSymptom(symptom.id)}
+                              style={{
+                                background: 'rgba(74, 222, 128, 0.2)',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                marginRight: '8px',
+                                color: '#86efac',
+                                fontSize: '16px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              +
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>
@@ -4465,8 +4779,8 @@ function SymptomTrackerMobile() {
                       }}
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.87h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v3.07h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v3.04C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                       </svg>
@@ -4713,37 +5027,69 @@ function SymptomTrackerMobile() {
         </div>
       )}
 
-      {/* Manage Stack Modal */}
+      {/* Manage Stack - Full Screen */}
       {showManageStack && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.9)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          zIndex: 1000,
-        }}>
-          <div style={{
-            background: 'linear-gradient(180deg, #1e1b4b 0%, #0f0a2e 100%)',
-            borderRadius: '20px',
-            padding: '24px',
-            width: '100%',
-            maxWidth: '400px',
-            maxHeight: '85vh',
+        <div 
+          onClick={() => {
+            setShowManageStack(false);
+            setEditingStackItemId(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.92)',
+            zIndex: 1000,
             overflowY: 'auto',
-          }}>
-            <h2 style={{ color: '#f8fafc', marginTop: 0, marginBottom: '20px' }}>Manage Stack</h2>
-            
-            {/* Add new item - always visible */}
+            padding: '20px',
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '400px', margin: '0 auto' }}
+          >
             <div style={{
-              background: 'rgba(15, 23, 42, 0.6)',
-              borderRadius: '12px',
-              padding: '14px',
-              marginBottom: '16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '20px',
             }}>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+              <h2 style={{ color: '#f8fafc', fontSize: '22px', fontWeight: '700', margin: 0 }}>
+                Add to Stack
+              </h2>
+              <button
+                onClick={() => {
+                  setShowManageStack(false);
+                  setEditingStackItemId(null);
+                }}
+                style={{
+                  background: 'rgba(99, 102, 241, 0.2)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  width: '44px',
+                  height: '44px',
+                  color: '#a5b4fc',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Add new item */}
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.6)',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '20px',
+            }}>
+              <label style={{
+                color: '#94a3b8',
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+              }}>Add New Supplement</label>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '10px', marginBottom: '10px' }}>
                 <input
                   type="text"
                   placeholder="Supplement name"
@@ -4752,12 +5098,12 @@ function SymptomTrackerMobile() {
                   style={{
                     flex: 1,
                     background: 'rgba(15, 23, 42, 0.8)',
-                    border: '1px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '8px',
-                    padding: '10px 12px',
+                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
                     color: '#f8fafc',
-                    fontSize: '14px',
-                    boxSizing: 'border-box',
+                    fontSize: '15px',
+                    outline: 'none',
                   }}
                 />
               </div>
@@ -4769,27 +5115,28 @@ function SymptomTrackerMobile() {
                   value={newStackItem.defaultDose}
                   onChange={(e) => setNewStackItem({...newStackItem, defaultDose: e.target.value})}
                   style={{
-                    width: '70px',
+                    width: '80px',
                     background: 'rgba(15, 23, 42, 0.8)',
-                    border: '1px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '8px',
-                    padding: '10px 12px',
+                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
                     color: '#f8fafc',
-                    fontSize: '14px',
+                    fontSize: '15px',
                     textAlign: 'center',
+                    outline: 'none',
                   }}
                 />
                 <select
                   value={newStackItem.unit}
                   onChange={(e) => setNewStackItem({...newStackItem, unit: e.target.value})}
                   style={{
-                    width: '70px',
+                    width: '80px',
                     background: 'rgba(15, 23, 42, 0.8)',
-                    border: '1px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '8px',
-                    padding: '10px 8px',
+                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '10px',
+                    padding: '12px 10px',
                     color: '#f8fafc',
-                    fontSize: '14px',
+                    fontSize: '15px',
                   }}
                 >
                   <option value="mg">mg</option>
@@ -4798,6 +5145,7 @@ function SymptomTrackerMobile() {
                   <option value="IU">IU</option>
                   <option value="ml">ml</option>
                   <option value="drops">drops</option>
+                  <option value="caps">caps</option>
                 </select>
                 <button
                   onClick={addStackItem}
@@ -4805,121 +5153,326 @@ function SymptomTrackerMobile() {
                   style={{
                     flex: 1,
                     background: (!newStackItem.name.trim() || !newStackItem.defaultDose) 
-                      ? 'rgba(34, 197, 94, 0.2)' 
-                      : '#22c55e',
+                      ? 'rgba(99, 102, 241, 0.3)' 
+                      : '#6366f1',
                     border: 'none',
-                    borderRadius: '8px',
-                    padding: '10px',
+                    borderRadius: '10px',
+                    padding: '12px',
                     color: '#fff',
                     fontSize: '14px',
                     fontWeight: '600',
-                    cursor: 'pointer',
+                    cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  + Add
+                  Add
                 </button>
               </div>
             </div>
-            
-            {/* List of items */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-              {stackItems.sort((a, b) => (a.order || 0) - (b.order || 0)).map(item => (
+
+            {/* Active Items */}
+            {stackItems.filter(i => i.active).length > 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                }}>Active Supplements</label>
+                <p style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 12px 0' }}>
+                  Hold ≡ to reorder • Swipe left to hide • Tap to edit
+                </p>
                 <div 
-                  key={item.id}
                   style={{
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    background: 'rgba(15, 23, 42, 0.4)',
-                    borderRadius: '10px',
-                    padding: '12px 14px',
-                    opacity: item.active ? 1 : 0.5,
+                    flexDirection: 'column',
+                    gap: '8px',
+                    position: 'relative',
                   }}
+                  onTouchMove={handleReorderMove}
+                  onTouchEnd={handleReorderEnd}
+                  onMouseMove={handleReorderMove}
+                  onMouseUp={handleReorderEnd}
+                  onMouseLeave={handleReorderEnd}
                 >
-                  <div>
-                    <span style={{ color: '#e2e8f0', fontSize: '14px' }}>{item.name}</span>
-                    <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
-                      {item.defaultDose} {item.unit}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => toggleStackItemActive(item.id)}
-                    style={{
-                      background: item.active ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
-                      border: 'none',
-                      borderRadius: '6px',
-                      width: '28px',
-                      height: '28px',
-                      color: item.active ? '#f87171' : '#4ade80',
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {item.active ? '✕' : '+'}
-                  </button>
+                  {(() => {
+                    const activeItems = stackItems.filter(item => item.active).sort((a, b) => (a.order || 0) - (b.order || 0));
+                    return activeItems.map((item, index) => (
+                    <div
+                      key={item.id}
+                      data-reorder-item
+                      style={{
+                        position: 'relative',
+                        overflow: draggedItem?.id === item.id ? 'visible' : 'hidden',
+                        borderRadius: '10px',
+                        ...getReorderTransform(index, 'stack'),
+                      }}
+                    >
+                      {editingStackItemId === item.id ? (
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                          padding: '4px',
+                        }}>
+                          <input
+                            type="text"
+                            value={editingStackItemData.name}
+                            onChange={(e) => setEditingStackItemData({...editingStackItemData, name: e.target.value})}
+                            autoFocus
+                            style={{
+                              flex: 1,
+                              background: 'rgba(99, 102, 241, 0.2)',
+                              border: '2px solid rgba(99, 102, 241, 0.5)',
+                              borderRadius: '8px',
+                              padding: '10px 12px',
+                              color: '#fff',
+                              fontSize: '14px',
+                              outline: 'none',
+                            }}
+                          />
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={editingStackItemData.defaultDose}
+                              onChange={(e) => setEditingStackItemData({...editingStackItemData, defaultDose: e.target.value})}
+                              style={{
+                                width: '70px',
+                                background: 'rgba(99, 102, 241, 0.2)',
+                                border: '2px solid rgba(99, 102, 241, 0.5)',
+                                borderRadius: '8px',
+                                padding: '10px 12px',
+                                color: '#fff',
+                                fontSize: '14px',
+                                textAlign: 'center',
+                                outline: 'none',
+                              }}
+                            />
+                            <select
+                              value={editingStackItemData.unit}
+                              onChange={(e) => setEditingStackItemData({...editingStackItemData, unit: e.target.value})}
+                              style={{
+                                width: '70px',
+                                background: 'rgba(99, 102, 241, 0.2)',
+                                border: '2px solid rgba(99, 102, 241, 0.5)',
+                                borderRadius: '8px',
+                                padding: '10px 8px',
+                                color: '#fff',
+                                fontSize: '14px',
+                              }}
+                            >
+                              <option value="mg">mg</option>
+                              <option value="mcg">mcg</option>
+                              <option value="g">g</option>
+                              <option value="IU">IU</option>
+                              <option value="ml">ml</option>
+                              <option value="drops">drops</option>
+                              <option value="caps">caps</option>
+                            </select>
+                            <button
+                              onClick={saveStackItemEdit}
+                              style={{
+                                background: 'rgba(74, 222, 128, 0.2)',
+                                border: '2px solid rgba(74, 222, 128, 0.4)',
+                                borderRadius: '8px',
+                                padding: '10px 14px',
+                                color: '#86efac',
+                                fontSize: '14px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={cancelEditingStackItem}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.15)',
+                                border: '2px solid rgba(239, 68, 68, 0.3)',
+                                borderRadius: '8px',
+                                padding: '10px 14px',
+                                color: '#fca5a5',
+                                fontSize: '14px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Delete action revealed on swipe */}
+                          <div style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '80px',
+                            background: '#ef4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '10px',
+                          }}>
+                            <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Hide</span>
+                          </div>
+                          {/* Swipeable content */}
+                          <div
+                            onTouchStart={(e) => {
+                              if (!draggedItem) handleItemSwipeStart(e, `stack-${item.id}`);
+                            }}
+                            onTouchMove={(e) => {
+                              if (!draggedItem) handleItemSwipeMove(e, `stack-${item.id}`);
+                            }}
+                            onTouchEnd={() => {
+                              if (!draggedItem) handleItemSwipeEnd(`stack-${item.id}`, () => toggleStackItemActive(item.id));
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              background: draggedItem?.id === item.id ? '#2d2875' : '#1e1b4b',
+                              borderRadius: '10px',
+                              transform: `translateX(${swipeOffsets[`stack-${item.id}`] || 0}px)`,
+                              transition: swipeStartRef.current.id === `stack-${item.id}` ? 'none' : 'transform 0.2s ease',
+                            }}
+                          >
+                            {/* Drag handle */}
+                            <div
+                              onTouchStart={(e) => handleReorderStart(e, item, 'stack', index, activeItems)}
+                              onMouseDown={(e) => handleReorderStart(e, item, 'stack', index, activeItems)}
+                              style={{
+                                padding: '12px 8px 12px 12px',
+                                color: draggedItem?.id === item.id ? '#a5b4fc' : '#64748b',
+                                fontSize: '16px',
+                                cursor: 'grab',
+                                touchAction: 'none',
+                              }}
+                            >
+                              ≡
+                            </div>
+                            {/* Clickable text to edit */}
+                            <div 
+                              onClick={() => !draggedItem && startEditingStackItem(item)}
+                              style={{
+                                flex: 1,
+                                cursor: 'pointer',
+                                padding: '12px 12px 12px 0',
+                              }}
+                            >
+                              <span style={{ color: '#e2e8f0', fontSize: '14px' }}>{item.name}</span>
+                              <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
+                                {item.defaultDose} {item.unit}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ));
+                  })()}
                 </div>
-              ))}
-              {stackItems.length === 0 && (
-                <p style={{ color: '#64748b', textAlign: 'center', padding: '20px' }}>
-                  No supplements added yet
-                </p>
-              )}
-            </div>
+              </div>
+            )}
 
-            <button
-              onClick={() => {
-                setShowManageStack(false);
-                setShowAddStackItem(false);
-              }}
-              style={{
-                width: '100%',
-                background: 'rgba(99, 102, 241, 0.15)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '10px',
-                padding: '14px',
-                color: '#a5b4fc',
-                fontSize: '15px',
-                fontWeight: '600',
-                cursor: 'pointer',
-              }}
-            >
-              Done
-            </button>
+            {/* Inactive Items */}
+            {stackItems.filter(i => !i.active).length > 0 && (
+              <div>
+                <label style={{
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                }}>Inactive Supplements</label>
+                <p style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 12px 0' }}>
+                  Swipe left to delete • Tap + to restore
+                </p>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}>
+                  {stackItems.filter(item => !item.active).map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        position: 'relative',
+                        overflow: 'hidden',
+                        borderRadius: '10px',
+                        opacity: 0.7,
+                      }}
+                    >
+                      {/* Delete action revealed on swipe */}
+                      <div style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '80px',
+                        background: '#ef4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '10px',
+                      }}>
+                        <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Delete</span>
+                      </div>
+                      {/* Swipeable content */}
+                      <div
+                        onTouchStart={(e) => handleItemSwipeStart(e, `stack-inactive-${item.id}`)}
+                        onTouchMove={(e) => handleItemSwipeMove(e, `stack-inactive-${item.id}`)}
+                        onTouchEnd={() => handleItemSwipeEnd(`stack-inactive-${item.id}`, () => deleteStackItem(item.id))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          background: 'rgba(15, 23, 42, 0.6)',
+                          borderRadius: '10px',
+                          transform: `translateX(${swipeOffsets[`stack-inactive-${item.id}`] || 0}px)`,
+                          transition: swipeStartRef.current.id === `stack-inactive-${item.id}` ? 'none' : 'transform 0.2s ease',
+                        }}
+                      >
+                        {/* Clickable text to edit */}
+                        <div 
+                          onClick={() => startEditingStackItem(item)}
+                          style={{
+                            flex: 1,
+                            cursor: 'pointer',
+                            padding: '12px',
+                          }}
+                        >
+                          <span style={{ color: '#94a3b8', fontSize: '14px' }}>{item.name}</span>
+                          <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
+                            {item.defaultDose} {item.unit}
+                          </span>
+                        </div>
+                        {/* Restore button */}
+                        <button
+                          onClick={() => toggleStackItemActive(item.id)}
+                          style={{
+                            background: 'rgba(74, 222, 128, 0.2)',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            marginRight: '8px',
+                            color: '#86efac',
+                            fontSize: '16px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Success Toast */}
-      {lastAction && !isDragging && !showAddSymptom && !showCalendar && !showHistory && !showExport && !showSettings && !showInsights && !showManageStack && (
-        <div 
-          onClick={lastDeletedEntry ? undoDelete : undefined}
-          style={{
-            position: 'fixed',
-            bottom: '90px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: lastDeletedEntry ? 'rgba(99, 102, 241, 0.95)' : 'rgba(30, 27, 75, 0.95)',
-            border: '1px solid rgba(99, 102, 241, 0.4)',
-            borderRadius: '10px',
-            padding: '10px 18px',
-            color: lastDeletedEntry ? '#fff' : '#a5b4fc',
-            fontSize: '13px',
-            fontWeight: '500',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
-            animation: 'slideUpFade 3s ease forwards',
-            cursor: lastDeletedEntry ? 'pointer' : 'default',
-          }}>
-          {lastDeletedEntry ? '↩ Tap to undo' : `✓ ${lastAction}`}
-        </div>
-      )}
-
       <style>{`
-        @keyframes slideUpFade {
-          0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
-          10% { opacity: 1; transform: translateX(-50%) translateY(0); }
-          80% { opacity: 1; transform: translateX(-50%) translateY(0); }
-          100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-        }
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
