@@ -452,6 +452,14 @@ function SymptomTrackerMobile() {
   // Helper function for date keys (defined early for use in memos)
   const getDateKey = useCallback((date) => date.toISOString().split('T')[0], []);
   
+  // Helper function to get current time period based on hour (for AM/PM mode)
+  const getCurrentTimePeriod = useCallback(() => {
+    if (trackingMode !== 'ampm') return 'daily';
+    const hour = new Date().getHours();
+    // Before 12pm = morning, 12pm and after = evening
+    return hour < 12 ? 'morning' : 'evening';
+  }, [trackingMode]);
+  
   const activeSymptoms = useMemo(() => {
     let active = symptoms.filter(s => s.active);
     if (symptomSearch.trim()) {
@@ -513,36 +521,6 @@ function SymptomTrackerMobile() {
     }
     return count;
   }, [daysWithEntries]);
-
-  // 7-day sparkline data for each symptom
-  const symptomSparklines = useMemo(() => {
-    const sparklines = {};
-    const today = new Date();
-    
-    symptoms.forEach(symptom => {
-      const days = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateKey = date.toISOString().split('T')[0];
-        
-        // Find entries for this symptom on this day
-        const dayEntries = Object.values(entries).filter(e => 
-          e.date === dateKey && e.symptomId === symptom.id
-        );
-        
-        if (dayEntries.length > 0) {
-          const avg = dayEntries.reduce((sum, e) => sum + e.severity, 0) / dayEntries.length;
-          days.push(avg);
-        } else {
-          days.push(null);
-        }
-      }
-      sparklines[symptom.id] = days;
-    });
-    
-    return sparklines;
-  }, [symptoms, entries]);
 
   // Today's overall severity average
   const todayAvgSeverity = useMemo(() => {
@@ -960,7 +938,7 @@ function SymptomTrackerMobile() {
     setDailyNotes({});
     setHasSampleData(false);
     setConfirmClearData(false);
-    setShowSettings(false);
+    // Stay on settings page
     setLastAction('All data cleared');
   };
 
@@ -1202,37 +1180,40 @@ function SymptomTrackerMobile() {
       return;
     }
     
+    // Start fresh - remove all of today's entries first
     const newEntries = { ...stackEntries };
+    Object.keys(newEntries).forEach(key => {
+      if (key.startsWith(today + '-')) {
+        delete newEntries[key];
+      }
+    });
+    
     let copiedCount = 0;
     
-    // For each active item, only copy if it was taken yesterday
+    // Copy yesterday's entries exactly (only checked items have entries)
     activeItems.forEach(item => {
       const yesterdayEntryKey = `${yesterdayKey}-${item.id}`;
       const todayEntryKey = `${today}-${item.id}`;
       
-      // Only copy if today doesn't already have an entry
-      if (!newEntries[todayEntryKey]) {
-        const yesterdayEntry = stackEntries[yesterdayEntryKey];
-        // Only copy items that were actually taken (checked) yesterday
-        if (yesterdayEntry && yesterdayEntry.taken) {
-          newEntries[todayEntryKey] = { 
-            ...yesterdayEntry, 
-            date: today 
-          };
-          copiedCount++;
-        }
-        // If unchecked yesterday, leave today empty (no entry)
+      const yesterdayEntry = stackEntries[yesterdayEntryKey];
+      // Only copy items that were actually taken (checked) yesterday
+      if (yesterdayEntry && yesterdayEntry.taken) {
+        newEntries[todayEntryKey] = { 
+          ...yesterdayEntry, 
+          date: today 
+        };
+        copiedCount++;
       }
+      // If unchecked yesterday, leave today empty (no entry)
     });
-    
-    if (copiedCount === 0) {
-      setLastAction('No taken items from yesterday');
-      return;
-    }
     
     setStackEntries(newEntries);
     haptic('success');
-    setLastAction(`Copied ${copiedCount} items from yesterday`);
+    if (copiedCount === 0) {
+      setLastAction('Copied yesterday (nothing taken)');
+    } else {
+      setLastAction(`Copied ${copiedCount} items from yesterday`);
+    }
   }, [selectedDate, stackItems, stackEntries, getDateKey, haptic]);
 
   const changeDate = useCallback((days) => {
@@ -1276,7 +1257,7 @@ function SymptomTrackerMobile() {
     const period = timePeriods.find(p => p.id === timeId);
     haptic('light');
     setQuickLogSymptom(null);
-    setQuickLogTime(null);
+    // Keep quickLogTime sticky - don't reset it
     setLastAction(`${symptom?.name}: ${severity} (${period?.label || timeId})`);
   }, [selectedDate, timePeriods, symptoms, getDateKey, haptic]);
 
@@ -1316,10 +1297,12 @@ function SymptomTrackerMobile() {
   // Scroll to notes and focus
   const scrollToNotes = useCallback(() => {
     if (notesTextareaRef.current) {
-      notesTextareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Focus first to trigger keyboard on mobile
+      notesTextareaRef.current.focus();
+      // Then scroll into view
       setTimeout(() => {
-        notesTextareaRef.current?.focus();
-      }, 300);
+        notesTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
     }
   }, []);
 
@@ -2320,7 +2303,7 @@ function SymptomTrackerMobile() {
         flex: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
-        padding: '16px 16px 120px 16px',
+        padding: '16px 16px 220px 16px',
         WebkitOverflowScrolling: 'touch',
       }}>
         {appMode === 'symptoms' ? (
@@ -2395,178 +2378,47 @@ function SymptomTrackerMobile() {
           const symptomEntries = getSymptomEntries(symptom.id);
           const isActive = activeSymptom === symptom.id;
           const isQuickLog = quickLogSymptom === symptom.id;
-          const sparkline = symptomSparklines[symptom.id] || [];
           const isPinned = pinnedSymptoms.has(symptom.id);
           
           return (
             <div key={symptom.id}>
-              <div
-                onTouchStart={(e) => {
-                  if (isQuickLog) return; // Don't start drag if showing quick picker
-                  handleTouchStart(e, symptom.id);
-                }}
-                onMouseDown={(e) => {
-                  if (isQuickLog) return;
-                  handleMouseDown(e, symptom.id);
-                }}
-                onClick={() => {
-                  // Single tap toggles quick picker (if not dragging)
-                  if (!isDragging && !isActive) {
-                    if (isQuickLog) {
-                      setQuickLogSymptom(null);
-                      setQuickLogTime(null);
-                    } else {
-                      setQuickLogSymptom(symptom.id);
-                      // Default to first time period - user can toggle if needed
-                      // (Auto-detect removed - unreliable in preview environments)
-                      if (trackingMode === 'ampm') {
-                        setQuickLogTime(timePeriods[0].id);
-                      }
-                    }
-                  }
-                }}
-                style={{
-                  background: isActive 
-                    ? 'rgba(99, 102, 241, 0.15)' 
-                    : isQuickLog
-                      ? 'rgba(139, 92, 246, 0.15)'
-                      : isPinned
-                        ? 'rgba(251, 191, 36, 0.08)'
-                        : 'rgba(30, 27, 75, 0.6)',
-                  borderRadius: isQuickLog ? '14px 14px 0 0' : '14px',
-                  padding: '12px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  border: isActive 
-                    ? '2px solid rgba(99, 102, 241, 0.5)' 
-                    : isQuickLog
-                      ? '2px solid rgba(139, 92, 246, 0.4)'
-                      : isPinned
-                        ? '2px solid rgba(251, 191, 36, 0.2)'
-                        : '2px solid transparent',
-                  borderBottom: isQuickLog ? 'none' : undefined,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  transform: isActive ? 'scale(1.02)' : 'scale(1)',
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {isPinned && (
-                      <span style={{ fontSize: '10px', color: '#fbbf24' }}>📌</span>
-                    )}
-                    <span style={{
-                      color: '#e2e8f0',
-                      fontSize: '15px',
-                      fontWeight: '600',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}>{symptom.name}</span>
+              {isQuickLog ? (
+                /* QUICK LOG MODE - severity buttons replace name */
+                <div style={{
+                  background: 'rgba(139, 92, 246, 0.15)',
+                  border: '2px solid rgba(139, 92, 246, 0.4)',
+                  borderRadius: '14px',
+                  overflow: 'hidden',
+                }}>
+                  {/* Header with symptom name and time */}
+                  <div 
+                    onClick={() => setQuickLogSymptom(null)}
+                    style={{
+                      padding: '10px 16px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid rgba(139, 92, 246, 0.2)',
+                    }}
+                  >
+                    <span style={{ color: '#c4b5fd', fontSize: '13px', fontWeight: '500' }}>
+                      Logging <span style={{ color: '#e2e8f0', fontWeight: '600' }}>{symptom.name}</span>
+                      {timePeriods.length > 1 && (() => {
+                        const currentTime = quickLogTime || getCurrentTimePeriod();
+                        const currentPeriod = timePeriods.find(p => p.id === currentTime);
+                        return ` to ${currentPeriod?.icon} ${currentPeriod?.label}`;
+                      })()}
+                    </span>
                   </div>
                   
-                  {/* Mini sparkline - 7 day trend */}
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '3px', 
-                    marginTop: '6px',
-                    alignItems: 'flex-end',
-                    height: '12px',
-                  }}>
-                    {sparkline.map((val, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          width: '4px',
-                          height: val !== null ? `${Math.max(3, (val / 5) * 12)}px` : '2px',
-                          borderRadius: '2px',
-                          background: val !== null 
-                            ? severityColors[Math.round(val)] || '#4ade80'
-                            : 'rgba(100, 116, 139, 0.2)',
-                          opacity: i === 6 ? 1 : 0.6,
-                        }}
-                      />
-                    ))}
-                    {sparkline.some(v => v !== null) && (
-                      <span style={{ 
-                        fontSize: '9px', 
-                        color: '#64748b', 
-                        marginLeft: '4px',
-                        lineHeight: '12px',
-                      }}>7d</span>
-                    )}
-                  </div>
-                </div>
-                
-                <div style={{
-                  display: 'flex',
-                  gap: '4px',
-                  justifyContent: 'flex-end',
-                  alignItems: 'center',
-                  marginLeft: '12px',
-                }}>
-                  {symptomEntries.length === 0 ? (
-                    <span style={{ color: '#64748b', fontSize: '11px' }}>
-                      Tap to log
-                    </span>
-                  ) : (
-                    timePeriods.map((period) => {
-                      const entry = symptomEntries.find(e => e.time === period.id);
-                      if (!entry) {
-                        return <div key={period.id} style={{ width: '36px' }} />;
-                      }
-                      return (
-                        <div 
-                          key={period.id} 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearEntry(symptom.id, entry.time);
-                          }}
-                          style={{
-                            background: `${severityColors[entry.severity]}20`,
-                            border: `1px solid ${severityColors[entry.severity]}40`,
-                            borderRadius: '6px',
-                            padding: '4px 6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <span style={{ fontSize: '10px', color: '#94a3b8' }}>
-                            {period.icon}
-                          </span>
-                          <span style={{
-                            color: severityColors[entry.severity],
-                            fontSize: '13px',
-                            fontWeight: '700',
-                          }}>{entry.severity}</span>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-              
-              {/* Quick Log Picker - shown when tapped */}
-              {isQuickLog && (
-                <div style={{
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  border: '2px solid rgba(139, 92, 246, 0.4)',
-                  borderTop: 'none',
-                  borderRadius: '0 0 14px 14px',
-                  padding: '12px 16px',
-                }}>
-                  {/* Severity buttons */}
+                  {/* Severity buttons - same height as normal tile */}
                   <div style={{
+                    padding: '12px 16px',
                     display: 'flex',
                     justifyContent: 'space-between',
                     gap: '6px',
                   }}>
                     {[0, 1, 2, 3, 4, 5].map(severity => {
-                      // Get the actual time that will be used for logging
-                      const logTime = quickLogTime || (trackingMode === 'ampm' ? timePeriods[0].id : 'daily');
+                      const logTime = quickLogTime || getCurrentTimePeriod();
                       return (
                         <button
                           key={severity}
@@ -2576,36 +2428,60 @@ function SymptomTrackerMobile() {
                           }}
                           style={{
                             flex: 1,
-                            padding: '12px 0',
-                            background: `${severityColors[severity]}25`,
-                          border: `2px solid ${severityColors[severity]}60`,
-                          borderRadius: '8px',
-                          color: severityColors[severity],
-                          fontSize: '18px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {severity}
-                      </button>
+                            padding: '14px 0',
+                            background: `${severityColors[severity]}20`,
+                            border: 'none',
+                            borderRadius: '8px',
+                            color: severityColors[severity],
+                            fontSize: '20px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {severity}
+                        </button>
                       );
                     })}
                   </div>
                   
-                  {/* Action buttons row */}
+                  {/* Pin and AM/PM buttons */}
                   <div style={{
+                    padding: '10px 16px',
+                    borderTop: '1px solid rgba(139, 92, 246, 0.2)',
                     display: 'flex',
                     gap: '8px',
-                    marginTop: '10px',
-                    paddingTop: '10px',
-                    borderTop: '1px solid rgba(139, 92, 246, 0.2)',
                   }}>
-                    {/* AM/PM toggle - only for AM/PM mode */}
+                    {/* Pin button - on left */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePin(symptom.id);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        background: isPinned ? 'rgba(251, 191, 36, 0.15)' : 'rgba(100, 116, 139, 0.1)',
+                        border: isPinned ? '1px solid rgba(251, 191, 36, 0.4)' : '1px solid rgba(100, 116, 139, 0.3)',
+                        borderRadius: '8px',
+                        color: isPinned ? '#fbbf24' : '#94a3b8',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      📌 {isPinned ? 'Unpin' : 'Pin'}
+                    </button>
+                    
+                    {/* AM/PM toggle - on right */}
                     {timePeriods.length > 1 && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const currentTime = quickLogTime || timePeriods[0].id;
+                          const currentTime = quickLogTime || getCurrentTimePeriod();
                           const nextTime = currentTime === 'morning' ? 'evening' : 'morning';
                           setQuickLogTime(nextTime);
                         }}
@@ -2626,37 +2502,109 @@ function SymptomTrackerMobile() {
                         }}
                       >
                         {(() => {
-                          const currentTime = quickLogTime || timePeriods[0].id;
+                          const currentTime = quickLogTime || getCurrentTimePeriod();
                           const currentPeriod = timePeriods.find(p => p.id === currentTime);
                           return `${currentPeriod?.icon} ${currentPeriod?.label}`;
                         })()}
                       </button>
                     )}
-                    
-                    {/* Pin button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePin(symptom.id);
-                      }}
-                      style={{
-                        flex: timePeriods.length > 1 ? 0.6 : 1,
-                        padding: '8px',
-                        background: isPinned ? 'rgba(251, 191, 36, 0.15)' : 'rgba(100, 116, 139, 0.1)',
-                        border: isPinned ? '1px solid rgba(251, 191, 36, 0.4)' : '1px solid rgba(100, 116, 139, 0.3)',
-                        borderRadius: '8px',
-                        color: isPinned ? '#fbbf24' : '#94a3b8',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      📌 {isPinned ? 'Unpin' : 'Pin'}
-                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* NORMAL MODE - symptom name tile */
+                <div
+                  onTouchStart={(e) => handleTouchStart(e, symptom.id)}
+                  onMouseDown={(e) => handleMouseDown(e, symptom.id)}
+                  onClick={() => {
+                    if (!isDragging && !isActive) {
+                      setQuickLogSymptom(symptom.id);
+                      if (trackingMode === 'ampm' && !quickLogTime) {
+                        setQuickLogTime(getCurrentTimePeriod());
+                      }
+                    }
+                  }}
+                  style={{
+                    background: isActive 
+                      ? 'rgba(99, 102, 241, 0.15)' 
+                      : isPinned
+                        ? 'rgba(251, 191, 36, 0.08)'
+                        : 'rgba(30, 27, 75, 0.6)',
+                    borderRadius: '14px',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    border: isActive 
+                      ? '2px solid rgba(99, 102, 241, 0.5)' 
+                      : isPinned
+                        ? '2px solid rgba(251, 191, 36, 0.2)'
+                        : '2px solid transparent',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    transform: isActive ? 'scale(1.02)' : 'scale(1)',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {isPinned && (
+                      <span style={{ fontSize: '10px', color: '#fbbf24' }}>📌</span>
+                    )}
+                    <span style={{
+                      color: '#e2e8f0',
+                      fontSize: '15px',
+                      fontWeight: '600',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>{symptom.name}</span>
+                  </div>
+                  
+                  <div style={{
+                    display: 'flex',
+                    gap: '4px',
+                    justifyContent: 'flex-end',
+                    alignItems: 'center',
+                    marginLeft: '12px',
+                  }}>
+                    {symptomEntries.length === 0 ? (
+                      <span style={{ color: '#64748b', fontSize: '11px' }}>
+                        Tap to log
+                      </span>
+                    ) : (
+                      timePeriods.map((period) => {
+                        const entry = symptomEntries.find(e => e.time === period.id);
+                        if (!entry) {
+                          return <div key={period.id} style={{ width: '36px' }} />;
+                        }
+                        return (
+                          <div 
+                            key={period.id} 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              clearEntry(symptom.id, entry.time);
+                            }}
+                            style={{
+                              background: `${severityColors[entry.severity]}25`,
+                              border: 'none',
+                              borderRadius: '6px',
+                              padding: '4px 6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                              {period.icon}
+                            </span>
+                            <span style={{
+                              color: severityColors[entry.severity],
+                              fontSize: '13px',
+                              fontWeight: '700',
+                            }}>{entry.severity}</span>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               )}
@@ -2714,7 +2662,7 @@ function SymptomTrackerMobile() {
             marginTop: '4px',
           }}
         >
-          + Add Symptoms
+          + Manage Symptoms
         </button>
         </div>
         ) : (
@@ -3007,7 +2955,7 @@ function SymptomTrackerMobile() {
               marginTop: '4px',
             }}
           >
-            + Add to Stack
+            + Manage Stack
           </button>
         </div>
         )}
@@ -3023,19 +2971,19 @@ function SymptomTrackerMobile() {
             right: '12px',
             background: 'rgba(99, 102, 241, 0.15)',
             border: '1px solid rgba(99, 102, 241, 0.3)',
-            borderRadius: '8px',
-            padding: '8px 10px',
+            borderRadius: '10px',
+            padding: '12px 14px',
             color: '#a5b4fc',
-            fontSize: '11px',
+            fontSize: '13px',
             fontWeight: '500',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
+            gap: '6px',
             zIndex: 150,
           }}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 20h9"/>
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
           </svg>
@@ -3535,7 +3483,7 @@ function SymptomTrackerMobile() {
         </div>
       )}
 
-      {/* Add Symptom Modal */}
+      {/* Manage Symptoms Modal */}
       {showAddSymptom && (
         <div 
           onClick={() => setShowAddSymptom(false)}
@@ -3559,7 +3507,7 @@ function SymptomTrackerMobile() {
               marginBottom: '20px',
             }}>
               <h2 style={{ color: '#f8fafc', fontSize: '22px', fontWeight: '700', margin: 0 }}>
-                Add Symptoms
+                Manage Symptoms
               </h2>
               <button
                 onClick={() => setShowAddSymptom(false)}
@@ -5023,6 +4971,18 @@ function SymptomTrackerMobile() {
                 </div>
               )}
             </div>
+            
+            {/* Version number */}
+            <div style={{
+              textAlign: 'center',
+              marginTop: '30px',
+              paddingTop: '20px',
+              borderTop: '1px solid rgba(99, 102, 241, 0.1)',
+            }}>
+              <span style={{ color: '#475569', fontSize: '12px' }}>
+                Symptom Tracker v3.0
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -5054,7 +5014,7 @@ function SymptomTrackerMobile() {
               marginBottom: '20px',
             }}>
               <h2 style={{ color: '#f8fafc', fontSize: '22px', fontWeight: '700', margin: 0 }}>
-                Add to Stack
+                Manage Stack
               </h2>
               <button
                 onClick={() => {
