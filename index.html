@@ -2381,26 +2381,142 @@ function SymptomTrackerMobile() {
           const isPinned = pinnedSymptoms.has(symptom.id);
           
           return (
-            <div key={symptom.id}>
-              {isQuickLog ? (
-                /* QUICK LOG MODE - severity buttons replace name */
-                <div style={{
-                  background: 'rgba(139, 92, 246, 0.15)',
-                  border: '2px solid rgba(139, 92, 246, 0.4)',
+            <div key={symptom.id} style={{ position: 'relative' }}>
+              {/* Always show the normal tile */}
+              <div
+                onTouchStart={(e) => {
+                  if (isQuickLog) return;
+                  handleTouchStart(e, symptom.id);
+                }}
+                onMouseDown={(e) => {
+                  if (isQuickLog) return;
+                  handleMouseDown(e, symptom.id);
+                }}
+                onClick={() => {
+                  if (!isDragging && !isActive) {
+                    if (isQuickLog) {
+                      setQuickLogSymptom(null);
+                    } else {
+                      setQuickLogSymptom(symptom.id);
+                      if (trackingMode === 'ampm' && !quickLogTime) {
+                        setQuickLogTime(getCurrentTimePeriod());
+                      }
+                    }
+                  }
+                }}
+                style={{
+                  background: isActive 
+                    ? 'rgba(99, 102, 241, 0.15)' 
+                    : isPinned
+                      ? 'rgba(251, 191, 36, 0.08)'
+                      : 'rgba(30, 27, 75, 0.6)',
                   borderRadius: '14px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  border: isActive 
+                    ? '2px solid rgba(99, 102, 241, 0.5)' 
+                    : isQuickLog
+                      ? '2px solid rgba(139, 92, 246, 0.5)'
+                      : isPinned
+                        ? '2px solid rgba(251, 191, 36, 0.2)'
+                        : '2px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  transform: isActive ? 'scale(1.02)' : 'scale(1)',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {isPinned && (
+                    <span style={{ fontSize: '10px', color: '#fbbf24' }}>📌</span>
+                  )}
+                  <span style={{
+                    color: '#e2e8f0',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>{symptom.name}</span>
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  gap: '4px',
+                  justifyContent: 'flex-end',
+                  alignItems: 'center',
+                  marginLeft: '12px',
+                }}>
+                  {symptomEntries.length === 0 ? (
+                    <span style={{ color: '#64748b', fontSize: '11px' }}>
+                      Tap to log
+                    </span>
+                  ) : (
+                    timePeriods.map((period) => {
+                      const entry = symptomEntries.find(e => e.time === period.id);
+                      if (!entry) {
+                        return <div key={period.id} style={{ width: '36px' }} />;
+                      }
+                      return (
+                        <div 
+                          key={period.id} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearEntry(symptom.id, entry.time);
+                          }}
+                          style={{
+                            background: `${severityColors[entry.severity]}25`,
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '4px 6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+                            {period.icon}
+                          </span>
+                          <span style={{
+                            color: severityColors[entry.severity],
+                            fontSize: '13px',
+                            fontWeight: '700',
+                          }}>{entry.severity}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+              
+              {/* OVERLAY - severity picker positioned over the tile */}
+              {isQuickLog && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-45px',
+                  left: 0,
+                  right: 0,
+                  zIndex: 100,
+                  background: 'rgba(30, 27, 75, 0.98)',
+                  border: '2px solid rgba(139, 92, 246, 0.5)',
+                  borderRadius: '14px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
                   overflow: 'hidden',
                 }}>
-                  {/* Header with symptom name and time */}
+                  {/* Header - Logging symptom to AM/PM - ABOVE buttons */}
                   <div 
                     onClick={() => setQuickLogSymptom(null)}
                     style={{
-                      padding: '10px 16px',
+                      padding: '8px 16px',
                       textAlign: 'center',
                       cursor: 'pointer',
                       borderBottom: '1px solid rgba(139, 92, 246, 0.2)',
+                      background: 'rgba(139, 92, 246, 0.1)',
                     }}
                   >
-                    <span style={{ color: '#c4b5fd', fontSize: '13px', fontWeight: '500' }}>
+                    <span style={{ color: '#c4b5fd', fontSize: '12px', fontWeight: '500' }}>
                       Logging <span style={{ color: '#e2e8f0', fontWeight: '600' }}>{symptom.name}</span>
                       {timePeriods.length > 1 && (() => {
                         const currentTime = quickLogTime || getCurrentTimePeriod();
@@ -2410,7 +2526,7 @@ function SymptomTrackerMobile() {
                     </span>
                   </div>
                   
-                  {/* Severity buttons - same height as normal tile */}
+                  {/* Severity buttons - aligned with original tile position */}
                   <div style={{
                     padding: '12px 16px',
                     display: 'flex',
@@ -2428,12 +2544,12 @@ function SymptomTrackerMobile() {
                           }}
                           style={{
                             flex: 1,
-                            padding: '14px 0',
+                            padding: '12px 0',
                             background: `${severityColors[severity]}20`,
                             border: 'none',
                             borderRadius: '8px',
                             color: severityColors[severity],
-                            fontSize: '20px',
+                            fontSize: '18px',
                             fontWeight: '700',
                             cursor: 'pointer',
                           }}
@@ -2446,12 +2562,11 @@ function SymptomTrackerMobile() {
                   
                   {/* Pin and AM/PM buttons */}
                   <div style={{
-                    padding: '10px 16px',
-                    borderTop: '1px solid rgba(139, 92, 246, 0.2)',
+                    padding: '8px 16px 12px',
                     display: 'flex',
                     gap: '8px',
                   }}>
-                    {/* Pin button - on left */}
+                    {/* Pin button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -2464,19 +2579,19 @@ function SymptomTrackerMobile() {
                         border: isPinned ? '1px solid rgba(251, 191, 36, 0.4)' : '1px solid rgba(100, 116, 139, 0.3)',
                         borderRadius: '8px',
                         color: isPinned ? '#fbbf24' : '#94a3b8',
-                        fontSize: '11px',
+                        fontSize: '12px',
                         fontWeight: '600',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '4px',
+                        gap: '6px',
                       }}
                     >
-                      📌 {isPinned ? 'Unpin' : 'Pin'}
+                      <span style={{ fontSize: '14px' }}>⊙</span> {isPinned ? 'Unpin' : 'Pin'}
                     </button>
                     
-                    {/* AM/PM toggle - on right */}
+                    {/* AM/PM toggle */}
                     {timePeriods.length > 1 && (
                       <button
                         onClick={(e) => {
@@ -2498,7 +2613,7 @@ function SymptomTrackerMobile() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '4px',
+                          gap: '6px',
                         }}
                       >
                         {(() => {
@@ -2507,103 +2622,6 @@ function SymptomTrackerMobile() {
                           return `${currentPeriod?.icon} ${currentPeriod?.label}`;
                         })()}
                       </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* NORMAL MODE - symptom name tile */
-                <div
-                  onTouchStart={(e) => handleTouchStart(e, symptom.id)}
-                  onMouseDown={(e) => handleMouseDown(e, symptom.id)}
-                  onClick={() => {
-                    if (!isDragging && !isActive) {
-                      setQuickLogSymptom(symptom.id);
-                      if (trackingMode === 'ampm' && !quickLogTime) {
-                        setQuickLogTime(getCurrentTimePeriod());
-                      }
-                    }
-                  }}
-                  style={{
-                    background: isActive 
-                      ? 'rgba(99, 102, 241, 0.15)' 
-                      : isPinned
-                        ? 'rgba(251, 191, 36, 0.08)'
-                        : 'rgba(30, 27, 75, 0.6)',
-                    borderRadius: '14px',
-                    padding: '12px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    border: isActive 
-                      ? '2px solid rgba(99, 102, 241, 0.5)' 
-                      : isPinned
-                        ? '2px solid rgba(251, 191, 36, 0.2)'
-                        : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    transform: isActive ? 'scale(1.02)' : 'scale(1)',
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {isPinned && (
-                      <span style={{ fontSize: '10px', color: '#fbbf24' }}>📌</span>
-                    )}
-                    <span style={{
-                      color: '#e2e8f0',
-                      fontSize: '15px',
-                      fontWeight: '600',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}>{symptom.name}</span>
-                  </div>
-                  
-                  <div style={{
-                    display: 'flex',
-                    gap: '4px',
-                    justifyContent: 'flex-end',
-                    alignItems: 'center',
-                    marginLeft: '12px',
-                  }}>
-                    {symptomEntries.length === 0 ? (
-                      <span style={{ color: '#64748b', fontSize: '11px' }}>
-                        Tap to log
-                      </span>
-                    ) : (
-                      timePeriods.map((period) => {
-                        const entry = symptomEntries.find(e => e.time === period.id);
-                        if (!entry) {
-                          return <div key={period.id} style={{ width: '36px' }} />;
-                        }
-                        return (
-                          <div 
-                            key={period.id} 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              clearEntry(symptom.id, entry.time);
-                            }}
-                            style={{
-                              background: `${severityColors[entry.severity]}25`,
-                              border: 'none',
-                              borderRadius: '6px',
-                              padding: '4px 6px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '3px',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <span style={{ fontSize: '10px', color: '#94a3b8' }}>
-                              {period.icon}
-                            </span>
-                            <span style={{
-                              color: severityColors[entry.severity],
-                              fontSize: '13px',
-                              fontWeight: '700',
-                            }}>{entry.severity}</span>
-                          </div>
-                        );
-                      })
                     )}
                   </div>
                 </div>
