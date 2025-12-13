@@ -1,4 +1,4 @@
-# Symptom Tracker v3.0.4
+# Symptom Tracker v3.1.0
 
 A mobile-first health tracking PWA for logging symptoms and supplements with cloud sync.
 
@@ -6,11 +6,13 @@ A mobile-first health tracking PWA for logging symptoms and supplements with clo
 
 ### Symptom Tracking
 - **Tap-to-log interface**: Tap any symptom to reveal severity picker (0-5 scale)
-- **In-place editing**: Numbers appear where symptom name was - minimal thumb movement
+- **Overlay modal**: Severity picker appears directly where you tap
 - **AM/PM tracking mode**: Log morning and evening separately
 - **Sticky time selection**: AM/PM choice persists across symptoms until changed
+- **Yesterday's highlight**: Subtle border shows yesterday's selection for reference
 - **Pin symptoms**: Keep frequently-used symptoms at the top
 - **Color-coded severity**: Visual feedback from green (0) to red (5)
+- **⚡ Rapid Entry Mode**: Cycle through all symptoms one by one with large buttons
 
 ### Supplement Stack
 - **Daily checklist**: Track supplements with checkboxes
@@ -62,11 +64,17 @@ A mobile-first health tracking PWA for logging symptoms and supplements with clo
    - Visit: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=symptoms-dae26
    - Click "Enable"
 
-4. **Authorize your domain**:
+4. **Create Firestore Database**:
+   - Firebase Console → Firestore Database
+   - Click "Create database"
+   - Choose "Start in test mode" (or production with rules below)
+   - Select region closest to you
+
+5. **Authorize your domain**:
    - Firebase Console → Authentication → Settings → Authorized domains
    - Add your GitHub Pages domain (e.g., `yourusername.github.io`)
 
-5. **Firestore Rules** (set in Firebase Console → Firestore → Rules):
+6. **Firestore Rules** (set in Firebase Console → Firestore → Rules):
 ```javascript
 rules_version = '2';
 service cloud.firestore {
@@ -82,10 +90,20 @@ service cloud.firestore {
 
 ### Logging Symptoms
 
-1. **Tap a symptom** to open the severity picker
+1. **Tap a symptom** to open the severity picker overlay
 2. **Tap a number (0-5)** to log severity
 3. **In AM/PM mode**: Toggle between Morning/Evening with the button
 4. **Tap existing entry** to clear it
+5. **Tap anywhere else** to close the picker
+
+### Rapid Entry Mode (⚡)
+
+1. **Tap the ⚡ button** in the header (next to date arrows)
+2. **Large buttons** show the current symptom
+3. **Tap severity (0-5)** to log and auto-advance
+4. **Skip →** to skip a symptom
+5. **Progress bar** shows completion
+6. Automatically exits when done
 
 ### Managing Supplements
 
@@ -127,7 +145,7 @@ symptomTracker_pinned      // Pinned symptom IDs
   trackingMode: 'simple' | 'ampm',
   pinnedSymptoms: [symptomId],
   updatedAt: timestamp,
-  version: '3.0'
+  version: '3.1'
 }
 ```
 
@@ -136,7 +154,7 @@ symptomTracker_pinned      // Pinned symptom IDs
 - **Framework**: React 18 (CDN)
 - **Transpilation**: Babel standalone
 - **Storage**: localStorage + optional Firestore
-- **Auth**: Firebase Google Sign-In
+- **Auth**: Firebase Google Sign-In (redirect on mobile, popup on desktop)
 - **PWA**: manifest.json for Add to Home Screen
 - **Styling**: Inline styles (no CSS framework)
 
@@ -154,6 +172,27 @@ symptomTracker_pinned      // Pinned symptom IDs
 - CORS errors when opening file:// directly (use a local server or deploy)
 
 ## Version History
+
+### v3.1.0
+- **⚡ Rapid Entry Mode**: Cycle through symptoms with large buttons
+- **Overlay modal**: Severity picker now appears as overlay at tap position
+- **Click-away to close**: Tapping outside modal closes it
+- **Yesterday's severity hint**: Subtle border highlights yesterday's selection
+- **Mobile auth fix**: Uses redirect sign-in on mobile Safari
+- **Offline handling**: Graceful degradation when offline
+
+### v3.0.13
+- Firebase offline persistence enabled
+- Better error messages for offline state
+- Auth persistence for mobile
+
+### v3.0.12
+- Yesterday's highlight is now contextual to AM/PM
+- More subtle highlight border
+
+### v3.0.10
+- Modal positioning refined for thumb alignment
+- Header "Logging {symptom} to AM/PM" above numbers
 
 ### v3.0.4
 - Symptom picker now replaces name in-place (thumb-friendly)

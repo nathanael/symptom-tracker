@@ -109,6 +109,20 @@ const initFirebase = async () => {
     firebaseDb = firebase.firestore();
     googleProvider = new firebase.auth.GoogleAuthProvider();
     
+    // Set auth persistence for better mobile support
+    await firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    
+    // Enable Firestore offline persistence
+    try {
+      await firebaseDb.enablePersistence({ synchronizeTabs: true });
+    } catch (err) {
+      if (err.code === 'failed-precondition') {
+        console.log('Firestore persistence failed: multiple tabs open');
+      } else if (err.code === 'unimplemented') {
+        console.log('Firestore persistence not supported in this browser');
+      }
+    }
+    
     return { auth: firebaseAuth, db: firebaseDb, provider: googleProvider };
   } catch (error) {
     console.error('Failed to load Firebase:', error);
@@ -116,8 +130,13 @@ const initFirebase = async () => {
   }
 };
 
+// Detect if on mobile
+const isMobile = () => {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+};
+
 // ============================================================================
-// SYMPTOM TRACKER v3.0
+// SYMPTOM TRACKER v3.1
 // ============================================================================
 // A mobile-first health tracking app for symptoms and supplements.
 //
@@ -412,6 +431,8 @@ function SymptomTrackerMobile() {
   const [isLoading, setIsLoading] = useState(false); // For loading states
   const [quickLogSymptom, setQuickLogSymptom] = useState(null); // For tap-to-log quick picker
   const [quickLogTime, setQuickLogTime] = useState(null); // Selected time period in quick picker (null = first period)
+  const [rapidEntryMode, setRapidEntryMode] = useState(false); // Rapid entry mode
+  const [rapidEntryIndex, setRapidEntryIndex] = useState(0); // Current symptom index in rapid entry
   
   // Drag-to-reorder state
   const [draggedItem, setDraggedItem] = useState(null); // { id, type: 'symptom' | 'stack', startIndex }
@@ -581,6 +602,16 @@ function SymptomTrackerMobile() {
         if (firebase) {
           setFirebaseReady(true);
           
+          // Check for redirect result (for mobile sign-in)
+          try {
+            const result = await firebase.auth.getRedirectResult();
+            if (result.user) {
+              console.log('Redirect sign-in successful');
+            }
+          } catch (redirectError) {
+            console.log('No redirect result or error:', redirectError.message);
+          }
+          
           unsubscribe = firebase.auth.onAuthStateChanged(async (firebaseUser) => {
             setUser(firebaseUser);
             setAuthLoading(false);
@@ -698,7 +729,7 @@ function SymptomTrackerMobile() {
           stackEntries,
           pinnedSymptoms: [...pinnedSymptoms],
           trackingMode,
-          version: '3.0',
+          version: '3.1',
           updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
         });
         lastSyncDataRef.current = currentData;
@@ -771,7 +802,7 @@ function SymptomTrackerMobile() {
         trackingMode,
         pinnedSymptoms: [...pinnedSymptoms],
         updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
-        version: '3.0',
+        version: '3.1',
       };
       
       await firebaseDb.collection('users').doc(user.uid).set(userData);
@@ -779,8 +810,14 @@ function SymptomTrackerMobile() {
       setLastAction('☁️ Saved to cloud');
     } catch (error) {
       console.error('Error saving to cloud:', error);
-      setSyncError(error.message);
-      setLastAction('❌ Sync failed');
+      // Handle offline errors gracefully
+      if (error.message?.includes('offline') || error.code === 'unavailable') {
+        setLastAction('📴 Offline - will sync when online');
+        // Don't set syncError for offline
+      } else {
+        setSyncError(error.message);
+        setLastAction('❌ Sync failed');
+      }
     } finally {
       setSyncing(false);
     }
@@ -816,7 +853,13 @@ function SymptomTrackerMobile() {
       }
     } catch (error) {
       console.error('Error loading from cloud:', error);
-      setSyncError(error.message);
+      // Handle offline errors gracefully
+      if (error.message?.includes('offline') || error.code === 'unavailable') {
+        setLastAction('📴 Offline - using local data');
+        // Don't set syncError for offline - it's not really an error
+      } else {
+        setSyncError(error.message);
+      }
     } finally {
       setSyncing(false);
     }
@@ -831,7 +874,12 @@ function SymptomTrackerMobile() {
     
     try {
       setSyncing(true);
-      await firebaseAuth.signInWithPopup(googleProvider);
+      // Use redirect for mobile (popups often blocked), popup for desktop
+      if (isMobile()) {
+        await firebaseAuth.signInWithRedirect(googleProvider);
+      } else {
+        await firebaseAuth.signInWithPopup(googleProvider);
+      }
     } catch (error) {
       console.error('Sign in error:', error);
       setSyncError(error.message);
@@ -984,7 +1032,7 @@ function SymptomTrackerMobile() {
   // Backup all data to a JSON file (save to iCloud via Files app)
   const backupToFile = () => {
     const backup = {
-      version: '3.0',
+      version: '3.1',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -2218,6 +2266,234 @@ function SymptomTrackerMobile() {
         bottom: 0,
       }}
     >
+      {/* RAPID ENTRY MODE - Full screen overlay */}
+      {rapidEntryMode && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '20px',
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '20px',
+          }}>
+            <div style={{ color: '#94a3b8', fontSize: '14px' }}>
+              ⚡ Rapid Entry
+            </div>
+            <button
+              onClick={() => setRapidEntryMode(false)}
+              style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '8px',
+                padding: '8px 16px',
+                color: '#f87171',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              ✕ Close
+            </button>
+          </div>
+          
+          {/* Progress indicator */}
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            marginBottom: '20px',
+          }}>
+            {activeSymptoms.map((_, idx) => (
+              <div
+                key={idx}
+                style={{
+                  flex: 1,
+                  height: '4px',
+                  borderRadius: '2px',
+                  background: idx < rapidEntryIndex 
+                    ? '#10b981' 
+                    : idx === rapidEntryIndex 
+                      ? '#8b5cf6' 
+                      : 'rgba(100, 116, 139, 0.3)',
+                }}
+              />
+            ))}
+          </div>
+          
+          {/* Current symptom */}
+          {activeSymptoms[rapidEntryIndex] ? (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '30px',
+            }}>
+              {/* Symptom name */}
+              <div style={{
+                color: '#f8fafc',
+                fontSize: '28px',
+                fontWeight: '700',
+                textAlign: 'center',
+              }}>
+                {activeSymptoms[rapidEntryIndex].name}
+              </div>
+              
+              {/* Time period indicator */}
+              {timePeriods.length > 1 && (
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                }}>
+                  {timePeriods.map(period => {
+                    const currentTime = quickLogTime || getCurrentTimePeriod();
+                    const isSelected = currentTime === period.id;
+                    return (
+                      <button
+                        key={period.id}
+                        onClick={() => setQuickLogTime(period.id)}
+                        style={{
+                          padding: '10px 20px',
+                          background: isSelected ? 'rgba(139, 92, 246, 0.3)' : 'rgba(100, 116, 139, 0.1)',
+                          border: isSelected ? '2px solid rgba(139, 92, 246, 0.6)' : '2px solid transparent',
+                          borderRadius: '10px',
+                          color: isSelected ? '#c4b5fd' : '#94a3b8',
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {period.icon} {period.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* Yesterday's value hint */}
+              {(() => {
+                const logTime = quickLogTime || getCurrentTimePeriod();
+                const yesterday = new Date(selectedDate);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayKey = getDateKey(yesterday);
+                const symptomId = activeSymptoms[rapidEntryIndex].id;
+                const yesterdayEntry = entries[`${yesterdayKey}-${symptomId}-${logTime}`];
+                if (yesterdayEntry) {
+                  return (
+                    <div style={{ color: '#64748b', fontSize: '14px' }}>
+                      Yesterday: <span style={{ color: severityColors[yesterdayEntry.severity], fontWeight: '600' }}>{yesterdayEntry.severity}</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              
+              {/* Large severity buttons */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '12px',
+                width: '100%',
+                maxWidth: '400px',
+              }}>
+                {[0, 1, 2, 3, 4, 5].map(severity => {
+                  const logTime = quickLogTime || getCurrentTimePeriod();
+                  const symptomId = activeSymptoms[rapidEntryIndex].id;
+                  
+                  // Check yesterday for subtle highlight
+                  const yesterday = new Date(selectedDate);
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  const yesterdayKey = getDateKey(yesterday);
+                  const yesterdayEntry = entries[`${yesterdayKey}-${symptomId}-${logTime}`];
+                  const isYesterdaySeverity = yesterdayEntry?.severity === severity;
+                  
+                  return (
+                    <button
+                      key={severity}
+                      onClick={() => {
+                        quickLog(symptomId, severity, logTime);
+                        // Auto-advance to next symptom
+                        if (rapidEntryIndex < activeSymptoms.length - 1) {
+                          setRapidEntryIndex(rapidEntryIndex + 1);
+                        } else {
+                          // Done with all symptoms
+                          setRapidEntryMode(false);
+                          setRapidEntryIndex(0);
+                          setLastAction(`⚡ Logged ${activeSymptoms.length} symptoms`);
+                        }
+                      }}
+                      style={{
+                        padding: '24px',
+                        background: `${severityColors[severity]}20`,
+                        border: isYesterdaySeverity ? `2px solid ${severityColors[severity]}40` : '2px solid transparent',
+                        borderRadius: '16px',
+                        color: severityColors[severity],
+                        fontSize: '32px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {severity}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Skip button */}
+              <button
+                onClick={() => {
+                  if (rapidEntryIndex < activeSymptoms.length - 1) {
+                    setRapidEntryIndex(rapidEntryIndex + 1);
+                  } else {
+                    setRapidEntryMode(false);
+                    setRapidEntryIndex(0);
+                  }
+                }}
+                style={{
+                  padding: '12px 32px',
+                  background: 'rgba(100, 116, 139, 0.1)',
+                  border: '1px solid rgba(100, 116, 139, 0.3)',
+                  borderRadius: '10px',
+                  color: '#94a3b8',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Skip →
+              </button>
+              
+              {/* Counter */}
+              <div style={{ color: '#64748b', fontSize: '14px' }}>
+                {rapidEntryIndex + 1} of {activeSymptoms.length}
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              color: '#64748b',
+            }}>
+              No active symptoms
+            </div>
+          )}
+        </div>
+      )}
+      
       {/* Fixed Header Area - Clean & Minimal */}
       <div style={{
         flexShrink: 0,
@@ -2295,6 +2571,36 @@ function SymptomTrackerMobile() {
           >
             ›
           </button>
+          
+          {/* Rapid Entry Button */}
+          {appMode === 'symptoms' && (
+            <button
+              onClick={() => {
+                setRapidEntryMode(true);
+                setRapidEntryIndex(0);
+                if (trackingMode === 'ampm' && !quickLogTime) {
+                  setQuickLogTime(getCurrentTimePeriod());
+                }
+              }}
+              style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '10px',
+                width: '40px',
+                height: '40px',
+                color: '#34d399',
+                fontSize: '16px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: '8px',
+              }}
+              title="Rapid Entry Mode"
+            >
+              ⚡
+            </button>
+          )}
         </div>
       </div>
 
@@ -2394,9 +2700,11 @@ function SymptomTrackerMobile() {
                 }}
                 onClick={() => {
                   if (!isDragging && !isActive) {
-                    if (isQuickLog) {
+                    // If a modal is open for ANY symptom, close it first
+                    if (quickLogSymptom !== null) {
                       setQuickLogSymptom(null);
                     } else {
+                      // No modal open, so open this one
                       setQuickLogSymptom(symptom.id);
                       if (trackingMode === 'ampm' && !quickLogTime) {
                         setQuickLogTime(getCurrentTimePeriod());
@@ -5005,7 +5313,7 @@ function SymptomTrackerMobile() {
               borderTop: '1px solid rgba(99, 102, 241, 0.1)',
             }}>
               <span style={{ color: '#475569', fontSize: '12px' }}>
-                Symptom Tracker v3.0
+                Symptom Tracker v3.1
               </span>
             </div>
           </div>
