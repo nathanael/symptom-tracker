@@ -4654,7 +4654,7 @@ function SymptomTrackerMobile() {
                   letterSpacing: '1px',
                 }}>Hidden Symptoms</label>
                 <p style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 12px 0' }}>
-                  Swipe left to delete • Tap + to restore
+                  Tap + to restore
                 </p>
                 <div style={{
                   display: 'flex',
@@ -4728,34 +4728,14 @@ function SymptomTrackerMobile() {
                         </div>
                       ) : (
                         <>
-                          {/* Delete action revealed on swipe */}
-                          <div style={{
-                            position: 'absolute',
-                            right: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: '80px',
-                            background: '#ef4444',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: '5px',
-                          }}>
-                            <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Delete</span>
-                          </div>
-                          {/* Swipeable content */}
+                          {/* Non-swipeable content */}
                           <div
-                            onTouchStart={(e) => handleItemSwipeStart(e, `inactive-${symptom.id}`)}
-                            onTouchMove={(e) => handleItemSwipeMove(e, `inactive-${symptom.id}`)}
-                            onTouchEnd={() => handleItemSwipeEnd(`inactive-${symptom.id}`, () => setSymptoms(symptoms.filter(s => s.id !== symptom.id)))}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
                               gap: '8px',
                               background: 'rgba(15, 23, 42, 0.6)',
                               borderRadius: '5px',
-                              transform: `translateX(${swipeOffsets[`inactive-${symptom.id}`] || 0}px)`,
-                              transition: swipeStartRef.current.id === `inactive-${symptom.id}` ? 'none' : 'transform 0.2s ease',
                             }}
                           >
                             {/* Clickable text to edit */}
@@ -5818,7 +5798,7 @@ function SymptomTrackerMobile() {
                   App Info
                 </div>
                 <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
-                  Version: 3.2.4 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
+                  Version: 3.2.5 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
                 </div>
                 <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>
                   Cloud sync: {isAuthSupported() ? '✓ Available' : '✗ Not available in this mode'}
@@ -6293,7 +6273,7 @@ function SymptomTrackerMobile() {
                   letterSpacing: '1px',
                 }}>Inactive Supplements</label>
                 <p style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 12px 0' }}>
-                  Swipe left to delete • Tap + to restore
+                  Tap + to restore
                 </p>
                 <div style={{
                   display: 'flex',
@@ -6310,34 +6290,14 @@ function SymptomTrackerMobile() {
                         opacity: 0.7,
                       }}
                     >
-                      {/* Delete action revealed on swipe */}
-                      <div style={{
-                        position: 'absolute',
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: '80px',
-                        background: '#ef4444',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '5px',
-                      }}>
-                        <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Delete</span>
-                      </div>
-                      {/* Swipeable content */}
+                      {/* Non-swipeable content */}
                       <div
-                        onTouchStart={(e) => handleItemSwipeStart(e, `stack-inactive-${item.id}`)}
-                        onTouchMove={(e) => handleItemSwipeMove(e, `stack-inactive-${item.id}`)}
-                        onTouchEnd={() => handleItemSwipeEnd(`stack-inactive-${item.id}`, () => deleteStackItem(item.id))}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: '8px',
                           background: 'rgba(15, 23, 42, 0.6)',
                           borderRadius: '5px',
-                          transform: `translateX(${swipeOffsets[`stack-inactive-${item.id}`] || 0}px)`,
-                          transition: swipeStartRef.current.id === `stack-inactive-${item.id}` ? 'none' : 'transform 0.2s ease',
                         }}
                       >
                         {/* Clickable text to edit */}
