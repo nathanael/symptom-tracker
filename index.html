@@ -442,11 +442,15 @@ function SymptomTrackerMobile() {
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [historySort, setHistorySort] = useState({ column: 'date', direction: 'desc' });
   const [symptomSearch, setSymptomSearch] = useState('');
+  const [searchVisible, setSearchVisible] = useState(false); // Hidden by default
+  const [showCompletion, setShowCompletion] = useState(false); // Completion animation
   const [lastDeletedEntry, setLastDeletedEntry] = useState(null); // For undo functionality
   const [isLoading, setIsLoading] = useState(false); // For loading states
   const [quickLogSymptom, setQuickLogSymptom] = useState(null); // For tap-to-log quick picker
   const [quickLogTime, setQuickLogTime] = useState(null); // Selected time period in quick picker (null = first period)
   const [rapidEntryMode, setRapidEntryMode] = useState(false); // Rapid entry mode
+  const [rapidEntryConfirm, setRapidEntryConfirm] = useState(false); // Confirm start over
+  const [rapidEntryLogged, setRapidEntryLogged] = useState([]); // Track logged symptoms for back button
   const [rapidEntryIndex, setRapidEntryIndex] = useState(0); // Current symptom index in rapid entry
   
   // Drag-to-reorder state
@@ -515,6 +519,7 @@ function SymptomTrackerMobile() {
   // Incomplete symptoms for rapid entry - only symptoms not logged for the current time period
   const incompleteSymptoms = useMemo(() => {
     const dateKey = selectedDate.toISOString().split('T')[0];
+    // Use the current rapid entry time period, or calculate based on time of day
     const timePeriod = quickLogTime || (new Date().getHours() < 12 ? 'morning' : 'evening');
     
     // Get active symptoms without search filter for rapid entry
@@ -528,10 +533,57 @@ function SymptomTrackerMobile() {
     
     return allActive.filter(symptom => {
       // Check if this symptom has an entry for today's time period
-      const entryKey = `${dateKey}-${symptom.id}-${trackingMode === 'ampm' ? timePeriod : 'daily'}`;
+      const entryKey = trackingMode === 'ampm' 
+        ? `${dateKey}-${symptom.id}-${timePeriod}`
+        : `${dateKey}-${symptom.id}-daily`;
       return !entries[entryKey];
     });
   }, [symptoms, entries, selectedDate, quickLogTime, trackingMode, pinnedSymptoms]);
+  
+  // All active symptoms count for checking completion
+   const totalActiveSymptoms = useMemo(() => 
+    symptoms.filter(s => s.active).length,
+    [symptoms]
+  );
+  
+  // Track if user just logged a symptom (to distinguish from date navigation)
+  const justLoggedRef = useRef(false);
+  
+  // Track previous incomplete count for completion detection
+  const prevIncompleteRef = useRef(incompleteSymptoms.length);
+  const prevDateRef = useRef(selectedDate.toISOString());
+  
+  // Detect when all symptoms become complete (only from logging, not navigation)
+  useEffect(() => {
+    const prevCount = prevIncompleteRef.current;
+    const currentCount = incompleteSymptoms.length;
+    const dateChanged = prevDateRef.current !== selectedDate.toISOString();
+    
+    // Only show completion if:
+    // 1. We went from some incomplete to none
+    // 2. We have active symptoms
+    // 3. User just logged a symptom (not navigating dates)
+    if (prevCount > 0 && currentCount === 0 && totalActiveSymptoms > 0 && justLoggedRef.current && !dateChanged) {
+      setShowCompletion(true);
+      // Auto-hide after 2 seconds
+      const timer = setTimeout(() => setShowCompletion(false), 2000);
+      justLoggedRef.current = false;
+      return () => clearTimeout(timer);
+    }
+    
+    // Reset the flag if date changed
+    if (dateChanged) {
+      justLoggedRef.current = false;
+    }
+    
+    prevIncompleteRef.current = currentCount;
+    prevDateRef.current = selectedDate.toISOString();
+  }, [incompleteSymptoms.length, totalActiveSymptoms, selectedDate]);
+  
+  // Helper to mark that user just logged
+  const markJustLogged = useCallback(() => {
+    justLoggedRef.current = true;
+  }, []);
   
   const inactiveSymptoms = useMemo(() => 
     symptoms.filter(s => !s.active), 
@@ -893,23 +945,32 @@ function SymptomTrackerMobile() {
 
   // Keyboard shortcuts for rapid entry mode
   useEffect(() => {
-    if (!rapidEntryMode) return;
+    if (!rapidEntryMode || rapidEntryConfirm) return;
     
     const handleKeyDown = (e) => {
       // Number keys 0-5 to log severity
       if (e.key >= '0' && e.key <= '5') {
         const severity = parseInt(e.key);
         const symptomId = incompleteSymptoms[rapidEntryIndex]?.id;
+        const symptomName = incompleteSymptoms[rapidEntryIndex]?.name;
         if (symptomId) {
           const logTime = quickLogTime || getCurrentTimePeriod();
+          
+          // Track for undo
+          setRapidEntryLogged(prev => [...prev, {
+            symptomId,
+            symptomName,
+            severity,
+            time: logTime,
+          }]);
+          
           quickLog(symptomId, severity, logTime);
-          // Auto-advance
-          if (rapidEntryIndex < incompleteSymptoms.length - 1) {
-            setRapidEntryIndex(rapidEntryIndex + 1);
-          } else {
+          
+          // Check if this was the last one
+          if (incompleteSymptoms.length <= 1) {
             setRapidEntryMode(false);
             setRapidEntryIndex(0);
-            setLastAction(`⚡ Logged ${incompleteSymptoms.length} symptoms`);
+            setLastAction(`⚡ Rapid entry complete`);
           }
         }
       }
@@ -917,26 +978,34 @@ function SymptomTrackerMobile() {
       else if (e.key === 'Escape') {
         setRapidEntryMode(false);
         setRapidEntryIndex(0);
+        setRapidEntryConfirm(false);
       }
-      // Backspace or left arrow to go back
-      else if ((e.key === 'Backspace' || e.key === 'ArrowLeft') && rapidEntryIndex > 0) {
+      // Backspace or Left arrow to undo
+      else if ((e.key === 'Backspace' || e.key === 'ArrowLeft') && rapidEntryLogged.length > 0) {
         e.preventDefault();
-        setRapidEntryIndex(rapidEntryIndex - 1);
+        const lastLogged = rapidEntryLogged[rapidEntryLogged.length - 1];
+        const dateKey = selectedDate.toISOString().split('T')[0];
+        const timeKey = trackingMode === 'ampm' ? lastLogged.time : 'daily';
+        const entryKey = `${dateKey}-${lastLogged.symptomId}-${timeKey}`;
+        
+        setEntries(prev => {
+          const newEntries = { ...prev };
+          delete newEntries[entryKey];
+          return newEntries;
+        });
+        
+        setRapidEntryLogged(prev => prev.slice(0, -1));
       }
-      // Right arrow to skip
+      // Right arrow to skip/close
       else if (e.key === 'ArrowRight') {
-        if (rapidEntryIndex < incompleteSymptoms.length - 1) {
-          setRapidEntryIndex(rapidEntryIndex + 1);
-        } else {
-          setRapidEntryMode(false);
-          setRapidEntryIndex(0);
-        }
+        setRapidEntryMode(false);
+        setRapidEntryIndex(0);
       }
     };
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [rapidEntryMode, rapidEntryIndex, incompleteSymptoms, quickLogTime, quickLog, getCurrentTimePeriod]);
+  }, [rapidEntryMode, rapidEntryConfirm, rapidEntryIndex, incompleteSymptoms, quickLogTime, quickLog, getCurrentTimePeriod, rapidEntryLogged, selectedDate, trackingMode]);
 
   // ==========================================================================
   // FIREBASE SYNC FUNCTIONS
@@ -1453,6 +1522,9 @@ function SymptomTrackerMobile() {
     const timeId = timeOverride || timePeriods[0].id;
     const key = `${dateKey}-${symptomId}-${timeId}`;
     
+    // Mark that user just logged (for completion detection)
+    markJustLogged();
+    
     setEntries(prev => ({
       ...prev,
       [key]: { time: timeId, severity, date: dateKey, symptomId }
@@ -1464,13 +1536,16 @@ function SymptomTrackerMobile() {
     setQuickLogSymptom(null);
     // Keep quickLogTime sticky - don't reset it
     setLastAction(`${symptom?.name}: ${severity} (${period?.label || timeId})`);
-  }, [selectedDate, timePeriods, symptoms, getDateKey, haptic]);
+  }, [selectedDate, timePeriods, symptoms, getDateKey, haptic, markJustLogged]);
 
   // Log all active symptoms at severity 0 ("Good Day" feature)
   const logGoodDay = useCallback(() => {
     const dateKey = getDateKey(selectedDate);
     const timeId = timePeriods[0].id;
     const activeSymptomsList = symptoms.filter(s => s.active);
+    
+    // Mark that user just logged (for completion detection)
+    markJustLogged();
     
     const newEntries = { ...entries };
     activeSymptomsList.forEach(symptom => {
@@ -1481,7 +1556,7 @@ function SymptomTrackerMobile() {
     setEntries(newEntries);
     haptic('success');
     setLastAction(`☀️ Good day! Logged ${activeSymptomsList.length} symptoms at 0`);
-  }, [selectedDate, timePeriods, symptoms, entries, getDateKey, haptic]);
+  }, [selectedDate, timePeriods, symptoms, entries, getDateKey, haptic, markJustLogged]);
 
   // Toggle pin status for a symptom
   const togglePin = useCallback((symptomId) => {
@@ -2447,6 +2522,49 @@ function SymptomTrackerMobile() {
         bottom: 0,
       }}
     >
+      {/* COMPLETION CELEBRATION */}
+      {showCompletion && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(12, 10, 29, 0.95)',
+          zIndex: 1100,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '16px',
+          animation: 'fadeIn 0.3s ease',
+        }}>
+          <div style={{
+            fontSize: '64px',
+            animation: 'popIn 0.4s ease',
+          }}>
+            ✓
+          </div>
+          <div style={{
+            color: '#10b981',
+            fontSize: '24px',
+            fontWeight: '700',
+            textAlign: 'center',
+          }}>
+            All done!
+          </div>
+          <div style={{
+            color: '#94a3b8',
+            fontSize: '14px',
+          }}>
+            {trackingMode === 'ampm' 
+              ? `${quickLogTime === 'morning' ? 'Morning' : 'Evening'} symptoms logged`
+              : 'All symptoms logged for today'
+            }
+          </div>
+        </div>
+      )}
+
       {/* RAPID ENTRY MODE - Full screen overlay */}
       {rapidEntryMode && (
         <div style={{
@@ -2475,7 +2593,10 @@ function SymptomTrackerMobile() {
               Rapid Entry
             </div>
             <button
-              onClick={() => setRapidEntryMode(false)}
+              onClick={() => {
+                setRapidEntryMode(false);
+                setRapidEntryConfirm(false);
+              }}
               style={{
                 background: 'rgba(239, 68, 68, 0.15)',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
@@ -2491,27 +2612,145 @@ function SymptomTrackerMobile() {
             </button>
           </div>
           
-          {/* Progress indicator */}
+          {/* Confirmation dialog when all complete */}
+          {rapidEntryConfirm ? (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '24px',
+            }}>
+              <div style={{ color: '#10b981', fontSize: '48px' }}>✓</div>
+              <div style={{ color: '#f8fafc', fontSize: '20px', fontWeight: '600', textAlign: 'center' }}>
+                All {trackingMode === 'ampm' ? (quickLogTime === 'morning' ? 'AM' : 'PM') : ''} symptoms logged
+              </div>
+              
+              {/* Check if opposite period has incomplete symptoms */}
+              {(() => {
+                if (trackingMode !== 'ampm') return null;
+                
+                const dateKey = selectedDate.toISOString().split('T')[0];
+                const currentPeriod = quickLogTime || getCurrentTimePeriod();
+                const oppositePeriod = currentPeriod === 'morning' ? 'evening' : 'morning';
+                const oppositeLabel = oppositePeriod === 'morning' ? 'AM' : 'PM';
+                
+                // Count incomplete for opposite period
+                const oppositeIncomplete = symptoms.filter(s => s.active).filter(symptom => {
+                  const entryKey = `${dateKey}-${symptom.id}-${oppositePeriod}`;
+                  return !entries[entryKey];
+                });
+                
+                if (oppositeIncomplete.length > 0) {
+                  return (
+                    <button
+                      onClick={() => {
+                        setQuickLogTime(oppositePeriod);
+                        setRapidEntryConfirm(false);
+                        setRapidEntryIndex(0);
+                        setRapidEntryLogged([]);
+                      }}
+                      style={{
+                        padding: '14px 28px',
+                        background: 'rgba(16, 185, 129, 0.2)',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                        borderRadius: '5px',
+                        color: '#34d399',
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Switch to {oppositeLabel} ({oppositeIncomplete.length} incomplete)
+                    </button>
+                  );
+                }
+                return null;
+              })()}
+              
+              <div style={{ color: '#94a3b8', fontSize: '14px', textAlign: 'center', marginTop: '8px' }}>
+                Or start over to re-enter this period?
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => {
+                    setRapidEntryMode(false);
+                    setRapidEntryConfirm(false);
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'rgba(100, 116, 139, 0.1)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    borderRadius: '5px',
+                    color: '#94a3b8',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    // Clear all entries for current time period and start over
+                    const dateKey = selectedDate.toISOString().split('T')[0];
+                    const timePeriod = quickLogTime || getCurrentTimePeriod();
+                    const timeKey = trackingMode === 'ampm' ? timePeriod : 'daily';
+                    
+                    // Clear entries for this period
+                    const newEntries = { ...entries };
+                    symptoms.filter(s => s.active).forEach(symptom => {
+                      const entryKey = `${dateKey}-${symptom.id}-${timeKey}`;
+                      delete newEntries[entryKey];
+                    });
+                    setEntries(newEntries);
+                    
+                    setRapidEntryConfirm(false);
+                    setRapidEntryIndex(0);
+                    setRapidEntryLogged([]);
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'rgba(139, 92, 246, 0.2)',
+                    border: '1px solid rgba(139, 92, 246, 0.4)',
+                    borderRadius: '5px',
+                    color: '#c4b5fd',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Start Over
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+          {/* Progress indicator - shows completed vs total */}
           <div style={{
             display: 'flex',
             gap: '4px',
             marginBottom: '20px',
           }}>
-            {incompleteSymptoms.map((_, idx) => (
-              <div
-                key={idx}
-                style={{
-                  flex: 1,
-                  height: '4px',
-                  borderRadius: '2px',
-                  background: idx < rapidEntryIndex 
-                    ? '#10b981' 
-                    : idx === rapidEntryIndex 
-                      ? '#8b5cf6' 
-                      : 'rgba(100, 116, 139, 0.3)',
-                }}
-              />
-            ))}
+            {Array.from({ length: totalActiveSymptoms }).map((_, idx) => {
+              const completedCount = totalActiveSymptoms - incompleteSymptoms.length;
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    flex: 1,
+                    height: '4px',
+                    borderRadius: '2px',
+                    background: idx < completedCount 
+                      ? '#10b981'  // Completed - green
+                      : idx === completedCount
+                        ? '#8b5cf6'  // Current - purple
+                        : 'rgba(100, 116, 139, 0.3)',  // Pending - gray
+                  }}
+                />
+              );
+            })}
           </div>
           
           {/* Current symptom */}
@@ -2589,7 +2828,8 @@ function SymptomTrackerMobile() {
               }}>
                 {[0, 1, 2, 3, 4, 5].map(severity => {
                   const logTime = quickLogTime || getCurrentTimePeriod();
-                  const symptomId = incompleteSymptoms[rapidEntryIndex].id;
+                  const symptomId = incompleteSymptoms[rapidEntryIndex]?.id;
+                  const symptomName = incompleteSymptoms[rapidEntryIndex]?.name;
                   
                   // Check most recent entry for subtle highlight
                   const recentEntry = getMostRecentEntry(symptomId);
@@ -2599,15 +2839,23 @@ function SymptomTrackerMobile() {
                     <button
                       key={severity}
                       onClick={() => {
+                        if (!symptomId) return;
+                        
+                        // Track this for back button
+                        setRapidEntryLogged(prev => [...prev, {
+                          symptomId,
+                          symptomName,
+                          severity,
+                          time: logTime,
+                        }]);
+                        
                         quickLog(symptomId, severity, logTime);
-                        // Auto-advance to next symptom
-                        if (rapidEntryIndex < incompleteSymptoms.length - 1) {
-                          setRapidEntryIndex(rapidEntryIndex + 1);
-                        } else {
-                          // Done with all symptoms
+                        
+                        // Check if this was the last one
+                        if (incompleteSymptoms.length <= 1) {
                           setRapidEntryMode(false);
                           setRapidEntryIndex(0);
-                          setLastAction(`⚡ Logged ${incompleteSymptoms.length} symptoms`);
+                          setLastAction(`⚡ Rapid entry complete`);
                         }
                       }}
                       style={{
@@ -2629,57 +2877,72 @@ function SymptomTrackerMobile() {
               
               {/* Navigation buttons */}
               <div style={{ display: 'flex', gap: '12px' }}>
-                {/* Back button */}
+                {/* Back button - undo last entry */}
                 <button
                   onClick={() => {
-                    if (rapidEntryIndex > 0) {
-                      setRapidEntryIndex(rapidEntryIndex - 1);
+                    if (rapidEntryLogged.length > 0) {
+                      const lastLogged = rapidEntryLogged[rapidEntryLogged.length - 1];
+                      // Remove the entry
+                      const dateKey = selectedDate.toISOString().split('T')[0];
+                      const timeKey = trackingMode === 'ampm' ? lastLogged.time : 'daily';
+                      const entryKey = `${dateKey}-${lastLogged.symptomId}-${timeKey}`;
+                      
+                      setEntries(prev => {
+                        const newEntries = { ...prev };
+                        delete newEntries[entryKey];
+                        return newEntries;
+                      });
+                      
+                      // Remove from logged history
+                      setRapidEntryLogged(prev => prev.slice(0, -1));
                     }
                   }}
-                  disabled={rapidEntryIndex === 0}
+                  disabled={rapidEntryLogged.length === 0}
                   style={{
                     padding: '12px 24px',
-                    background: rapidEntryIndex > 0 ? 'rgba(100, 116, 139, 0.1)' : 'rgba(50, 50, 70, 0.2)',
+                    background: rapidEntryLogged.length > 0 ? 'rgba(100, 116, 139, 0.1)' : 'rgba(50, 50, 70, 0.2)',
                     border: '1px solid rgba(100, 116, 139, 0.3)',
                     borderRadius: '5px',
-                    color: rapidEntryIndex > 0 ? '#94a3b8' : '#475569',
+                    color: rapidEntryLogged.length > 0 ? '#94a3b8' : '#475569',
                     fontSize: '14px',
                     fontWeight: '600',
-                    cursor: rapidEntryIndex > 0 ? 'pointer' : 'default',
-                    opacity: rapidEntryIndex > 0 ? 1 : 0.5,
+                    cursor: rapidEntryLogged.length > 0 ? 'pointer' : 'default',
+                    opacity: rapidEntryLogged.length > 0 ? 1 : 0.5,
                   }}
                 >
-                  ← Back
+                  ← Undo
                 </button>
                 
-                {/* Skip button */}
+                {/* Skip/Close button */}
                 <button
-                  onClick={() => {
-                    if (rapidEntryIndex < incompleteSymptoms.length - 1) {
-                      setRapidEntryIndex(rapidEntryIndex + 1);
-                    } else {
-                      setRapidEntryMode(false);
-                      setRapidEntryIndex(0);
-                    }
-                  }}
-                  style={{
-                    padding: '12px 24px',
-                    background: 'rgba(100, 116, 139, 0.1)',
-                    border: '1px solid rgba(100, 116, 139, 0.3)',
-                    borderRadius: '5px',
-                    color: '#94a3b8',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Skip →
-                </button>
+                onClick={() => {
+                  if (incompleteSymptoms.length > 1) {
+                    // Move current to end by skipping - but since list is dynamic, just close if only one left
+                    setRapidEntryMode(false);
+                    setRapidEntryIndex(0);
+                  } else {
+                    setRapidEntryMode(false);
+                    setRapidEntryIndex(0);
+                  }
+                }}
+                style={{
+                  padding: '12px 32px',
+                  background: 'rgba(100, 116, 139, 0.1)',
+                  border: '1px solid rgba(100, 116, 139, 0.3)',
+                  borderRadius: '5px',
+                  color: '#94a3b8',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Skip / Close
+              </button>
               </div>
               
-              {/* Counter */}
+              {/* Counter - shows completed / total */}
               <div style={{ color: '#64748b', fontSize: '14px' }}>
-                {rapidEntryIndex + 1} of {incompleteSymptoms.length}
+                {totalActiveSymptoms - incompleteSymptoms.length} of {totalActiveSymptoms} logged • {incompleteSymptoms.length} remaining
               </div>
             </div>
           ) : (
@@ -2693,6 +2956,8 @@ function SymptomTrackerMobile() {
             }}>
               All symptoms logged for this period ✓
             </div>
+          )}
+            </>
           )}
         </div>
       )}
@@ -2760,10 +3025,23 @@ function SymptomTrackerMobile() {
             {appMode === 'symptoms' && (
               <button
                 onClick={() => {
-                  setRapidEntryMode(true);
-                  setRapidEntryIndex(0);
+                  // Set time period first
                   if (trackingMode === 'ampm' && !quickLogTime) {
                     setQuickLogTime(getCurrentTimePeriod());
+                  }
+                  
+                  // Reset logged history for back button
+                  setRapidEntryLogged([]);
+                  
+                  // Check if all symptoms are already complete
+                  if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
+                    // Show confirmation dialog
+                    setRapidEntryConfirm(true);
+                    setRapidEntryMode(true);
+                  } else {
+                    // Normal rapid entry
+                    setRapidEntryMode(true);
+                    setRapidEntryIndex(0);
                   }
                 }}
                 style={{
@@ -2826,17 +3104,39 @@ function SymptomTrackerMobile() {
           gap: '8px',
         }}>
         
-        {/* Search Input */}
+        {/* Pull handle to reveal search */}
         {symptoms.filter(s => s.active).length > 8 && (
+          <div 
+            onClick={() => setSearchVisible(!searchVisible)}
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              padding: '4px 0 8px 0',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{
+              width: '40px',
+              height: '4px',
+              background: searchVisible ? 'rgba(99, 102, 241, 0.5)' : 'rgba(100, 116, 139, 0.3)',
+              borderRadius: '2px',
+            }} />
+          </div>
+        )}
+        
+        {/* Search Input - hidden by default */}
+        {searchVisible && symptoms.filter(s => s.active).length > 8 && (
           <div style={{
             position: 'relative',
             marginBottom: '8px',
+            animation: 'slideDown 0.2s ease',
           }}>
             <input
               type="text"
               value={symptomSearch}
               onChange={(e) => setSymptomSearch(e.target.value)}
               placeholder="Search symptoms..."
+              autoFocus
               style={{
                 width: '100%',
                 padding: '12px 40px 12px 16px',
@@ -2962,9 +3262,10 @@ function SymptomTrackerMobile() {
                   justifyContent: 'flex-end',
                   alignItems: 'center',
                   marginLeft: '12px',
+                  minWidth: timePeriods.length > 1 ? '80px' : '40px',
                 }}>
                   {symptomEntries.length === 0 ? (
-                    <span style={{ color: '#64748b', fontSize: '11px' }}>
+                    <span style={{ color: '#64748b', fontSize: '11px', textAlign: 'right' }}>
                       Tap to log
                     </span>
                   ) : (
@@ -5494,7 +5795,7 @@ function SymptomTrackerMobile() {
               borderTop: '1px solid rgba(99, 102, 241, 0.1)',
             }}>
               <span style={{ color: '#475569', fontSize: '12px' }}>
-                Symptom Tracker v3.1.3
+                Symptom Tracker v3.1.9
               </span>
             </div>
           </div>
@@ -5950,6 +6251,19 @@ function SymptomTrackerMobile() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes popIn {
+          0% { transform: scale(0); opacity: 0; }
+          50% { transform: scale(1.2); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         input::placeholder, textarea::placeholder {
           color: #64748b;

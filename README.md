@@ -1,4 +1,4 @@
-# Symptom Tracker v3.1.3
+# Symptom Tracker v3.1.9
 
 A mobile-first health tracking PWA for logging symptoms and supplements with cloud sync.
 
@@ -101,16 +101,19 @@ service cloud.firestore {
 1. **Tap the ⚡ button** in the header (next to date arrows)
 2. **Only shows incomplete symptoms** for the current time period
 3. **Large buttons** show the current symptom
-4. **Tap severity (0-5)** to log and auto-advance
-5. **← Back** to go to previous symptom
-6. **Skip →** to skip a symptom
-7. **Progress bar** shows completion
-8. Shows "All symptoms logged" when done
+4. **Tap severity (0-5)** to log - next symptom appears automatically
+5. **← Undo** to remove the last entry and go back to that symptom
+6. **Skip / Close** to skip current symptom or exit
+7. **Progress bar** shows completed (green) vs remaining (gray)
+8. If all complete for current period:
+   - **Switch to AM/PM** button appears if opposite period has incomplete symptoms
+   - **Start Over** to re-enter all symptoms for current period
+9. **Completion animation** when all symptoms are logged
 
 **Keyboard shortcuts** (desktop):
-- **0-5**: Log severity and advance
-- **←/Backspace**: Go back to previous symptom
-- **→**: Skip to next symptom
+- **0-5**: Log severity
+- **←/Backspace**: Undo last entry
+- **→**: Skip / close
 - **Escape**: Close rapid entry
 
 ### Managing Supplements
@@ -131,9 +134,9 @@ service cloud.firestore {
 - **←/→**: Navigate dates
 - **Escape**: Close modals
 - **In Rapid Entry Mode**:
-  - **0-5**: Log severity and advance
-  - **←/Backspace**: Previous symptom
-  - **→**: Skip to next
+  - **0-5**: Log severity
+  - **←/Backspace**: Undo last entry
+  - **→**: Skip / close
   - **Escape**: Close
 
 ## Data Model
@@ -185,6 +188,39 @@ symptomTracker_pinned      // Pinned symptom IDs
 - CORS errors when opening file:// directly (use a local server or deploy)
 
 ## Version History
+
+### v3.1.9
+- **Switch period in rapid entry**: When all symptoms are complete for current period (AM/PM), you can now switch to the opposite period if it has incomplete symptoms
+- Shows "Switch to AM/PM (X incomplete)" button in the completion dialog
+- Updated text to show which period is complete ("All AM symptoms logged" vs "All PM symptoms logged")
+
+### v3.1.8
+- **Fixed completion animation trigger**: "All done!" now only shows when you actually complete logging, not when navigating to an already-complete date
+- Tracks whether user just logged vs. just navigated
+
+### v3.1.7
+- **Undo button in rapid entry**: "← Undo" button removes the last logged entry so you can correct mistakes
+- **Keyboard shortcut**: ←/Backspace to undo last entry
+- Tracks all entries logged during the rapid entry session
+- Button is disabled until you've logged at least one symptom
+
+### v3.1.6
+- **Removed back button**: Back didn't work with the new logic since logged items leave the list
+- **Hidden search by default**: Tap the pull handle (gray bar) at top of symptom list to reveal search
+- **Completion celebration**: Full-screen "All done!" animation when you complete all symptoms for a period
+- **Skip/Close button**: Combined button to skip current symptom or close rapid entry
+
+### v3.1.5
+- **Fixed rapid entry skipping bug**: No longer skips every other symptom - the list now properly advances as items are logged
+- **Progress bar shows completed/total**: Progress bar reflects how many are done out of all active symptoms
+- **Better counter**: Shows "X of Y logged • Z remaining" instead of position in list
+- **Proper completion detection**: Closes rapid entry only when all symptoms are actually logged
+
+### v3.1.4
+- **Rapid entry reliability fix**: Fixed incomplete symptoms calculation to consistently show remaining items
+- **Start over confirmation**: When all symptoms are complete, rapid entry asks if you want to start over instead of auto-clearing
+- **Fixed tile sizing**: Symptom tiles no longer change size when logging scores (consistent min-width)
+- **Error boundary**: Added React error boundary for better error handling
 
 ### v3.1.3
 - **Rapid entry shows only incomplete symptoms**: Only symptoms not yet logged for the current time period are shown
