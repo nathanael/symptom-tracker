@@ -1151,29 +1151,41 @@ function SymptomTrackerMobile() {
     
     try {
       setSyncing(true);
-      // Use popup for:
-      // - Desktop browsers
-      // - PWA/standalone mode (redirects don't work in standalone)
-      // Use redirect only for mobile browsers (not standalone)
-      const usePopup = !isMobile() || isStandalone();
+      setSyncError(null);
       
-      if (usePopup) {
+      // Always try popup first - it's more reliable
+      // Only fall back to redirect if popup is blocked
+      try {
+        console.log('Attempting popup sign-in...');
         const result = await firebaseAuth.signInWithPopup(googleProvider);
+        console.log('Popup sign-in result:', result);
         if (result.user) {
+          console.log('Signed in as:', result.user.email);
+          setUser(result.user); // Explicitly set user state
           setLastAction('✓ Signed in as ' + result.user.email);
+          // Load data from cloud
+          await loadFromCloud(result.user.uid);
         }
-      } else {
-        await firebaseAuth.signInWithRedirect(googleProvider);
+      } catch (popupError) {
+        console.log('Popup error:', popupError.code, popupError.message);
+        // If popup was blocked, try redirect as fallback
+        if (popupError.code === 'auth/popup-blocked') {
+          console.log('Popup blocked, trying redirect...');
+          setLastAction('Popup blocked, redirecting...');
+          await firebaseAuth.signInWithRedirect(googleProvider);
+        } else {
+          throw popupError;
+        }
       }
     } catch (error) {
       console.error('Sign in error:', error);
-      // Handle popup blocked error
-      if (error.code === 'auth/popup-blocked') {
-        setSyncError('Popup blocked. Please allow popups for this site.');
-      } else if (error.code === 'auth/popup-closed-by-user') {
+      if (error.code === 'auth/popup-closed-by-user') {
         setSyncError('Sign-in cancelled');
       } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
         setSyncError('Sign-in not supported. Use Safari browser (not home screen app) or deploy to HTTPS.');
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // Another popup was already open, ignore
+        console.log('Cancelled duplicate popup request');
       } else {
         setSyncError(error.message);
       }
@@ -5821,7 +5833,7 @@ function SymptomTrackerMobile() {
                   App Info
                 </div>
                 <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
-                  Version: 3.2.1 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
+                  Version: 3.2.2 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
                 </div>
                 <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>
                   Cloud sync: {isAuthSupported() ? '✓ Available' : '✗ Not available in this mode'}
