@@ -5396,50 +5396,44 @@ function SymptomTrackerMobile() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
+            background: '#0c0a1d',
             zIndex: 100,
             overflowY: 'auto',
-            padding: '20px 20px 120px 20px',
+            padding: '20px 16px 120px 16px',
           }}
         >
           <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '24px',
+            {/* Header */}
+            <h2 style={{
+              color: '#f8fafc',
+              fontSize: '28px',
+              fontWeight: '700',
+              margin: '0 0 24px 0',
+              letterSpacing: '-0.5px',
             }}>
-              <h2 style={{
-                color: '#f8fafc',
-                fontSize: '24px',
-                fontWeight: '700',
-                margin: 0,
-              }}>
-                Settings
-              </h2>
-            </div>
+              Settings
+            </h2>
             
-            {/* Cloud Sync (Firebase) */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{
-                background: 'rgba(99, 102, 241, 0.1)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '3px',
-                padding: '14px',
-              }}>
+            {/* Account Section */}
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.5)',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              overflow: 'hidden',
+            }}>
+              <div style={{ padding: '16px' }}>
                 {firebaseError ? (
-                  <div style={{ textAlign: 'center', padding: '12px', color: '#94a3b8' }}>
-                    <div style={{ marginBottom: '8px', fontSize: '24px' }}>🔒</div>
-                    <div style={{ fontSize: '12px', lineHeight: '1.4' }}>
-                      Cloud sync not available in preview.
+                  <div style={{ textAlign: 'center', padding: '8px', color: '#94a3b8' }}>
+                    <div style={{ fontSize: '13px', lineHeight: '1.4' }}>
+                      Cloud sync unavailable in preview
                     </div>
-                    <div style={{ fontSize: '11px', marginTop: '8px', color: '#64748b' }}>
-                      Host on your own domain to enable sync.
+                    <div style={{ fontSize: '12px', marginTop: '4px', color: '#64748b' }}>
+                      Host on your own domain to enable
                     </div>
                   </div>
                 ) : (authLoading || !firebaseReady) ? (
-                  <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>
-                    {!firebaseReady ? 'Loading Firebase...' : 'Checking auth...'}
+                  <div style={{ textAlign: 'center', padding: '12px', color: '#94a3b8' }}>
+                    {!firebaseReady ? 'Loading...' : 'Checking auth...'}
                   </div>
                 ) : user ? (
                   <>
@@ -5448,40 +5442,43 @@ function SymptomTrackerMobile() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '12px',
-                      marginBottom: '12px',
-                      paddingBottom: '12px',
-                      borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
                     }}>
-                      {user.photoURL && (
-                        <img 
-                          src={user.photoURL} 
-                          alt="" 
-                          style={{
-                            width: '36px',
-                            height: '36px',
-                            borderRadius: '50%',
-                            border: '2px solid rgba(99, 102, 241, 0.4)',
-                          }}
-                        />
-                      )}
+                      <div style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        background: 'rgba(99, 102, 241, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#a5b4fc',
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        overflow: 'hidden',
+                      }}>
+                        {user.photoURL ? (
+                          <img src={user.photoURL} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          (user.displayName || user.email || 'U')[0].toUpperCase()
+                        )}
+                      </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '600' }}>
-                          {user.displayName || 'User'}
+                        <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '600' }}>
+                          {user.displayName || user.email?.split('@')[0] || 'User'}
                         </div>
-                        <div style={{ color: '#64748b', fontSize: '11px' }}>
+                        <div style={{ color: '#64748b', fontSize: '12px' }}>
                           {user.email}
                         </div>
                       </div>
                       <button
                         onClick={handleSignOut}
                         style={{
-                          background: 'rgba(239, 68, 68, 0.15)',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          borderRadius: '3px',
-                          padding: '6px 10px',
-                          color: '#f87171',
-                          fontSize: '11px',
-                          fontWeight: '600',
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '8px 12px',
+                          color: '#ef4444',
+                          fontSize: '14px',
+                          fontWeight: '500',
                           cursor: 'pointer',
                         }}
                       >
@@ -5491,41 +5488,31 @@ function SymptomTrackerMobile() {
                     
                     {/* Sync Status */}
                     <div style={{ 
+                      marginTop: '12px',
+                      paddingTop: '12px',
+                      borderTop: '1px solid rgba(100, 116, 139, 0.2)',
                       color: '#64748b', 
-                      fontSize: '12px', 
+                      fontSize: '13px', 
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      flexWrap: 'wrap',
                     }}>
                       {syncing ? (
-                        <>
-                          <span style={{ color: '#fbbf24' }}>⏳</span>
-                          <span>Syncing...</span>
-                        </>
+                        <span>Syncing...</span>
                       ) : lastSynced ? (
-                        <>
-                          <span style={{ color: '#4ade80' }}>●</span>
-                          <span>Auto-sync on • Last: {lastSynced.toLocaleTimeString()}</span>
-                        </>
+                        <span>Last synced {lastSynced.toLocaleTimeString()}</span>
                       ) : (
-                        <>
-                          <span style={{ color: '#4ade80' }}>●</span>
-                          <span>Auto-sync enabled</span>
-                        </>
+                        <span>Auto-sync enabled</span>
                       )}
                     </div>
                     
                     {syncError && (
                       <div style={{ 
-                        color: '#f87171', 
-                        fontSize: '11px', 
+                        color: '#ef4444', 
+                        fontSize: '13px', 
                         marginTop: '8px',
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        padding: '8px',
-                        borderRadius: '3px',
                       }}>
-                        ⚠️ {syncError}
+                        {syncError}
                       </div>
                     )}
                   </>
@@ -5829,8 +5816,16 @@ function SymptomTrackerMobile() {
               </div>
             </div>
             
-            {/* History & Export Row */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+            {/* Quick Actions Section */}
+            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+              DATA
+            </div>
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.5)',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              overflow: 'hidden',
+            }}>
               <button
                 onClick={() => {
                   setShowSettings(false);
@@ -5838,19 +5833,22 @@ function SymptomTrackerMobile() {
                   setShowHistory(true);
                 }}
                 style={{
-                  flex: 1,
-                  background: 'rgba(99, 102, 241, 0.15)',
-                  border: '2px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '3px',
-                  padding: '16px',
-                  color: '#a5b4fc',
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
+                  padding: '14px 16px',
+                  color: '#f8fafc',
                   fontSize: '15px',
-                  fontWeight: '600',
                   cursor: 'pointer',
-                  textAlign: 'center',
+                  textAlign: 'left',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}
               >
-                📋 History
+                <span>History</span>
+                <span style={{ color: '#64748b' }}>›</span>
               </button>
               <button
                 onClick={() => {
@@ -5859,172 +5857,171 @@ function SymptomTrackerMobile() {
                   setShowExport(true);
                 }}
                 style={{
-                  flex: 1,
-                  background: 'rgba(99, 102, 241, 0.15)',
-                  border: '2px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '3px',
-                  padding: '16px',
-                  color: '#a5b4fc',
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '14px 16px',
+                  color: '#f8fafc',
                   fontSize: '15px',
-                  fontWeight: '600',
                   cursor: 'pointer',
-                  textAlign: 'center',
+                  textAlign: 'left',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}
               >
-                📤 Export
+                <span>Export CSV</span>
+                <span style={{ color: '#64748b' }}>›</span>
               </button>
             </div>
             
-            {/* Manage Symptoms Button */}
-            <button
-              onClick={() => {
-                setShowSettings(false);
-                setShowAddSymptom(true);
-              }}
-              style={{
-                width: '100%',
-                background: 'rgba(99, 102, 241, 0.15)',
-                border: '2px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '3px',
-                padding: '16px',
-                color: '#a5b4fc',
-                fontSize: '15px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                textAlign: 'left',
-                marginBottom: '12px',
-              }}
-            >
-              <div style={{ fontWeight: '600', marginBottom: '4px' }}>Manage Symptoms</div>
-              <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                Add, edit, hide, or restore symptoms
-              </div>
-            </button>
-            
-            {/* Manage Stack Button */}
-            <button
-              onClick={() => {
-                setShowSettings(false);
-                setShowManageStack(true);
-              }}
-              style={{
-                width: '100%',
-                background: 'rgba(99, 102, 241, 0.15)',
-                border: '2px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '3px',
-                padding: '16px',
-                color: '#a5b4fc',
-                fontSize: '15px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                textAlign: 'left',
-                marginBottom: '20px',
-              }}
-            >
-              <div style={{ fontWeight: '600', marginBottom: '4px' }}>Manage Stack</div>
-              <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                Add, edit, or remove supplements
-              </div>
-            </button>
-            
-            {/* Tracking Mode Selection */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                color: '#94a3b8',
-                fontSize: '12px',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                display: 'block',
-                marginBottom: '12px',
-              }}>Tracking Mode</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {Object.entries(trackingModes).map(([key, mode]) => (
-                  <button
-                    key={key}
-                    onClick={() => setTrackingMode(key)}
-                    style={{
-                      background: trackingMode === key ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.1)',
-                      border: trackingMode === key ? '2px solid rgba(99, 102, 241, 0.6)' : '2px solid rgba(99, 102, 241, 0.2)',
-                      borderRadius: '3px',
-                      padding: '12px 16px',
-                      color: trackingMode === key ? '#fff' : '#a5b4fc',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: '600' }}>{mode.label}</div>
-                      <div style={{ fontSize: '11px', opacity: 0.7, marginTop: '2px' }}>{mode.description}</div>
-                    </div>
-                    {trackingMode === key && <span style={{ fontSize: '16px' }}>✓</span>}
-                  </button>
-                ))}
-              </div>
+            {/* Manage Section */}
+            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+              MANAGE
+            </div>
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.5)',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              overflow: 'hidden',
+            }}>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowAddSymptom(true);
+                }}
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
+                  padding: '14px 16px',
+                  color: '#f8fafc',
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div>
+                  <div>Symptoms</div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Add, edit, hide, or restore</div>
+                </div>
+                <span style={{ color: '#64748b' }}>›</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowManageStack(true);
+                }}
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '14px 16px',
+                  color: '#f8fafc',
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div>
+                  <div>Supplements</div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Add, edit, or remove</div>
+                </div>
+                <span style={{ color: '#64748b' }}>›</span>
+              </button>
             </div>
             
-            {/* iCloud / File Backup */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                color: '#94a3b8',
-                fontSize: '12px',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                display: 'block',
-                marginBottom: '12px',
-              }}>iCloud Backup</label>
-              
-              <div style={{
-                background: 'rgba(99, 102, 241, 0.1)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '3px',
-                padding: '14px',
-              }}>
-                <p style={{ 
-                  color: '#94a3b8', 
-                  fontSize: '12px', 
-                  margin: '0 0 12px 0',
-                  lineHeight: '1.4',
-                }}>
-                  Save backup to Files → iCloud Drive to sync between devices
-                </p>
-                
-                <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Tracking Mode Selection */}
+            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+              TRACKING MODE
+            </div>
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.5)',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              overflow: 'hidden',
+            }}>
+              {Object.entries(trackingModes).map(([key, mode], index, arr) => (
+                <button
+                  key={key}
+                  onClick={() => setTrackingMode(key)}
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: index < arr.length - 1 ? '1px solid rgba(100, 116, 139, 0.15)' : 'none',
+                    padding: '14px 16px',
+                    color: '#f8fafc',
+                    fontSize: '15px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div>
+                    <div>{mode.label}</div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{mode.description}</div>
+                  </div>
+                  {trackingMode === key && <span style={{ color: '#8b5cf6', fontSize: '18px' }}>✓</span>}
+                </button>
+              ))}
+            </div>
+            
+            {/* Backup Section */}
+            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+              BACKUP
+            </div>
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.5)',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              overflow: 'hidden',
+            }}>
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
+                <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px' }}>
+                  Save to Files → iCloud Drive to sync between devices
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
                   <button
                     onClick={backupToFile}
                     style={{
                       flex: 1,
-                      background: 'rgba(74, 222, 128, 0.15)',
-                      border: '1px solid rgba(74, 222, 128, 0.3)',
-                      borderRadius: '3px',
-                      padding: '12px',
-                      color: '#86efac',
-                      fontSize: '13px',
-                      fontWeight: '600',
+                      background: 'rgba(99, 102, 241, 0.2)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '10px',
+                      color: '#a5b4fc',
+                      fontSize: '14px',
+                      fontWeight: '500',
                       cursor: 'pointer',
                     }}
                   >
-                    ↓ Save Backup
+                    Save Backup
                   </button>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     style={{
                       flex: 1,
-                      background: 'rgba(99, 102, 241, 0.15)',
-                      border: '1px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '3px',
-                      padding: '12px',
+                      background: 'rgba(99, 102, 241, 0.2)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '10px',
                       color: '#a5b4fc',
-                      fontSize: '13px',
-                      fontWeight: '600',
+                      fontSize: '14px',
+                      fontWeight: '500',
                       cursor: 'pointer',
                     }}
                   >
-                    ↑ Load Backup
+                    Load Backup
                   </button>
                 </div>
                 <input
@@ -6035,64 +6032,60 @@ function SymptomTrackerMobile() {
                   style={{ display: 'none' }}
                 />
               </div>
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button
                 onClick={loadSampleData}
                 disabled={isLoading}
                 style={{
-                  background: isLoading ? 'rgba(99, 102, 241, 0.15)' : 'rgba(74, 222, 128, 0.15)',
-                  border: `2px solid ${isLoading ? 'rgba(99, 102, 241, 0.3)' : 'rgba(74, 222, 128, 0.3)'}`,
-                  borderRadius: '3px',
-                  padding: '16px',
-                  color: isLoading ? '#a5b4fc' : '#86efac',
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '14px 16px',
+                  color: '#f8fafc',
                   fontSize: '15px',
-                  fontWeight: '500',
                   cursor: isLoading ? 'wait' : 'pointer',
                   textAlign: 'left',
-                  opacity: isLoading ? 0.8 : 1,
+                  opacity: isLoading ? 0.6 : 1,
                 }}
               >
-                <div style={{ fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {isLoading ? '⏳ Loading...' : 'Load Default Data'}
+                <div>{isLoading ? 'Loading...' : 'Load Sample Data'}</div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                  {defaultSymptoms.length} symptoms + {defaultStackItems.length} supplements
                 </div>
-                {!isLoading && (
-                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                    Load {defaultSymptoms.length} symptoms + {defaultStackItems.length} supplements with 6 months sample entries
-                  </div>
-                )}
               </button>
-
+            </div>
+            
+            {/* Danger Zone */}
+            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+              DANGER ZONE
+            </div>
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.5)',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              overflow: 'hidden',
+            }}>
               {!confirmClearData ? (
                 <button
                   onClick={clearAllData}
                   style={{
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    border: '2px solid rgba(239, 68, 68, 0.3)',
-                    borderRadius: '3px',
-                    padding: '16px',
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
+                    padding: '14px 16px',
                     color: '#fca5a5',
                     fontSize: '15px',
-                    fontWeight: '500',
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
                 >
-                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>Clear All Data</div>
-                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                    Remove all recorded entries (keeps symptoms & stack)
-                  </div>
+                  <div>Clear All Entries</div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Keeps symptoms & supplements</div>
                 </button>
               ) : (
-                <div style={{
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: '2px solid rgba(239, 68, 68, 0.5)',
-                  borderRadius: '3px',
-                  padding: '16px',
-                }}>
-                  <div style={{ color: '#fca5a5', fontWeight: '600', marginBottom: '12px', textAlign: 'center' }}>
-                    ⚠️ Are you sure? This cannot be undone.
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
+                  <div style={{ color: '#fca5a5', fontWeight: '500', marginBottom: '12px', textAlign: 'center' }}>
+                    Clear all entries? This cannot be undone.
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button
@@ -6100,12 +6093,12 @@ function SymptomTrackerMobile() {
                       style={{
                         flex: 1,
                         background: 'rgba(99, 102, 241, 0.2)',
-                        border: '1px solid rgba(99, 102, 241, 0.4)',
-                        borderRadius: '3px',
-                        padding: '12px',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px',
                         color: '#a5b4fc',
                         fontSize: '14px',
-                        fontWeight: '600',
+                        fontWeight: '500',
                         cursor: 'pointer',
                       }}
                     >
@@ -6116,96 +6109,42 @@ function SymptomTrackerMobile() {
                       style={{
                         flex: 1,
                         background: 'rgba(239, 68, 68, 0.3)',
-                        border: '1px solid rgba(239, 68, 68, 0.5)',
-                        borderRadius: '3px',
-                        padding: '12px',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px',
                         color: '#fca5a5',
                         fontSize: '14px',
-                        fontWeight: '600',
+                        fontWeight: '500',
                         cursor: 'pointer',
                       }}
                     >
-                      Yes, Clear All
+                      Clear
                     </button>
                   </div>
                 </div>
               )}
-
-              {/* App Info & Force Reload */}
-              <div style={{
-                background: 'rgba(99, 102, 241, 0.1)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '3px',
-                padding: '16px',
-                marginBottom: '16px',
-              }}>
-                <div style={{ color: '#a5b4fc', fontWeight: '600', marginBottom: '12px' }}>
-                  App Info
-                </div>
-                <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
-                  Version: 3.3.4 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
-                </div>
-                <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>
-                  Cloud sync: {window.location.protocol === 'file:' ? '✗ Not available (local file)' : '✓ Available'}
-                </div>
-                <button
-                  onClick={() => {
-                    // Clear service worker cache if exists
-                    if ('caches' in window) {
-                      caches.keys().then(names => {
-                        names.forEach(name => caches.delete(name));
-                      });
-                    }
-                    // Force reload from server
-                    window.location.reload(true);
-                  }}
-                  style={{
-                    width: '100%',
-                    background: 'rgba(99, 102, 241, 0.2)',
-                    border: '1px solid rgba(99, 102, 241, 0.4)',
-                    borderRadius: '3px',
-                    padding: '12px',
-                    color: '#a5b4fc',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    marginTop: '8px',
-                  }}
-                >
-                  🔄 Force Reload (Check for Updates)
-                </button>
-              </div>
-
-              {/* Full Reset */}
+              
               {!confirmFullReset ? (
                 <button
                   onClick={fullReset}
                   style={{
-                    background: 'rgba(239, 68, 68, 0.25)',
-                    border: '2px solid rgba(239, 68, 68, 0.5)',
-                    borderRadius: '3px',
-                    padding: '16px',
-                    color: '#fca5a5',
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '14px 16px',
+                    color: '#ef4444',
                     fontSize: '15px',
-                    fontWeight: '500',
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
                 >
-                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>⚠️ Full Reset</div>
-                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                    Remove EVERYTHING - symptoms, stack, all entries, notes
-                  </div>
+                  <div>Full Reset</div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Remove everything</div>
                 </button>
               ) : (
-                <div style={{
-                  background: 'rgba(239, 68, 68, 0.3)',
-                  border: '2px solid rgba(239, 68, 68, 0.6)',
-                  borderRadius: '3px',
-                  padding: '16px',
-                }}>
-                  <div style={{ color: '#fca5a5', fontWeight: '600', marginBottom: '12px', textAlign: 'center' }}>
-                    🚨 FULL RESET - This will delete EVERYTHING!
+                <div style={{ padding: '14px 16px' }}>
+                  <div style={{ color: '#ef4444', fontWeight: '500', marginBottom: '12px', textAlign: 'center' }}>
+                    Delete EVERYTHING? This cannot be undone.
                   </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <button
@@ -6213,12 +6152,12 @@ function SymptomTrackerMobile() {
                       style={{
                         flex: 1,
                         background: 'rgba(99, 102, 241, 0.2)',
-                        border: '1px solid rgba(99, 102, 241, 0.4)',
-                        borderRadius: '3px',
-                        padding: '12px',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px',
                         color: '#a5b4fc',
                         fontSize: '14px',
-                        fontWeight: '600',
+                        fontWeight: '500',
                         cursor: 'pointer',
                       }}
                     >
@@ -6229,31 +6168,70 @@ function SymptomTrackerMobile() {
                       style={{
                         flex: 1,
                         background: 'rgba(239, 68, 68, 0.4)',
-                        border: '1px solid rgba(239, 68, 68, 0.6)',
-                        borderRadius: '3px',
-                        padding: '12px',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px',
                         color: '#fca5a5',
                         fontSize: '14px',
-                        fontWeight: '600',
+                        fontWeight: '500',
                         cursor: 'pointer',
                       }}
                     >
-                      Yes, Reset Everything
+                      Reset
                     </button>
                   </div>
                 </div>
               )}
             </div>
             
-            {/* Version number */}
+            {/* App Info Section */}
+            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+              ABOUT
+            </div>
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.5)',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              overflow: 'hidden',
+            }}>
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
+                <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
+                <div style={{ color: '#64748b', fontSize: '13px' }}>
+                  3.3.5 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if ('caches' in window) {
+                    caches.keys().then(names => {
+                      names.forEach(name => caches.delete(name));
+                    });
+                  }
+                  window.location.reload(true);
+                }}
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '14px 16px',
+                  color: '#8b5cf6',
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                Check for Updates
+              </button>
+            </div>
+            
+            {/* Footer */}
             <div style={{
               textAlign: 'center',
-              marginTop: '30px',
               paddingTop: '20px',
-              borderTop: '1px solid rgba(99, 102, 241, 0.1)',
+              paddingBottom: '20px',
             }}>
               <span style={{ color: '#475569', fontSize: '12px' }}>
-                Symptom Tracker v3.2.0
+                Symptom Tracker
               </span>
             </div>
           </div>
