@@ -12,6 +12,7 @@
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; padding: 0; background: #0c0a1d; overflow: hidden; height: 100%; width: 100%; }
     #root { height: 100%; width: 100%; }
+    .error-display { color: #f87171; padding: 20px; font-family: monospace; white-space: pre-wrap; background: #1a1333; }
   </style>
 </head>
 <body>
@@ -20,6 +21,39 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="text/babel" data-type="module">
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    this.setState({ error, errorInfo });
+    console.error('React Error Boundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-display">
+          <h2>Something went wrong</h2>
+          <p>{this.state.error?.toString()}</p>
+          <details>
+            <summary>Stack trace</summary>
+            <pre>{this.state.errorInfo?.componentStack}</pre>
+          </details>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const { useState, useRef, useEffect, useMemo, useCallback } = React;
 
 // ============================================================================
@@ -480,15 +514,24 @@ function SymptomTrackerMobile() {
   
   // Incomplete symptoms for rapid entry - only symptoms not logged for the current time period
   const incompleteSymptoms = useMemo(() => {
-    const dateKey = getDateKey(selectedDate);
+    const dateKey = selectedDate.toISOString().split('T')[0];
     const timePeriod = quickLogTime || (new Date().getHours() < 12 ? 'morning' : 'evening');
     
-    return activeSymptoms.filter(symptom => {
+    // Get active symptoms without search filter for rapid entry
+    const allActive = symptoms.filter(s => s.active).sort((a, b) => {
+      const aPinned = pinnedSymptoms.has(a.id);
+      const bPinned = pinnedSymptoms.has(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return (a.order || 0) - (b.order || 0);
+    });
+    
+    return allActive.filter(symptom => {
       // Check if this symptom has an entry for today's time period
       const entryKey = `${dateKey}-${symptom.id}-${trackingMode === 'ampm' ? timePeriod : 'daily'}`;
       return !entries[entryKey];
     });
-  }, [activeSymptoms, entries, selectedDate, quickLogTime, trackingMode, getDateKey]);
+  }, [symptoms, entries, selectedDate, quickLogTime, trackingMode, pinnedSymptoms]);
   
   const inactiveSymptoms = useMemo(() => 
     symptoms.filter(s => !s.active), 
@@ -5929,7 +5972,11 @@ function SymptomTrackerMobile() {
 
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<SymptomTrackerMobile />);
+root.render(
+  <ErrorBoundary>
+    <SymptomTrackerMobile />
+  </ErrorBoundary>
+);
   </script>
 </body>
 </html>
