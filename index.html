@@ -7,6 +7,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0c0a1d">
   <title>Symptom Tracker</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzBjMGExZCIvPgogIDxwYXRoIGQ9Ik02IDE2aDZsMy04IDQgMTYgMy04aDQiIHN0cm9rZT0iIzEwYjk4MSIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgo8L3N2Zz4K">
+  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iIzBjMGExZCIvPgogIDxwYXRoIGQ9Ik02IDE2aDZsMy04IDQgMTYgMy04aDQiIHN0cm9rZT0iIzEwYjk4MSIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgo8L3N2Zz4K">
   <link rel="manifest" href="manifest.json">
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -148,6 +150,13 @@ const initFirebase = async () => {
 // Detect if on mobile
 const isMobile = () => {
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+};
+
+// Detect if running as PWA (standalone mode)
+const isStandalone = () => {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone === true ||
+         document.referrer.includes('android-app://');
 };
 
 // ============================================================================
@@ -1036,10 +1045,16 @@ function SymptomTrackerMobile() {
       setLastAction('☁️ Saved to cloud');
     } catch (error) {
       console.error('Error saving to cloud:', error);
-      // Handle offline errors gracefully
+      // Handle specific error types
       if (error.message?.includes('offline') || error.code === 'unavailable') {
         setLastAction('📴 Offline - will sync when online');
         // Don't set syncError for offline
+      } else if (error.code === 'not-found' || error.message?.includes('does not exist')) {
+        setSyncError('Database not set up. Create Firestore database in Firebase Console.');
+        setLastAction('❌ Database not configured');
+      } else if (error.code === 'permission-denied') {
+        setSyncError('Permission denied. Check Firestore security rules.');
+        setLastAction('❌ Permission denied');
       } else {
         setSyncError(error.message);
         setLastAction('❌ Sync failed');
@@ -1079,10 +1094,16 @@ function SymptomTrackerMobile() {
       }
     } catch (error) {
       console.error('Error loading from cloud:', error);
-      // Handle offline errors gracefully
+      // Handle specific error types
       if (error.message?.includes('offline') || error.code === 'unavailable') {
         setLastAction('📴 Offline - using local data');
         // Don't set syncError for offline - it's not really an error
+      } else if (error.code === 'not-found' || error.message?.includes('does not exist')) {
+        setSyncError('Database not set up. Create Firestore database in Firebase Console.');
+        setLastAction('❌ Database not configured');
+      } else if (error.code === 'permission-denied') {
+        setSyncError('Permission denied. Check Firestore security rules.');
+        setLastAction('❌ Permission denied');
       } else {
         setSyncError(error.message);
       }
@@ -1100,15 +1121,30 @@ function SymptomTrackerMobile() {
     
     try {
       setSyncing(true);
-      // Use redirect for mobile (popups often blocked), popup for desktop
-      if (isMobile()) {
-        await firebaseAuth.signInWithRedirect(googleProvider);
+      // Use popup for:
+      // - Desktop browsers
+      // - PWA/standalone mode (redirects don't work in standalone)
+      // Use redirect only for mobile browsers (not standalone)
+      const usePopup = !isMobile() || isStandalone();
+      
+      if (usePopup) {
+        const result = await firebaseAuth.signInWithPopup(googleProvider);
+        if (result.user) {
+          setLastAction('✓ Signed in as ' + result.user.email);
+        }
       } else {
-        await firebaseAuth.signInWithPopup(googleProvider);
+        await firebaseAuth.signInWithRedirect(googleProvider);
       }
     } catch (error) {
       console.error('Sign in error:', error);
-      setSyncError(error.message);
+      // Handle popup blocked error
+      if (error.code === 'auth/popup-blocked') {
+        setSyncError('Popup blocked. Please allow popups for this site.');
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        setSyncError('Sign-in cancelled');
+      } else {
+        setSyncError(error.message);
+      }
       setLastAction('❌ Sign in failed');
     } finally {
       setSyncing(false);
@@ -5718,6 +5754,48 @@ function SymptomTrackerMobile() {
                 </div>
               )}
 
+              {/* App Info & Force Reload */}
+              <div style={{
+                background: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '3px',
+                padding: '16px',
+                marginBottom: '16px',
+              }}>
+                <div style={{ color: '#a5b4fc', fontWeight: '600', marginBottom: '12px' }}>
+                  App Info
+                </div>
+                <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
+                  Version: 3.2.0 • {isStandalone() ? 'PWA Mode' : 'Browser Mode'}
+                </div>
+                <button
+                  onClick={() => {
+                    // Clear service worker cache if exists
+                    if ('caches' in window) {
+                      caches.keys().then(names => {
+                        names.forEach(name => caches.delete(name));
+                      });
+                    }
+                    // Force reload from server
+                    window.location.reload(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(99, 102, 241, 0.2)',
+                    border: '1px solid rgba(99, 102, 241, 0.4)',
+                    borderRadius: '3px',
+                    padding: '12px',
+                    color: '#a5b4fc',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    marginTop: '8px',
+                  }}
+                >
+                  🔄 Force Reload (Check for Updates)
+                </button>
+              </div>
+
               {/* Full Reset */}
               {!confirmFullReset ? (
                 <button
@@ -5795,7 +5873,7 @@ function SymptomTrackerMobile() {
               borderTop: '1px solid rgba(99, 102, 241, 0.1)',
             }}>
               <span style={{ color: '#475569', fontSize: '12px' }}>
-                Symptom Tracker v3.1.9
+                Symptom Tracker v3.2.0
               </span>
             </div>
           </div>
