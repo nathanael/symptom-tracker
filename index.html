@@ -9,35 +9,16 @@
   <title>Symptom Tracker</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    * {
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #0c0a1d;
-      overflow: hidden;
-      height: 100%;
-      width: 100%;
-    }
-    #root {
-      height: 100%;
-      width: 100%;
-    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; background: #0c0a1d; overflow: hidden; height: 100%; width: 100%; }
+    #root { height: 100%; width: 100%; }
   </style>
 </head>
 <body>
   <div id="root"></div>
-  
-  <!-- React -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  
-  <!-- Babel for JSX transpilation -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  
-  <!-- App Component -->
   <script type="text/babel" data-type="module">
 const { useState, useRef, useEffect, useMemo, useCallback } = React;
 
@@ -497,6 +478,18 @@ function SymptomTrackerMobile() {
     });
   }, [symptoms, symptomSearch, pinnedSymptoms]);
   
+  // Incomplete symptoms for rapid entry - only symptoms not logged for the current time period
+  const incompleteSymptoms = useMemo(() => {
+    const dateKey = getDateKey(selectedDate);
+    const timePeriod = quickLogTime || (new Date().getHours() < 12 ? 'morning' : 'evening');
+    
+    return activeSymptoms.filter(symptom => {
+      // Check if this symptom has an entry for today's time period
+      const entryKey = `${dateKey}-${symptom.id}-${trackingMode === 'ampm' ? timePeriod : 'daily'}`;
+      return !entries[entryKey];
+    });
+  }, [activeSymptoms, entries, selectedDate, quickLogTime, trackingMode, getDateKey]);
+  
   const inactiveSymptoms = useMemo(() => 
     symptoms.filter(s => !s.active), 
     [symptoms]
@@ -780,6 +773,127 @@ function SymptomTrackerMobile() {
       document.documentElement.style.overflow = '';
     };
   }, [isDragging]);
+
+  // Auto-copy yesterday's stack when viewing today with no entries
+  useEffect(() => {
+    const todayKey = getDateKey(new Date());
+    const selectedKey = getDateKey(selectedDate);
+    
+    // Only auto-copy if we're viewing today
+    if (selectedKey !== todayKey) return;
+    
+    // Check if today has any stack entries
+    const hasTodayEntries = Object.keys(stackEntries).some(key => key.startsWith(todayKey + '-'));
+    if (hasTodayEntries) return;
+    
+    // Get yesterday's entries
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = getDateKey(yesterday);
+    
+    const activeItems = stackItems.filter(item => item.active);
+    if (activeItems.length === 0) return;
+    
+    // Copy yesterday's taken items to today
+    const newEntries = { ...stackEntries };
+    let copiedCount = 0;
+    
+    activeItems.forEach(item => {
+      const yesterdayEntryKey = `${yesterdayKey}-${item.id}`;
+      const todayEntryKey = `${todayKey}-${item.id}`;
+      
+      const yesterdayEntry = stackEntries[yesterdayEntryKey];
+      if (yesterdayEntry && yesterdayEntry.taken) {
+        newEntries[todayEntryKey] = { 
+          ...yesterdayEntry, 
+          date: todayKey 
+        };
+        copiedCount++;
+      }
+    });
+    
+    if (copiedCount > 0) {
+      setStackEntries(newEntries);
+      setLastAction(`Auto-copied ${copiedCount} items from yesterday`);
+    }
+  }, [selectedDate, stackItems]); // Only depend on date and items, not entries to avoid loops
+
+  // Midnight check - auto-switch to today when date changes
+  useEffect(() => {
+    const checkMidnight = () => {
+      const now = new Date();
+      const currentDateKey = getDateKey(now);
+      const selectedKey = getDateKey(selectedDate);
+      
+      // If we're viewing yesterday (or earlier) and it's now a new day, switch to today
+      if (selectedKey < currentDateKey) {
+        setSelectedDate(new Date());
+      }
+    };
+    
+    // Check every minute
+    const interval = setInterval(checkMidnight, 60000);
+    
+    // Also check on visibility change (when app becomes visible)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        checkMidnight();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [selectedDate, getDateKey]);
+
+  // Keyboard shortcuts for rapid entry mode
+  useEffect(() => {
+    if (!rapidEntryMode) return;
+    
+    const handleKeyDown = (e) => {
+      // Number keys 0-5 to log severity
+      if (e.key >= '0' && e.key <= '5') {
+        const severity = parseInt(e.key);
+        const symptomId = incompleteSymptoms[rapidEntryIndex]?.id;
+        if (symptomId) {
+          const logTime = quickLogTime || getCurrentTimePeriod();
+          quickLog(symptomId, severity, logTime);
+          // Auto-advance
+          if (rapidEntryIndex < incompleteSymptoms.length - 1) {
+            setRapidEntryIndex(rapidEntryIndex + 1);
+          } else {
+            setRapidEntryMode(false);
+            setRapidEntryIndex(0);
+            setLastAction(`⚡ Logged ${incompleteSymptoms.length} symptoms`);
+          }
+        }
+      }
+      // Escape to close
+      else if (e.key === 'Escape') {
+        setRapidEntryMode(false);
+        setRapidEntryIndex(0);
+      }
+      // Backspace or left arrow to go back
+      else if ((e.key === 'Backspace' || e.key === 'ArrowLeft') && rapidEntryIndex > 0) {
+        e.preventDefault();
+        setRapidEntryIndex(rapidEntryIndex - 1);
+      }
+      // Right arrow to skip
+      else if (e.key === 'ArrowRight') {
+        if (rapidEntryIndex < incompleteSymptoms.length - 1) {
+          setRapidEntryIndex(rapidEntryIndex + 1);
+        } else {
+          setRapidEntryMode(false);
+          setRapidEntryIndex(0);
+        }
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [rapidEntryMode, rapidEntryIndex, incompleteSymptoms, quickLogTime, quickLog, getCurrentTimePeriod]);
 
   // ==========================================================================
   // FIREBASE SYNC FUNCTIONS
@@ -1551,6 +1665,30 @@ function SymptomTrackerMobile() {
       .sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
   };
 
+  // Get the most recent entry for a symptom (regardless of AM/PM)
+  const getMostRecentEntry = (symptomId) => {
+    const allEntries = Object.entries(entries)
+      .filter(([key]) => key.includes(`-${symptomId}-`))
+      .map(([key, value]) => ({ key, ...value }))
+      .sort((a, b) => {
+        // Sort by date descending, then by time
+        const dateCompare = b.date.localeCompare(a.date);
+        if (dateCompare !== 0) return dateCompare;
+        // Same date - prefer evening over morning
+        const timeOrder = { evening: 2, daily: 1, morning: 0 };
+        return (timeOrder[b.time] || 0) - (timeOrder[a.time] || 0);
+      });
+    
+    // Return the most recent entry that's not from today
+    const todayKey = getDateKey(selectedDate);
+    for (const entry of allEntries) {
+      if (entry.date !== todayKey) {
+        return entry;
+      }
+    }
+    return null;
+  };
+
   const parseBulkSymptoms = (input) => {
     return input
       .split(/[,\t\n\r;]+/)
@@ -2287,15 +2425,18 @@ function SymptomTrackerMobile() {
             alignItems: 'center',
             marginBottom: '20px',
           }}>
-            <div style={{ color: '#94a3b8', fontSize: '14px' }}>
-              ⚡ Rapid Entry
+            <div style={{ color: '#34d399', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#34d399" stroke="none">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+              Rapid Entry
             </div>
             <button
               onClick={() => setRapidEntryMode(false)}
               style={{
                 background: 'rgba(239, 68, 68, 0.15)',
                 border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '8px',
+                borderRadius: '3px',
                 padding: '8px 16px',
                 color: '#f87171',
                 fontSize: '14px',
@@ -2313,7 +2454,7 @@ function SymptomTrackerMobile() {
             gap: '4px',
             marginBottom: '20px',
           }}>
-            {activeSymptoms.map((_, idx) => (
+            {incompleteSymptoms.map((_, idx) => (
               <div
                 key={idx}
                 style={{
@@ -2331,7 +2472,7 @@ function SymptomTrackerMobile() {
           </div>
           
           {/* Current symptom */}
-          {activeSymptoms[rapidEntryIndex] ? (
+          {incompleteSymptoms[rapidEntryIndex] ? (
             <div style={{
               flex: 1,
               display: 'flex',
@@ -2347,7 +2488,7 @@ function SymptomTrackerMobile() {
                 fontWeight: '700',
                 textAlign: 'center',
               }}>
-                {activeSymptoms[rapidEntryIndex].name}
+                {incompleteSymptoms[rapidEntryIndex].name}
               </div>
               
               {/* Time period indicator */}
@@ -2367,7 +2508,7 @@ function SymptomTrackerMobile() {
                           padding: '10px 20px',
                           background: isSelected ? 'rgba(139, 92, 246, 0.3)' : 'rgba(100, 116, 139, 0.1)',
                           border: isSelected ? '2px solid rgba(139, 92, 246, 0.6)' : '2px solid transparent',
-                          borderRadius: '10px',
+                          borderRadius: '5px',
                           color: isSelected ? '#c4b5fd' : '#94a3b8',
                           fontSize: '16px',
                           fontWeight: '600',
@@ -2381,18 +2522,14 @@ function SymptomTrackerMobile() {
                 </div>
               )}
               
-              {/* Yesterday's value hint */}
+              {/* Most recent value hint */}
               {(() => {
-                const logTime = quickLogTime || getCurrentTimePeriod();
-                const yesterday = new Date(selectedDate);
-                yesterday.setDate(yesterday.getDate() - 1);
-                const yesterdayKey = getDateKey(yesterday);
-                const symptomId = activeSymptoms[rapidEntryIndex].id;
-                const yesterdayEntry = entries[`${yesterdayKey}-${symptomId}-${logTime}`];
-                if (yesterdayEntry) {
+                const symptomId = incompleteSymptoms[rapidEntryIndex].id;
+                const recentEntry = getMostRecentEntry(symptomId);
+                if (recentEntry) {
                   return (
                     <div style={{ color: '#64748b', fontSize: '14px' }}>
-                      Yesterday: <span style={{ color: severityColors[yesterdayEntry.severity], fontWeight: '600' }}>{yesterdayEntry.severity}</span>
+                      Last recorded: <span style={{ color: severityColors[recentEntry.severity], fontWeight: '600' }}>{recentEntry.severity}</span>
                     </div>
                   );
                 }
@@ -2409,14 +2546,11 @@ function SymptomTrackerMobile() {
               }}>
                 {[0, 1, 2, 3, 4, 5].map(severity => {
                   const logTime = quickLogTime || getCurrentTimePeriod();
-                  const symptomId = activeSymptoms[rapidEntryIndex].id;
+                  const symptomId = incompleteSymptoms[rapidEntryIndex].id;
                   
-                  // Check yesterday for subtle highlight
-                  const yesterday = new Date(selectedDate);
-                  yesterday.setDate(yesterday.getDate() - 1);
-                  const yesterdayKey = getDateKey(yesterday);
-                  const yesterdayEntry = entries[`${yesterdayKey}-${symptomId}-${logTime}`];
-                  const isYesterdaySeverity = yesterdayEntry?.severity === severity;
+                  // Check most recent entry for subtle highlight
+                  const recentEntry = getMostRecentEntry(symptomId);
+                  const isRecentSeverity = recentEntry?.severity === severity;
                   
                   return (
                     <button
@@ -2424,20 +2558,20 @@ function SymptomTrackerMobile() {
                       onClick={() => {
                         quickLog(symptomId, severity, logTime);
                         // Auto-advance to next symptom
-                        if (rapidEntryIndex < activeSymptoms.length - 1) {
+                        if (rapidEntryIndex < incompleteSymptoms.length - 1) {
                           setRapidEntryIndex(rapidEntryIndex + 1);
                         } else {
                           // Done with all symptoms
                           setRapidEntryMode(false);
                           setRapidEntryIndex(0);
-                          setLastAction(`⚡ Logged ${activeSymptoms.length} symptoms`);
+                          setLastAction(`⚡ Logged ${incompleteSymptoms.length} symptoms`);
                         }
                       }}
                       style={{
                         padding: '24px',
                         background: `${severityColors[severity]}20`,
-                        border: isYesterdaySeverity ? `2px solid ${severityColors[severity]}40` : '2px solid transparent',
-                        borderRadius: '16px',
+                        border: isRecentSeverity ? `2px solid ${severityColors[severity]}40` : '2px solid transparent',
+                        borderRadius: '3px',
                         color: severityColors[severity],
                         fontSize: '32px',
                         fontWeight: '700',
@@ -2450,33 +2584,59 @@ function SymptomTrackerMobile() {
                 })}
               </div>
               
-              {/* Skip button */}
-              <button
-                onClick={() => {
-                  if (rapidEntryIndex < activeSymptoms.length - 1) {
-                    setRapidEntryIndex(rapidEntryIndex + 1);
-                  } else {
-                    setRapidEntryMode(false);
-                    setRapidEntryIndex(0);
-                  }
-                }}
-                style={{
-                  padding: '12px 32px',
-                  background: 'rgba(100, 116, 139, 0.1)',
-                  border: '1px solid rgba(100, 116, 139, 0.3)',
-                  borderRadius: '10px',
-                  color: '#94a3b8',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Skip →
-              </button>
+              {/* Navigation buttons */}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {/* Back button */}
+                <button
+                  onClick={() => {
+                    if (rapidEntryIndex > 0) {
+                      setRapidEntryIndex(rapidEntryIndex - 1);
+                    }
+                  }}
+                  disabled={rapidEntryIndex === 0}
+                  style={{
+                    padding: '12px 24px',
+                    background: rapidEntryIndex > 0 ? 'rgba(100, 116, 139, 0.1)' : 'rgba(50, 50, 70, 0.2)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    borderRadius: '5px',
+                    color: rapidEntryIndex > 0 ? '#94a3b8' : '#475569',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: rapidEntryIndex > 0 ? 'pointer' : 'default',
+                    opacity: rapidEntryIndex > 0 ? 1 : 0.5,
+                  }}
+                >
+                  ← Back
+                </button>
+                
+                {/* Skip button */}
+                <button
+                  onClick={() => {
+                    if (rapidEntryIndex < incompleteSymptoms.length - 1) {
+                      setRapidEntryIndex(rapidEntryIndex + 1);
+                    } else {
+                      setRapidEntryMode(false);
+                      setRapidEntryIndex(0);
+                    }
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    background: 'rgba(100, 116, 139, 0.1)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    borderRadius: '5px',
+                    color: '#94a3b8',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Skip →
+                </button>
+              </div>
               
               {/* Counter */}
               <div style={{ color: '#64748b', fontSize: '14px' }}>
-                {rapidEntryIndex + 1} of {activeSymptoms.length}
+                {rapidEntryIndex + 1} of {incompleteSymptoms.length}
               </div>
             </div>
           ) : (
@@ -2488,7 +2648,7 @@ function SymptomTrackerMobile() {
               alignItems: 'center',
               color: '#64748b',
             }}>
-              No active symptoms
+              All symptoms logged for this period ✓
             </div>
           )}
         </div>
@@ -2514,7 +2674,7 @@ function SymptomTrackerMobile() {
             style={{
               background: 'rgba(99, 102, 241, 0.15)',
               border: '1px solid rgba(99, 102, 241, 0.3)',
-              borderRadius: '10px',
+              borderRadius: '5px',
               width: '40px',
               height: '40px',
               color: '#a5b4fc',
@@ -2551,56 +2711,60 @@ function SymptomTrackerMobile() {
             </h1>
           </button>
 
-          <button
-            onClick={() => changeDate(1)}
-            disabled={!canGoForward}
-            style={{
-              background: canGoForward ? 'rgba(99, 102, 241, 0.15)' : 'rgba(50, 50, 70, 0.3)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              borderRadius: '10px',
-              width: '40px',
-              height: '40px',
-              color: canGoForward ? '#a5b4fc' : '#475569',
-              fontSize: '20px',
-              cursor: canGoForward ? 'pointer' : 'default',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: canGoForward ? 1 : 0.5,
-            }}
-          >
-            ›
-          </button>
-          
-          {/* Rapid Entry Button */}
-          {appMode === 'symptoms' && (
+          {/* Right side buttons group */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Rapid Entry Button */}
+            {appMode === 'symptoms' && (
+              <button
+                onClick={() => {
+                  setRapidEntryMode(true);
+                  setRapidEntryIndex(0);
+                  if (trackingMode === 'ampm' && !quickLogTime) {
+                    setQuickLogTime(getCurrentTimePeriod());
+                  }
+                }}
+                style={{
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  borderRadius: '5px',
+                  width: '40px',
+                  height: '40px',
+                  color: '#34d399',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Rapid Entry Mode"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="#34d399" stroke="none">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+              </button>
+            )}
+
             <button
-              onClick={() => {
-                setRapidEntryMode(true);
-                setRapidEntryIndex(0);
-                if (trackingMode === 'ampm' && !quickLogTime) {
-                  setQuickLogTime(getCurrentTimePeriod());
-                }
-              }}
+              onClick={() => changeDate(1)}
+              disabled={!canGoForward}
               style={{
-                background: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                borderRadius: '10px',
+                background: canGoForward ? 'rgba(99, 102, 241, 0.15)' : 'rgba(50, 50, 70, 0.3)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '5px',
                 width: '40px',
                 height: '40px',
-                color: '#34d399',
-                fontSize: '16px',
-                cursor: 'pointer',
+                color: canGoForward ? '#a5b4fc' : '#475569',
+                fontSize: '20px',
+                cursor: canGoForward ? 'pointer' : 'default',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginLeft: '8px',
+                opacity: canGoForward ? 1 : 0.5,
               }}
-              title="Rapid Entry Mode"
             >
-              ⚡
+              ›
             </button>
-          )}
+          </div>
         </div>
       </div>
 
@@ -2635,7 +2799,7 @@ function SymptomTrackerMobile() {
                 padding: '12px 40px 12px 16px',
                 background: 'rgba(30, 27, 75, 0.6)',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '12px',
+                borderRadius: '3px',
                 color: '#f8fafc',
                 fontSize: '15px',
                 outline: 'none',
@@ -2718,7 +2882,7 @@ function SymptomTrackerMobile() {
                     : isPinned
                       ? 'rgba(251, 191, 36, 0.08)'
                       : 'rgba(30, 27, 75, 0.6)',
-                  borderRadius: '14px',
+                  borderRadius: '5px',
                   padding: '12px 16px',
                   display: 'flex',
                   alignItems: 'center',
@@ -2776,7 +2940,7 @@ function SymptomTrackerMobile() {
                           style={{
                             background: `${severityColors[entry.severity]}25`,
                             border: 'none',
-                            borderRadius: '6px',
+                            borderRadius: '3px',
                             padding: '4px 6px',
                             display: 'flex',
                             alignItems: 'center',
@@ -2809,7 +2973,7 @@ function SymptomTrackerMobile() {
                   zIndex: 100,
                   background: 'rgba(30, 27, 75, 0.98)',
                   border: '2px solid rgba(139, 92, 246, 0.5)',
-                  borderRadius: '14px',
+                  borderRadius: '5px',
                   boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
                   overflow: 'hidden',
                 }}>
@@ -2843,12 +3007,9 @@ function SymptomTrackerMobile() {
                   }}>
                     {[0, 1, 2, 3, 4, 5].map(severity => {
                       const logTime = quickLogTime || getCurrentTimePeriod();
-                      // Check yesterday's entry for this symptom/time
-                      const yesterday = new Date(selectedDate);
-                      yesterday.setDate(yesterday.getDate() - 1);
-                      const yesterdayKey = getDateKey(yesterday);
-                      const yesterdayEntry = entries[`${yesterdayKey}-${symptom.id}-${logTime}`];
-                      const isYesterdaySeverity = yesterdayEntry?.severity === severity;
+                      // Check most recent entry for this symptom
+                      const recentEntry = getMostRecentEntry(symptom.id);
+                      const isRecentSeverity = recentEntry?.severity === severity;
                       
                       return (
                         <button
@@ -2861,8 +3022,8 @@ function SymptomTrackerMobile() {
                             flex: 1,
                             padding: '12px 0',
                             background: `${severityColors[severity]}20`,
-                            border: isYesterdaySeverity ? `1px solid ${severityColors[severity]}35` : '1px solid transparent',
-                            borderRadius: '8px',
+                            border: isRecentSeverity ? `1px solid ${severityColors[severity]}35` : '1px solid transparent',
+                            borderRadius: '3px',
                             color: severityColors[severity],
                             fontSize: '18px',
                             fontWeight: '700',
@@ -2892,7 +3053,7 @@ function SymptomTrackerMobile() {
                         padding: '8px',
                         background: isPinned ? 'rgba(251, 191, 36, 0.15)' : 'rgba(100, 116, 139, 0.1)',
                         border: isPinned ? '1px solid rgba(251, 191, 36, 0.4)' : '1px solid rgba(100, 116, 139, 0.3)',
-                        borderRadius: '8px',
+                        borderRadius: '3px',
                         color: isPinned ? '#fbbf24' : '#94a3b8',
                         fontSize: '12px',
                         fontWeight: '600',
@@ -2920,7 +3081,7 @@ function SymptomTrackerMobile() {
                           padding: '8px',
                           background: 'rgba(99, 102, 241, 0.15)',
                           border: '1px solid rgba(99, 102, 241, 0.4)',
-                          borderRadius: '8px',
+                          borderRadius: '3px',
                           color: '#a5b4fc',
                           fontSize: '12px',
                           fontWeight: '600',
@@ -2948,7 +3109,7 @@ function SymptomTrackerMobile() {
         {/* Daily Notes */}
         <div style={{
           background: 'rgba(30, 27, 75, 0.6)',
-          borderRadius: '14px',
+          borderRadius: '5px',
           padding: '14px 16px',
           marginTop: '8px',
         }}>
@@ -2971,7 +3132,7 @@ function SymptomTrackerMobile() {
               minHeight: '80px',
               background: 'rgba(15, 10, 46, 0.5)',
               border: '1px solid rgba(99, 102, 241, 0.2)',
-              borderRadius: '10px',
+              borderRadius: '5px',
               padding: '12px',
               color: '#e2e8f0',
               fontSize: '14px',
@@ -2986,7 +3147,7 @@ function SymptomTrackerMobile() {
           style={{
             background: 'transparent',
             border: '2px dashed rgba(99, 102, 241, 0.3)',
-            borderRadius: '14px',
+            borderRadius: '5px',
             padding: '16px',
             color: '#6366f1',
             fontSize: '15px',
@@ -3034,7 +3195,7 @@ function SymptomTrackerMobile() {
                 style={{
                   background: 'rgba(74, 222, 128, 0.1)',
                   border: '1px solid rgba(74, 222, 128, 0.3)',
-                  borderRadius: '8px',
+                  borderRadius: '3px',
                   color: '#4ade80',
                   fontSize: '11px',
                   fontWeight: '600',
@@ -3043,21 +3204,6 @@ function SymptomTrackerMobile() {
                 }}
               >
                 ✓ All
-              </button>
-              <button
-                onClick={copyYesterdayStack}
-                style={{
-                  background: 'rgba(99, 102, 241, 0.1)',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '8px',
-                  color: '#a5b4fc',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  padding: '6px 10px',
-                }}
-              >
-                ↩ Copy Yesterday
               </button>
               <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '600' }}>
                 {getStackProgress().taken}/{getStackProgress().total}
@@ -3077,7 +3223,7 @@ function SymptomTrackerMobile() {
                 style={{
                   background: 'rgba(248, 113, 113, 0.1)',
                   border: '1px solid rgba(248, 113, 113, 0.3)',
-                  borderRadius: '8px',
+                  borderRadius: '3px',
                   color: '#f87171',
                   fontSize: '11px',
                   fontWeight: '600',
@@ -3105,7 +3251,7 @@ function SymptomTrackerMobile() {
                       ? 'rgba(139, 92, 246, 0.1)'  // Purple tint for multiplied
                       : 'rgba(34, 197, 94, 0.1)' 
                     : 'rgba(30, 27, 75, 0.6)',
-                  borderRadius: '14px',
+                  borderRadius: '5px',
                   padding: '14px 16px',
                   display: 'flex',
                   alignItems: 'center',
@@ -3142,7 +3288,7 @@ function SymptomTrackerMobile() {
                     style={{
                       minWidth: multiplier > 1 ? '36px' : '32px',
                       height: multiplier > 1 ? '36px' : '32px',
-                      borderRadius: '8px',
+                      borderRadius: '3px',
                       background: isTaken 
                         ? multiplier > 1 
                           ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)' 
@@ -3177,7 +3323,7 @@ function SymptomTrackerMobile() {
                   <div style={{
                     width: '24px',
                     height: '24px',
-                    borderRadius: '6px',
+                    borderRadius: '3px',
                     background: isTaken ? '#22c55e' : 'rgba(100, 116, 139, 0.3)',
                     display: 'flex',
                     alignItems: 'center',
@@ -3220,7 +3366,7 @@ function SymptomTrackerMobile() {
                         width: '60px',
                         background: 'rgba(99, 102, 241, 0.15)',
                         border: '2px solid rgba(99, 102, 241, 0.5)',
-                        borderRadius: '8px',
+                        borderRadius: '3px',
                         padding: '8px 10px',
                         color: '#f8fafc',
                         fontSize: '16px',
@@ -3247,7 +3393,7 @@ function SymptomTrackerMobile() {
                       alignItems: 'baseline', 
                       gap: '4px',
                       padding: '4px 8px',
-                      borderRadius: '6px',
+                      borderRadius: '3px',
                       background: isTaken ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
                     }}
                     onClick={(e) => {
@@ -3279,7 +3425,7 @@ function SymptomTrackerMobile() {
             style={{
               background: 'transparent',
               border: '2px dashed rgba(99, 102, 241, 0.3)',
-              borderRadius: '14px',
+              borderRadius: '5px',
               padding: '16px',
               color: '#6366f1',
               fontSize: '15px',
@@ -3304,7 +3450,7 @@ function SymptomTrackerMobile() {
             right: '12px',
             background: 'rgba(99, 102, 241, 0.15)',
             border: '1px solid rgba(99, 102, 241, 0.3)',
-            borderRadius: '10px',
+            borderRadius: '5px',
             padding: '12px 14px',
             color: '#a5b4fc',
             fontSize: '13px',
@@ -3343,7 +3489,7 @@ function SymptomTrackerMobile() {
             flex: 1,
             background: appMode === 'symptoms' && !showInsights && !showSettings ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
             border: 'none',
-            borderRadius: '12px',
+            borderRadius: '3px',
             padding: '12px 8px',
             cursor: 'pointer',
             display: 'flex',
@@ -3357,16 +3503,18 @@ function SymptomTrackerMobile() {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={appMode === 'symptoms' && !showInsights && !showSettings ? '#a5b4fc' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
-            <span style={{
-              position: 'absolute',
-              top: '-2px',
-              right: '-2px',
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: statusColors[tabBadges.symptoms.status],
-              border: '1.5px solid #0c0a1d',
-            }} />
+            {tabBadges.symptoms.status === 'none' && (
+              <span style={{
+                position: 'absolute',
+                top: '-2px',
+                right: '-2px',
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: '#ef4444',
+                border: '1.5px solid #0c0a1d',
+              }} />
+            )}
           </div>
           <span style={{
             color: appMode === 'symptoms' && !showInsights && !showSettings ? '#a5b4fc' : '#64748b',
@@ -3380,7 +3528,7 @@ function SymptomTrackerMobile() {
             flex: 1,
             background: appMode === 'stack' && !showInsights && !showSettings ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
             border: 'none',
-            borderRadius: '12px',
+            borderRadius: '3px',
             padding: '12px 8px',
             cursor: 'pointer',
             display: 'flex',
@@ -3395,16 +3543,6 @@ function SymptomTrackerMobile() {
               <path d="M10.5 20.5L3.5 13.5a4.95 4.95 0 1 1 7-7l7 7a4.95 4.95 0 1 1-7 7z"/>
               <line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/>
             </svg>
-            <span style={{
-              position: 'absolute',
-              top: '-2px',
-              right: '-2px',
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: statusColors[tabBadges.stack.status],
-              border: '1.5px solid #0c0a1d',
-            }} />
           </div>
           <span style={{
             color: appMode === 'stack' && !showInsights && !showSettings ? '#a5b4fc' : '#64748b',
@@ -3418,7 +3556,7 @@ function SymptomTrackerMobile() {
             flex: 1,
             background: showInsights ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
             border: 'none',
-            borderRadius: '12px',
+            borderRadius: '3px',
             padding: '12px 8px',
             cursor: 'pointer',
             display: 'flex',
@@ -3444,7 +3582,7 @@ function SymptomTrackerMobile() {
             flex: 1,
             background: showSettings ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
             border: 'none',
-            borderRadius: '12px',
+            borderRadius: '3px',
             padding: '12px 8px',
             cursor: 'pointer',
             display: 'flex',
@@ -3635,7 +3773,7 @@ function SymptomTrackerMobile() {
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#1a1333',
-              borderRadius: '20px',
+              borderRadius: '5px',
               padding: '24px',
               width: '100%',
               maxWidth: '380px',
@@ -3657,7 +3795,7 @@ function SymptomTrackerMobile() {
                 style={{
                   background: 'rgba(99, 102, 241, 0.2)',
                   border: 'none',
-                  borderRadius: '12px',
+                  borderRadius: '3px',
                   width: '52px',
                   height: '52px',
                   color: '#a5b4fc',
@@ -3686,7 +3824,7 @@ function SymptomTrackerMobile() {
                 style={{
                   background: 'rgba(99, 102, 241, 0.2)',
                   border: 'none',
-                  borderRadius: '12px',
+                  borderRadius: '3px',
                   width: '52px',
                   height: '52px',
                   color: '#a5b4fc',
@@ -3759,7 +3897,7 @@ function SymptomTrackerMobile() {
                     disabled={isFuture}
                     style={{
                       aspectRatio: '1',
-                      borderRadius: '12px',
+                      borderRadius: '3px',
                       border: isSelected ? '2px solid #6366f1' : isToday ? '2px solid rgba(99, 102, 241, 0.4)' : '2px solid transparent',
                       background: isFuture 
                         ? 'rgba(30, 27, 75, 0.2)' 
@@ -3803,7 +3941,7 @@ function SymptomTrackerMobile() {
                 padding: '14px',
                 background: 'rgba(99, 102, 241, 0.2)',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '12px',
+                borderRadius: '3px',
                 color: '#a5b4fc',
                 fontSize: '15px',
                 fontWeight: '600',
@@ -3847,7 +3985,7 @@ function SymptomTrackerMobile() {
                 style={{
                   background: 'rgba(99, 102, 241, 0.2)',
                   border: 'none',
-                  borderRadius: '10px',
+                  borderRadius: '5px',
                   width: '44px',
                   height: '44px',
                   color: '#a5b4fc',
@@ -3861,7 +3999,7 @@ function SymptomTrackerMobile() {
 
             <div style={{
               background: 'rgba(30, 27, 75, 0.6)',
-              borderRadius: '12px',
+              borderRadius: '3px',
               padding: '16px',
               marginBottom: '20px',
             }}>
@@ -3887,7 +4025,7 @@ function SymptomTrackerMobile() {
                   width: '100%',
                   background: 'rgba(15, 23, 42, 0.8)',
                   border: '2px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '10px',
+                  borderRadius: '5px',
                   padding: '12px 14px',
                   color: '#f8fafc',
                   fontSize: '15px',
@@ -3906,7 +4044,7 @@ function SymptomTrackerMobile() {
                   style={{
                     background: parseBulkSymptoms(bulkSymptomInput).length > 0 ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
                     border: 'none',
-                    borderRadius: '10px',
+                    borderRadius: '5px',
                     padding: '10px 20px',
                     color: '#fff',
                     fontSize: '14px',
@@ -3950,7 +4088,7 @@ function SymptomTrackerMobile() {
                       style={{
                         position: 'relative',
                         overflow: draggedItem?.id === symptom.id ? 'visible' : 'hidden',
-                        borderRadius: '10px',
+                        borderRadius: '5px',
                         ...getReorderTransform(index, 'symptom'),
                       }}
                     >
@@ -3973,7 +4111,7 @@ function SymptomTrackerMobile() {
                               flex: 1,
                               background: 'rgba(99, 102, 241, 0.2)',
                               border: '2px solid rgba(99, 102, 241, 0.5)',
-                              borderRadius: '8px',
+                              borderRadius: '3px',
                               padding: '10px 12px',
                               color: '#fff',
                               fontSize: '14px',
@@ -3985,7 +4123,7 @@ function SymptomTrackerMobile() {
                             style={{
                               background: 'rgba(74, 222, 128, 0.2)',
                               border: '2px solid rgba(74, 222, 128, 0.4)',
-                              borderRadius: '8px',
+                              borderRadius: '3px',
                               padding: '10px 14px',
                               color: '#86efac',
                               fontSize: '14px',
@@ -3999,7 +4137,7 @@ function SymptomTrackerMobile() {
                             style={{
                               background: 'rgba(239, 68, 68, 0.15)',
                               border: '2px solid rgba(239, 68, 68, 0.3)',
-                              borderRadius: '8px',
+                              borderRadius: '3px',
                               padding: '10px 14px',
                               color: '#fca5a5',
                               fontSize: '14px',
@@ -4022,7 +4160,7 @@ function SymptomTrackerMobile() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            borderRadius: '10px',
+                            borderRadius: '5px',
                           }}>
                             <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Hide</span>
                           </div>
@@ -4042,7 +4180,7 @@ function SymptomTrackerMobile() {
                               alignItems: 'center',
                               gap: '8px',
                               background: draggedItem?.id === symptom.id ? '#2d2875' : '#1e1b4b',
-                              borderRadius: '10px',
+                              borderRadius: '5px',
                               transform: `translateX(${swipeOffsets[symptom.id] || 0}px)`,
                               transition: swipeStartRef.current.id === symptom.id ? 'none' : 'transform 0.2s ease',
                             }}
@@ -4105,7 +4243,7 @@ function SymptomTrackerMobile() {
                       style={{
                         position: 'relative',
                         overflow: 'hidden',
-                        borderRadius: '10px',
+                        borderRadius: '5px',
                         opacity: 0.7,
                       }}
                     >
@@ -4128,7 +4266,7 @@ function SymptomTrackerMobile() {
                               flex: 1,
                               background: 'rgba(99, 102, 241, 0.2)',
                               border: '2px solid rgba(99, 102, 241, 0.5)',
-                              borderRadius: '8px',
+                              borderRadius: '3px',
                               padding: '10px 12px',
                               color: '#fff',
                               fontSize: '14px',
@@ -4140,7 +4278,7 @@ function SymptomTrackerMobile() {
                             style={{
                               background: 'rgba(74, 222, 128, 0.2)',
                               border: '2px solid rgba(74, 222, 128, 0.4)',
-                              borderRadius: '8px',
+                              borderRadius: '3px',
                               padding: '10px 14px',
                               color: '#86efac',
                               fontSize: '14px',
@@ -4154,7 +4292,7 @@ function SymptomTrackerMobile() {
                             style={{
                               background: 'rgba(239, 68, 68, 0.15)',
                               border: '2px solid rgba(239, 68, 68, 0.3)',
-                              borderRadius: '8px',
+                              borderRadius: '3px',
                               padding: '10px 14px',
                               color: '#fca5a5',
                               fontSize: '14px',
@@ -4177,7 +4315,7 @@ function SymptomTrackerMobile() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            borderRadius: '10px',
+                            borderRadius: '5px',
                           }}>
                             <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Delete</span>
                           </div>
@@ -4191,7 +4329,7 @@ function SymptomTrackerMobile() {
                               alignItems: 'center',
                               gap: '8px',
                               background: 'rgba(15, 23, 42, 0.6)',
-                              borderRadius: '10px',
+                              borderRadius: '5px',
                               transform: `translateX(${swipeOffsets[`inactive-${symptom.id}`] || 0}px)`,
                               transition: swipeStartRef.current.id === `inactive-${symptom.id}` ? 'none' : 'transform 0.2s ease',
                             }}
@@ -4215,7 +4353,7 @@ function SymptomTrackerMobile() {
                               style={{
                                 background: 'rgba(74, 222, 128, 0.2)',
                                 border: 'none',
-                                borderRadius: '8px',
+                                borderRadius: '3px',
                                 padding: '8px 12px',
                                 marginRight: '8px',
                                 color: '#86efac',
@@ -4279,7 +4417,7 @@ function SymptomTrackerMobile() {
                 style={{
                   background: 'rgba(99, 102, 241, 0.2)',
                   border: 'none',
-                  borderRadius: '10px',
+                  borderRadius: '5px',
                   width: '44px',
                   height: '44px',
                   color: '#a5b4fc',
@@ -4298,7 +4436,7 @@ function SymptomTrackerMobile() {
             ) : (
               <div style={{
                 background: 'rgba(30, 27, 75, 0.5)',
-                borderRadius: '12px',
+                borderRadius: '3px',
                 overflow: 'hidden',
                 border: '1px solid rgba(99, 102, 241, 0.2)',
               }}>
@@ -4359,7 +4497,7 @@ function SymptomTrackerMobile() {
                             display: 'inline-block',
                             minWidth: '28px',
                             padding: '4px 8px',
-                            borderRadius: '6px',
+                            borderRadius: '3px',
                             background: `${severityColors[entry.severity]}20`,
                             color: severityColors[entry.severity],
                             fontWeight: '700',
@@ -4397,7 +4535,7 @@ function SymptomTrackerMobile() {
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#1a1333',
-              borderRadius: '20px',
+              borderRadius: '5px',
               padding: '24px',
               width: '100%',
               maxWidth: '320px',
@@ -4439,7 +4577,7 @@ function SymptomTrackerMobile() {
                     style={{
                       background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%)',
                       border: '1px solid rgba(139, 92, 246, 0.4)',
-                      borderRadius: '10px',
+                      borderRadius: '5px',
                       padding: '12px',
                       color: '#c4b5fd',
                       fontSize: '13px',
@@ -4487,7 +4625,7 @@ function SymptomTrackerMobile() {
                     style={{
                       background: 'rgba(99, 102, 241, 0.15)',
                       border: '1px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '10px',
+                      borderRadius: '5px',
                       padding: '12px 16px',
                       color: '#e2e8f0',
                       fontSize: '14px',
@@ -4510,7 +4648,7 @@ function SymptomTrackerMobile() {
                 padding: '14px',
                 background: 'transparent',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '12px',
+                borderRadius: '3px',
                 color: '#94a3b8',
                 fontSize: '15px',
                 cursor: 'pointer',
@@ -4565,7 +4703,7 @@ function SymptomTrackerMobile() {
                     style={{
                       flex: 1,
                       padding: '10px',
-                      borderRadius: '10px',
+                      borderRadius: '5px',
                       border: insightsWindow === days 
                         ? '2px solid rgba(99, 102, 241, 0.6)' 
                         : '1px solid rgba(99, 102, 241, 0.2)',
@@ -4587,7 +4725,7 @@ function SymptomTrackerMobile() {
                 <div style={{
                   background: 'rgba(99, 102, 241, 0.1)',
                   border: '1px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '20px',
+                  borderRadius: '5px',
                   padding: '32px 24px',
                   textAlign: 'center',
                 }}>
@@ -4606,7 +4744,7 @@ function SymptomTrackerMobile() {
                 <div style={{
                   background: 'rgba(99, 102, 241, 0.1)',
                   border: '1px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '20px',
+                  borderRadius: '5px',
                   padding: '32px 24px',
                   textAlign: 'center',
                 }}>
@@ -4631,7 +4769,7 @@ function SymptomTrackerMobile() {
                               ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(74, 222, 128, 0.1) 100%)'
                               : 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%)',
                             border: `2px solid ${insight.direction === 'improving' ? 'rgba(74, 222, 128, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
-                            borderRadius: '16px',
+                            borderRadius: '3px',
                             padding: '20px',
                             display: 'flex',
                             alignItems: 'center',
@@ -4664,7 +4802,7 @@ function SymptomTrackerMobile() {
                     <div style={{
                       background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.15) 0%, rgba(251, 191, 36, 0.1) 100%)',
                       border: '2px solid rgba(251, 146, 60, 0.4)',
-                      borderRadius: '16px',
+                      borderRadius: '3px',
                       padding: '20px',
                       marginBottom: '20px',
                     }}>
@@ -4695,7 +4833,7 @@ function SymptomTrackerMobile() {
                       width: '100%',
                       background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%)',
                       border: '2px solid rgba(139, 92, 246, 0.4)',
-                      borderRadius: '16px',
+                      borderRadius: '3px',
                       padding: '20px',
                       color: '#c4b5fd',
                       fontSize: '15px',
@@ -4768,7 +4906,7 @@ function SymptomTrackerMobile() {
                   flex: 1,
                   background: 'rgba(99, 102, 241, 0.15)',
                   border: '2px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '12px',
+                  borderRadius: '3px',
                   padding: '16px',
                   color: '#a5b4fc',
                   fontSize: '15px',
@@ -4789,7 +4927,7 @@ function SymptomTrackerMobile() {
                   flex: 1,
                   background: 'rgba(99, 102, 241, 0.15)',
                   border: '2px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '12px',
+                  borderRadius: '3px',
                   padding: '16px',
                   color: '#a5b4fc',
                   fontSize: '15px',
@@ -4812,7 +4950,7 @@ function SymptomTrackerMobile() {
                 width: '100%',
                 background: 'rgba(99, 102, 241, 0.15)',
                 border: '2px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '12px',
+                borderRadius: '3px',
                 padding: '16px',
                 color: '#a5b4fc',
                 fontSize: '15px',
@@ -4838,7 +4976,7 @@ function SymptomTrackerMobile() {
                 width: '100%',
                 background: 'rgba(99, 102, 241, 0.15)',
                 border: '2px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '12px',
+                borderRadius: '3px',
                 padding: '16px',
                 color: '#a5b4fc',
                 fontSize: '15px',
@@ -4872,7 +5010,7 @@ function SymptomTrackerMobile() {
                     style={{
                       background: trackingMode === key ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.1)',
                       border: trackingMode === key ? '2px solid rgba(99, 102, 241, 0.6)' : '2px solid rgba(99, 102, 241, 0.2)',
-                      borderRadius: '12px',
+                      borderRadius: '3px',
                       padding: '12px 16px',
                       color: trackingMode === key ? '#fff' : '#a5b4fc',
                       fontSize: '14px',
@@ -4908,7 +5046,7 @@ function SymptomTrackerMobile() {
               <div style={{
                 background: 'rgba(99, 102, 241, 0.1)',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '12px',
+                borderRadius: '3px',
                 padding: '14px',
               }}>
                 {firebaseError ? (
@@ -4961,7 +5099,7 @@ function SymptomTrackerMobile() {
                         style={{
                           background: 'rgba(239, 68, 68, 0.15)',
                           border: '1px solid rgba(239, 68, 68, 0.3)',
-                          borderRadius: '6px',
+                          borderRadius: '3px',
                           padding: '6px 10px',
                           color: '#f87171',
                           fontSize: '11px',
@@ -4995,7 +5133,7 @@ function SymptomTrackerMobile() {
                         marginBottom: '12px',
                         background: 'rgba(239, 68, 68, 0.1)',
                         padding: '8px',
-                        borderRadius: '6px',
+                        borderRadius: '3px',
                       }}>
                         ⚠️ {syncError}
                       </div>
@@ -5013,7 +5151,7 @@ function SymptomTrackerMobile() {
                         border: syncing 
                           ? '1px solid rgba(100, 116, 139, 0.3)' 
                           : '1px solid rgba(74, 222, 128, 0.4)',
-                        borderRadius: '8px',
+                        borderRadius: '3px',
                         padding: '12px',
                         color: syncing ? '#64748b' : '#4ade80',
                         fontSize: '14px',
@@ -5046,7 +5184,7 @@ function SymptomTrackerMobile() {
                         background: 'linear-gradient(135deg, #4285f4 0%, #34a853 50%, #fbbc05 75%, #ea4335 100%)',
                         backgroundSize: '300% 100%',
                         border: 'none',
-                        borderRadius: '8px',
+                        borderRadius: '3px',
                         padding: '12px 16px',
                         color: '#fff',
                         fontSize: '14px',
@@ -5086,7 +5224,7 @@ function SymptomTrackerMobile() {
               <div style={{
                 background: 'rgba(99, 102, 241, 0.1)',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '12px',
+                borderRadius: '3px',
                 padding: '14px',
               }}>
                 <p style={{ 
@@ -5105,7 +5243,7 @@ function SymptomTrackerMobile() {
                       flex: 1,
                       background: 'rgba(74, 222, 128, 0.15)',
                       border: '1px solid rgba(74, 222, 128, 0.3)',
-                      borderRadius: '8px',
+                      borderRadius: '3px',
                       padding: '12px',
                       color: '#86efac',
                       fontSize: '13px',
@@ -5121,7 +5259,7 @@ function SymptomTrackerMobile() {
                       flex: 1,
                       background: 'rgba(99, 102, 241, 0.15)',
                       border: '1px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '8px',
+                      borderRadius: '3px',
                       padding: '12px',
                       color: '#a5b4fc',
                       fontSize: '13px',
@@ -5149,7 +5287,7 @@ function SymptomTrackerMobile() {
                 style={{
                   background: isLoading ? 'rgba(99, 102, 241, 0.15)' : 'rgba(74, 222, 128, 0.15)',
                   border: `2px solid ${isLoading ? 'rgba(99, 102, 241, 0.3)' : 'rgba(74, 222, 128, 0.3)'}`,
-                  borderRadius: '12px',
+                  borderRadius: '3px',
                   padding: '16px',
                   color: isLoading ? '#a5b4fc' : '#86efac',
                   fontSize: '15px',
@@ -5175,7 +5313,7 @@ function SymptomTrackerMobile() {
                   style={{
                     background: 'rgba(239, 68, 68, 0.15)',
                     border: '2px solid rgba(239, 68, 68, 0.3)',
-                    borderRadius: '12px',
+                    borderRadius: '3px',
                     padding: '16px',
                     color: '#fca5a5',
                     fontSize: '15px',
@@ -5193,7 +5331,7 @@ function SymptomTrackerMobile() {
                 <div style={{
                   background: 'rgba(239, 68, 68, 0.2)',
                   border: '2px solid rgba(239, 68, 68, 0.5)',
-                  borderRadius: '12px',
+                  borderRadius: '3px',
                   padding: '16px',
                 }}>
                   <div style={{ color: '#fca5a5', fontWeight: '600', marginBottom: '12px', textAlign: 'center' }}>
@@ -5206,7 +5344,7 @@ function SymptomTrackerMobile() {
                         flex: 1,
                         background: 'rgba(99, 102, 241, 0.2)',
                         border: '1px solid rgba(99, 102, 241, 0.4)',
-                        borderRadius: '8px',
+                        borderRadius: '3px',
                         padding: '12px',
                         color: '#a5b4fc',
                         fontSize: '14px',
@@ -5222,7 +5360,7 @@ function SymptomTrackerMobile() {
                         flex: 1,
                         background: 'rgba(239, 68, 68, 0.3)',
                         border: '1px solid rgba(239, 68, 68, 0.5)',
-                        borderRadius: '8px',
+                        borderRadius: '3px',
                         padding: '12px',
                         color: '#fca5a5',
                         fontSize: '14px',
@@ -5243,7 +5381,7 @@ function SymptomTrackerMobile() {
                   style={{
                     background: 'rgba(239, 68, 68, 0.25)',
                     border: '2px solid rgba(239, 68, 68, 0.5)',
-                    borderRadius: '12px',
+                    borderRadius: '3px',
                     padding: '16px',
                     color: '#fca5a5',
                     fontSize: '15px',
@@ -5261,7 +5399,7 @@ function SymptomTrackerMobile() {
                 <div style={{
                   background: 'rgba(239, 68, 68, 0.3)',
                   border: '2px solid rgba(239, 68, 68, 0.6)',
-                  borderRadius: '12px',
+                  borderRadius: '3px',
                   padding: '16px',
                 }}>
                   <div style={{ color: '#fca5a5', fontWeight: '600', marginBottom: '12px', textAlign: 'center' }}>
@@ -5274,7 +5412,7 @@ function SymptomTrackerMobile() {
                         flex: 1,
                         background: 'rgba(99, 102, 241, 0.2)',
                         border: '1px solid rgba(99, 102, 241, 0.4)',
-                        borderRadius: '8px',
+                        borderRadius: '3px',
                         padding: '12px',
                         color: '#a5b4fc',
                         fontSize: '14px',
@@ -5290,7 +5428,7 @@ function SymptomTrackerMobile() {
                         flex: 1,
                         background: 'rgba(239, 68, 68, 0.4)',
                         border: '1px solid rgba(239, 68, 68, 0.6)',
-                        borderRadius: '8px',
+                        borderRadius: '3px',
                         padding: '12px',
                         color: '#fca5a5',
                         fontSize: '14px',
@@ -5313,7 +5451,7 @@ function SymptomTrackerMobile() {
               borderTop: '1px solid rgba(99, 102, 241, 0.1)',
             }}>
               <span style={{ color: '#475569', fontSize: '12px' }}>
-                Symptom Tracker v3.1
+                Symptom Tracker v3.1.3
               </span>
             </div>
           </div>
@@ -5357,7 +5495,7 @@ function SymptomTrackerMobile() {
                 style={{
                   background: 'rgba(99, 102, 241, 0.2)',
                   border: 'none',
-                  borderRadius: '10px',
+                  borderRadius: '5px',
                   width: '44px',
                   height: '44px',
                   color: '#a5b4fc',
@@ -5372,7 +5510,7 @@ function SymptomTrackerMobile() {
             {/* Add new item */}
             <div style={{
               background: 'rgba(30, 27, 75, 0.6)',
-              borderRadius: '12px',
+              borderRadius: '3px',
               padding: '16px',
               marginBottom: '20px',
             }}>
@@ -5392,7 +5530,7 @@ function SymptomTrackerMobile() {
                     flex: 1,
                     background: 'rgba(15, 23, 42, 0.8)',
                     border: '2px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '10px',
+                    borderRadius: '5px',
                     padding: '12px 14px',
                     color: '#f8fafc',
                     fontSize: '15px',
@@ -5411,7 +5549,7 @@ function SymptomTrackerMobile() {
                     width: '80px',
                     background: 'rgba(15, 23, 42, 0.8)',
                     border: '2px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '10px',
+                    borderRadius: '5px',
                     padding: '12px 14px',
                     color: '#f8fafc',
                     fontSize: '15px',
@@ -5426,7 +5564,7 @@ function SymptomTrackerMobile() {
                     width: '80px',
                     background: 'rgba(15, 23, 42, 0.8)',
                     border: '2px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '10px',
+                    borderRadius: '5px',
                     padding: '12px 10px',
                     color: '#f8fafc',
                     fontSize: '15px',
@@ -5449,7 +5587,7 @@ function SymptomTrackerMobile() {
                       ? 'rgba(99, 102, 241, 0.3)' 
                       : '#6366f1',
                     border: 'none',
-                    borderRadius: '10px',
+                    borderRadius: '5px',
                     padding: '12px',
                     color: '#fff',
                     fontSize: '14px',
@@ -5496,7 +5634,7 @@ function SymptomTrackerMobile() {
                       style={{
                         position: 'relative',
                         overflow: draggedItem?.id === item.id ? 'visible' : 'hidden',
-                        borderRadius: '10px',
+                        borderRadius: '5px',
                         ...getReorderTransform(index, 'stack'),
                       }}
                     >
@@ -5516,7 +5654,7 @@ function SymptomTrackerMobile() {
                               flex: 1,
                               background: 'rgba(99, 102, 241, 0.2)',
                               border: '2px solid rgba(99, 102, 241, 0.5)',
-                              borderRadius: '8px',
+                              borderRadius: '3px',
                               padding: '10px 12px',
                               color: '#fff',
                               fontSize: '14px',
@@ -5533,7 +5671,7 @@ function SymptomTrackerMobile() {
                                 width: '70px',
                                 background: 'rgba(99, 102, 241, 0.2)',
                                 border: '2px solid rgba(99, 102, 241, 0.5)',
-                                borderRadius: '8px',
+                                borderRadius: '3px',
                                 padding: '10px 12px',
                                 color: '#fff',
                                 fontSize: '14px',
@@ -5548,7 +5686,7 @@ function SymptomTrackerMobile() {
                                 width: '70px',
                                 background: 'rgba(99, 102, 241, 0.2)',
                                 border: '2px solid rgba(99, 102, 241, 0.5)',
-                                borderRadius: '8px',
+                                borderRadius: '3px',
                                 padding: '10px 8px',
                                 color: '#fff',
                                 fontSize: '14px',
@@ -5567,7 +5705,7 @@ function SymptomTrackerMobile() {
                               style={{
                                 background: 'rgba(74, 222, 128, 0.2)',
                                 border: '2px solid rgba(74, 222, 128, 0.4)',
-                                borderRadius: '8px',
+                                borderRadius: '3px',
                                 padding: '10px 14px',
                                 color: '#86efac',
                                 fontSize: '14px',
@@ -5581,7 +5719,7 @@ function SymptomTrackerMobile() {
                               style={{
                                 background: 'rgba(239, 68, 68, 0.15)',
                                 border: '2px solid rgba(239, 68, 68, 0.3)',
-                                borderRadius: '8px',
+                                borderRadius: '3px',
                                 padding: '10px 14px',
                                 color: '#fca5a5',
                                 fontSize: '14px',
@@ -5605,7 +5743,7 @@ function SymptomTrackerMobile() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            borderRadius: '10px',
+                            borderRadius: '5px',
                           }}>
                             <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Hide</span>
                           </div>
@@ -5625,7 +5763,7 @@ function SymptomTrackerMobile() {
                               alignItems: 'center',
                               gap: '8px',
                               background: draggedItem?.id === item.id ? '#2d2875' : '#1e1b4b',
-                              borderRadius: '10px',
+                              borderRadius: '5px',
                               transform: `translateX(${swipeOffsets[`stack-${item.id}`] || 0}px)`,
                               transition: swipeStartRef.current.id === `stack-${item.id}` ? 'none' : 'transform 0.2s ease',
                             }}
@@ -5691,7 +5829,7 @@ function SymptomTrackerMobile() {
                       style={{
                         position: 'relative',
                         overflow: 'hidden',
-                        borderRadius: '10px',
+                        borderRadius: '5px',
                         opacity: 0.7,
                       }}
                     >
@@ -5706,7 +5844,7 @@ function SymptomTrackerMobile() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderRadius: '10px',
+                        borderRadius: '5px',
                       }}>
                         <span style={{ color: '#fff', fontWeight: '600', fontSize: '13px' }}>Delete</span>
                       </div>
@@ -5720,7 +5858,7 @@ function SymptomTrackerMobile() {
                           alignItems: 'center',
                           gap: '8px',
                           background: 'rgba(15, 23, 42, 0.6)',
-                          borderRadius: '10px',
+                          borderRadius: '5px',
                           transform: `translateX(${swipeOffsets[`stack-inactive-${item.id}`] || 0}px)`,
                           transition: swipeStartRef.current.id === `stack-inactive-${item.id}` ? 'none' : 'transform 0.2s ease',
                         }}
@@ -5745,7 +5883,7 @@ function SymptomTrackerMobile() {
                           style={{
                             background: 'rgba(74, 222, 128, 0.2)',
                             border: 'none',
-                            borderRadius: '8px',
+                            borderRadius: '3px',
                             padding: '8px 12px',
                             marginRight: '8px',
                             color: '#86efac',
@@ -5790,7 +5928,6 @@ function SymptomTrackerMobile() {
 
 
 
-// Render the app
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<SymptomTrackerMobile />);
   </script>

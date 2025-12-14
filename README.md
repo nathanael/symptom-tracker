@@ -1,4 +1,4 @@
-# Symptom Tracker v3.1.0
+# Symptom Tracker v3.1.3
 
 A mobile-first health tracking PWA for logging symptoms and supplements with cloud sync.
 
@@ -9,7 +9,7 @@ A mobile-first health tracking PWA for logging symptoms and supplements with clo
 - **Overlay modal**: Severity picker appears directly where you tap
 - **AM/PM tracking mode**: Log morning and evening separately
 - **Sticky time selection**: AM/PM choice persists across symptoms until changed
-- **Yesterday's highlight**: Subtle border shows yesterday's selection for reference
+- **Most recent highlight**: Subtle border shows your last logged severity for reference
 - **Pin symptoms**: Keep frequently-used symptoms at the top
 - **Color-coded severity**: Visual feedback from green (0) to red (5)
 - **⚡ Rapid Entry Mode**: Cycle through all symptoms one by one with large buttons
@@ -17,7 +17,7 @@ A mobile-first health tracking PWA for logging symptoms and supplements with clo
 ### Supplement Stack
 - **Daily checklist**: Track supplements with checkboxes
 - **Dose multipliers**: ½×, 2×, 3× buttons for flexible dosing
-- **Copy Yesterday**: Precisely copies yesterday's selections (checked and unchecked)
+- **Auto-copy from yesterday**: Today's stack automatically copies yesterday's taken items
 - **Quick actions**: "✓ All" and "✕ Clear" buttons
 
 ### Data Management
@@ -99,11 +99,19 @@ service cloud.firestore {
 ### Rapid Entry Mode (⚡)
 
 1. **Tap the ⚡ button** in the header (next to date arrows)
-2. **Large buttons** show the current symptom
-3. **Tap severity (0-5)** to log and auto-advance
-4. **Skip →** to skip a symptom
-5. **Progress bar** shows completion
-6. Automatically exits when done
+2. **Only shows incomplete symptoms** for the current time period
+3. **Large buttons** show the current symptom
+4. **Tap severity (0-5)** to log and auto-advance
+5. **← Back** to go to previous symptom
+6. **Skip →** to skip a symptom
+7. **Progress bar** shows completion
+8. Shows "All symptoms logged" when done
+
+**Keyboard shortcuts** (desktop):
+- **0-5**: Log severity and advance
+- **←/Backspace**: Go back to previous symptom
+- **→**: Skip to next symptom
+- **Escape**: Close rapid entry
 
 ### Managing Supplements
 
@@ -122,6 +130,11 @@ service cloud.firestore {
 
 - **←/→**: Navigate dates
 - **Escape**: Close modals
+- **In Rapid Entry Mode**:
+  - **0-5**: Log severity and advance
+  - **←/Backspace**: Previous symptom
+  - **→**: Skip to next
+  - **Escape**: Close
 
 ## Data Model
 
@@ -172,6 +185,27 @@ symptomTracker_pinned      // Pinned symptom IDs
 - CORS errors when opening file:// directly (use a local server or deploy)
 
 ## Version History
+
+### v3.1.3
+- **Rapid entry shows only incomplete symptoms**: Only symptoms not yet logged for the current time period are shown
+- **Back button in rapid entry**: Navigate to previous symptom  
+- **"Last recorded" label**: Changed from "Last" for clarity
+- **"All symptoms logged" message**: Shown when all symptoms complete
+
+### v3.1.2
+- **Reduced border radius**: All corners reduced by 30% for a sharper look
+- **Solid green lightning icon**: Rapid entry button now has solid fill
+- **Simplified status dots**: Only red dot shows when no symptoms logged
+- **Button spacing**: Lightning icon grouped with right nav arrow
+- **Keyboard shortcuts for rapid entry**: 0-5 to log, arrows to navigate, Escape to close
+
+### v3.1.1
+- **Most recent severity**: Highlight now shows your last entry (not yesterday's AM/PM)
+- **Auto-copy stack**: Yesterday's taken items auto-copy when viewing today
+- **Midnight check**: App auto-switches to today when date changes
+- **Flat lightning icon**: Replaced ⚡ with SVG icon
+- **Button order fixed**: Right arrow always far-right in header
+- **Removed Copy Yesterday button**: Now automatic
 
 ### v3.1.0
 - **⚡ Rapid Entry Mode**: Cycle through symptoms with large buttons
