@@ -495,6 +495,9 @@ function SymptomTrackerMobile() {
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState(null);
   const [syncError, setSyncError] = useState(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
   
   // Refs
   const containerRef = useRef(null);
@@ -1192,6 +1195,77 @@ function SymptomTrackerMobile() {
       } else if (error.code === 'auth/cancelled-popup-request') {
         // Another popup was already open, ignore
         console.log('Cancelled duplicate popup request');
+      } else {
+        setSyncError(error.message);
+      }
+      setLastAction('❌ Sign in failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Email/Password sign in (works in PWA mode)
+  const handleEmailSignIn = async (e) => {
+    e.preventDefault();
+    
+    if (!firebaseAuth) {
+      setSyncError('Firebase not loaded');
+      return;
+    }
+    
+    if (!authEmail || !authPassword) {
+      setSyncError('Please enter email and password');
+      return;
+    }
+    
+    if (authPassword.length < 6) {
+      setSyncError('Password must be at least 6 characters');
+      return;
+    }
+    
+    try {
+      setSyncing(true);
+      setSyncError(null);
+      
+      let result;
+      if (isSignUp) {
+        // Create new account
+        result = await firebaseAuth.createUserWithEmailAndPassword(authEmail, authPassword);
+        console.log('Created account:', result.user.email);
+      } else {
+        // Sign in to existing account
+        result = await firebaseAuth.signInWithEmailAndPassword(authEmail, authPassword);
+        console.log('Signed in:', result.user.email);
+      }
+      
+      if (result.user) {
+        setUser(result.user);
+        setLastAction('✓ Signed in as ' + result.user.email);
+        setAuthEmail('');
+        setAuthPassword('');
+        // Load data from cloud
+        await loadFromCloud(result.user.uid);
+      }
+    } catch (error) {
+      console.error('Email sign in error:', error);
+      
+      // Handle specific error codes with friendly messages
+      if (error.code === 'auth/user-not-found') {
+        setSyncError('No account with this email. Tap "Create account" to sign up.');
+        setIsSignUp(true);
+      } else if (error.code === 'auth/wrong-password') {
+        setSyncError('Incorrect password');
+      } else if (error.code === 'auth/email-already-in-use') {
+        setSyncError('Account exists. Tap "Sign in" instead.');
+        setIsSignUp(false);
+      } else if (error.code === 'auth/invalid-email') {
+        setSyncError('Invalid email address');
+      } else if (error.code === 'auth/weak-password') {
+        setSyncError('Password must be at least 6 characters');
+      } else if (error.code === 'auth/too-many-requests') {
+        setSyncError('Too many attempts. Try again later.');
+      } else if (error.code === 'auth/invalid-credential') {
+        setSyncError('Invalid email or password');
       } else {
         setSyncError(error.message);
       }
@@ -5560,7 +5634,7 @@ function SymptomTrackerMobile() {
                   </>
                 ) : (
                   <>
-                    {!isAuthSupported() ? (
+                    {window.location.protocol === 'file:' ? (
                       <div style={{ 
                         color: '#f87171', 
                         fontSize: '12px', 
@@ -5571,14 +5645,102 @@ function SymptomTrackerMobile() {
                         border: '1px solid rgba(239, 68, 68, 0.3)',
                       }}>
                         <div style={{ fontWeight: '600', marginBottom: '6px' }}>⚠️ Cloud sync unavailable</div>
-                        {window.location.protocol === 'file:' ? (
-                          <span>Running from local file. Deploy to GitHub Pages or use a web server for cloud sync.</span>
-                        ) : isStandalone() ? (
-                          <span>Safari's home screen mode doesn't support Google Sign-In. Use the browser version for cloud sync, or use iCloud backup below.</span>
-                        ) : (
-                          <span>This environment doesn't support cloud sync. Use iCloud backup below instead.</span>
-                        )}
+                        <span>Running from local file. Deploy to GitHub Pages or use a web server for cloud sync.</span>
                       </div>
+                    ) : isStandalone() ? (
+                      <>
+                        <p style={{ 
+                          color: '#94a3b8', 
+                          fontSize: '12px', 
+                          margin: '0 0 12px 0',
+                          lineHeight: '1.4',
+                        }}>
+                          {isSignUp ? 'Create an account' : 'Sign in'} to sync across devices
+                        </p>
+                        
+                        <form onSubmit={handleEmailSignIn} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <input
+                            type="email"
+                            placeholder="Email"
+                            value={authEmail}
+                            onChange={(e) => setAuthEmail(e.target.value)}
+                            autoComplete="email"
+                            style={{
+                              width: '100%',
+                              background: 'rgba(30, 27, 75, 0.8)',
+                              border: '1px solid rgba(139, 92, 246, 0.3)',
+                              borderRadius: '3px',
+                              padding: '12px',
+                              color: '#f8fafc',
+                              fontSize: '14px',
+                              outline: 'none',
+                            }}
+                          />
+                          <input
+                            type="password"
+                            placeholder="Password"
+                            value={authPassword}
+                            onChange={(e) => setAuthPassword(e.target.value)}
+                            autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                            style={{
+                              width: '100%',
+                              background: 'rgba(30, 27, 75, 0.8)',
+                              border: '1px solid rgba(139, 92, 246, 0.3)',
+                              borderRadius: '3px',
+                              padding: '12px',
+                              color: '#f8fafc',
+                              fontSize: '14px',
+                              outline: 'none',
+                            }}
+                          />
+                          <button
+                            type="submit"
+                            disabled={syncing}
+                            style={{
+                              width: '100%',
+                              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.3) 0%, rgba(99, 102, 241, 0.3) 100%)',
+                              border: '1px solid rgba(139, 92, 246, 0.5)',
+                              borderRadius: '3px',
+                              padding: '12px 16px',
+                              color: '#e2e8f0',
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              cursor: syncing ? 'not-allowed' : 'pointer',
+                              opacity: syncing ? 0.7 : 1,
+                            }}
+                          >
+                            {syncing ? 'Please wait...' : isSignUp ? 'Create Account' : 'Sign In'}
+                          </button>
+                        </form>
+                        
+                        <button
+                          onClick={() => { setIsSignUp(!isSignUp); setSyncError(null); }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#8b5cf6',
+                            fontSize: '12px',
+                            marginTop: '10px',
+                            cursor: 'pointer',
+                            padding: 0,
+                          }}
+                        >
+                          {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+                        </button>
+                        
+                        {syncError && (
+                          <div style={{ 
+                            color: '#f87171', 
+                            fontSize: '11px', 
+                            marginTop: '10px',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            padding: '8px',
+                            borderRadius: '3px',
+                          }}>
+                            ⚠️ {syncError}
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <>
                         <p style={{ 
@@ -5801,10 +5963,10 @@ function SymptomTrackerMobile() {
                   App Info
                 </div>
                 <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
-                  Version: 3.2.6 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
+                  Version: 3.3.0 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
                 </div>
                 <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>
-                  Cloud sync: {isAuthSupported() ? '✓ Available' : '✗ Not available in this mode'}
+                  Cloud sync: {window.location.protocol === 'file:' ? '✗ Not available (local file)' : isStandalone() ? '✓ Email sign-in' : '✓ Google sign-in'}
                 </div>
                 <button
                   onClick={() => {
