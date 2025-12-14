@@ -1032,8 +1032,9 @@ function SymptomTrackerMobile() {
         
         setRapidEntryLogged(prev => prev.slice(0, -1));
       }
-      // Right arrow to skip/close
-      else if (e.key === 'ArrowRight') {
+      // Right arrow or Space to skip/close
+      else if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
         setRapidEntryMode(false);
         setRapidEntryIndex(0);
       }
@@ -2826,7 +2827,8 @@ function SymptomTrackerMobile() {
                 cursor: 'pointer',
               }}
             >
-              ✕ Close
+              Close
+              {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#94635a', fontWeight: '400' }}>Esc</span>}
             </button>
           </div>
           
@@ -3085,9 +3087,20 @@ function SymptomTrackerMobile() {
                         fontSize: '32px',
                         fontWeight: '700',
                         cursor: 'pointer',
+                        position: 'relative',
                       }}
                     >
                       {severity}
+                      {!isMobile() && (
+                        <span style={{
+                          position: 'absolute',
+                          bottom: '4px',
+                          right: '6px',
+                          fontSize: '10px',
+                          color: '#475569',
+                          fontWeight: '500',
+                        }}>{severity}</span>
+                      )}
                     </button>
                   );
                 })}
@@ -3129,6 +3142,7 @@ function SymptomTrackerMobile() {
                   }}
                 >
                   ← Undo
+                  {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>⌫</span>}
                 </button>
                 
                 {/* Skip/Close button */}
@@ -3155,6 +3169,7 @@ function SymptomTrackerMobile() {
                 }}
               >
                 Skip / Close
+                {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>Space</span>}
               </button>
               </div>
               
@@ -6198,7 +6213,7 @@ function SymptomTrackerMobile() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
                 <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>
-                  3.3.6 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                  3.3.7 • {isStandalone() ? 'Home Screen App' : 'Browser'}
                 </div>
               </div>
               <button

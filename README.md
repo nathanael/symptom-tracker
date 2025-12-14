@@ -1,303 +1,191 @@
-# Symptom Tracker v3.1.9
+# Symptom Tracker v3.3.7
 
-A mobile-first health tracking PWA for logging symptoms and supplements with cloud sync.
+A mobile-first health tracking PWA for symptoms and supplements with cloud sync.
+
+## Quick Start
+
+1. Open `index.html` in Safari (iOS) or any browser
+2. **iOS:** Tap Share → "Add to Home Screen" for app-like experience
+3. Sign in with Google or Email to enable cloud sync
+4. Data persists locally and syncs automatically when signed in
 
 ## Features
 
-### Symptom Tracking
-- **Tap-to-log interface**: Tap any symptom to reveal severity picker (0-5 scale)
-- **Overlay modal**: Severity picker appears directly where you tap
-- **AM/PM tracking mode**: Log morning and evening separately
-- **Sticky time selection**: AM/PM choice persists across symptoms until changed
-- **Most recent highlight**: Subtle border shows your last logged severity for reference
-- **Pin symptoms**: Keep frequently-used symptoms at the top
-- **Color-coded severity**: Visual feedback from green (0) to red (5)
-- **⚡ Rapid Entry Mode**: Cycle through all symptoms one by one with large buttons
+### Symptoms Tab
+- **2D gesture interface**: Hold 200ms → drag to set severity (0-5)
+- **Rapid Entry mode**: Quick logging with keyboard shortcuts (desktop: 0-5 keys)
+- **Calendar navigation** with entry indicators
+- **Pin symptoms** to top of list (⊙ icon)
+- **Daily notes**: Add notes for each day
+- **2 tracking modes**: Simple (once daily) or AM/PM (morning/evening)
 
-### Supplement Stack
-- **Daily checklist**: Track supplements with checkboxes
-- **Dose multipliers**: ½×, 2×, 3× buttons for flexible dosing
-- **Auto-copy from yesterday**: Today's stack automatically copies yesterday's taken items
-- **Quick actions**: "✓ All" and "✕ Clear" buttons
+### Stack Tab  
+- Track daily supplements with checkboxes
+- **Multiplier buttons**: ½×, 2×, 3× dose adjustments
+- Swipe to delete, drag to reorder
+- Tap dose to edit
 
-### Data Management
-- **Calendar view**: Navigate to any past date
-- **Daily notes**: Add context about diet, sleep, stress, etc.
-- **History view**: Sortable table of all entries
-- **CSV export**: Download data for analysis
-- **Local storage**: All data persists in browser
-- **Cloud sync**: Optional Firebase backup with Google Sign-In
+### Insights Tab
+- 30/60/90 day trend analysis
+- Symptom clustering detection
+- Copy data for AI analysis
 
 ### Settings
-- **Tracking mode**: Simple (daily) or AM/PM
-- **Manage Symptoms**: Add, edit, reorder, hide symptoms
-- **Manage Stack**: Add, edit, reorder, hide supplements
-- **Backup/Restore**: JSON import/export
-- **Clear Data**: Remove entries while keeping symptom/stack configuration
-- **Full Reset**: Complete factory reset
+- **Cloud Sync**: Google Sign-In or Email/Password authentication
+- **History**: View and sort all entries
+- **Export**: CSV download or copy for AI
+- **Manage Symptoms/Supplements**: Add, edit, hide, restore
+- **Backup**: Manual save/load via Files app (iCloud)
+- **Password Reset**: For email accounts
+
+## Cloud Sync (Firebase)
+
+When deployed to GitHub Pages or a web server:
+
+1. Go to Settings
+2. Sign in with Google or create an Email account
+3. Data syncs automatically every 5 seconds
+4. Works across all devices signed into the same account
+
+**Note:** Cloud sync requires HTTPS. Not available when running from local file.
+
+## Manual Backup (iCloud)
+
+For offline backup or when cloud sync isn't available:
+
+1. Settings → Backup → **Save Backup**
+2. Save to Files → iCloud Drive
+3. On other device: **Load Backup** → select file
+
+## Keyboard Shortcuts (Desktop)
+
+### Rapid Entry Mode
+| Key | Action |
+|-----|--------|
+| 0-5 | Log severity |
+| Space / → | Skip/Close |
+| Backspace / ← | Undo last |
+| Esc | Close |
+
+## Tech Stack
+
+- React 18 (via CDN)
+- Firebase Auth + Firestore
+- Single HTML file, no build step
+- Works offline after initial load
+- PWA-capable
 
 ## Deployment
 
 ### GitHub Pages
+1. Push `index.html`, `manifest.json`, and favicon to repo
+2. Enable GitHub Pages in repo settings
+3. Add your domain to Firebase authorized domains
 
-1. Create a new repository on GitHub
-
-2. Upload these files to the repository:
-   - `index.html`
-   - `manifest.json`
-
-3. Enable GitHub Pages:
-   - Go to Settings → Pages
-   - Source: Deploy from branch
-   - Branch: main, / (root)
-   - Save
-
-4. Your app will be available at: `https://yourusername.github.io/repository-name/`
-
-### Firebase Setup (Optional - for cloud sync)
-
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-
-2. Select project `symptoms-dae26` (or create new)
-
-3. **Enable Firestore API**:
-   - Visit: https://console.developers.google.com/apis/api/firestore.googleapis.com/overview?project=symptoms-dae26
-   - Click "Enable"
-
-4. **Create Firestore Database**:
-   - Firebase Console → Firestore Database
-   - Click "Create database"
-   - Choose "Start in test mode" (or production with rules below)
-   - Select region closest to you
-
-5. **Authorize your domain**:
-   - Firebase Console → Authentication → Settings → Authorized domains
-   - Add your GitHub Pages domain (e.g., `yourusername.github.io`)
-
-6. **Firestore Rules** (set in Firebase Console → Firestore → Rules):
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
+### Local Development
+```bash
+python3 -m http.server 8080
+# or
+npx serve .
 ```
 
-## Usage
+---
 
-### Logging Symptoms
+## Changelog
 
-1. **Tap a symptom** to open the severity picker overlay
-2. **Tap a number (0-5)** to log severity
-3. **In AM/PM mode**: Toggle between Morning/Evening with the button
-4. **Tap existing entry** to clear it
-5. **Tap anywhere else** to close the picker
+### v3.3.7 (2024-12-14)
+- **Keyboard shortcuts for Rapid Entry**: Space to skip, Backspace to undo, Esc to close
+- **Desktop shortcut labels**: Subtle key hints shown on desktop only
 
-### Rapid Entry Mode (⚡)
+### v3.3.6 (2024-12-14)
+- **Navigation fixes**: All settings sub-pages return to Settings when closed
+- **Consistent page layouts**: All pages now use 28px titles with "Done" button
+- **Export redesign**: Full-screen layout matching other pages, iOS-style sections
 
-1. **Tap the ⚡ button** in the header (next to date arrows)
-2. **Only shows incomplete symptoms** for the current time period
-3. **Large buttons** show the current symptom
-4. **Tap severity (0-5)** to log - next symptom appears automatically
-5. **← Undo** to remove the last entry and go back to that symptom
-6. **Skip / Close** to skip current symptom or exit
-7. **Progress bar** shows completed (green) vs remaining (gray)
-8. If all complete for current period:
-   - **Switch to AM/PM** button appears if opposite period has incomplete symptoms
-   - **Start Over** to re-enter all symptoms for current period
-9. **Completion animation** when all symptoms are logged
+### v3.3.5 (2024-12-14)
+- **iOS-styled Settings**: Complete redesign with grouped sections and rounded cards
+- **Section headers**: DATA, MANAGE, TRACKING MODE, BACKUP, DANGER ZONE, ABOUT
+- **Cleaner UI**: Removed 3D icons, flat design throughout
+- **Simplified buttons**: Text-only "Done" buttons, chevron arrows for navigation
 
-**Keyboard shortcuts** (desktop):
-- **0-5**: Log severity
-- **←/Backspace**: Undo last entry
-- **→**: Skip / close
-- **Escape**: Close rapid entry
+### v3.3.4 (2024-12-14)
+- **Password reset debugging**: Alert popup confirms email sent
+- **Console logging**: Debug output for password reset flow
+- **Better error messages**: Shows error codes for troubleshooting
 
-### Managing Supplements
+### v3.3.3 (2024-12-14)
+- **UI spacing fixes**: "Create one" and "Forgot password?" properly separated
+- **Tablet support**: Increased max-width (800px symptoms/stack, 600px settings)
 
-1. **Tap checkbox** to mark as taken
-2. **Tap dose** to edit amount
-3. **Use multiplier buttons** (½×, 2×, 3×) for different doses
-4. **"↩ Copy Yesterday"** copies yesterday's exact state
+### v3.3.2 (2024-12-14)
+- **Forgot password**: Password reset link for email accounts
+- **Firebase integration**: Uses sendPasswordResetEmail()
 
-### Navigation
+### v3.3.1 (2024-12-14)
+- **Email auth in browser**: Email/password available in all modes (not just PWA)
 
-- **← →** arrows or **swipe** to change dates
-- **Tap date** to open calendar picker
-- **Bottom tabs**: Symptoms, Stack, Insights, Settings
+### v3.3.0 (2024-12-14)
+- **Email/Password authentication**: Sign up and sign in with email
+- **Smart error messages**: Helpful feedback for auth errors
+- **Sign-up/Sign-in toggle**: Easy switching between modes
 
-### Keyboard Shortcuts (Desktop)
+### v3.2.6 (2024-12-13)
+- **PWA auth fix**: Fixed standalone mode detection for auth
 
-- **←/→**: Navigate dates
-- **Escape**: Close modals
-- **In Rapid Entry Mode**:
-  - **0-5**: Log severity
-  - **←/Backspace**: Undo last entry
-  - **→**: Skip / close
-  - **Escape**: Close
+### v3.2.5 (2024-12-13)
+- **Hidden item management**: Removed delete from hidden items (restore only)
 
-## Data Model
+### v3.2.4 (2024-12-13)
+- **Pin UX improvements**: Closes overlay immediately, no special styling
 
-```javascript
-// Local Storage Keys
-symptomTracker_symptoms    // Symptom definitions
-symptomTracker_entries     // Symptom log entries
-symptomTracker_notes       // Daily notes
-symptomTracker_stackItems  // Supplement definitions
-symptomTracker_stackEntries // Supplement log entries
-symptomTracker_mode        // 'simple' or 'ampm'
-symptomTracker_pinned      // Pinned symptom IDs
+### v3.2.3 (2024-12-13)
+- **Auto-sync optimization**: Reduced sync delay to 5 seconds
+- **Removed manual sync button**: Sync is now fully automatic
 
-// Firestore: users/{uid}
-{
-  symptoms: [{ id, name, active, order }],
-  entries: { [key]: { date, symptomId, time, severity } },
-  dailyNotes: { [date]: string },
-  stackItems: [{ id, name, unit, defaultDose, active, order }],
-  stackEntries: { [key]: { date, itemId, dose, taken, multiplier } },
-  trackingMode: 'simple' | 'ampm',
-  pinnedSymptoms: [symptomId],
-  updatedAt: timestamp,
-  version: '3.1'
-}
-```
+### v3.2.2 (2024-12-13)
+- **Popup auth fix**: Fixed Google Sign-In reliability with popup-first approach
 
-## Technical Details
+### v3.2.1 (2024-12-13)
+- **Environment detection**: Auth checks for supported environments
 
-- **Framework**: React 18 (CDN)
-- **Transpilation**: Babel standalone
-- **Storage**: localStorage + optional Firestore
-- **Auth**: Firebase Google Sign-In (redirect on mobile, popup on desktop)
-- **PWA**: manifest.json for Add to Home Screen
-- **Styling**: Inline styles (no CSS framework)
+### v3.2.0 (2024-12-13)
+- **Firebase Cloud Sync**: Real-time sync with Firestore
+- **Google Sign-In**: One-tap authentication
+- **PWA detection**: Different auth flows for browser vs installed app
+- **Offline persistence**: Firestore cache for offline access
 
-## Browser Support
+### v3.1.0 (2024-12-13)
+- **Rapid Entry mode**: Fast symptom logging with progress bar
+- **Undo support**: Back button in rapid entry
+- **Period switching**: Switch AM/PM when current period complete
 
-- iOS Safari 14+
-- Chrome 90+
-- Firefox 90+
-- Edge 90+
+### v3.0.0 (2024-12-12)
+- **Major refactor**: Consolidated codebase
+- **Pinned symptoms**: Pin frequently-used symptoms to top
+- **Daily notes**: Add text notes for each day
+- **Search**: Find symptoms quickly (hidden by default)
+- **Completion celebration**: Animation when all symptoms logged
 
-## Known Issues
+### v2.0.0 (2024-12-12)
+- **Drag to reorder**: Hold and drag symptoms/supplements
+- **Swipe to delete**: Swipe left on items (active items only)
+- **Multiplier buttons**: Quick dose adjustments (½×, 2×, 3×)
+- **Error boundary**: Graceful error handling
 
-- Console warnings about Permissions-Policy and Babel transformer are harmless
-- Ad blockers may interfere with Firebase requests
-- CORS errors when opening file:// directly (use a local server or deploy)
+### v1.6 (2024-12-12)
+- Settings in tab bar
+- History & Export in Settings
+- Copy for AI export
 
-## Version History
+### v1.5 (2024-12-12)
+- iCloud Backup/Restore
+- Full-screen views
 
-### v3.1.9
-- **Switch period in rapid entry**: When all symptoms are complete for current period (AM/PM), you can now switch to the opposite period if it has incomplete symptoms
-- Shows "Switch to AM/PM (X incomplete)" button in the completion dialog
-- Updated text to show which period is complete ("All AM symptoms logged" vs "All PM symptoms logged")
+### v1.0-v1.4 (2024-12-11)
+- Initial release through Stack mode additions
 
-### v3.1.8
-- **Fixed completion animation trigger**: "All done!" now only shows when you actually complete logging, not when navigating to an already-complete date
-- Tracks whether user just logged vs. just navigated
-
-### v3.1.7
-- **Undo button in rapid entry**: "← Undo" button removes the last logged entry so you can correct mistakes
-- **Keyboard shortcut**: ←/Backspace to undo last entry
-- Tracks all entries logged during the rapid entry session
-- Button is disabled until you've logged at least one symptom
-
-### v3.1.6
-- **Removed back button**: Back didn't work with the new logic since logged items leave the list
-- **Hidden search by default**: Tap the pull handle (gray bar) at top of symptom list to reveal search
-- **Completion celebration**: Full-screen "All done!" animation when you complete all symptoms for a period
-- **Skip/Close button**: Combined button to skip current symptom or close rapid entry
-
-### v3.1.5
-- **Fixed rapid entry skipping bug**: No longer skips every other symptom - the list now properly advances as items are logged
-- **Progress bar shows completed/total**: Progress bar reflects how many are done out of all active symptoms
-- **Better counter**: Shows "X of Y logged • Z remaining" instead of position in list
-- **Proper completion detection**: Closes rapid entry only when all symptoms are actually logged
-
-### v3.1.4
-- **Rapid entry reliability fix**: Fixed incomplete symptoms calculation to consistently show remaining items
-- **Start over confirmation**: When all symptoms are complete, rapid entry asks if you want to start over instead of auto-clearing
-- **Fixed tile sizing**: Symptom tiles no longer change size when logging scores (consistent min-width)
-- **Error boundary**: Added React error boundary for better error handling
-
-### v3.1.3
-- **Rapid entry shows only incomplete symptoms**: Only symptoms not yet logged for the current time period are shown
-- **Back button in rapid entry**: Navigate to previous symptom  
-- **"Last recorded" label**: Changed from "Last" for clarity
-- **"All symptoms logged" message**: Shown when all symptoms complete
-
-### v3.1.2
-- **Reduced border radius**: All corners reduced by 30% for a sharper look
-- **Solid green lightning icon**: Rapid entry button now has solid fill
-- **Simplified status dots**: Only red dot shows when no symptoms logged
-- **Button spacing**: Lightning icon grouped with right nav arrow
-- **Keyboard shortcuts for rapid entry**: 0-5 to log, arrows to navigate, Escape to close
-
-### v3.1.1
-- **Most recent severity**: Highlight now shows your last entry (not yesterday's AM/PM)
-- **Auto-copy stack**: Yesterday's taken items auto-copy when viewing today
-- **Midnight check**: App auto-switches to today when date changes
-- **Flat lightning icon**: Replaced ⚡ with SVG icon
-- **Button order fixed**: Right arrow always far-right in header
-- **Removed Copy Yesterday button**: Now automatic
-
-### v3.1.0
-- **⚡ Rapid Entry Mode**: Cycle through symptoms with large buttons
-- **Overlay modal**: Severity picker now appears as overlay at tap position
-- **Click-away to close**: Tapping outside modal closes it
-- **Yesterday's severity hint**: Subtle border highlights yesterday's selection
-- **Mobile auth fix**: Uses redirect sign-in on mobile Safari
-- **Offline handling**: Graceful degradation when offline
-
-### v3.0.13
-- Firebase offline persistence enabled
-- Better error messages for offline state
-- Auth persistence for mobile
-
-### v3.0.12
-- Yesterday's highlight is now contextual to AM/PM
-- More subtle highlight border
-
-### v3.0.10
-- Modal positioning refined for thumb alignment
-- Header "Logging {symptom} to AM/PM" above numbers
-
-### v3.0.4
-- Symptom picker now replaces name in-place (thumb-friendly)
-- Header shows "Logging {name} to AM/PM"
-- Copy Yesterday copies precisely (clears today first)
-
-### v3.0.3
-- Reorganized symptom tile layout
-- Pin button on left, AM/PM toggle on right
-
-### v3.0.2
-- AM/PM selection is now sticky across symptoms
-- Added "Logging to AM/PM" indicator
-- Removed borders from small severity badges
-
-### v3.0.1
-- Increased scroll padding for mobile
-- Larger Note button (30% bigger)
-- Renamed "Add Symptoms" → "Manage Symptoms"
-- Renamed "Add to Stack" → "Manage Stack"
-
-### v3.0.0
-- Drag-to-reorder with ≡ handles
-- Swipe-to-delete gestures
-- Removed sparkline charts
-- Version number in Settings
-
-### v2.9
-- Auto-sync to cloud (30-second debounce)
-- Fixed full reset functionality
-
-### v2.8
-- AM/PM toggle simplified
-- Copy Yesterday only copies checked items
+---
 
 ## License
 
-MIT License - Feel free to modify and use for personal health tracking.
+MIT
