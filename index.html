@@ -170,7 +170,10 @@ const isAuthSupported = () => {
     storageAvailable = false;
   }
   
-  return validProtocol && storageAvailable;
+  // Safari standalone mode doesn't support OAuth
+  const notStandalone = !isStandalone();
+  
+  return validProtocol && storageAvailable && notStandalone;
 };
 
 // ============================================================================
@@ -5798,7 +5801,7 @@ function SymptomTrackerMobile() {
                   App Info
                 </div>
                 <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
-                  Version: 3.2.5 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
+                  Version: 3.2.6 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
                 </div>
                 <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>
                   Cloud sync: {isAuthSupported() ? '✓ Available' : '✗ Not available in this mode'}
