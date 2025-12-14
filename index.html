@@ -1275,6 +1275,40 @@ function SymptomTrackerMobile() {
     }
   };
 
+  // Forgot password
+  const handleForgotPassword = async () => {
+    if (!firebaseAuth) {
+      setSyncError('Firebase not loaded');
+      return;
+    }
+    
+    if (!authEmail) {
+      setSyncError('Enter your email address first');
+      return;
+    }
+    
+    try {
+      setSyncing(true);
+      setSyncError(null);
+      await firebaseAuth.sendPasswordResetEmail(authEmail);
+      setLastAction('✓ Password reset email sent');
+      setSyncError('Check your email for reset link');
+    } catch (error) {
+      console.error('Password reset error:', error);
+      if (error.code === 'auth/user-not-found') {
+        setSyncError('No account with this email');
+      } else if (error.code === 'auth/invalid-email') {
+        setSyncError('Invalid email address');
+      } else if (error.code === 'auth/too-many-requests') {
+        setSyncError('Too many attempts. Try again later.');
+      } else {
+        setSyncError(error.message);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Sign out
   const handleSignOut = async () => {
     if (!firebaseAuth) return;
@@ -5728,6 +5762,24 @@ function SymptomTrackerMobile() {
                           {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
                         </button>
                         
+                        {!isSignUp && (
+                          <button
+                            onClick={handleForgotPassword}
+                            disabled={syncing}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#64748b',
+                              fontSize: '12px',
+                              marginTop: '8px',
+                              cursor: 'pointer',
+                              padding: 0,
+                            }}
+                          >
+                            Forgot password?
+                          </button>
+                        )}
+                        
                         {syncError && (
                           <div style={{ 
                             color: '#f87171', 
@@ -5822,6 +5874,24 @@ function SymptomTrackerMobile() {
                         >
                           {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
                         </button>
+                        
+                        {!isSignUp && (
+                          <button
+                            onClick={handleForgotPassword}
+                            disabled={syncing}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#64748b',
+                              fontSize: '12px',
+                              marginTop: '8px',
+                              cursor: 'pointer',
+                              padding: 0,
+                            }}
+                          >
+                            Forgot password?
+                          </button>
+                        )}
                         
                         {/* Divider */}
                         <div style={{ 
@@ -6060,7 +6130,7 @@ function SymptomTrackerMobile() {
                   App Info
                 </div>
                 <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '8px' }}>
-                  Version: 3.3.1 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
+                  Version: 3.3.2 • {isStandalone() ? 'PWA' : 'Browser'} • {window.location.protocol.replace(':', '')}
                 </div>
                 <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '8px' }}>
                   Cloud sync: {window.location.protocol === 'file:' ? '✗ Not available (local file)' : '✓ Available'}
