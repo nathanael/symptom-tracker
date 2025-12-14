@@ -1454,6 +1454,25 @@ function SymptomTrackerMobile() {
     }
   };
 
+  // Helper to close Manage Symptoms and return to Settings if opened from there
+  const closeManageSymptoms = () => {
+    setShowAddSymptom(false);
+    if (openedFromSettings) {
+      setOpenedFromSettings(false);
+      setShowSettings(true);
+    }
+  };
+
+  // Helper to close Manage Stack and return to Settings if opened from there
+  const closeManageStack = () => {
+    setShowManageStack(false);
+    setEditingStackItemId(null);
+    if (openedFromSettings) {
+      setOpenedFromSettings(false);
+      setShowSettings(true);
+    }
+  };
+
   // Backup all data to a JSON file (save to iCloud via Files app)
   const backupToFile = () => {
     const backup = {
@@ -4502,7 +4521,7 @@ function SymptomTrackerMobile() {
       {/* Manage Symptoms Modal */}
       {showAddSymptom && (
         <div 
-          onClick={() => setShowAddSymptom(false)}
+          onClick={closeManageSymptoms}
           style={{
             position: 'fixed',
             inset: 0,
@@ -4514,7 +4533,7 @@ function SymptomTrackerMobile() {
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '400px', margin: '0 auto' }}
+            style={{ maxWidth: '500px', margin: '0 auto' }}
           >
             <div style={{
               display: 'flex',
@@ -4522,23 +4541,21 @@ function SymptomTrackerMobile() {
               alignItems: 'center',
               marginBottom: '20px',
             }}>
-              <h2 style={{ color: '#f8fafc', fontSize: '22px', fontWeight: '700', margin: 0 }}>
-                Manage Symptoms
+              <h2 style={{ color: '#f8fafc', fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
+                Symptoms
               </h2>
               <button
-                onClick={() => setShowAddSymptom(false)}
+                onClick={closeManageSymptoms}
                 style={{
-                  background: 'rgba(99, 102, 241, 0.2)',
+                  background: 'none',
                   border: 'none',
-                  borderRadius: '5px',
-                  width: '44px',
-                  height: '44px',
-                  color: '#a5b4fc',
-                  fontSize: '20px',
+                  color: '#8b5cf6',
+                  fontSize: '17px',
                   cursor: 'pointer',
+                  padding: '8px',
                 }}
               >
-                ✕
+                Done
               </button>
             </div>
 
@@ -4930,27 +4947,25 @@ function SymptomTrackerMobile() {
               zIndex: 10,
             }}>
               <div>
-                <h2 style={{ color: '#f8fafc', fontSize: '22px', fontWeight: '700', margin: 0 }}>
+                <h2 style={{ color: '#f8fafc', fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
                   History
                 </h2>
-                <p style={{ color: '#64748b', fontSize: '12px', margin: '4px 0 0 0' }}>
-                  {sortedHistory.length} entries • Tap column headers to sort
+                <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>
+                  {sortedHistory.length} entries
                 </p>
               </div>
               <button
                 onClick={closeHistory}
                 style={{
-                  background: 'rgba(99, 102, 241, 0.2)',
+                  background: 'none',
                   border: 'none',
-                  borderRadius: '5px',
-                  width: '44px',
-                  height: '44px',
-                  color: '#a5b4fc',
-                  fontSize: '20px',
+                  color: '#8b5cf6',
+                  fontSize: '17px',
                   cursor: 'pointer',
+                  padding: '8px',
                 }}
               >
-                ✕
+                Done
               </button>
             </div>
 
@@ -5050,46 +5065,50 @@ function SymptomTrackerMobile() {
             inset: 0,
             background: 'rgba(0, 0, 0, 0.92)',
             zIndex: 1000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            overflowY: 'auto',
             padding: '20px',
           }}
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#1a1333',
-              borderRadius: '5px',
-              padding: '24px',
-              width: '100%',
-              maxWidth: '320px',
-              maxHeight: '80vh',
-              overflowY: 'auto',
-              border: '2px solid rgba(99, 102, 241, 0.3)',
-            }}
+            style={{ maxWidth: '500px', margin: '0 auto' }}
           >
-            <h2 style={{
-              color: '#f8fafc',
-              fontSize: '20px',
-              fontWeight: '700',
-              margin: '0 0 16px 0',
-              textAlign: 'center',
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px',
             }}>
-              Export
-            </h2>
+              <h2 style={{ color: '#f8fafc', fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
+                Export
+              </h2>
+              <button
+                onClick={closeExport}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#8b5cf6',
+                  fontSize: '17px',
+                  cursor: 'pointer',
+                  padding: '8px',
+                }}
+              >
+                Done
+              </button>
+            </div>
             
             {/* Copy for AI Section */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{
-                color: '#94a3b8',
-                fontSize: '11px',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                display: 'block',
-                marginBottom: '10px',
-              }}>Copy for AI Analysis</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+              COPY FOR AI
+            </div>
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.5)',
+              borderRadius: '12px',
+              padding: '16px',
+              marginBottom: '20px',
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 {[
                   { label: '7 days', days: 7 },
                   { label: '14 days', days: 14 },
@@ -5100,87 +5119,67 @@ function SymptomTrackerMobile() {
                     key={days}
                     onClick={() => copyAIData(days)}
                     style={{
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%)',
-                      border: '1px solid rgba(139, 92, 246, 0.4)',
-                      borderRadius: '5px',
+                      background: 'rgba(139, 92, 246, 0.2)',
+                      border: 'none',
+                      borderRadius: '8px',
                       padding: '12px',
                       color: '#c4b5fd',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                    }}
-                  >
-                    🤖 {label}
-                  </button>
-                ))}
-              </div>
-              <p style={{ 
-                color: '#64748b', 
-                fontSize: '11px', 
-                margin: '8px 0 0 0',
-                textAlign: 'center',
-              }}>
-                Copies symptoms + supplements data
-              </p>
-            </div>
-            
-            {/* CSV Export Section */}
-            <div>
-              <label style={{
-                color: '#94a3b8',
-                fontSize: '11px',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-                display: 'block',
-                marginBottom: '10px',
-              }}>Download CSV</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {[
-                  { label: 'Last 7 days', days: 7 },
-                  { label: 'Last 30 days', days: 30 },
-                  { label: 'Last 3 months', days: 90 },
-                  { label: 'Last 6 months', days: 180 },
-                  { label: 'Last 12 months', days: 365 },
-                  { label: 'All time', days: 99999 },
-                ].map(({ label, days }) => (
-                  <button
-                    key={days}
-                    onClick={() => exportCSV(days)}
-                    style={{
-                      background: 'rgba(99, 102, 241, 0.15)',
-                      border: '1px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '5px',
-                      padding: '12px 16px',
-                      color: '#e2e8f0',
                       fontSize: '14px',
                       fontWeight: '500',
                       cursor: 'pointer',
-                      textAlign: 'left',
+                      textAlign: 'center',
                     }}
                   >
                     {label}
                   </button>
                 ))}
               </div>
+              <p style={{ 
+                color: '#64748b', 
+                fontSize: '12px', 
+                margin: '12px 0 0 0',
+                textAlign: 'center',
+              }}>
+                Copies symptoms + supplements data to clipboard
+              </p>
             </div>
-
-            <button
-              onClick={closeExport}
-              style={{
-                width: '100%',
-                marginTop: '16px',
-                padding: '14px',
-                background: 'transparent',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '3px',
-                color: '#94a3b8',
-                fontSize: '15px',
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
+            
+            {/* CSV Export Section */}
+            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+              DOWNLOAD CSV
+            </div>
+            <div style={{
+              background: 'rgba(30, 27, 75, 0.5)',
+              borderRadius: '12px',
+              overflow: 'hidden',
+            }}>
+              {[
+                { label: 'Last 7 days', days: 7 },
+                { label: 'Last 30 days', days: 30 },
+                { label: 'Last 3 months', days: 90 },
+                { label: 'Last 6 months', days: 180 },
+                { label: 'Last 12 months', days: 365 },
+                { label: 'All time', days: 99999 },
+              ].map(({ label, days }, index, arr) => (
+                <button
+                  key={days}
+                  onClick={() => exportCSV(days)}
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: index < arr.length - 1 ? '1px solid rgba(100, 116, 139, 0.15)' : 'none',
+                    padding: '14px 16px',
+                    color: '#f8fafc',
+                    fontSize: '15px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -5204,13 +5203,13 @@ function SymptomTrackerMobile() {
             }}
           >
             <div 
-              style={{ maxWidth: '400px', margin: '0 auto' }}
+              style={{ maxWidth: '500px', margin: '0 auto' }}
             >
               {/* Header */}
               <div style={{
-                marginBottom: '20px',
+                marginBottom: '24px',
               }}>
-                <h2 style={{ color: '#f8fafc', fontSize: '24px', fontWeight: '700', margin: 0 }}>
+                <h2 style={{ color: '#f8fafc', fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
                   Insights
                 </h2>
               </div>
@@ -5888,6 +5887,7 @@ function SymptomTrackerMobile() {
               <button
                 onClick={() => {
                   setShowSettings(false);
+                  setOpenedFromSettings(true);
                   setShowAddSymptom(true);
                 }}
                 style={{
@@ -5914,6 +5914,7 @@ function SymptomTrackerMobile() {
               <button
                 onClick={() => {
                   setShowSettings(false);
+                  setOpenedFromSettings(true);
                   setShowManageStack(true);
                 }}
                 style={{
@@ -6197,7 +6198,7 @@ function SymptomTrackerMobile() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
                 <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>
-                  3.3.5 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                  3.3.6 • {isStandalone() ? 'Home Screen App' : 'Browser'}
                 </div>
               </div>
               <button
@@ -6241,10 +6242,7 @@ function SymptomTrackerMobile() {
       {/* Manage Stack - Full Screen */}
       {showManageStack && (
         <div 
-          onClick={() => {
-            setShowManageStack(false);
-            setEditingStackItemId(null);
-          }}
+          onClick={closeManageStack}
           style={{
             position: 'fixed',
             inset: 0,
@@ -6256,7 +6254,7 @@ function SymptomTrackerMobile() {
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '400px', margin: '0 auto' }}
+            style={{ maxWidth: '500px', margin: '0 auto' }}
           >
             <div style={{
               display: 'flex',
@@ -6264,26 +6262,21 @@ function SymptomTrackerMobile() {
               alignItems: 'center',
               marginBottom: '20px',
             }}>
-              <h2 style={{ color: '#f8fafc', fontSize: '22px', fontWeight: '700', margin: 0 }}>
-                Manage Stack
+              <h2 style={{ color: '#f8fafc', fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
+                Supplements
               </h2>
               <button
-                onClick={() => {
-                  setShowManageStack(false);
-                  setEditingStackItemId(null);
-                }}
+                onClick={closeManageStack}
                 style={{
-                  background: 'rgba(99, 102, 241, 0.2)',
+                  background: 'none',
                   border: 'none',
-                  borderRadius: '5px',
-                  width: '44px',
-                  height: '44px',
-                  color: '#a5b4fc',
-                  fontSize: '20px',
+                  color: '#8b5cf6',
+                  fontSize: '17px',
                   cursor: 'pointer',
+                  padding: '8px',
                 }}
               >
-                ✕
+                Done
               </button>
             </div>
 
