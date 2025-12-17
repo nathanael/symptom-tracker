@@ -487,6 +487,7 @@ function SymptomTrackerMobile() {
   const [showExport, setShowExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [lastUpdateCheck, setLastUpdateCheck] = useState(null);
+  const [checkingForUpdates, setCheckingForUpdates] = useState(false);
   const [openedFromSettings, setOpenedFromSettings] = useState(false);
   const [confirmClearData, setConfirmClearData] = useState(false);
   const [confirmFullReset, setConfirmFullReset] = useState(false);
@@ -828,6 +829,15 @@ function SymptomTrackerMobile() {
       return () => clearTimeout(timer);
     }
   }, [lastAction]);
+
+  // Check if we just reloaded after an update check
+  useEffect(() => {
+    const justChecked = sessionStorage.getItem('justCheckedForUpdates');
+    if (justChecked) {
+      sessionStorage.removeItem('justCheckedForUpdates');
+      setLastAction('✓ App is up to date');
+    }
+  }, []);
 
   // Reset confirmClearData and confirmFullReset when leaving Settings
   useEffect(() => {
@@ -2177,25 +2187,37 @@ function SymptomTrackerMobile() {
     return allDayEntries.sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
   };
 
-  // Get the most recent entry for a symptom BEFORE the selected date
-  const getMostRecentEntry = (symptomId) => {
+  // Get the most recent entry for a symptom before the current logging context
+  // If logging PM, can show this morning's entry from today
+  // If logging AM or daily, show entries from before today
+  const getMostRecentEntry = (symptomId, currentTimePeriod = null) => {
     const selectedDateKey = getDateKey(selectedDate);
+    const timeOrder = { morning: 0, daily: 1, evening: 2 };
+    const currentTimeOrder = timeOrder[currentTimePeriod] ?? 999;
     
     const allEntries = Object.entries(entries)
       .filter(([key]) => key.includes(`-${symptomId}-`))
       .map(([key, value]) => ({ key, ...value }))
-      // Only include entries from BEFORE the selected date
-      .filter(entry => entry.date < selectedDateKey)
+      .filter(entry => {
+        // Include entries from before the selected date
+        if (entry.date < selectedDateKey) return true;
+        
+        // For same-day entries, only include earlier time periods
+        if (entry.date === selectedDateKey) {
+          const entryTimeOrder = timeOrder[entry.time] ?? 0;
+          return entryTimeOrder < currentTimeOrder;
+        }
+        
+        return false;
+      })
       .sort((a, b) => {
-        // Sort by date descending, then by time
+        // Sort by date descending, then by time descending
         const dateCompare = b.date.localeCompare(a.date);
         if (dateCompare !== 0) return dateCompare;
-        // Same date - prefer evening over morning
-        const timeOrder = { evening: 2, daily: 1, morning: 0 };
+        // Same date - prefer later time periods (evening > daily > morning)
         return (timeOrder[b.time] || 0) - (timeOrder[a.time] || 0);
       });
     
-    // Return the most recent entry before the selected date
     return allEntries.length > 0 ? allEntries[0] : null;
   };
 
@@ -3313,7 +3335,8 @@ function SymptomTrackerMobile() {
               {/* Most recent value hint */}
               {(() => {
                 const symptomId = incompleteSymptoms[rapidEntryIndex].id;
-                const recentEntry = getMostRecentEntry(symptomId);
+                const logTime = quickLogTime || getCurrentTimePeriod();
+                const recentEntry = getMostRecentEntry(symptomId, logTime);
                 if (recentEntry) {
                   return (
                     <div style={{ color: '#64748b', fontSize: '14px' }}>
@@ -3338,7 +3361,7 @@ function SymptomTrackerMobile() {
                   const symptomName = incompleteSymptoms[rapidEntryIndex]?.name;
                   
                   // Check most recent entry for subtle highlight
-                  const recentEntry = getMostRecentEntry(symptomId);
+                  const recentEntry = getMostRecentEntry(symptomId, logTime);
                   const isRecentSeverity = recentEntry?.severity === severity;
                   
                   return (
@@ -4002,7 +4025,7 @@ function SymptomTrackerMobile() {
                     {[0, 1, 2, 3, 4, 5].map(severity => {
                       const logTime = quickLogTime || getCurrentTimePeriod();
                       // Check most recent entry for this symptom
-                      const recentEntry = getMostRecentEntry(symptom.id);
+                      const recentEntry = getMostRecentEntry(symptom.id, logTime);
                       const isRecentSeverity = recentEntry?.severity === severity;
                       
                       return (
@@ -6747,12 +6770,18 @@ function SymptomTrackerMobile() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
                 <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>
-                  3.3.13 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                  3.3.15 • {isStandalone() ? 'Home Screen App' : 'Browser'}
                 </div>
               </div>
               <button
                 onClick={async () => {
+                  if (checkingForUpdates) return;
+                  setCheckingForUpdates(true);
                   haptic('light');
+                  
+                  // Set flag to show toast after reload
+                  sessionStorage.setItem('justCheckedForUpdates', 'true');
+                  
                   // Clear all caches
                   if ('caches' in window) {
                     const names = await caches.keys();
@@ -6766,23 +6795,31 @@ function SymptomTrackerMobile() {
                   // Force reload from server (bypass cache)
                   window.location.reload(true);
                 }}
+                disabled={checkingForUpdates}
                 style={{
                   width: '100%',
                   background: 'transparent',
                   border: 'none',
                   padding: '14px 16px',
-                  color: '#8b5cf6',
+                  color: checkingForUpdates ? '#64748b' : '#8b5cf6',
                   fontSize: '15px',
-                  cursor: 'pointer',
+                  cursor: checkingForUpdates ? 'default' : 'pointer',
                   textAlign: 'left',
+                  opacity: checkingForUpdates ? 0.7 : 1,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Check for Updates</span>
-                  {lastUpdateCheck && (
-                    <span style={{ color: '#64748b', fontSize: '12px' }}>
-                      {lastUpdateCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                  <span>{checkingForUpdates ? 'Checking...' : 'Check for Updates'}</span>
+                  {checkingForUpdates && (
+                    <span style={{ 
+                      display: 'inline-block',
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid #64748b',
+                      borderTopColor: '#8b5cf6',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                    }} />
                   )}
                 </div>
               </button>

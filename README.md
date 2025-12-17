@@ -1,4 +1,4 @@
-# Symptom Tracker v3.3.13
+# Symptom Tracker v3.3.15
 
 A mobile-first health tracking PWA for symptoms and supplements with cloud sync.
 
@@ -95,6 +95,14 @@ npx serve .
 ---
 
 ## Changelog
+
+### v3.3.15 (2024-12-17)
+- **Last recorded fix (complete)**: Now correctly shows this morning's value when logging PM
+  - PM logging: shows AM from today if exists, else most recent before today
+  - AM logging: shows most recent from before today
+
+### v3.3.14 (2024-12-17)
+- **Check for Updates feedback**: Shows spinning loader while checking, toast confirmation after reload
 
 ### v3.3.13 (2024-12-17)
 - **Last recorded fix**: When logging past dates, shows entries from BEFORE that date (not today's data)
