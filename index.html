@@ -498,6 +498,7 @@ function SymptomTrackerMobile() {
   const [symptomSearch, setSymptomSearch] = useState('');
   const [searchVisible, setSearchVisible] = useState(false); // Hidden by default
   const [showCompletion, setShowCompletion] = useState(false); // Completion animation
+  const [showRapidComplete, setShowRapidComplete] = useState(false); // Rapid entry completion toast
   const [lastDeletedEntry, setLastDeletedEntry] = useState(null); // For undo functionality
   const [isLoading, setIsLoading] = useState(false); // For loading states
   const [quickLogSymptom, setQuickLogSymptom] = useState(null); // For tap-to-log quick picker
@@ -1062,6 +1063,16 @@ function SymptomTrackerMobile() {
   useEffect(() => {
     if (!rapidEntryMode || rapidEntryConfirm) return;
     
+    // If rapid entry is open but no incomplete symptoms, close and show toast
+    if (incompleteSymptoms.length === 0) {
+      setRapidEntryMode(false);
+      setRapidEntryIndex(0);
+      setRapidEntryLogged([]);
+      setShowRapidComplete(true);
+      setTimeout(() => setShowRapidComplete(false), 2000);
+      return;
+    }
+    
     const handleKeyDown = (e) => {
       // Number keys 0-5 to log severity
       if (e.key >= '0' && e.key <= '5') {
@@ -1085,7 +1096,10 @@ function SymptomTrackerMobile() {
           if (incompleteSymptoms.length <= 1) {
             setRapidEntryMode(false);
             setRapidEntryIndex(0);
-            setLastAction(`⚡ Rapid entry complete`);
+            setRapidEntryLogged([]);
+            // Show celebration toast
+            setShowRapidComplete(true);
+            setTimeout(() => setShowRapidComplete(false), 2000);
           } else {
             // Reset index if it would go out of bounds after logging
             if (rapidEntryIndex >= incompleteSymptoms.length - 1) {
@@ -3258,7 +3272,10 @@ function SymptomTrackerMobile() {
                         if (incompleteSymptoms.length <= 1) {
                           setRapidEntryMode(false);
                           setRapidEntryIndex(0);
-                          setLastAction(`⚡ Rapid entry complete`);
+                          setRapidEntryLogged([]);
+                          // Show celebration toast
+                          setShowRapidComplete(true);
+                          setTimeout(() => setShowRapidComplete(false), 2000);
                         } else {
                           // Keep index in bounds (list shrinks by 1 after logging)
                           if (rapidEntryIndex >= incompleteSymptoms.length - 1) {
@@ -4376,6 +4393,72 @@ function SymptomTrackerMobile() {
           animation: 'fadeInOut 1.5s ease-in-out',
         }}>
           {copyToastMessage}
+        </div>
+      )}
+
+      {/* Rapid Entry Completion - Bottom Toast */}
+      {showRapidComplete && (
+        <div style={{
+          position: 'fixed',
+          bottom: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(16, 185, 129, 0.95)',
+          color: '#fff',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          zIndex: 300,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          animation: 'fadeInOut 2s ease-in-out',
+        }}>
+          ⚡ All done!
+        </div>
+      )}
+
+      {/* Confetti Animation */}
+      {showRapidComplete && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: 'none',
+          zIndex: 299,
+          overflow: 'hidden',
+        }}>
+          {[...Array(60)].map((_, i) => {
+            const colors = ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c'];
+            const color = colors[i % colors.length];
+            const startX = 40 + Math.random() * 20; // Start near center (40-60%)
+            const delay = Math.random() * 0.3;
+            const duration = 1 + Math.random() * 0.8;
+            const size = 6 + Math.random() * 10;
+            const drift = (Math.random() - 0.5) * 200; // Random left/right drift
+            const endY = 150 + Math.random() * 200; // Fall distance
+            
+            return (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: `${startX}%`,
+                  top: '35%',
+                  width: `${size}px`,
+                  height: i % 4 === 0 ? `${size}px` : `${size * 0.6}px`,
+                  background: color,
+                  borderRadius: i % 3 === 0 ? '50%' : '2px',
+                  opacity: 0,
+                  animation: `confettiBurst ${duration}s ease-out ${delay}s forwards`,
+                  '--endX': `${drift}px`,
+                  '--endY': `${endY}px`,
+                  '--rot': `${Math.random() * 720 - 360}deg`,
+                }}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -7032,6 +7115,19 @@ function SymptomTrackerMobile() {
           0% { transform: scale(0); opacity: 0; }
           50% { transform: scale(1.2); }
           100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes confettiBurst {
+          0% { 
+            opacity: 1; 
+            transform: translateY(0) translateX(0) rotate(0deg) scale(0);
+          }
+          10% {
+            transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+          }
+          100% { 
+            opacity: 0; 
+            transform: translateY(var(--endY, 150px)) translateX(var(--endX, 0px)) rotate(var(--rot, 360deg)) scale(0.3);
+          }
         }
         @keyframes slideDown {
           from { opacity: 0; transform: translateY(-10px); }
