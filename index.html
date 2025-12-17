@@ -249,6 +249,7 @@ const STORAGE_KEY_APP_MODE = 'symptomTracker_appMode';
 const STORAGE_KEY_STACK_ITEMS = 'symptomTracker_stackItems';
 const STORAGE_KEY_STACK_ENTRIES = 'symptomTracker_stackEntries';
 const STORAGE_KEY_PINNED = 'symptomTracker_pinned';
+const STORAGE_KEY_COPY_DAYS = 'symptomTracker_copyDays';
 
 // ============================================================================
 // TIME PERIODS & TRACKING MODES
@@ -405,6 +406,24 @@ function SymptomTrackerMobile() {
     return saved ? JSON.parse(saved) : defaultSymptoms;
   });
   const [selectedDate, setSelectedDate] = useState(new Date());
+  
+  // Track the last date we were on - used for auto-switching at midnight
+  const lastDateKeyRef = useRef(null);
+  
+  // Check date on EVERY render - more reliable than timers on iOS
+  const currentDateKey = new Date().toISOString().split('T')[0];
+  const selectedDateKey = selectedDate.toISOString().split('T')[0];
+  
+  // If we're viewing an old date and it's now a new day, switch to today
+  if (selectedDateKey < currentDateKey && lastDateKeyRef.current !== currentDateKey) {
+    console.log('[SymptomTracker] Date changed! Switching from', selectedDateKey, 'to', currentDateKey);
+    lastDateKeyRef.current = currentDateKey;
+    // Use setTimeout to avoid state update during render
+    setTimeout(() => setSelectedDate(new Date()), 0);
+  } else if (lastDateKeyRef.current !== currentDateKey) {
+    lastDateKeyRef.current = currentDateKey;
+  }
+  
   const [entries, setEntries] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY_ENTRIES);
     return saved ? JSON.parse(saved) : {};
@@ -452,11 +471,13 @@ function SymptomTrackerMobile() {
   const [isDragging, setIsDragging] = useState(false);
   const [fingerPosition, setFingerPosition] = useState({ x: 0, y: 0 });
   const [lastAction, setLastAction] = useState('');
+  const [copyToastMessage, setCopyToastMessage] = useState('');
   const [showAddSymptom, setShowAddSymptom] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [lastUpdateCheck, setLastUpdateCheck] = useState(null);
   const [openedFromSettings, setOpenedFromSettings] = useState(false);
   const [confirmClearData, setConfirmClearData] = useState(false);
   const [confirmFullReset, setConfirmFullReset] = useState(false);
@@ -478,6 +499,12 @@ function SymptomTrackerMobile() {
   const [rapidEntryConfirm, setRapidEntryConfirm] = useState(false); // Confirm start over
   const [rapidEntryLogged, setRapidEntryLogged] = useState([]); // Track logged symptoms for back button
   const [rapidEntryIndex, setRapidEntryIndex] = useState(0); // Current symptom index in rapid entry
+  const [copyDays, setCopyDays] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_COPY_DAYS);
+    return saved ? parseInt(saved) : 3;
+  }); // Days to copy
+  const [showCopyDropdown, setShowCopyDropdown] = useState(false); // Show copy days dropdown
+  const copyLongPressTimer = useRef(null); // Timer for long press
   
   // Drag-to-reorder state
   const [draggedItem, setDraggedItem] = useState(null); // { id, type: 'symptom' | 'stack', startIndex }
@@ -813,6 +840,10 @@ function SymptomTrackerMobile() {
     localStorage.setItem(STORAGE_KEY_PINNED, JSON.stringify([...pinnedSymptoms]));
   }, [pinnedSymptoms]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_COPY_DAYS, copyDays.toString());
+  }, [copyDays]);
+
   // Auto-sync to cloud when data changes (debounced)
   const syncTimeoutRef = useRef(null);
   const lastSyncDataRef = useRef('');
@@ -905,6 +936,9 @@ function SymptomTrackerMobile() {
     };
   }, [isDragging]);
 
+  // Track which date we last auto-copied stack for (to prevent duplicates)
+  const lastAutoCopiedDateRef = useRef(null);
+
   // Auto-copy yesterday's stack when viewing today with no entries
   useEffect(() => {
     const todayKey = getDateKey(new Date());
@@ -913,9 +947,16 @@ function SymptomTrackerMobile() {
     // Only auto-copy if we're viewing today
     if (selectedKey !== todayKey) return;
     
-    // Check if today has any stack entries
+    // Don't copy if we already copied for today
+    if (lastAutoCopiedDateRef.current === todayKey) return;
+    
+    // Check if today has any stack entries already
     const hasTodayEntries = Object.keys(stackEntries).some(key => key.startsWith(todayKey + '-'));
-    if (hasTodayEntries) return;
+    if (hasTodayEntries) {
+      // Mark as "copied" so we don't keep checking
+      lastAutoCopiedDateRef.current = todayKey;
+      return;
+    }
     
     // Get yesterday's entries
     const yesterday = new Date();
@@ -923,7 +964,10 @@ function SymptomTrackerMobile() {
     const yesterdayKey = getDateKey(yesterday);
     
     const activeItems = stackItems.filter(item => item.active);
-    if (activeItems.length === 0) return;
+    if (activeItems.length === 0) {
+      lastAutoCopiedDateRef.current = todayKey;
+      return;
+    }
     
     // Copy yesterday's taken items to today
     const newEntries = { ...stackEntries };
@@ -943,41 +987,77 @@ function SymptomTrackerMobile() {
       }
     });
     
+    // Mark that we've processed today (whether we copied or not)
+    lastAutoCopiedDateRef.current = todayKey;
+    
     if (copiedCount > 0) {
+      console.log('[SymptomTracker] Auto-copied', copiedCount, 'stack items from yesterday');
       setStackEntries(newEntries);
       setLastAction(`Auto-copied ${copiedCount} items from yesterday`);
     }
-  }, [selectedDate, stackItems]); // Only depend on date and items, not entries to avoid loops
+  }, [selectedDate, stackItems, stackEntries, getDateKey]);
 
-  // Midnight check - auto-switch to today when date changes
+  // Backup midnight check using timers (primary check is render-based above)
   useEffect(() => {
-    const checkMidnight = () => {
-      const now = new Date();
-      const currentDateKey = getDateKey(now);
-      const selectedKey = getDateKey(selectedDate);
-      
-      // If we're viewing yesterday (or earlier) and it's now a new day, switch to today
-      if (selectedKey < currentDateKey) {
+    // Force a re-render periodically to trigger the render-based date check
+    const forceUpdate = () => {
+      // Reading selectedDate triggers the render-based check
+      const nowKey = new Date().toISOString().split('T')[0];
+      const selKey = selectedDate.toISOString().split('T')[0];
+      if (selKey < nowKey) {
+        console.log('[SymptomTracker] Timer-based midnight check triggered update');
         setSelectedDate(new Date());
       }
     };
     
-    // Check every minute
-    const interval = setInterval(checkMidnight, 60000);
+    // Check every 30 seconds
+    const interval = setInterval(forceUpdate, 30000);
     
     // Also check on visibility change (when app becomes visible)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        checkMidnight();
+        console.log('[SymptomTracker] App became visible');
+        forceUpdate();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
     
+    // pageshow event - fires when page is restored from bfcache
+    const handlePageShow = (e) => {
+      if (e.persisted) {
+        console.log('[SymptomTracker] Page restored from cache');
+        forceUpdate();
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    
+    // Focus event
+    const handleFocus = () => {
+      console.log('[SymptomTracker] Window focused');
+      forceUpdate();
+    };
+    window.addEventListener('focus', handleFocus);
+    
+    // Touch event - fires on first interaction (good for iOS PWA)
+    let touchChecked = false;
+    const handleTouch = () => {
+      if (!touchChecked) {
+        touchChecked = true;
+        forceUpdate();
+        // Reset after a delay so we check again on next session
+        setTimeout(() => { touchChecked = false; }, 60000);
+      }
+    };
+    document.addEventListener('touchstart', handleTouch, { passive: true });
+    
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('touchstart', handleTouch);
     };
-  }, [selectedDate, getDateKey]);
+  }, [selectedDate]);
 
   // Keyboard shortcuts for rapid entry mode
   useEffect(() => {
@@ -1007,6 +1087,11 @@ function SymptomTrackerMobile() {
             setRapidEntryMode(false);
             setRapidEntryIndex(0);
             setLastAction(`⚡ Rapid entry complete`);
+          } else {
+            // Reset index if it would go out of bounds after logging
+            if (rapidEntryIndex >= incompleteSymptoms.length - 1) {
+              setRapidEntryIndex(0);
+            }
           }
         }
       }
@@ -1016,8 +1101,8 @@ function SymptomTrackerMobile() {
         setRapidEntryIndex(0);
         setRapidEntryConfirm(false);
       }
-      // Backspace or Left arrow to undo
-      else if ((e.key === 'Backspace' || e.key === 'ArrowLeft') && rapidEntryLogged.length > 0) {
+      // Backspace or Z to undo
+      else if ((e.key === 'z' || e.key === 'Z') && rapidEntryLogged.length > 0) {
         e.preventDefault();
         const lastLogged = rapidEntryLogged[rapidEntryLogged.length - 1];
         const dateKey = selectedDate.toISOString().split('T')[0];
@@ -1032,11 +1117,12 @@ function SymptomTrackerMobile() {
         
         setRapidEntryLogged(prev => prev.slice(0, -1));
       }
-      // Right arrow or Space to skip/close
+      // Right arrow or Space to skip to next symptom
       else if (e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault();
-        setRapidEntryMode(false);
-        setRapidEntryIndex(0);
+        if (incompleteSymptoms.length > 1) {
+          setRapidEntryIndex(prev => (prev + 1) % incompleteSymptoms.length);
+        }
       }
     };
     
@@ -2488,106 +2574,193 @@ function SymptomTrackerMobile() {
     };
   };
 
-  const generateAIPrompt = (insights, topCluster, daysOfData, windowDays) => {
-    let prompt = `Analyze my symptom tracking data. Be cautious and avoid prescriptive medical advice.\n\n`;
-    
-    if (insights.length > 0) {
-      prompt += `Significant changes (last ${windowDays} days vs prior ${windowDays} days):\n`;
-      insights.forEach(i => {
-        prompt += `• ${i.name}: ${i.percentChange > 0 ? '+' : ''}${i.percentChange}% (${i.direction})\n`;
-      });
-    }
-    
-    if (topCluster) {
-      prompt += `\nFrequent co-occurrence (${topCluster.percent}% of days):\n`;
-      prompt += `• "${topCluster.names[0]}" often appears with "${topCluster.names[1]}"\n`;
-    }
-    
-    // Add last 60 days of raw data
-    const sixtyDaysAgo = new Date();
-    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-    
-    const recentEntries = Object.values(entries)
-      .filter(e => new Date(e.date) >= sixtyDaysAgo)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    
-    if (recentEntries.length > 0) {
-      prompt += `\n\n--- RAW DATA (Last 60 days) ---\n`;
-      prompt += `Date,Symptom,Time,Severity\n`;
-      recentEntries.forEach(e => {
-        const symptomName = symptoms.find(s => s.id === e.symptomId)?.name || e.symptomId;
-        const timePeriod = timePeriods.find(t => t.id === e.time)?.label || e.time;
-        prompt += `${e.date},${symptomName},${timePeriod},${e.severity}\n`;
-      });
-    }
-    
-    // Add stack data for last 60 days
-    const recentStackEntries = Object.values(stackEntries)
-      .filter(e => {
-        const entryDate = new Date(e.date);
-        return entryDate >= sixtyDaysAgo;
-      })
-      .sort((a, b) => b.date.localeCompare(a.date));
-    
-    if (recentStackEntries.length > 0) {
-      prompt += `\n--- SUPPLEMENT DATA (Last 60 days) ---\n`;
-      prompt += `Date,Supplement,Dose,Taken\n`;
-      recentStackEntries.forEach(e => {
-        const item = stackItems.find(i => i.id === e.itemId);
-        if (item) {
-          prompt += `${e.date},${item.name},${e.dose}${item.unit},${e.taken ? 'yes' : 'no'}\n`;
-        }
-      });
-    }
-    
-    prompt += `\n--- END DATA ---\n\nPlease identify potential patterns, correlations between symptoms and supplements, and what might be worth discussing with a healthcare provider.`;
-    
-    return prompt;
-  };
-
-  // Generate AI-ready data export for a specific number of days
+  // Generate AI-ready data export for a specific number of days (markdown tables)
   const generateAIDataExport = (days) => {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
     
-    let prompt = `Analyze my health tracking data from the last ${days} days. Be cautious and avoid prescriptive medical advice.\n\n`;
+    let output = `# Health Tracking Data (Last ${days} days)\n\n`;
     
-    // Symptom data
-    const recentEntries = Object.values(entries)
-      .filter(e => new Date(e.date) >= cutoffDate)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    
-    if (recentEntries.length > 0) {
-      prompt += `--- SYMPTOM DATA (Last ${days} days) ---\n`;
-      prompt += `Date,Symptom,Time,Severity (0-5)\n`;
-      recentEntries.forEach(e => {
-        const symptomName = symptoms.find(s => s.id === e.symptomId)?.name || e.symptomId;
-        const timePeriod = timePeriods.find(t => t.id === e.time)?.label || e.time;
-        prompt += `${e.date},${symptomName},${timePeriod},${e.severity}\n`;
-      });
-    } else {
-      prompt += `No symptom data in the last ${days} days.\n`;
+    // Get all dates in range (most recent first)
+    const dates = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      dates.push(getDateKey(d));
     }
     
-    // Supplement data
-    const recentStackEntries = Object.values(stackEntries)
-      .filter(e => new Date(e.date) >= cutoffDate)
-      .sort((a, b) => b.date.localeCompare(a.date));
+    // Get relevant entries
+    const recentEntries = Object.values(entries)
+      .filter(e => new Date(e.date) >= cutoffDate);
     
+    // Build symptom table
+    if (recentEntries.length > 0) {
+      output += `## Symptoms\n\n`;
+      
+      // Get unique symptoms that have entries
+      const symptomIds = [...new Set(recentEntries.map(e => e.symptomId))];
+      const symptomNames = symptomIds.map(id => {
+        const s = symptoms.find(s => s.id === id);
+        return s ? s.name : id;
+      });
+      
+      // Check if we need AM/PM columns
+      const hasTimePeriods = trackingMode === 'ampm';
+      
+      if (hasTimePeriods) {
+        // Header with AM/PM for each symptom
+        output += `| Date |`;
+        symptomNames.forEach(name => {
+          output += ` ${name} AM | ${name} PM |`;
+        });
+        output += `\n`;
+        
+        // Separator
+        output += `|------|`;
+        symptomNames.forEach(() => {
+          output += `:---:|:---:|`;
+        });
+        output += `\n`;
+        
+        // Data rows
+        dates.forEach(dateKey => {
+          const dateEntries = recentEntries.filter(e => e.date === dateKey);
+          if (dateEntries.length > 0) {
+            const shortDate = dateKey.slice(5); // MM-DD
+            output += `| ${shortDate} |`;
+            symptomIds.forEach(symptomId => {
+              const amEntry = dateEntries.find(e => e.symptomId === symptomId && e.time === 'morning');
+              const pmEntry = dateEntries.find(e => e.symptomId === symptomId && e.time === 'evening');
+              output += ` ${amEntry ? amEntry.severity : '-'} | ${pmEntry ? pmEntry.severity : '-'} |`;
+            });
+            output += `\n`;
+          }
+        });
+      } else {
+        // Simple header without time periods
+        output += `| Date |`;
+        symptomNames.forEach(name => {
+          output += ` ${name} |`;
+        });
+        output += `\n`;
+        
+        // Separator
+        output += `|------|`;
+        symptomNames.forEach(() => {
+          output += `:---:|`;
+        });
+        output += `\n`;
+        
+        // Data rows
+        dates.forEach(dateKey => {
+          const dateEntries = recentEntries.filter(e => e.date === dateKey);
+          if (dateEntries.length > 0) {
+            const shortDate = dateKey.slice(5); // MM-DD
+            output += `| ${shortDate} |`;
+            symptomIds.forEach(symptomId => {
+              const entry = dateEntries.find(e => e.symptomId === symptomId);
+              output += ` ${entry ? entry.severity : '-'} |`;
+            });
+            output += `\n`;
+          }
+        });
+      }
+      
+      output += `\n*Severity scale: 0=None, 1=Minimal, 2=Mild, 3=Moderate, 4=Significant, 5=Severe*\n\n`;
+    } else {
+      output += `## Symptoms\n\nNo symptom data recorded.\n\n`;
+    }
+    
+    // Get relevant stack entries
+    const recentStackEntries = Object.values(stackEntries)
+      .filter(e => new Date(e.date) >= cutoffDate);
+    
+    // Build supplement table
     if (recentStackEntries.length > 0) {
-      prompt += `\n--- SUPPLEMENT DATA (Last ${days} days) ---\n`;
-      prompt += `Date,Supplement,Dose,Taken\n`;
-      recentStackEntries.forEach(e => {
-        const item = stackItems.find(i => i.id === e.itemId);
-        if (item) {
-          prompt += `${e.date},${item.name},${e.dose}${item.unit},${e.taken ? 'yes' : 'no'}\n`;
+      output += `## Supplements\n\n`;
+      
+      // Get unique supplements that have entries
+      const itemIds = [...new Set(recentStackEntries.map(e => e.itemId))];
+      const itemData = itemIds.map(id => {
+        const item = stackItems.find(i => i.id === id);
+        return item ? { id, name: item.name, unit: item.unit } : { id, name: id, unit: '' };
+      });
+      
+      // Header
+      output += `| Date |`;
+      itemData.forEach(item => {
+        output += ` ${item.name} |`;
+      });
+      output += `\n`;
+      
+      // Separator
+      output += `|------|`;
+      itemData.forEach(() => {
+        output += `:---:|`;
+      });
+      output += `\n`;
+      
+      // Data rows
+      dates.forEach(dateKey => {
+        const dateEntries = recentStackEntries.filter(e => e.date === dateKey);
+        if (dateEntries.length > 0) {
+          const shortDate = dateKey.slice(5); // MM-DD
+          output += `| ${shortDate} |`;
+          itemData.forEach(item => {
+            const entry = dateEntries.find(e => e.itemId === item.id);
+            if (entry && entry.taken) {
+              const multiplier = entry.multiplier && entry.multiplier !== 1 ? `${entry.multiplier}×` : '';
+              output += ` ${multiplier}${entry.dose}${item.unit} |`;
+            } else if (entry && !entry.taken) {
+              output += ` ✗ |`;
+            } else {
+              output += ` - |`;
+            }
+          });
+          output += `\n`;
         }
       });
+      
+      output += `\n*✗ = skipped, - = no data*\n\n`;
     } else {
-      prompt += `\nNo supplement data in the last ${days} days.\n`;
+      output += `## Supplements\n\nNo supplement data recorded.\n\n`;
     }
     
-    prompt += `\n--- END DATA ---\n\nPlease identify potential patterns, correlations between symptoms and supplements, and what might be worth discussing with a healthcare provider.`;
+    // Add daily notes if any
+    const notesInRange = dates
+      .filter(dateKey => dailyNotes[dateKey])
+      .map(dateKey => ({ date: dateKey, note: dailyNotes[dateKey] }));
+    
+    if (notesInRange.length > 0) {
+      output += `## Notes\n\n`;
+      notesInRange.forEach(({ date, note }) => {
+        output += `**${date}:** ${note}\n\n`;
+      });
+    }
+    
+    output += `---\n*Exported ${new Date().toISOString().split('T')[0]}*`;
+    
+    return output;
+  };
+
+  const generateAIPrompt = (insights, topCluster, daysOfData, windowDays) => {
+    let prompt = `# Symptom Analysis Summary\n\n`;
+    
+    if (insights.length > 0) {
+      prompt += `## Significant Changes (last ${windowDays} days vs prior)\n\n`;
+      insights.forEach(i => {
+        prompt += `- **${i.name}**: ${i.percentChange > 0 ? '+' : ''}${i.percentChange}% (${i.direction})\n`;
+      });
+      prompt += `\n`;
+    }
+    
+    if (topCluster) {
+      prompt += `## Frequent Co-occurrence (${topCluster.percent}% of days)\n\n`;
+      prompt += `"${topCluster.names[0]}" often appears with "${topCluster.names[1]}"\n\n`;
+    }
+    
+    // Use the markdown table generator for raw data (60 days)
+    prompt += generateAIDataExport(60);
     
     return prompt;
   };
@@ -2596,7 +2769,18 @@ function SymptomTrackerMobile() {
     const data = generateAIDataExport(days);
     navigator.clipboard.writeText(data);
     closeExport();
-    setLastAction(`Copied ${days} days for AI analysis`);
+    setCopyToastMessage(`Copied ${days} days to clipboard`);
+    haptic('light');
+    setTimeout(() => setCopyToastMessage(''), 1500);
+  };
+
+  // Quick copy from main screen using selected days
+  const quickCopyData = () => {
+    const data = generateAIDataExport(copyDays);
+    navigator.clipboard.writeText(data);
+    setCopyToastMessage(`Copied ${copyDays} day${copyDays > 1 ? 's' : ''} to clipboard`);
+    haptic('light');
+    setTimeout(() => setCopyToastMessage(''), 1500);
   };
 
   // Copy today's symptoms and stack for AI
@@ -3076,6 +3260,11 @@ function SymptomTrackerMobile() {
                           setRapidEntryMode(false);
                           setRapidEntryIndex(0);
                           setLastAction(`⚡ Rapid entry complete`);
+                        } else {
+                          // Keep index in bounds (list shrinks by 1 after logging)
+                          if (rapidEntryIndex >= incompleteSymptoms.length - 1) {
+                            setRapidEntryIndex(0);
+                          }
                         }
                       }}
                       style={{
@@ -3142,40 +3331,37 @@ function SymptomTrackerMobile() {
                   }}
                 >
                   ← Undo
-                  {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>⌫</span>}
+                  {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>Z</span>}
                 </button>
                 
-                {/* Skip/Close button */}
+                {/* Skip button */}
                 <button
-                onClick={() => {
-                  if (incompleteSymptoms.length > 1) {
-                    // Move current to end by skipping - but since list is dynamic, just close if only one left
-                    setRapidEntryMode(false);
-                    setRapidEntryIndex(0);
-                  } else {
-                    setRapidEntryMode(false);
-                    setRapidEntryIndex(0);
-                  }
-                }}
-                style={{
-                  padding: '12px 32px',
-                  background: 'rgba(100, 116, 139, 0.1)',
-                  border: '1px solid rgba(100, 116, 139, 0.3)',
-                  borderRadius: '5px',
-                  color: '#94a3b8',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Skip / Close
-                {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>Space</span>}
-              </button>
+                  onClick={() => {
+                    if (incompleteSymptoms.length > 1) {
+                      setRapidEntryIndex(prev => (prev + 1) % incompleteSymptoms.length);
+                    }
+                  }}
+                  disabled={incompleteSymptoms.length <= 1}
+                  style={{
+                    padding: '12px 24px',
+                    background: incompleteSymptoms.length > 1 ? 'rgba(100, 116, 139, 0.1)' : 'rgba(50, 50, 70, 0.2)',
+                    border: '1px solid rgba(100, 116, 139, 0.3)',
+                    borderRadius: '5px',
+                    color: incompleteSymptoms.length > 1 ? '#94a3b8' : '#475569',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: incompleteSymptoms.length > 1 ? 'pointer' : 'default',
+                    opacity: incompleteSymptoms.length > 1 ? 1 : 0.5,
+                  }}
+                >
+                  Skip →
+                  {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>Space</span>}
+                </button>
               </div>
               
               {/* Counter - shows completed / total */}
               <div style={{ color: '#64748b', fontSize: '14px' }}>
-                {totalActiveSymptoms - incompleteSymptoms.length} of {totalActiveSymptoms} logged • {incompleteSymptoms.length} remaining
+                {totalActiveSymptoms - incompleteSymptoms.length} of {totalActiveSymptoms} logged
               </div>
             </div>
           ) : (
@@ -3254,6 +3440,121 @@ function SymptomTrackerMobile() {
 
           {/* Right side buttons group */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Quick Copy Button with long-press dropdown */}
+            {appMode === 'symptoms' && (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onTouchStart={(e) => {
+                    copyLongPressTimer.current = setTimeout(() => {
+                      copyLongPressTimer.current = 'longpress';
+                      setShowCopyDropdown(true);
+                      haptic('medium');
+                    }, 500);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault(); // Prevent click from firing
+                    if (copyLongPressTimer.current && copyLongPressTimer.current !== 'longpress') {
+                      clearTimeout(copyLongPressTimer.current);
+                      // Short tap - copy data
+                      quickCopyData();
+                    }
+                    copyLongPressTimer.current = null;
+                  }}
+                  onTouchCancel={() => {
+                    if (copyLongPressTimer.current && copyLongPressTimer.current !== 'longpress') {
+                      clearTimeout(copyLongPressTimer.current);
+                    }
+                    copyLongPressTimer.current = null;
+                  }}
+                  onClick={(e) => {
+                    // For mouse clicks (desktop only - touch devices use touchEnd)
+                    if (e.nativeEvent.pointerType === 'mouse' || (!('ontouchstart' in window) && !showCopyDropdown)) {
+                      quickCopyData();
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    // Right-click on desktop shows dropdown
+                    e.preventDefault();
+                    setShowCopyDropdown(true);
+                  }}
+                  style={{
+                    background: 'rgba(34, 197, 94, 0.15)',
+                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                    borderRadius: '5px',
+                    minWidth: '40px',
+                    height: '40px',
+                    color: '#4ade80',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 10px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                  }}
+                  title={`Copy last ${copyDays} days to clipboard (hold for options)`}
+                >
+                  {copyDays}d
+                </button>
+                
+                {/* Dropdown for selecting days */}
+                {showCopyDropdown && (
+                  <>
+                    <div 
+                      onClick={() => setShowCopyDropdown(false)}
+                      style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 199,
+                      }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '4px',
+                      background: 'rgba(30, 27, 75, 0.98)',
+                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                      zIndex: 200,
+                      overflow: 'hidden',
+                      minWidth: '100px',
+                    }}>
+                      {[1, 3, 7, 14].map(days => (
+                        <button
+                          key={days}
+                          onClick={() => {
+                            setCopyDays(days);
+                            setShowCopyDropdown(false);
+                            haptic('light');
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '12px 16px',
+                            background: days === copyDays ? 'rgba(34, 197, 94, 0.2)' : 'transparent',
+                            border: 'none',
+                            borderBottom: days !== 14 ? '1px solid rgba(100, 116, 139, 0.15)' : 'none',
+                            color: days === copyDays ? '#4ade80' : '#e2e8f0',
+                            fontSize: '14px',
+                            fontWeight: days === copyDays ? '600' : '400',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <span>{days} day{days > 1 ? 's' : ''}</span>
+                          {days === copyDays && <span style={{ color: '#4ade80' }}>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            
             {/* Rapid Entry Button */}
             {appMode === 'symptoms' && (
               <button
@@ -3462,6 +3763,7 @@ function SymptomTrackerMobile() {
                     : 'rgba(30, 27, 75, 0.6)',
                   borderRadius: '5px',
                   padding: '12px 16px',
+                  minHeight: '52px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -3834,6 +4136,7 @@ function SymptomTrackerMobile() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  gap: '12px',
                   border: isTaken 
                     ? multiplier > 1
                       ? '1px solid rgba(139, 92, 246, 0.4)'  // Purple border for multiplied
@@ -3844,8 +4147,112 @@ function SymptomTrackerMobile() {
                 }}
                 onClick={() => !isEditing && toggleStackItem(item.id)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                  {/* Multiplier button - more prominent */}
+                {/* Left side: checkbox + name */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                  {/* Checkbox */}
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '3px',
+                    background: isTaken ? '#22c55e' : 'rgba(100, 116, 139, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isTaken ? '#fff' : '#64748b',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    flexShrink: 0,
+                  }}>
+                    {isTaken ? '✓' : ''}
+                  </div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                    <span style={{
+                      color: isTaken ? '#e2e8f0' : '#94a3b8',
+                      fontSize: '15px',
+                      fontWeight: '500',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>{item.name}</span>
+                    {multiplier > 1 && (
+                      <span style={{
+                        color: '#a78bfa',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                      }}>
+                        {multiplier}× dose today
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Right side: dose + multiplier */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  {isEditing ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                         onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        defaultValue={entry?.dose || item.defaultDose}
+                        autoFocus
+                        style={{
+                          width: '60px',
+                          background: 'rgba(99, 102, 241, 0.15)',
+                          border: '2px solid rgba(99, 102, 241, 0.5)',
+                          borderRadius: '3px',
+                          padding: '8px 10px',
+                          color: '#f8fafc',
+                          fontSize: '16px',
+                          fontWeight: '600',
+                          textAlign: 'center',
+                          outline: 'none',
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            updateStackDose(item.id, e.target.value);
+                          } else if (e.key === 'Escape') {
+                            setEditingStackItem(null);
+                          }
+                        }}
+                        onBlur={(e) => updateStackDose(item.id, e.target.value)}
+                      />
+                      <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>{item.unit}</span>
+                    </div>
+                  ) : (
+                    <div 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'baseline', 
+                        gap: '4px',
+                        padding: '4px 8px',
+                        borderRadius: '3px',
+                        background: isTaken ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingStackItem(item.id);
+                      }}
+                    >
+                      <span style={{
+                        color: isTaken ? '#4ade80' : '#64748b',
+                        fontSize: '15px',
+                        fontWeight: '600',
+                      }}>
+                        {entry?.dose || item.defaultDose}
+                      </span>
+                      <span style={{
+                        color: isTaken ? '#4ade80' : '#64748b',
+                        fontSize: '11px',
+                      }}>
+                        {item.unit}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Multiplier button - far right */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -3896,104 +4303,7 @@ function SymptomTrackerMobile() {
                   >
                     {multiplier}x
                   </button>
-                  
-                  {/* Checkbox */}
-                  <div style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '3px',
-                    background: isTaken ? '#22c55e' : 'rgba(100, 116, 139, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isTaken ? '#fff' : '#64748b',
-                    fontSize: '14px',
-                    fontWeight: '700',
-                    flexShrink: 0,
-                  }}>
-                    {isTaken ? '✓' : ''}
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{
-                      color: isTaken ? '#e2e8f0' : '#94a3b8',
-                      fontSize: '15px',
-                      fontWeight: '500',
-                    }}>{item.name}</span>
-                    {multiplier > 1 && (
-                      <span style={{
-                        color: '#a78bfa',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                      }}>
-                        {multiplier}× dose today
-                      </span>
-                    )}
-                  </div>
                 </div>
-                
-                {isEditing ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                       onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      defaultValue={entry?.dose || item.defaultDose}
-                      autoFocus
-                      style={{
-                        width: '60px',
-                        background: 'rgba(99, 102, 241, 0.15)',
-                        border: '2px solid rgba(99, 102, 241, 0.5)',
-                        borderRadius: '3px',
-                        padding: '8px 10px',
-                        color: '#f8fafc',
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        textAlign: 'center',
-                        outline: 'none',
-                      }}
-                      onFocus={(e) => e.target.select()}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          updateStackDose(item.id, e.target.value);
-                        } else if (e.key === 'Escape') {
-                          setEditingStackItem(null);
-                        }
-                      }}
-                      onBlur={(e) => updateStackDose(item.id, e.target.value)}
-                    />
-                    <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>{item.unit}</span>
-                  </div>
-                ) : (
-                  <div 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'baseline', 
-                      gap: '4px',
-                      padding: '4px 8px',
-                      borderRadius: '3px',
-                      background: isTaken ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingStackItem(item.id);
-                    }}
-                  >
-                    <span style={{
-                      color: isTaken ? '#4ade80' : '#64748b',
-                      fontSize: '15px',
-                      fontWeight: '600',
-                    }}>
-                      {entry?.dose || item.defaultDose}
-                    </span>
-                    <span style={{
-                      color: isTaken ? '#4ade80' : '#64748b',
-                      fontSize: '11px',
-                    }}>
-                      {item.unit}
-                    </span>
-                  </div>
-                )}
               </div>
             );
           })}
@@ -4047,6 +4357,27 @@ function SymptomTrackerMobile() {
           </svg>
           Note
         </button>
+      )}
+
+      {/* Copy Toast Notification */}
+      {copyToastMessage && (
+        <div style={{
+          position: 'fixed',
+          bottom: '100px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(16, 185, 129, 0.95)',
+          color: '#fff',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontWeight: '500',
+          zIndex: 300,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          animation: 'fadeInOut 1.5s ease-in-out',
+        }}>
+          {copyToastMessage}
+        </div>
       )}
 
       {/* Bottom Tab Bar */}
@@ -5113,9 +5444,9 @@ function SymptomTrackerMobile() {
               </button>
             </div>
             
-            {/* Copy for AI Section */}
+            {/* Copy to Clipboard Section */}
             <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
-              COPY FOR AI
+              COPY TO CLIPBOARD
             </div>
             <div style={{
               background: 'rgba(30, 27, 75, 0.5)',
@@ -5155,13 +5486,13 @@ function SymptomTrackerMobile() {
                 margin: '12px 0 0 0',
                 textAlign: 'center',
               }}>
-                Copies symptoms + supplements data to clipboard
+                Copies as markdown tables
               </p>
             </div>
             
-            {/* CSV Export Section */}
+            {/* Download CSV Section */}
             <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
-              DOWNLOAD CSV
+              DOWNLOAD TRACKING DATA
             </div>
             <div style={{
               background: 'rgba(30, 27, 75, 0.5)',
@@ -5366,7 +5697,9 @@ function SymptomTrackerMobile() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(data.aiPrompt);
-                      setLastAction('Copied — paste into Claude for AI analysis');
+                      setCopyToastMessage('Copied 60 days to clipboard');
+                      haptic('light');
+                      setTimeout(() => setCopyToastMessage(''), 1500);
                     }}
                     style={{
                       width: '100%',
@@ -5382,8 +5715,8 @@ function SymptomTrackerMobile() {
                       marginBottom: '20px',
                     }}
                   >
-                    <span style={{ fontSize: '20px', marginRight: '8px' }}>🤖</span>
-                    Copy for AI Analysis
+                    <span style={{ fontSize: '20px', marginRight: '8px' }}>📋</span>
+                    Copy Tracking Data
                   </button>
 
                   <p style={{
@@ -5884,7 +6217,7 @@ function SymptomTrackerMobile() {
                   alignItems: 'center',
                 }}
               >
-                <span>Export CSV</span>
+                <span>Export & Copy</span>
                 <span style={{ color: '#64748b' }}>›</span>
               </button>
             </div>
@@ -6213,17 +6546,20 @@ function SymptomTrackerMobile() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
                 <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>
-                  3.3.7 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                  3.3.10 • {isStandalone() ? 'Home Screen App' : 'Browser'}
                 </div>
               </div>
               <button
                 onClick={() => {
+                  // Clear caches to get fresh version on next load
                   if ('caches' in window) {
                     caches.keys().then(names => {
                       names.forEach(name => caches.delete(name));
                     });
                   }
-                  window.location.reload(true);
+                  // Record check time
+                  setLastUpdateCheck(new Date());
+                  haptic('light');
                 }}
                 style={{
                   width: '100%',
@@ -6236,7 +6572,14 @@ function SymptomTrackerMobile() {
                   textAlign: 'left',
                 }}
               >
-                Check for Updates
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Check for Updates</span>
+                  {lastUpdateCheck && (
+                    <span style={{ color: '#64748b', fontSize: '12px' }}>
+                      {lastUpdateCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
               </button>
             </div>
             
@@ -6679,6 +7022,12 @@ function SymptomTrackerMobile() {
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes fadeInOut {
+          0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+          15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
         }
         @keyframes popIn {
           0% { transform: scale(0); opacity: 0; }
