@@ -1,4 +1,4 @@
-# Symptom Tracker v3.3.15
+# Symptom Tracker v3.3.17
 
 A mobile-first health tracking PWA for symptoms and supplements with cloud sync.
 
@@ -95,6 +95,14 @@ npx serve .
 ---
 
 ## Changelog
+
+### v3.3.17 (2024-12-17)
+- **Removed full-screen completion modal**: All completions now use toast notifications only
+  - Prevents app from hanging when completion triggers
+  - Shows "✓ Morning complete!" or "✓ All symptoms logged!" toast
+
+### v3.3.16 (2024-12-17)
+- **Check for Updates feedback fix**: Now stays on Settings page and shows toast after reload
 
 ### v3.3.15 (2024-12-17)
 - **Last recorded fix (complete)**: Now correctly shows this morning's value when logging PM

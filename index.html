@@ -500,7 +500,6 @@ function SymptomTrackerMobile() {
   const [historySort, setHistorySort] = useState({ column: 'date', direction: 'desc' });
   const [symptomSearch, setSymptomSearch] = useState('');
   const [searchVisible, setSearchVisible] = useState(false); // Hidden by default
-  const [showCompletion, setShowCompletion] = useState(false); // Completion animation
   const [showRapidComplete, setShowRapidComplete] = useState(false); // Rapid entry completion toast
   const [lastDeletedEntry, setLastDeletedEntry] = useState(null); // For undo functionality
   const [isLoading, setIsLoading] = useState(false); // For loading states
@@ -651,11 +650,13 @@ function SymptomTrackerMobile() {
     // 2. We have active symptoms
     // 3. User just logged a symptom (not navigating dates)
     if (prevCount > 0 && currentCount === 0 && totalActiveSymptoms > 0 && justLoggedRef.current && !dateChanged) {
-      setShowCompletion(true);
-      // Auto-hide after 2 seconds
-      const timer = setTimeout(() => setShowCompletion(false), 2000);
+      // Show toast notification instead of full-screen modal
+      const message = trackingMode === 'ampm' 
+        ? `✓ ${quickLogTime === 'morning' ? 'Morning' : 'Evening'} complete!`
+        : '✓ All symptoms logged!';
+      setCopyToastMessage(message);
+      setTimeout(() => setCopyToastMessage(''), 3000);
       justLoggedRef.current = false;
-      return () => clearTimeout(timer);
     }
     
     // Reset the flag if date changed
@@ -665,7 +666,7 @@ function SymptomTrackerMobile() {
     
     prevIncompleteRef.current = currentCount;
     prevDateRef.current = selectedDate.toISOString();
-  }, [incompleteSymptoms.length, totalActiveSymptoms, selectedDate]);
+  }, [incompleteSymptoms.length, totalActiveSymptoms, selectedDate, trackingMode, quickLogTime]);
   
   // Helper to mark that user just logged
   const markJustLogged = useCallback(() => {
@@ -835,7 +836,13 @@ function SymptomTrackerMobile() {
     const justChecked = sessionStorage.getItem('justCheckedForUpdates');
     if (justChecked) {
       sessionStorage.removeItem('justCheckedForUpdates');
-      setLastAction('✓ App is up to date');
+      // Stay on settings page and show toast
+      setShowSettings(true);
+      // Small delay to ensure settings is shown first
+      setTimeout(() => {
+        setCopyToastMessage('✓ App is up to date');
+        setTimeout(() => setCopyToastMessage(''), 3000);
+      }, 100);
     }
   }, []);
 
@@ -3049,49 +3056,6 @@ function SymptomTrackerMobile() {
         bottom: 0,
       }}
     >
-      {/* COMPLETION CELEBRATION */}
-      {showCompletion && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(12, 10, 29, 0.95)',
-          zIndex: 1100,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: '16px',
-          animation: 'fadeIn 0.3s ease',
-        }}>
-          <div style={{
-            fontSize: '64px',
-            animation: 'popIn 0.4s ease',
-          }}>
-            ✓
-          </div>
-          <div style={{
-            color: '#10b981',
-            fontSize: '24px',
-            fontWeight: '700',
-            textAlign: 'center',
-          }}>
-            All done!
-          </div>
-          <div style={{
-            color: '#94a3b8',
-            fontSize: '14px',
-          }}>
-            {trackingMode === 'ampm' 
-              ? `${quickLogTime === 'morning' ? 'Morning' : 'Evening'} symptoms logged`
-              : 'All symptoms logged for today'
-            }
-          </div>
-        </div>
-      )}
-
       {/* RAPID ENTRY MODE - Full screen overlay */}
       {rapidEntryMode && (
         <div style={{
@@ -4510,9 +4474,8 @@ function SymptomTrackerMobile() {
           borderRadius: '8px',
           fontSize: '14px',
           fontWeight: '500',
-          zIndex: 300,
+          zIndex: 2000,
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-          animation: 'fadeInOut 1.5s ease-in-out',
         }}>
           {copyToastMessage}
         </div>
@@ -6770,7 +6733,7 @@ function SymptomTrackerMobile() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
                 <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>
-                  3.3.15 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                  3.3.17 • {isStandalone() ? 'Home Screen App' : 'Browser'}
                 </div>
               </div>
               <button
