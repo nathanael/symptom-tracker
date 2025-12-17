@@ -407,21 +407,28 @@ function SymptomTrackerMobile() {
   });
   const [selectedDate, setSelectedDate] = useState(new Date());
   
-  // Track the last date we were on - used for auto-switching at midnight
-  const lastDateKeyRef = useRef(null);
+  // Track the last CURRENT date we saw - used for detecting midnight
+  const lastCurrentDateRef = useRef(null);
   
-  // Check date on EVERY render - more reliable than timers on iOS
+  // Check if the actual calendar day has changed (midnight passed)
   const currentDateKey = new Date().toISOString().split('T')[0];
-  const selectedDateKey = selectedDate.toISOString().split('T')[0];
   
-  // If we're viewing an old date and it's now a new day, switch to today
-  if (selectedDateKey < currentDateKey && lastDateKeyRef.current !== currentDateKey) {
-    console.log('[SymptomTracker] Date changed! Switching from', selectedDateKey, 'to', currentDateKey);
-    lastDateKeyRef.current = currentDateKey;
-    // Use setTimeout to avoid state update during render
-    setTimeout(() => setSelectedDate(new Date()), 0);
-  } else if (lastDateKeyRef.current !== currentDateKey) {
-    lastDateKeyRef.current = currentDateKey;
+  // Only switch to today if midnight actually passed (currentDateKey changed since last check)
+  // AND we were viewing the previous "today" (not intentionally viewing a past date)
+  if (lastCurrentDateRef.current !== null && lastCurrentDateRef.current !== currentDateKey) {
+    const selectedDateKey = selectedDate.toISOString().split('T')[0];
+    // Only auto-switch if user was viewing the OLD today (not browsing history)
+    if (selectedDateKey === lastCurrentDateRef.current) {
+      console.log('[SymptomTracker] Midnight passed! Switching from', lastCurrentDateRef.current, 'to', currentDateKey);
+      lastCurrentDateRef.current = currentDateKey;
+      // Use setTimeout to avoid state update during render
+      setTimeout(() => setSelectedDate(new Date()), 0);
+    } else {
+      // Midnight passed but user was viewing a different date - just update ref
+      lastCurrentDateRef.current = currentDateKey;
+    }
+  } else if (lastCurrentDateRef.current === null) {
+    lastCurrentDateRef.current = currentDateKey;
   }
   
   const [entries, setEntries] = useState(() => {
@@ -998,26 +1005,20 @@ function SymptomTrackerMobile() {
   }, [selectedDate, stackItems, stackEntries, getDateKey]);
 
   // Backup midnight check using timers (primary check is render-based above)
+  // This triggers re-renders which then use the render-based logic
   useEffect(() => {
-    // Force a re-render periodically to trigger the render-based date check
-    const forceUpdate = () => {
-      // Reading selectedDate triggers the render-based check
-      const nowKey = new Date().toISOString().split('T')[0];
-      const selKey = selectedDate.toISOString().split('T')[0];
-      if (selKey < nowKey) {
-        console.log('[SymptomTracker] Timer-based midnight check triggered update');
-        setSelectedDate(new Date());
-      }
+    // Trigger a re-render with a new Date object (same value, new reference)
+    const triggerRerender = () => {
+      setSelectedDate(prev => new Date(prev.getTime()));
     };
     
     // Check every 30 seconds
-    const interval = setInterval(forceUpdate, 30000);
+    const interval = setInterval(triggerRerender, 30000);
     
     // Also check on visibility change (when app becomes visible)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        console.log('[SymptomTracker] App became visible');
-        forceUpdate();
+        triggerRerender();
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
@@ -1025,16 +1026,14 @@ function SymptomTrackerMobile() {
     // pageshow event - fires when page is restored from bfcache
     const handlePageShow = (e) => {
       if (e.persisted) {
-        console.log('[SymptomTracker] Page restored from cache');
-        forceUpdate();
+        triggerRerender();
       }
     };
     window.addEventListener('pageshow', handlePageShow);
     
     // Focus event
     const handleFocus = () => {
-      console.log('[SymptomTracker] Window focused');
-      forceUpdate();
+      triggerRerender();
     };
     window.addEventListener('focus', handleFocus);
     
@@ -1043,7 +1042,7 @@ function SymptomTrackerMobile() {
     const handleTouch = () => {
       if (!touchChecked) {
         touchChecked = true;
-        forceUpdate();
+        triggerRerender();
         // Reset after a delay so we check again on next session
         setTimeout(() => { touchChecked = false; }, 60000);
       }
@@ -1057,7 +1056,7 @@ function SymptomTrackerMobile() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('touchstart', handleTouch);
     };
-  }, [selectedDate]);
+  }, []);
 
   // Keyboard shortcuts for rapid entry mode
   useEffect(() => {
