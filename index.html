@@ -403,7 +403,7 @@ function SymptomTrackerMobile() {
   
   const [symptoms, setSymptoms] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY_SYMPTOMS);
-    return saved ? JSON.parse(saved) : defaultSymptoms;
+    return saved ? JSON.parse(saved) : [];
   });
   const [selectedDate, setSelectedDate] = useState(new Date());
   
@@ -445,7 +445,7 @@ function SymptomTrackerMobile() {
   // Stack state
   const [stackItems, setStackItems] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY_STACK_ITEMS);
-    return saved ? JSON.parse(saved) : defaultStackItems;
+    return saved ? JSON.parse(saved) : [];
   });
   const [stackEntries, setStackEntries] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY_STACK_ENTRIES);
@@ -1069,7 +1069,7 @@ function SymptomTrackerMobile() {
       setRapidEntryIndex(0);
       setRapidEntryLogged([]);
       setShowRapidComplete(true);
-      setTimeout(() => setShowRapidComplete(false), 2000);
+      setTimeout(() => setShowRapidComplete(false), 3000);
       return;
     }
     
@@ -1099,7 +1099,7 @@ function SymptomTrackerMobile() {
             setRapidEntryLogged([]);
             // Show celebration toast
             setShowRapidComplete(true);
-            setTimeout(() => setShowRapidComplete(false), 2000);
+            setTimeout(() => setShowRapidComplete(false), 3000);
           } else {
             // Reset index if it would go out of bounds after logging
             if (rapidEntryIndex >= incompleteSymptoms.length - 1) {
@@ -3275,7 +3275,7 @@ function SymptomTrackerMobile() {
                           setRapidEntryLogged([]);
                           // Show celebration toast
                           setShowRapidComplete(true);
-                          setTimeout(() => setShowRapidComplete(false), 2000);
+                          setTimeout(() => setShowRapidComplete(false), 3000);
                         } else {
                           // Keep index in bounds (list shrinks by 1 after logging)
                           if (rapidEntryIndex >= incompleteSymptoms.length - 1) {
@@ -3380,18 +3380,7 @@ function SymptomTrackerMobile() {
                 {totalActiveSymptoms - incompleteSymptoms.length} of {totalActiveSymptoms} logged
               </div>
             </div>
-          ) : (
-            <div style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              color: '#64748b',
-            }}>
-              All symptoms logged for this period ✓
-            </div>
-          )}
+          ) : null}
             </>
           )}
         </div>
@@ -4409,9 +4398,9 @@ function SymptomTrackerMobile() {
           borderRadius: '8px',
           fontSize: '14px',
           fontWeight: '500',
-          zIndex: 300,
+          zIndex: 1200,
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-          animation: 'fadeInOut 2s ease-in-out',
+          animation: 'fadeInOut 3s ease-in-out',
         }}>
           ⚡ All done!
         </div>
@@ -4426,39 +4415,48 @@ function SymptomTrackerMobile() {
           right: 0,
           bottom: 0,
           pointerEvents: 'none',
-          zIndex: 299,
+          zIndex: 1100,
           overflow: 'hidden',
         }}>
-          {[...Array(60)].map((_, i) => {
-            const colors = ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c'];
-            const color = colors[i % colors.length];
-            const startX = 40 + Math.random() * 20; // Start near center (40-60%)
-            const delay = Math.random() * 0.3;
-            const duration = 1 + Math.random() * 0.8;
-            const size = 6 + Math.random() * 10;
-            const drift = (Math.random() - 0.5) * 200; // Random left/right drift
-            const endY = 150 + Math.random() * 200; // Fall distance
-            
-            return (
-              <div
-                key={i}
-                style={{
-                  position: 'absolute',
-                  left: `${startX}%`,
-                  top: '35%',
-                  width: `${size}px`,
-                  height: i % 4 === 0 ? `${size}px` : `${size * 0.6}px`,
-                  background: color,
-                  borderRadius: i % 3 === 0 ? '50%' : '2px',
-                  opacity: 0,
-                  animation: `confettiBurst ${duration}s ease-out ${delay}s forwards`,
-                  '--endX': `${drift}px`,
-                  '--endY': `${endY}px`,
-                  '--rot': `${Math.random() * 720 - 360}deg`,
-                }}
-              />
-            );
-          })}
+          {/* Left burst */}
+          {[0,1,2,3,4,5,6,7].map(i => (
+            <div key={`l${i}`} style={{
+              position: 'absolute',
+              left: '50%',
+              top: '45%',
+              width: 10 + (i % 3) * 4 + 'px',
+              height: 8 + (i % 2) * 4 + 'px',
+              background: ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c', '#10b981'][i],
+              borderRadius: i % 2 === 0 ? '50%' : '2px',
+              animation: `confettiLeft 2s ease-out ${i * 0.05}s forwards`,
+            }} />
+          ))}
+          {/* Right burst */}
+          {[0,1,2,3,4,5,6,7].map(i => (
+            <div key={`r${i}`} style={{
+              position: 'absolute',
+              left: '50%',
+              top: '45%',
+              width: 8 + (i % 3) * 4 + 'px',
+              height: 10 + (i % 2) * 4 + 'px',
+              background: ['#fb923c', '#a78bfa', '#fbbf24', '#60a5fa', '#f472b6', '#34d399', '#f87171', '#10b981'][i],
+              borderRadius: i % 2 === 0 ? '2px' : '50%',
+              animation: `confettiRight 2s ease-out ${i * 0.05}s forwards`,
+            }} />
+          ))}
+          {/* Up burst */}
+          {[0,1,2,3,4,5].map(i => (
+            <div key={`u${i}`} style={{
+              position: 'absolute',
+              left: '50%',
+              top: '45%',
+              width: 12 + (i % 2) * 4 + 'px',
+              height: 6 + (i % 3) * 3 + 'px',
+              background: ['#34d399', '#f87171', '#60a5fa', '#fbbf24', '#a78bfa', '#fb923c'][i],
+              borderRadius: '2px',
+              animation: `confettiUp 1.8s ease-out ${i * 0.04}s forwards`,
+            }} />
+          ))}
         </div>
       )}
 
@@ -7107,8 +7105,8 @@ function SymptomTrackerMobile() {
         }
         @keyframes fadeInOut {
           0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
-          15% { opacity: 1; transform: translateX(-50%) translateY(0); }
-          85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+          90% { opacity: 1; transform: translateX(-50%) translateY(0); }
           100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
         }
         @keyframes popIn {
@@ -7116,17 +7114,46 @@ function SymptomTrackerMobile() {
           50% { transform: scale(1.2); }
           100% { transform: scale(1); opacity: 1; }
         }
-        @keyframes confettiBurst {
+        @keyframes confettiLeft {
           0% { 
             opacity: 1; 
-            transform: translateY(0) translateX(0) rotate(0deg) scale(0);
+            transform: translate(0, 0) rotate(0deg) scale(0);
           }
-          10% {
-            transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+          15% {
+            opacity: 1;
+            transform: translate(-30px, -40px) rotate(90deg) scale(1);
           }
           100% { 
             opacity: 0; 
-            transform: translateY(var(--endY, 150px)) translateX(var(--endX, 0px)) rotate(var(--rot, 360deg)) scale(0.3);
+            transform: translate(-120px, 180px) rotate(540deg) scale(0.3);
+          }
+        }
+        @keyframes confettiRight {
+          0% { 
+            opacity: 1; 
+            transform: translate(0, 0) rotate(0deg) scale(0);
+          }
+          15% {
+            opacity: 1;
+            transform: translate(30px, -40px) rotate(-90deg) scale(1);
+          }
+          100% { 
+            opacity: 0; 
+            transform: translate(120px, 180px) rotate(-540deg) scale(0.3);
+          }
+        }
+        @keyframes confettiUp {
+          0% { 
+            opacity: 1; 
+            transform: translate(0, 0) rotate(0deg) scale(0);
+          }
+          20% {
+            opacity: 1;
+            transform: translate(0, -80px) rotate(180deg) scale(1);
+          }
+          100% { 
+            opacity: 0; 
+            transform: translate(0, 150px) rotate(720deg) scale(0.3);
           }
         }
         @keyframes slideDown {
