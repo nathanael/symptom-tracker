@@ -6626,20 +6626,24 @@ function SymptomTrackerMobile() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
                 <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>
-                  3.3.10 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                  3.3.11 • {isStandalone() ? 'Home Screen App' : 'Browser'}
                 </div>
               </div>
               <button
-                onClick={() => {
-                  // Clear caches to get fresh version on next load
-                  if ('caches' in window) {
-                    caches.keys().then(names => {
-                      names.forEach(name => caches.delete(name));
-                    });
-                  }
-                  // Record check time
-                  setLastUpdateCheck(new Date());
+                onClick={async () => {
                   haptic('light');
+                  // Clear all caches
+                  if ('caches' in window) {
+                    const names = await caches.keys();
+                    await Promise.all(names.map(name => caches.delete(name)));
+                  }
+                  // Unregister service workers
+                  if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(reg => reg.unregister()));
+                  }
+                  // Force reload from server (bypass cache)
+                  window.location.reload(true);
                 }}
                 style={{
                   width: '100%',
