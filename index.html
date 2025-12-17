@@ -525,6 +525,7 @@ function SymptomTrackerMobile() {
   
   // Swipe-to-delete state
   const [swipeOffsets, setSwipeOffsets] = useState({}); // { [itemId]: offsetX }
+  const [deletingItems, setDeletingItems] = useState({}); // { [itemId]: true } for delete animation
   
   // Firebase Auth State
   const [user, setUser] = useState(null);
@@ -598,11 +599,30 @@ function SymptomTrackerMobile() {
     });
     
     return allActive.filter(symptom => {
-      // Check if this symptom has an entry for today's time period
-      const entryKey = trackingMode === 'ampm' 
-        ? `${dateKey}-${symptom.id}-${timePeriod}`
-        : `${dateKey}-${symptom.id}-daily`;
-      return !entries[entryKey];
+      if (trackingMode === 'ampm') {
+        // In AM/PM mode, check for the specific time period
+        // Also consider if there's a legacy daily entry (treat as morning complete)
+        const hasTimePeriodEntry = entries[`${dateKey}-${symptom.id}-${timePeriod}`];
+        if (hasTimePeriodEntry) return false;
+        
+        // If checking morning and there's a legacy daily entry, consider it complete
+        if (timePeriod === 'morning' && entries[`${dateKey}-${symptom.id}-daily`]) {
+          return false;
+        }
+        return true;
+      } else {
+        // In simple mode, check for daily entry
+        // Also consider if there's AM/PM data (either one counts as complete)
+        const hasDailyEntry = entries[`${dateKey}-${symptom.id}-daily`];
+        if (hasDailyEntry) return false;
+        
+        // Check for legacy AM/PM entries
+        const hasMorningEntry = entries[`${dateKey}-${symptom.id}-morning`];
+        const hasEveningEntry = entries[`${dateKey}-${symptom.id}-evening`];
+        if (hasMorningEntry || hasEveningEntry) return false;
+        
+        return true;
+      }
     });
   }, [symptoms, entries, selectedDate, quickLogTime, trackingMode, pinnedSymptoms]);
   
@@ -2097,10 +2117,64 @@ function SymptomTrackerMobile() {
   const getSymptomEntries = (symptomId) => {
     const dateKey = getDateKey(selectedDate);
     const timeOrder = { night: 0, morning: 1, allday: 2, midday: 3, evening: 4, daily: 2 };
-    return Object.entries(entries)
+    
+    const allDayEntries = Object.entries(entries)
       .filter(([key]) => key.startsWith(`${dateKey}-${symptomId}`))
-      .map(([key, value]) => value)
-      .sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
+      .map(([key, value]) => value);
+    
+    // In simple mode, handle legacy AM/PM data
+    if (trackingMode === 'simple') {
+      const dailyEntry = allDayEntries.find(e => e.time === 'daily');
+      if (dailyEntry) {
+        return [dailyEntry];
+      }
+      
+      // No daily entry - check for AM/PM entries and show average
+      const morningEntry = allDayEntries.find(e => e.time === 'morning');
+      const eveningEntry = allDayEntries.find(e => e.time === 'evening');
+      
+      if (morningEntry || eveningEntry) {
+        const severities = [];
+        if (morningEntry) severities.push(morningEntry.severity);
+        if (eveningEntry) severities.push(eveningEntry.severity);
+        const avgSeverity = Math.round(severities.reduce((a, b) => a + b, 0) / severities.length);
+        
+        // Return synthetic daily entry with averaged severity
+        return [{
+          time: 'daily',
+          severity: avgSeverity,
+          date: dateKey,
+          symptomId,
+          _synthetic: true, // Mark as synthetic so we don't save it
+          _fromAmPm: true,
+        }];
+      }
+      return [];
+    }
+    
+    // In AM/PM mode, handle legacy simple data
+    if (trackingMode === 'ampm') {
+      const morningEntry = allDayEntries.find(e => e.time === 'morning');
+      const eveningEntry = allDayEntries.find(e => e.time === 'evening');
+      const dailyEntry = allDayEntries.find(e => e.time === 'daily');
+      
+      // If we have a daily entry but no AM/PM entries, show it as morning
+      if (dailyEntry && !morningEntry && !eveningEntry) {
+        return [{
+          ...dailyEntry,
+          time: 'morning',
+          _synthetic: true,
+          _fromDaily: true,
+        }];
+      }
+      
+      // Return AM/PM entries normally
+      return allDayEntries
+        .filter(e => e.time === 'morning' || e.time === 'evening')
+        .sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
+    }
+    
+    return allDayEntries.sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
   };
 
   // Get the most recent entry for a symptom (regardless of AM/PM)
@@ -2377,12 +2451,27 @@ function SymptomTrackerMobile() {
     const offset = swipeOffsets[itemId] || 0;
     
     if (offset < -60) {
-      // Swiped far enough - trigger delete
-      onDelete();
+      // Swiped far enough - animate then delete
+      haptic('medium');
+      setDeletingItems(prev => ({ ...prev, [itemId]: true }));
+      // Wait for animation then delete
+      setTimeout(() => {
+        onDelete();
+        setDeletingItems(prev => {
+          const next = { ...prev };
+          delete next[itemId];
+          return next;
+        });
+        setSwipeOffsets(prev => {
+          const next = { ...prev };
+          delete next[itemId];
+          return next;
+        });
+      }, 300);
+    } else {
+      // Reset swipe
+      setSwipeOffsets(prev => ({ ...prev, [itemId]: 0 }));
     }
-    
-    // Reset swipe
-    setSwipeOffsets(prev => ({ ...prev, [itemId]: 0 }));
     swipeStartRef.current = { x: 0, y: 0, id: null };
   };
 
@@ -3464,11 +3553,20 @@ function SymptomTrackerMobile() {
                       clearTimeout(copyLongPressTimer.current);
                       // Short tap - copy data
                       quickCopyData();
+                      copyLongPressTimer.current = null;
+                    } else if (copyLongPressTimer.current === 'longpress') {
+                      // Long press just completed - keep dropdown open, mark as just opened
+                      copyLongPressTimer.current = 'justopened';
+                      // Clear the flag after a short delay
+                      setTimeout(() => {
+                        if (copyLongPressTimer.current === 'justopened') {
+                          copyLongPressTimer.current = null;
+                        }
+                      }, 300);
                     }
-                    copyLongPressTimer.current = null;
                   }}
                   onTouchCancel={() => {
-                    if (copyLongPressTimer.current && copyLongPressTimer.current !== 'longpress') {
+                    if (copyLongPressTimer.current && copyLongPressTimer.current !== 'longpress' && copyLongPressTimer.current !== 'justopened') {
                       clearTimeout(copyLongPressTimer.current);
                     }
                     copyLongPressTimer.current = null;
@@ -3508,7 +3606,19 @@ function SymptomTrackerMobile() {
                 {showCopyDropdown && (
                   <>
                     <div 
-                      onClick={() => setShowCopyDropdown(false)}
+                      onClick={() => {
+                        // Don't close if just opened via long press
+                        if (copyLongPressTimer.current === 'justopened') return;
+                        setShowCopyDropdown(false);
+                      }}
+                      onTouchEnd={(e) => {
+                        // Don't close if just opened via long press
+                        if (copyLongPressTimer.current === 'justopened') {
+                          e.preventDefault();
+                          return;
+                        }
+                        setShowCopyDropdown(false);
+                      }}
                       style={{
                         position: 'fixed',
                         inset: 0,
@@ -5080,6 +5190,17 @@ function SymptomTrackerMobile() {
                         overflow: draggedItem?.id === symptom.id ? 'visible' : 'hidden',
                         borderRadius: '5px',
                         ...getReorderTransform(index, 'symptom'),
+                        // Delete animation
+                        ...(deletingItems[symptom.id] ? {
+                          maxHeight: '0px',
+                          opacity: 0,
+                          marginBottom: '-8px',
+                          transition: 'max-height 0.3s ease, opacity 0.2s ease, margin-bottom 0.3s ease',
+                        } : {
+                          maxHeight: '200px',
+                          opacity: 1,
+                          transition: 'max-height 0.3s ease, opacity 0.2s ease',
+                        }),
                       }}
                     >
                       {editingSymptomId === symptom.id ? (
@@ -6628,7 +6749,7 @@ function SymptomTrackerMobile() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
                 <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>
-                  3.3.11 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                  3.3.12 • {isStandalone() ? 'Home Screen App' : 'Browser'}
                 </div>
               </div>
               <button
@@ -6853,6 +6974,17 @@ function SymptomTrackerMobile() {
                         overflow: draggedItem?.id === item.id ? 'visible' : 'hidden',
                         borderRadius: '5px',
                         ...getReorderTransform(index, 'stack'),
+                        // Delete animation
+                        ...(deletingItems[`stack-${item.id}`] ? {
+                          maxHeight: '0px',
+                          opacity: 0,
+                          marginBottom: '-8px',
+                          transition: 'max-height 0.3s ease, opacity 0.2s ease, margin-bottom 0.3s ease',
+                        } : {
+                          maxHeight: '200px',
+                          opacity: 1,
+                          transition: 'max-height 0.3s ease, opacity 0.2s ease',
+                        }),
                       }}
                     >
                       {editingStackItemId === item.id ? (
