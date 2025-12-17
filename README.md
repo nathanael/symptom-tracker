@@ -1,4 +1,4 @@
-# Symptom Tracker v3.3.7
+# Symptom Tracker v3.3.13
 
 A mobile-first health tracking PWA for symptoms and supplements with cloud sync.
 
@@ -14,6 +14,7 @@ A mobile-first health tracking PWA for symptoms and supplements with cloud sync.
 ### Symptoms Tab
 - **2D gesture interface**: Hold 200ms → drag to set severity (0-5)
 - **Rapid Entry mode**: Quick logging with keyboard shortcuts (desktop: 0-5 keys)
+- **Quick copy button**: Tap to copy recent days, long-press to change days (1/3/7/14)
 - **Calendar navigation** with entry indicators
 - **Pin symptoms** to top of list (⊙ icon)
 - **Daily notes**: Add notes for each day
@@ -21,8 +22,9 @@ A mobile-first health tracking PWA for symptoms and supplements with cloud sync.
 
 ### Stack Tab  
 - Track daily supplements with checkboxes
-- **Multiplier buttons**: ½×, 2×, 3× dose adjustments
-- Swipe to delete, drag to reorder
+- **Multiplier buttons**: ½×, 2×, 3× dose adjustments (right side)
+- **Swipe to delete** with smooth animation
+- Drag to reorder
 - Tap dose to edit
 
 ### Insights Tab
@@ -33,9 +35,10 @@ A mobile-first health tracking PWA for symptoms and supplements with cloud sync.
 ### Settings
 - **Cloud Sync**: Google Sign-In or Email/Password authentication
 - **History**: View and sort all entries
-- **Export**: CSV download or copy for AI
+- **Export**: Markdown tables, CSV download, or copy for AI
 - **Manage Symptoms/Supplements**: Add, edit, hide, restore
 - **Backup**: Manual save/load via Files app (iCloud)
+- **Check for Updates**: Force refresh to get latest version
 - **Password Reset**: For email accounts
 
 ## Cloud Sync (Firebase)
@@ -63,8 +66,8 @@ For offline backup or when cloud sync isn't available:
 | Key | Action |
 |-----|--------|
 | 0-5 | Log severity |
-| Space / → | Skip/Close |
-| Backspace / ← | Undo last |
+| Space / → | Skip to next |
+| Z | Undo last |
 | Esc | Close |
 
 ## Tech Stack
@@ -78,7 +81,7 @@ For offline backup or when cloud sync isn't available:
 ## Deployment
 
 ### GitHub Pages
-1. Push `index.html`, `manifest.json`, and favicon to repo
+1. Push `index.html`, `manifest.json`, `apple-touch-icon.png`, and `favicon.svg` to repo
 2. Enable GitHub Pages in repo settings
 3. Add your domain to Firebase authorized domains
 
@@ -92,6 +95,42 @@ npx serve .
 ---
 
 ## Changelog
+
+### v3.3.13 (2024-12-17)
+- **Last recorded fix**: When logging past dates, shows entries from BEFORE that date (not today's data)
+
+### v3.3.12 (2024-12-17)
+- **Copy dropdown fix**: Long-press on mobile now stays open properly
+- **Swipe-to-delete animation**: Items smoothly collapse, others slide up
+- **Mode switching data preservation**: Switching between AM/PM and Simple modes no longer loses data
+  - AM/PM → Simple: Shows averaged severity
+  - Simple → AM/PM: Shows daily entries as morning entries
+- **Consistent page widths**: All pages use 600px max-width on desktop
+
+### v3.3.11 (2024-12-17)
+- **Check for Updates**: Now force-refreshes the app (clears caches, reloads)
+- **Empty by default**: App starts with no pre-populated symptoms or supplements
+- **High-res icon**: 180x180 PNG for Safari homescreen bookmarks
+- **Haptic feedback**: Added to swipe-to-delete
+
+### v3.3.10 (2024-12-16)
+- **Quick copy button redesign**: Shows days count (3d), long-press for dropdown
+- **Configurable copy days**: Choose 1, 3, 7, or 14 days (persists in localStorage)
+- **Symptom tile fix**: Consistent height when selecting severity
+- **Unified toast notifications**: All copy actions show consistent feedback
+- **Stack multiplier repositioned**: Moved to far right of item row
+- **Rapid Entry improvements**: Separate Skip and Close buttons
+- **Undo shortcut changed**: Now uses Z key instead of Backspace
+
+### v3.3.9 (2024-12-16)
+- **Markdown table export**: Copy data as formatted tables for AI
+- **Quick copy button**: One-tap copy on Symptoms page
+- **Animated toast**: Feedback when copying to clipboard
+
+### v3.3.8 (2024-12-16)
+- **Midnight detection fix**: Render-based date check for reliable day switching
+- **Stack auto-copy**: Automatically copies yesterday's checked items
+- **Multiple event triggers**: visibilitychange, pageshow, focus, touchstart
 
 ### v3.3.7 (2024-12-14)
 - **Keyboard shortcuts for Rapid Entry**: Space to skip, Backspace to undo, Esc to close

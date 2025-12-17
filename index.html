@@ -2177,11 +2177,15 @@ function SymptomTrackerMobile() {
     return allDayEntries.sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
   };
 
-  // Get the most recent entry for a symptom (regardless of AM/PM)
+  // Get the most recent entry for a symptom BEFORE the selected date
   const getMostRecentEntry = (symptomId) => {
+    const selectedDateKey = getDateKey(selectedDate);
+    
     const allEntries = Object.entries(entries)
       .filter(([key]) => key.includes(`-${symptomId}-`))
       .map(([key, value]) => ({ key, ...value }))
+      // Only include entries from BEFORE the selected date
+      .filter(entry => entry.date < selectedDateKey)
       .sort((a, b) => {
         // Sort by date descending, then by time
         const dateCompare = b.date.localeCompare(a.date);
@@ -2191,14 +2195,8 @@ function SymptomTrackerMobile() {
         return (timeOrder[b.time] || 0) - (timeOrder[a.time] || 0);
       });
     
-    // Return the most recent entry that's not from today
-    const todayKey = getDateKey(selectedDate);
-    for (const entry of allEntries) {
-      if (entry.date !== todayKey) {
-        return entry;
-      }
-    }
-    return null;
+    // Return the most recent entry before the selected date
+    return allEntries.length > 0 ? allEntries[0] : null;
   };
 
   const parseBulkSymptoms = (input) => {
@@ -6749,7 +6747,7 @@ function SymptomTrackerMobile() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
                 <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>
-                  3.3.12 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                  3.3.13 • {isStandalone() ? 'Home Screen App' : 'Browser'}
                 </div>
               </div>
               <button
