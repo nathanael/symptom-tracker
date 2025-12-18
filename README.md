@@ -1,4 +1,4 @@
-# Symptom Tracker v3.3.17
+# Symptom Tracker v3.3.19
 
 A mobile-first health tracking PWA for symptoms and supplements with cloud sync.
 
@@ -95,6 +95,24 @@ npx serve .
 ---
 
 ## Changelog
+
+### v3.3.19 (2024-12-18)
+- **Explosion animation**: Completion celebration changed from party streamers to radial explosion
+  - 24 particles burst outward in all directions from center
+  - Inner ring of 12 smaller, faster particles
+  - Center flash effect
+  - Faster, more impactful animation (0.8s vs 2s)
+
+### v3.3.18 (2024-12-18)
+- **Rapid Entry redesigned**:
+  - Back button now navigates to previous symptom (not undo)
+  - Current selection shown with distinctive border + checkmark + glow
+  - Tap current selection to clear it, tap different value to change
+  - Progress bar shows current position (purple) and completion status (green)
+  - Counter shows "X of Y" position
+  - Skip at end closes rapid entry instead of looping
+  - Can freely navigate back/forward through all symptoms
+  - Z key or ← Back button goes to previous symptom
 
 ### v3.3.17 (2024-12-17)
 - **Removed full-screen completion modal**: All completions now use toast notifications only
