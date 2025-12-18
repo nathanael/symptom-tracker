@@ -507,7 +507,6 @@ function SymptomTrackerMobile() {
   const [quickLogTime, setQuickLogTime] = useState(null); // Selected time period in quick picker (null = first period)
   const [rapidEntryMode, setRapidEntryMode] = useState(false); // Rapid entry mode
   const [rapidEntryConfirm, setRapidEntryConfirm] = useState(false); // Confirm start over
-  const [rapidEntryLogged, setRapidEntryLogged] = useState([]); // Track logged symptoms for back button
   const [rapidEntryIndex, setRapidEntryIndex] = useState(0); // Current symptom index in rapid entry
   const [copyDays, setCopyDays] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY_COPY_DAYS);
@@ -1102,48 +1101,50 @@ function SymptomTrackerMobile() {
   useEffect(() => {
     if (!rapidEntryMode || rapidEntryConfirm) return;
     
-    // If rapid entry is open but no incomplete symptoms, close and show toast
-    if (incompleteSymptoms.length === 0) {
+    // Get list of active symptoms for sequential navigation
+    const activeSymptomsList = symptoms.filter(s => s.active);
+    
+    // If no active symptoms, close
+    if (activeSymptomsList.length === 0) {
       setRapidEntryMode(false);
       setRapidEntryIndex(0);
-      setRapidEntryLogged([]);
-      setShowRapidComplete(true);
-      setTimeout(() => setShowRapidComplete(false), 3000);
       return;
     }
     
     const handleKeyDown = (e) => {
+      const currentSymptom = activeSymptomsList[rapidEntryIndex];
+      if (!currentSymptom) return;
+      
+      const logTime = quickLogTime || getCurrentTimePeriod();
+      const dateKey = selectedDate.toISOString().split('T')[0];
+      const timeKey = trackingMode === 'ampm' ? logTime : 'daily';
+      const entryKey = `${dateKey}-${currentSymptom.id}-${timeKey}`;
+      const currentEntry = entries[entryKey];
+      
       // Number keys 0-5 to log severity
       if (e.key >= '0' && e.key <= '5') {
         const severity = parseInt(e.key);
-        const symptomId = incompleteSymptoms[rapidEntryIndex]?.id;
-        const symptomName = incompleteSymptoms[rapidEntryIndex]?.name;
-        if (symptomId) {
-          const logTime = quickLogTime || getCurrentTimePeriod();
+        
+        // If tapping same severity, clear it
+        if (currentEntry?.severity === severity) {
+          setEntries(prev => {
+            const newEntries = { ...prev };
+            delete newEntries[entryKey];
+            return newEntries;
+          });
+        } else {
+          // Set/change the value
+          quickLog(currentSymptom.id, severity, logTime);
           
-          // Track for undo
-          setRapidEntryLogged(prev => [...prev, {
-            symptomId,
-            symptomName,
-            severity,
-            time: logTime,
-          }]);
-          
-          quickLog(symptomId, severity, logTime);
-          
-          // Check if this was the last one
-          if (incompleteSymptoms.length <= 1) {
+          // Auto-advance to next symptom
+          if (rapidEntryIndex < activeSymptomsList.length - 1) {
+            setRapidEntryIndex(prev => prev + 1);
+          } else {
+            // At end - close rapid entry
             setRapidEntryMode(false);
             setRapidEntryIndex(0);
-            setRapidEntryLogged([]);
-            // Show celebration toast
             setShowRapidComplete(true);
             setTimeout(() => setShowRapidComplete(false), 3000);
-          } else {
-            // Reset index if it would go out of bounds after logging
-            if (rapidEntryIndex >= incompleteSymptoms.length - 1) {
-              setRapidEntryIndex(0);
-            }
           }
         }
       }
@@ -1153,34 +1154,29 @@ function SymptomTrackerMobile() {
         setRapidEntryIndex(0);
         setRapidEntryConfirm(false);
       }
-      // Backspace or Z to undo
-      else if ((e.key === 'z' || e.key === 'Z') && rapidEntryLogged.length > 0) {
+      // Z or Left arrow to go back
+      else if (e.key === 'z' || e.key === 'Z' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        const lastLogged = rapidEntryLogged[rapidEntryLogged.length - 1];
-        const dateKey = selectedDate.toISOString().split('T')[0];
-        const timeKey = trackingMode === 'ampm' ? lastLogged.time : 'daily';
-        const entryKey = `${dateKey}-${lastLogged.symptomId}-${timeKey}`;
-        
-        setEntries(prev => {
-          const newEntries = { ...prev };
-          delete newEntries[entryKey];
-          return newEntries;
-        });
-        
-        setRapidEntryLogged(prev => prev.slice(0, -1));
+        if (rapidEntryIndex > 0) {
+          setRapidEntryIndex(prev => prev - 1);
+        }
       }
       // Right arrow or Space to skip to next symptom
       else if (e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault();
-        if (incompleteSymptoms.length > 1) {
-          setRapidEntryIndex(prev => (prev + 1) % incompleteSymptoms.length);
+        if (rapidEntryIndex < activeSymptomsList.length - 1) {
+          setRapidEntryIndex(prev => prev + 1);
+        } else {
+          // At end - close rapid entry
+          setRapidEntryMode(false);
+          setRapidEntryIndex(0);
         }
       }
     };
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [rapidEntryMode, rapidEntryConfirm, rapidEntryIndex, incompleteSymptoms, quickLogTime, quickLog, getCurrentTimePeriod, rapidEntryLogged, selectedDate, trackingMode]);
+  }, [rapidEntryMode, rapidEntryConfirm, rapidEntryIndex, symptoms, quickLogTime, quickLog, getCurrentTimePeriod, selectedDate, trackingMode, entries]);
 
   // ==========================================================================
   // FIREBASE SYNC FUNCTIONS
@@ -3141,7 +3137,6 @@ function SymptomTrackerMobile() {
                         setQuickLogTime(oppositePeriod);
                         setRapidEntryConfirm(false);
                         setRapidEntryIndex(0);
-                        setRapidEntryLogged([]);
                       }}
                       style={{
                         padding: '14px 28px',
@@ -3200,7 +3195,6 @@ function SymptomTrackerMobile() {
                     
                     setRapidEntryConfirm(false);
                     setRapidEntryIndex(0);
-                    setRapidEntryLogged([]);
                   }}
                   style={{
                     padding: '12px 24px',
@@ -3219,34 +3213,56 @@ function SymptomTrackerMobile() {
             </div>
           ) : (
             <>
-          {/* Progress indicator - shows completed vs total */}
-          <div style={{
-            display: 'flex',
-            gap: '4px',
-            marginBottom: '20px',
-          }}>
-            {Array.from({ length: totalActiveSymptoms }).map((_, idx) => {
-              const completedCount = totalActiveSymptoms - incompleteSymptoms.length;
-              return (
-                <div
-                  key={idx}
-                  style={{
-                    flex: 1,
-                    height: '4px',
-                    borderRadius: '2px',
-                    background: idx < completedCount 
-                      ? '#10b981'  // Completed - green
-                      : idx === completedCount
-                        ? '#8b5cf6'  // Current - purple
-                        : 'rgba(100, 116, 139, 0.3)',  // Pending - gray
-                  }}
-                />
-              );
-            })}
-          </div>
+          {/* Progress indicator - shows position in list */}
+          {(() => {
+            const activeSymptomsList = symptoms.filter(s => s.active);
+            return (
+              <div style={{
+                display: 'flex',
+                gap: '4px',
+                marginBottom: '20px',
+              }}>
+                {activeSymptomsList.map((symptom, idx) => {
+                  const dateKey = selectedDate.toISOString().split('T')[0];
+                  const logTime = quickLogTime || getCurrentTimePeriod();
+                  const timeKey = trackingMode === 'ampm' ? logTime : 'daily';
+                  const entryKey = `${dateKey}-${symptom.id}-${timeKey}`;
+                  const hasEntry = !!entries[entryKey];
+                  
+                  return (
+                    <div
+                      key={symptom.id}
+                      style={{
+                        flex: 1,
+                        height: '4px',
+                        borderRadius: '2px',
+                        background: idx === rapidEntryIndex
+                          ? '#8b5cf6'  // Current - purple
+                          : hasEntry
+                            ? '#10b981'  // Has entry - green
+                            : 'rgba(100, 116, 139, 0.3)',  // No entry - gray
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })()}
           
           {/* Current symptom */}
-          {incompleteSymptoms[rapidEntryIndex] ? (
+          {(() => {
+            const activeSymptomsList = symptoms.filter(s => s.active);
+            const currentSymptom = activeSymptomsList[rapidEntryIndex];
+            
+            if (!currentSymptom) return null;
+            
+            const dateKey = selectedDate.toISOString().split('T')[0];
+            const logTime = quickLogTime || getCurrentTimePeriod();
+            const timeKey = trackingMode === 'ampm' ? logTime : 'daily';
+            const entryKey = `${dateKey}-${currentSymptom.id}-${timeKey}`;
+            const currentEntry = entries[entryKey];
+            
+            return (
             <div style={{
               flex: 1,
               display: 'flex',
@@ -3255,6 +3271,11 @@ function SymptomTrackerMobile() {
               alignItems: 'center',
               gap: '30px',
             }}>
+              {/* Counter */}
+              <div style={{ color: '#64748b', fontSize: '14px' }}>
+                {rapidEntryIndex + 1} of {activeSymptomsList.length}
+              </div>
+              
               {/* Symptom name */}
               <div style={{
                 color: '#f8fafc',
@@ -3262,7 +3283,7 @@ function SymptomTrackerMobile() {
                 fontWeight: '700',
                 textAlign: 'center',
               }}>
-                {incompleteSymptoms[rapidEntryIndex].name}
+                {currentSymptom.name}
               </div>
               
               {/* Time period indicator */}
@@ -3298,9 +3319,7 @@ function SymptomTrackerMobile() {
               
               {/* Most recent value hint */}
               {(() => {
-                const symptomId = incompleteSymptoms[rapidEntryIndex].id;
-                const logTime = quickLogTime || getCurrentTimePeriod();
-                const recentEntry = getMostRecentEntry(symptomId, logTime);
+                const recentEntry = getMostRecentEntry(currentSymptom.id, logTime);
                 if (recentEntry) {
                   return (
                     <div style={{ color: '#64748b', fontSize: '14px' }}>
@@ -3320,59 +3339,70 @@ function SymptomTrackerMobile() {
                 maxWidth: '400px',
               }}>
                 {[0, 1, 2, 3, 4, 5].map(severity => {
-                  const logTime = quickLogTime || getCurrentTimePeriod();
-                  const symptomId = incompleteSymptoms[rapidEntryIndex]?.id;
-                  const symptomName = incompleteSymptoms[rapidEntryIndex]?.name;
+                  // Check if this severity is currently selected
+                  const isCurrentSelection = currentEntry?.severity === severity;
                   
-                  // Check most recent entry for subtle highlight
-                  const recentEntry = getMostRecentEntry(symptomId, logTime);
-                  const isRecentSeverity = recentEntry?.severity === severity;
+                  // Check most recent entry for subtle hint
+                  const recentEntry = getMostRecentEntry(currentSymptom.id, logTime);
+                  const isRecentSeverity = recentEntry?.severity === severity && !currentEntry;
                   
                   return (
                     <button
                       key={severity}
                       onClick={() => {
-                        if (!symptomId) return;
-                        
-                        // Track this for back button
-                        setRapidEntryLogged(prev => [...prev, {
-                          symptomId,
-                          symptomName,
-                          severity,
-                          time: logTime,
-                        }]);
-                        
-                        quickLog(symptomId, severity, logTime);
-                        
-                        // Check if this was the last one
-                        if (incompleteSymptoms.length <= 1) {
-                          setRapidEntryMode(false);
-                          setRapidEntryIndex(0);
-                          setRapidEntryLogged([]);
-                          // Show celebration toast
-                          setShowRapidComplete(true);
-                          setTimeout(() => setShowRapidComplete(false), 3000);
+                        // If tapping current selection, clear it
+                        if (isCurrentSelection) {
+                          setEntries(prev => {
+                            const newEntries = { ...prev };
+                            delete newEntries[entryKey];
+                            return newEntries;
+                          });
                         } else {
-                          // Keep index in bounds (list shrinks by 1 after logging)
-                          if (rapidEntryIndex >= incompleteSymptoms.length - 1) {
+                          // Set/change value and advance
+                          quickLog(currentSymptom.id, severity, logTime);
+                          
+                          // Auto-advance to next symptom
+                          if (rapidEntryIndex < activeSymptomsList.length - 1) {
+                            setRapidEntryIndex(prev => prev + 1);
+                          } else {
+                            // At end - close rapid entry
+                            setRapidEntryMode(false);
                             setRapidEntryIndex(0);
+                            setShowRapidComplete(true);
+                            setTimeout(() => setShowRapidComplete(false), 3000);
                           }
                         }
                       }}
                       style={{
                         padding: '24px',
-                        background: `${severityColors[severity]}20`,
-                        border: isRecentSeverity ? `2px solid ${severityColors[severity]}40` : '2px solid transparent',
+                        background: isCurrentSelection 
+                          ? `${severityColors[severity]}40`
+                          : `${severityColors[severity]}20`,
+                        border: isCurrentSelection 
+                          ? `3px solid ${severityColors[severity]}`
+                          : isRecentSeverity 
+                            ? `2px solid ${severityColors[severity]}40` 
+                            : '2px solid transparent',
                         borderRadius: '3px',
                         color: severityColors[severity],
                         fontSize: '32px',
                         fontWeight: '700',
                         cursor: 'pointer',
                         position: 'relative',
+                        boxShadow: isCurrentSelection ? `0 0 12px ${severityColors[severity]}50` : 'none',
                       }}
                     >
                       {severity}
-                      {!isMobile() && (
+                      {isCurrentSelection && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '4px',
+                          right: '6px',
+                          fontSize: '12px',
+                          color: severityColors[severity],
+                        }}>✓</span>
+                      )}
+                      {!isMobile() && !isCurrentSelection && (
                         <span style={{
                           position: 'absolute',
                           bottom: '4px',
@@ -3389,74 +3419,59 @@ function SymptomTrackerMobile() {
               
               {/* Navigation buttons */}
               <div style={{ display: 'flex', gap: '12px' }}>
-                {/* Back button - undo last entry */}
+                {/* Back button - navigate to previous symptom */}
                 <button
                   onClick={() => {
-                    if (rapidEntryLogged.length > 0) {
-                      const lastLogged = rapidEntryLogged[rapidEntryLogged.length - 1];
-                      // Remove the entry
-                      const dateKey = selectedDate.toISOString().split('T')[0];
-                      const timeKey = trackingMode === 'ampm' ? lastLogged.time : 'daily';
-                      const entryKey = `${dateKey}-${lastLogged.symptomId}-${timeKey}`;
-                      
-                      setEntries(prev => {
-                        const newEntries = { ...prev };
-                        delete newEntries[entryKey];
-                        return newEntries;
-                      });
-                      
-                      // Remove from logged history
-                      setRapidEntryLogged(prev => prev.slice(0, -1));
+                    if (rapidEntryIndex > 0) {
+                      setRapidEntryIndex(prev => prev - 1);
                     }
                   }}
-                  disabled={rapidEntryLogged.length === 0}
+                  disabled={rapidEntryIndex === 0}
                   style={{
                     padding: '12px 24px',
-                    background: rapidEntryLogged.length > 0 ? 'rgba(100, 116, 139, 0.1)' : 'rgba(50, 50, 70, 0.2)',
+                    background: rapidEntryIndex > 0 ? 'rgba(100, 116, 139, 0.1)' : 'rgba(50, 50, 70, 0.2)',
                     border: '1px solid rgba(100, 116, 139, 0.3)',
                     borderRadius: '5px',
-                    color: rapidEntryLogged.length > 0 ? '#94a3b8' : '#475569',
+                    color: rapidEntryIndex > 0 ? '#94a3b8' : '#475569',
                     fontSize: '14px',
                     fontWeight: '600',
-                    cursor: rapidEntryLogged.length > 0 ? 'pointer' : 'default',
-                    opacity: rapidEntryLogged.length > 0 ? 1 : 0.5,
+                    cursor: rapidEntryIndex > 0 ? 'pointer' : 'default',
+                    opacity: rapidEntryIndex > 0 ? 1 : 0.5,
                   }}
                 >
-                  ← Undo
+                  ← Back
                   {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>Z</span>}
                 </button>
                 
                 {/* Skip button */}
                 <button
                   onClick={() => {
-                    if (incompleteSymptoms.length > 1) {
-                      setRapidEntryIndex(prev => (prev + 1) % incompleteSymptoms.length);
+                    if (rapidEntryIndex < activeSymptomsList.length - 1) {
+                      setRapidEntryIndex(prev => prev + 1);
+                    } else {
+                      // At end - close
+                      setRapidEntryMode(false);
+                      setRapidEntryIndex(0);
                     }
                   }}
-                  disabled={incompleteSymptoms.length <= 1}
                   style={{
                     padding: '12px 24px',
-                    background: incompleteSymptoms.length > 1 ? 'rgba(100, 116, 139, 0.1)' : 'rgba(50, 50, 70, 0.2)',
+                    background: 'rgba(100, 116, 139, 0.1)',
                     border: '1px solid rgba(100, 116, 139, 0.3)',
                     borderRadius: '5px',
-                    color: incompleteSymptoms.length > 1 ? '#94a3b8' : '#475569',
+                    color: '#94a3b8',
                     fontSize: '14px',
                     fontWeight: '600',
-                    cursor: incompleteSymptoms.length > 1 ? 'pointer' : 'default',
-                    opacity: incompleteSymptoms.length > 1 ? 1 : 0.5,
+                    cursor: 'pointer',
                   }}
                 >
-                  Skip →
+                  {rapidEntryIndex < activeSymptomsList.length - 1 ? 'Skip →' : 'Done'}
                   {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>Space</span>}
                 </button>
               </div>
-              
-              {/* Counter - shows completed / total */}
-              <div style={{ color: '#64748b', fontSize: '14px' }}>
-                {totalActiveSymptoms - incompleteSymptoms.length} of {totalActiveSymptoms} logged
-              </div>
             </div>
-          ) : null}
+            );
+          })()}
             </>
           )}
         </div>
@@ -3665,9 +3680,6 @@ function SymptomTrackerMobile() {
                   if (trackingMode === 'ampm' && !quickLogTime) {
                     setQuickLogTime(getCurrentTimePeriod());
                   }
-                  
-                  // Reset logged history for back button
-                  setRapidEntryLogged([]);
                   
                   // Check if all symptoms are already complete
                   if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
@@ -4502,7 +4514,7 @@ function SymptomTrackerMobile() {
         </div>
       )}
 
-      {/* Confetti Animation */}
+      {/* Explosion Animation */}
       {showRapidComplete && (
         <div style={{
           position: 'fixed',
@@ -4514,45 +4526,75 @@ function SymptomTrackerMobile() {
           zIndex: 1100,
           overflow: 'hidden',
         }}>
-          {/* Left burst */}
-          {[0,1,2,3,4,5,6,7].map(i => (
-            <div key={`l${i}`} style={{
-              position: 'absolute',
-              left: '50%',
-              top: '45%',
-              width: 10 + (i % 3) * 4 + 'px',
-              height: 8 + (i % 2) * 4 + 'px',
-              background: ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c', '#10b981'][i],
-              borderRadius: i % 2 === 0 ? '50%' : '2px',
-              animation: `confettiLeft 2s ease-out ${i * 0.05}s forwards`,
-            }} />
-          ))}
-          {/* Right burst */}
-          {[0,1,2,3,4,5,6,7].map(i => (
-            <div key={`r${i}`} style={{
-              position: 'absolute',
-              left: '50%',
-              top: '45%',
-              width: 8 + (i % 3) * 4 + 'px',
-              height: 10 + (i % 2) * 4 + 'px',
-              background: ['#fb923c', '#a78bfa', '#fbbf24', '#60a5fa', '#f472b6', '#34d399', '#f87171', '#10b981'][i],
-              borderRadius: i % 2 === 0 ? '2px' : '50%',
-              animation: `confettiRight 2s ease-out ${i * 0.05}s forwards`,
-            }} />
-          ))}
-          {/* Up burst */}
-          {[0,1,2,3,4,5].map(i => (
-            <div key={`u${i}`} style={{
-              position: 'absolute',
-              left: '50%',
-              top: '45%',
-              width: 12 + (i % 2) * 4 + 'px',
-              height: 6 + (i % 3) * 3 + 'px',
-              background: ['#34d399', '#f87171', '#60a5fa', '#fbbf24', '#a78bfa', '#fb923c'][i],
-              borderRadius: '2px',
-              animation: `confettiUp 1.8s ease-out ${i * 0.04}s forwards`,
-            }} />
-          ))}
+          {/* Radial explosion particles */}
+          {Array.from({ length: 24 }).map((_, i) => {
+            const angle = (i / 24) * 2 * Math.PI;
+            const distance = 100 + (i % 3) * 40;
+            const endX = Math.cos(angle) * distance;
+            const endY = Math.sin(angle) * distance;
+            const colors = ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6', '#fb923c', '#10b981'];
+            const size = 6 + (i % 4) * 3;
+            const delay = (i % 3) * 0.02;
+            return (
+              <div key={`p${i}`} style={{
+                position: 'absolute',
+                left: '50%',
+                top: '45%',
+                width: size + 'px',
+                height: size + 'px',
+                background: colors[i % 8],
+                borderRadius: '50%',
+                animation: `explode${i} 0.8s ease-out ${delay}s forwards`,
+              }}>
+                <style>{`
+                  @keyframes explode${i} {
+                    0% { opacity: 1; transform: translate(0, 0) scale(1); }
+                    100% { opacity: 0; transform: translate(${endX}px, ${endY}px) scale(0.3); }
+                  }
+                `}</style>
+              </div>
+            );
+          })}
+          {/* Inner ring - smaller, faster */}
+          {Array.from({ length: 12 }).map((_, i) => {
+            const angle = (i / 12) * 2 * Math.PI + 0.26;
+            const distance = 60;
+            const endX = Math.cos(angle) * distance;
+            const endY = Math.sin(angle) * distance;
+            const colors = ['#34d399', '#10b981', '#fbbf24', '#fb923c', '#60a5fa', '#a78bfa'];
+            return (
+              <div key={`i${i}`} style={{
+                position: 'absolute',
+                left: '50%',
+                top: '45%',
+                width: '4px',
+                height: '4px',
+                background: colors[i % 6],
+                borderRadius: '50%',
+                animation: `explodeInner${i} 0.5s ease-out forwards`,
+              }}>
+                <style>{`
+                  @keyframes explodeInner${i} {
+                    0% { opacity: 1; transform: translate(0, 0) scale(1); }
+                    100% { opacity: 0; transform: translate(${endX}px, ${endY}px) scale(0); }
+                  }
+                `}</style>
+              </div>
+            );
+          })}
+          {/* Center flash */}
+          <div style={{
+            position: 'absolute',
+            left: '50%',
+            top: '45%',
+            width: '40px',
+            height: '40px',
+            marginLeft: '-20px',
+            marginTop: '-20px',
+            background: 'radial-gradient(circle, rgba(52, 211, 153, 0.8) 0%, rgba(52, 211, 153, 0) 70%)',
+            borderRadius: '50%',
+            animation: 'flash 0.4s ease-out forwards',
+          }} />
         </div>
       )}
 
@@ -6733,7 +6775,7 @@ function SymptomTrackerMobile() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
                 <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
                 <div style={{ color: '#64748b', fontSize: '13px' }}>
-                  3.3.17 • {isStandalone() ? 'Home Screen App' : 'Browser'}
+                  3.3.19 • {isStandalone() ? 'Home Screen App' : 'Browser'}
                 </div>
               </div>
               <button
@@ -7250,46 +7292,18 @@ function SymptomTrackerMobile() {
           50% { transform: scale(1.2); }
           100% { transform: scale(1); opacity: 1; }
         }
-        @keyframes confettiLeft {
+        @keyframes flash {
           0% { 
             opacity: 1; 
-            transform: translate(0, 0) rotate(0deg) scale(0);
+            transform: scale(0.5);
           }
-          15% {
+          50% {
             opacity: 1;
-            transform: translate(-30px, -40px) rotate(90deg) scale(1);
+            transform: scale(2);
           }
           100% { 
             opacity: 0; 
-            transform: translate(-120px, 180px) rotate(540deg) scale(0.3);
-          }
-        }
-        @keyframes confettiRight {
-          0% { 
-            opacity: 1; 
-            transform: translate(0, 0) rotate(0deg) scale(0);
-          }
-          15% {
-            opacity: 1;
-            transform: translate(30px, -40px) rotate(-90deg) scale(1);
-          }
-          100% { 
-            opacity: 0; 
-            transform: translate(120px, 180px) rotate(-540deg) scale(0.3);
-          }
-        }
-        @keyframes confettiUp {
-          0% { 
-            opacity: 1; 
-            transform: translate(0, 0) rotate(0deg) scale(0);
-          }
-          20% {
-            opacity: 1;
-            transform: translate(0, -80px) rotate(180deg) scale(1);
-          }
-          100% { 
-            opacity: 0; 
-            transform: translate(0, 150px) rotate(720deg) scale(0.3);
+            transform: scale(3);
           }
         }
         @keyframes slideDown {
