@@ -16,7 +16,7 @@ export default function Export({
     onClose();
     setCopyToastMessage(`Copied ${days} days of tracking for AI chat`);
     haptic('light');
-    setTimeout(() => setCopyToastMessage(''), 1500);
+    setTimeout(() => setCopyToastMessage(''), 2250);
   };
 
   const handleExportCSV = (days) => {

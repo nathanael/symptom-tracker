@@ -22,7 +22,7 @@ export default function Insights({
     navigator.clipboard.writeText(exportData);
     setCopyToastMessage('Copied 60 days of tracking for AI chat');
     haptic('light');
-    setTimeout(() => setCopyToastMessage(''), 1500);
+    setTimeout(() => setCopyToastMessage(''), 2250);
   };
 
   return (

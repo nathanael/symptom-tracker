@@ -275,7 +275,7 @@ function App() {
     navigator.clipboard.writeText(data);
     setCopyToastMessage(`Copied ${copyDays} day${copyDays > 1 ? 's' : ''} of tracking for AI chat`);
     haptic('light');
-    setTimeout(() => setCopyToastMessage(''), 1500);
+    setTimeout(() => setCopyToastMessage(''), 2250);
   }, [copyDays, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode]);
 
   const canGoForward = useMemo(() => {
@@ -549,6 +549,7 @@ function App() {
           fontWeight: '500',
           zIndex: 2000,
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          textAlign: 'center',
         }}>
           {copyToastMessage}
         </div>
