@@ -526,10 +526,10 @@ export default function Settings({
           padding: '16px',
           marginBottom: '12px',
         }}>
-          <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px' }}>
-            Copy symptoms & supplements to clipboard
+          <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '10px' }}>
+            Copy tracking data to clipboard for AI chat
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '2px' }}>
             {[30, 60, 90].map(days => (
               <button
                 key={days}
@@ -542,7 +542,7 @@ export default function Settings({
                 }}
                 style={{
                   flex: 1,
-                  padding: '10px 0',
+                  padding: '8px 0',
                   background: 'rgba(139, 92, 246, 0.2)',
                   border: 'none',
                   borderRadius: '8px',
@@ -655,7 +655,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v3.7.13
+              v3.7.14
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

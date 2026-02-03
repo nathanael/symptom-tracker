@@ -931,7 +931,7 @@ export default function SymptomList({
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
-          Rapid
+          Rapid Entry
         </button>
 
         {/* Note Button - purple */}
