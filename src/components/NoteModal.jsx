@@ -1,0 +1,123 @@
+import { useRef, useEffect } from 'react';
+import { getDateKey } from '../utils/helpers';
+
+export default function NoteModal({
+  selectedDate,
+  dailyNotes,
+  setDailyNotes,
+  onClose,
+}) {
+  const textareaRef = useRef(null);
+  const dateKey = getDateKey(selectedDate);
+
+  useEffect(() => {
+    // Focus textarea on mount
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      // Move cursor to end
+      const len = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(len, len);
+    }
+  }, []);
+
+  const handleNoteChange = (value) => {
+    setDailyNotes(prev => ({
+      ...prev,
+      [dateKey]: value
+    }));
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.92)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        padding: '20px',
+        paddingTop: 'calc(60px + env(safe-area-inset-top))',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: '500px',
+          background: 'rgba(30, 27, 75, 0.95)',
+          borderRadius: '12px',
+          border: '1px solid rgba(99, 102, 241, 0.3)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '16px 20px',
+          borderBottom: '1px solid rgba(100, 116, 139, 0.2)',
+        }}>
+          <h3 style={{
+            color: '#f8fafc',
+            fontSize: '18px',
+            fontWeight: '600',
+            margin: 0,
+          }}>
+            Notes for {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#8b5cf6',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              padding: '4px 8px',
+            }}
+          >
+            Done
+          </button>
+        </div>
+
+        {/* Textarea */}
+        <div style={{ padding: '16px 20px 20px' }}>
+          <textarea
+            ref={textareaRef}
+            value={dailyNotes[dateKey] || ''}
+            onChange={(e) => handleNoteChange(e.target.value)}
+            placeholder="Add notes about today... (diet, sleep, stress, activities, etc.)"
+            style={{
+              width: '100%',
+              minHeight: '300px',
+              background: 'rgba(15, 10, 46, 0.5)',
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+              borderRadius: '8px',
+              padding: '14px',
+              color: '#e2e8f0',
+              fontSize: '15px',
+              lineHeight: '1.6',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+              outline: 'none',
+            }}
+          />
+          <p style={{
+            color: '#64748b',
+            fontSize: '12px',
+            margin: '12px 0 0 0',
+            textAlign: 'center',
+          }}>
+            Notes are saved automatically
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
