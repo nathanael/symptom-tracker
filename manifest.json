@@ -1,0 +1,23 @@
+{
+  "name": "Symptom Tracker",
+  "short_name": "Symptoms",
+  "description": "Track symptoms and supplements daily",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c0a1d",
+  "theme_color": "#0c0a1d",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
