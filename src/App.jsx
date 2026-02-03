@@ -10,6 +10,7 @@ import {
   STORAGE_KEY_STACK_ENTRIES,
   STORAGE_KEY_PINNED,
   STORAGE_KEY_COPY_DAYS,
+  STORAGE_KEY_TREND_WINDOW,
   severityColors,
   trackingModes,
   defaultSymptoms,
@@ -58,6 +59,7 @@ function App() {
   const [stackEntries, setStackEntries] = useLocalStorage(STORAGE_KEY_STACK_ENTRIES, {});
   const [pinnedSymptoms, setPinnedSymptoms] = useLocalStorageSet(STORAGE_KEY_PINNED, new Set());
   const [copyDays, setCopyDays] = useLocalStorage(STORAGE_KEY_COPY_DAYS, 7);
+  const [trendWindow, setTrendWindow] = useLocalStorage(STORAGE_KEY_TREND_WINDOW, 7);
 
   // Date state
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -504,6 +506,8 @@ function App() {
               setRapidEntryConfirm={setRapidEntryConfirm}
               incompleteSymptoms={incompleteSymptoms}
               totalActiveSymptoms={totalActiveSymptoms}
+              trendWindow={trendWindow}
+              showActions={!showInsights && !showSettings && !showExport}
             />
           ) : (
             <Stack
@@ -606,6 +610,8 @@ function App() {
           setPinnedSymptoms={setPinnedSymptoms}
           copyDays={copyDays}
           setCopyDays={setCopyDays}
+          trendWindow={trendWindow}
+          setTrendWindow={setTrendWindow}
           setLastAction={setLastAction}
           setCopyToastMessage={setCopyToastMessage}
           setShowExport={setShowExport}

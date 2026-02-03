@@ -50,14 +50,7 @@ export default function BottomNav({
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={appMode === 'symptoms' && !isViewOpen ? '#8b5cf6' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2v4"/>
-            <path d="M12 18v4"/>
-            <path d="M4.93 4.93l2.83 2.83"/>
-            <path d="M16.24 16.24l2.83 2.83"/>
-            <path d="M2 12h4"/>
-            <path d="M18 12h4"/>
-            <path d="M4.93 19.07l2.83-2.83"/>
-            <path d="M16.24 7.76l2.83-2.83"/>
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
           </svg>
           <span style={{
             fontSize: '11px',
@@ -89,7 +82,9 @@ export default function BottomNav({
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={appMode === 'stack' && !isViewOpen ? '#8b5cf6' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"/>
+            <path d="M10.5 20.5L3.5 13.5c-1.4-1.4-1.4-3.6 0-5s3.6-1.4 5 0"/>
+            <path d="M13.5 3.5L20.5 10.5c1.4 1.4 1.4 3.6 0 5s-3.6 1.4-5 0"/>
+            <path d="M8.5 15.5l7-7"/>
           </svg>
           <span style={{
             fontSize: '11px',

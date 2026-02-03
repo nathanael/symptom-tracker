@@ -8,6 +8,7 @@ export const STORAGE_KEY_STACK_ITEMS = 'symptomTracker_stackItems';
 export const STORAGE_KEY_STACK_ENTRIES = 'symptomTracker_stackEntries';
 export const STORAGE_KEY_PINNED = 'symptomTracker_pinned';
 export const STORAGE_KEY_COPY_DAYS = 'symptomTracker_copyDays';
+export const STORAGE_KEY_TREND_WINDOW = 'symptomTracker_trendWindow';
 
 // Severity Configuration
 export const severityLevels = [0, 1, 2, 3, 4, 5];

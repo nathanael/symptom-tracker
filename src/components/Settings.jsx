@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { trackingModes } from '../utils/constants';
-import { isStandalone, getDateKey, haptic } from '../utils/helpers';
+import { isStandalone, getDateKey, haptic, generateAIDataExport } from '../utils/helpers';
 
 export default function Settings({
   user,
@@ -29,6 +29,8 @@ export default function Settings({
   setPinnedSymptoms,
   copyDays,
   setCopyDays,
+  trendWindow,
+  setTrendWindow,
   setLastAction,
   setCopyToastMessage,
   setShowExport,
@@ -143,24 +145,13 @@ export default function Settings({
         background: '#08090A',
         zIndex: 100,
         overflowY: 'auto',
-        padding: '20px 24px 120px 24px',
+        padding: '20px 20px 120px 20px',
         paddingTop: 'calc(20px + env(safe-area-inset-top))',
       }}
     >
       <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-        {/* Header */}
-        <h2 style={{
-          color: '#f8fafc',
-          fontSize: '28px',
-          fontWeight: '700',
-          margin: '0 0 24px 0',
-          letterSpacing: '-0.5px',
-        }}>
-          Settings
-        </h2>
-
         {/* Cloud Sync Section */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
           CLOUD SYNC
         </div>
         <div style={{
@@ -416,7 +407,7 @@ export default function Settings({
         </div>
 
         {/* Tracking Mode Selection */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
           TRACKING MODE
         </div>
         <div style={{
@@ -454,7 +445,7 @@ export default function Settings({
         </div>
 
         {/* Copy Days Setting */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
           QUICK COPY
         </div>
         <div style={{
@@ -491,9 +482,9 @@ export default function Settings({
           </div>
         </div>
 
-        {/* Export Section */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
-          EXPORT
+        {/* Trend Indicator Window Setting */}
+        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+          TREND INDICATOR
         </div>
         <div style={{
           background: 'rgba(15, 17, 21, 0.5)',
@@ -501,6 +492,74 @@ export default function Settings({
           marginBottom: '20px',
           overflow: 'hidden',
         }}>
+          <div style={{ padding: '14px 16px' }}>
+            <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px' }}>
+              Days to analyze for trend arrows (↑↓)
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {[7, 14, 30].map(days => (
+                <button
+                  key={days}
+                  onClick={() => setTrendWindow(days)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 0',
+                    background: trendWindow === days ? 'rgba(34, 197, 94, 0.2)' : 'rgba(99, 102, 241, 0.1)',
+                    border: trendWindow === days ? '2px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(99, 102, 241, 0.2)',
+                    borderRadius: '8px',
+                    color: trendWindow === days ? '#4ade80' : '#94a3b8',
+                    fontSize: '14px',
+                    fontWeight: trendWindow === days ? '600' : '400',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {days}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Copy for AI Section */}
+        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+          QUICK COPY FOR AI
+        </div>
+        <div style={{
+          background: 'rgba(15, 17, 21, 0.5)',
+          borderRadius: '12px',
+          padding: '16px',
+          marginBottom: '20px',
+        }}>
+          <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px' }}>
+            Copy symptoms & supplements to clipboard
+          </div>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+            {[30, 60, 90].map(days => (
+              <button
+                key={days}
+                onClick={() => {
+                  const data = generateAIDataExport(days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode);
+                  navigator.clipboard.writeText(data);
+                  setCopyToastMessage(`Copied ${days} days to clipboard`);
+                  haptic('light');
+                  setTimeout(() => setCopyToastMessage(''), 1500);
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  background: 'rgba(139, 92, 246, 0.2)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#c4b5fd',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                }}
+              >
+                {days}d
+              </button>
+            ))}
+          </div>
           <button
             onClick={() => {
               setShowSettings(false);
@@ -510,28 +569,25 @@ export default function Settings({
               width: '100%',
               background: 'transparent',
               border: 'none',
-              padding: '14px 16px',
-              color: '#f8fafc',
-              fontSize: '15px',
+              padding: '0',
+              color: '#8b5cf6',
+              fontSize: '14px',
               cursor: 'pointer',
               textAlign: 'left',
               display: 'flex',
-              justifyContent: 'space-between',
               alignItems: 'center',
+              gap: '4px',
             }}
           >
-            <div>
-              <div>Export Data</div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>CSV or clipboard for AI analysis</div>
-            </div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            More options
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
           </button>
         </div>
 
         {/* Backup Section */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
           BACKUP
         </div>
         <div style={{
@@ -588,8 +644,72 @@ export default function Settings({
           </div>
         </div>
 
+        {/* About Section */}
+        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+          ABOUT
+        </div>
+        <div style={{
+          background: 'rgba(15, 17, 21, 0.5)',
+          borderRadius: '12px',
+          marginBottom: '20px',
+          overflow: 'hidden',
+        }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
+            <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
+            <div style={{ color: '#64748b', fontSize: '13px' }}>
+              3.7.7 ({isStandalone() ? 'Home Screen App' : 'Browser'})
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              if (checkingForUpdates) return;
+              setCheckingForUpdates(true);
+              haptic('light');
+
+              sessionStorage.setItem('justCheckedForUpdates', 'true');
+
+              if ('caches' in window) {
+                const names = await caches.keys();
+                await Promise.all(names.map(name => caches.delete(name)));
+              }
+              if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(registrations.map(reg => reg.unregister()));
+              }
+              window.location.reload(true);
+            }}
+            disabled={checkingForUpdates}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              padding: '14px 16px',
+              color: checkingForUpdates ? '#64748b' : '#8b5cf6',
+              fontSize: '15px',
+              cursor: checkingForUpdates ? 'default' : 'pointer',
+              textAlign: 'left',
+              opacity: checkingForUpdates ? 0.7 : 1,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>{checkingForUpdates ? 'Checking...' : 'Check for Updates'}</span>
+              {checkingForUpdates && (
+                <span style={{
+                  display: 'inline-block',
+                  width: '16px',
+                  height: '16px',
+                  border: '2px solid #64748b',
+                  borderTopColor: '#8b5cf6',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }} />
+              )}
+            </div>
+          </button>
+        </div>
+
         {/* Danger Zone */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
           DANGER ZONE
         </div>
         <div style={{
@@ -716,70 +836,6 @@ export default function Settings({
               </div>
             </div>
           )}
-        </div>
-
-        {/* About Section */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
-          ABOUT
-        </div>
-        <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          marginBottom: '20px',
-          overflow: 'hidden',
-        }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
-            <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
-            <div style={{ color: '#64748b', fontSize: '13px' }}>
-              3.6.8 ({isStandalone() ? 'Home Screen App' : 'Browser'})
-            </div>
-          </div>
-          <button
-            onClick={async () => {
-              if (checkingForUpdates) return;
-              setCheckingForUpdates(true);
-              haptic('light');
-
-              sessionStorage.setItem('justCheckedForUpdates', 'true');
-
-              if ('caches' in window) {
-                const names = await caches.keys();
-                await Promise.all(names.map(name => caches.delete(name)));
-              }
-              if ('serviceWorker' in navigator) {
-                const registrations = await navigator.serviceWorker.getRegistrations();
-                await Promise.all(registrations.map(reg => reg.unregister()));
-              }
-              window.location.reload(true);
-            }}
-            disabled={checkingForUpdates}
-            style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              padding: '14px 16px',
-              color: checkingForUpdates ? '#64748b' : '#8b5cf6',
-              fontSize: '15px',
-              cursor: checkingForUpdates ? 'default' : 'pointer',
-              textAlign: 'left',
-              opacity: checkingForUpdates ? 0.7 : 1,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{checkingForUpdates ? 'Checking...' : 'Check for Updates'}</span>
-              {checkingForUpdates && (
-                <span style={{
-                  display: 'inline-block',
-                  width: '16px',
-                  height: '16px',
-                  border: '2px solid #64748b',
-                  borderTopColor: '#8b5cf6',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                }} />
-              )}
-            </div>
-          </button>
         </div>
 
         {/* Footer */}

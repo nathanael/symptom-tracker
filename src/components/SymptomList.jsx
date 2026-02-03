@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { severityColors, trackingModes, HOLD_DELAY, DRAG_SENSITIVITY } from '../utils/constants';
-import { getDateKey, haptic } from '../utils/helpers';
+import { getDateKey, haptic, getSymptomTrend } from '../utils/helpers';
 
 export default function SymptomList({
   symptoms,
@@ -40,6 +40,8 @@ export default function SymptomList({
   setRapidEntryConfirm,
   incompleteSymptoms,
   totalActiveSymptoms,
+  trendWindow,
+  showActions,
 }) {
   // Drag state for hold-to-edit
   const [activeSymptom, setActiveSymptom] = useState(null);
@@ -389,14 +391,17 @@ export default function SymptomList({
         const symptomEntries = getSymptomEntries(symptom.id);
         const isQuickLog = quickLogSymptom === symptom.id;
         const isPinned = pinnedSymptoms.has(symptom.id);
+        const trend = getSymptomTrend(symptom.id, entries, trendWindow);
 
-        // Color based on severity
+        // Color based on severity - subtle off-white scale
         const getBadgeColor = (sev) => {
           if (sev === null) return { bg: 'transparent', border: 'rgba(255,255,255,0.1)', text: '#6b7280' };
-          if (sev === 0) return { bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', text: '#6b7280' };
-          if (sev <= 1) return { bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)', text: '#34d399' };
-          if (sev === 2) return { bg: 'rgba(234,179,8,0.1)', border: 'rgba(234,179,8,0.2)', text: '#facc15' };
-          return { bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', text: '#fbbf24' };
+          if (sev === 0) return { bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)', text: '#6b7280' };
+          if (sev === 1) return { bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)', text: '#9ca3af' };
+          if (sev === 2) return { bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.12)', text: '#b0b7c0' };
+          if (sev === 3) return { bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.14)', text: '#c9cdd3' };
+          if (sev === 4) return { bg: 'rgba(255,255,255,0.07)', border: 'rgba(255,255,255,0.16)', text: '#dfe2e6' };
+          return { bg: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.18)', text: '#f1f3f5' };
         };
 
         // For AM/PM mode, get both entries
@@ -445,6 +450,16 @@ export default function SymptomList({
                 {isPinned && (
                   <span style={{ color: '#fbbf24', fontSize: '12px' }}>⊙</span>
                 )}
+                <span style={{
+                  width: '16px',
+                  display: 'inline-block',
+                  fontSize: '12px',
+                  opacity: 0.7,
+                  color: trend === 'improving' ? '#4ade80' : '#fbbf24',
+                  flexShrink: 0,
+                }}>
+                  {trend === 'improving' ? '↓' : trend === 'worsening' ? '↑' : ''}
+                </span>
                 <span style={{
                   color: isDimmed ? '#9ca3af' : '#e5e7eb',
                   fontSize: '15px',
@@ -684,6 +699,8 @@ export default function SymptomList({
                     const logTime = quickLogTime || getCurrentTimePeriod();
                     const recentEntry = getMostRecentEntry(symptom.id, logTime);
                     const isRecentSeverity = recentEntry?.severity === severity;
+                    const subtleColors = ['#6b7280', '#9ca3af', '#b0b7c0', '#c9cdd3', '#dfe2e6', '#f1f3f5'];
+                    const color = subtleColors[severity];
 
                     return (
                       <button
@@ -695,10 +712,10 @@ export default function SymptomList({
                         style={{
                           flex: 1,
                           padding: '12px 0',
-                          background: `${severityColors[severity]}20`,
-                          border: isRecentSeverity ? `1px solid ${severityColors[severity]}35` : '1px solid transparent',
+                          background: `rgba(255,255,255,${0.03 + severity * 0.01})`,
+                          border: isRecentSeverity ? `1px solid rgba(255,255,255,0.25)` : '1px solid transparent',
                           borderRadius: '3px',
-                          color: severityColors[severity],
+                          color: color,
                           fontSize: '18px',
                           fontWeight: '700',
                           cursor: 'pointer',
@@ -741,6 +758,7 @@ export default function SymptomList({
       )}
 
       {/* Floating Action Buttons */}
+      {showActions && (
       <div style={{
         position: 'fixed',
         bottom: 'calc(90px + env(safe-area-inset-bottom))',
@@ -793,7 +811,7 @@ export default function SymptomList({
               background: 'rgba(16, 185, 129, 0.2)',
               border: '1px solid rgba(16, 185, 129, 0.3)',
               borderRadius: '8px',
-              padding: '12px 14px',
+              padding: '11px 14px',
               color: '#34d399',
               fontSize: '13px',
               fontWeight: '500',
@@ -897,7 +915,7 @@ export default function SymptomList({
             background: 'rgba(16, 185, 129, 0.2)',
             border: '1px solid rgba(16, 185, 129, 0.3)',
             borderRadius: '8px',
-            padding: '12px 14px',
+            padding: '11px 14px',
             color: '#34d399',
             fontSize: '13px',
             fontWeight: '500',
@@ -923,7 +941,7 @@ export default function SymptomList({
             background: 'rgba(99, 102, 241, 0.2)',
             border: '1px solid rgba(99, 102, 241, 0.3)',
             borderRadius: '8px',
-            padding: '12px 14px',
+            padding: '11px 14px',
             color: '#a5b4fc',
             fontSize: '13px',
             fontWeight: '500',
@@ -942,7 +960,7 @@ export default function SymptomList({
           Note
         </button>
       </div>
-
+      )}
 
       {/* Manage Symptoms Modal */}
       {showAddSymptom && (
@@ -1232,6 +1250,7 @@ export default function SymptomList({
               cursor: 'pointer',
               padding: '14px 40px',
               boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
+              zIndex: 100,
             }}
           >
             Done

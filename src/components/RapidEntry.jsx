@@ -267,7 +267,6 @@ export default function RapidEntry({
           }}
         >
           Close
-          {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#94635a', fontWeight: '400' }}>Esc</span>}
         </button>
       </div>
 
@@ -436,14 +435,17 @@ export default function RapidEntry({
                     color: severityColors[severity],
                   }}>✓</span>
                 )}
-                {!isMobile() && !isCurrentSelection && (
+                {!isMobile() && (
                   <span style={{
                     position: 'absolute',
-                    bottom: '4px',
-                    right: '6px',
-                    fontSize: '10px',
-                    color: '#475569',
-                    fontWeight: '500',
+                    top: '4px',
+                    left: '6px',
+                    fontSize: '11px',
+                    color: isCurrentSelection ? severityColors[severity] : '#64748b',
+                    fontWeight: '600',
+                    background: isCurrentSelection ? 'transparent' : 'rgba(0,0,0,0.3)',
+                    padding: '2px 5px',
+                    borderRadius: '3px',
                   }}>{severity}</span>
                 )}
               </button>
@@ -473,7 +475,6 @@ export default function RapidEntry({
             }}
           >
             Back
-            {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>←</span>}
           </button>
 
           <button
@@ -496,10 +497,65 @@ export default function RapidEntry({
             }}
           >
             {rapidEntryIndex < activeSymptomsList.length - 1 ? 'Skip' : 'Done'}
-            {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>→</span>}
           </button>
         </div>
       </div>
+
+      {/* Keyboard shortcuts bar - typeform style */}
+      {!isMobile() && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '20px',
+          right: '20px',
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '24px',
+          color: '#64748b',
+          fontSize: '13px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              background: 'rgba(100, 116, 139, 0.2)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+            }}>0-5</span>
+            <span>select value</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              background: 'rgba(100, 116, 139, 0.2)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+            }}>←</span>
+            <span>back</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              background: 'rgba(100, 116, 139, 0.2)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+            }}>→</span>
+            <span>skip</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              background: 'rgba(100, 116, 139, 0.2)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+            }}>esc</span>
+            <span>close</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

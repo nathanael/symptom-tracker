@@ -354,6 +354,48 @@ export const getInsights = (windowDays, entries, symptoms) => {
   };
 };
 
+// Symptom Trend Indicator
+export const getSymptomTrend = (symptomId, entries, windowDays = 7) => {
+  const now = new Date();
+  const midpoint = Math.floor(windowDays / 2);
+
+  // Collect entries for this symptom in the window
+  let recentEntries = [];  // last 3-4 days
+  let olderEntries = [];   // previous 3-4 days
+
+  for (let i = 0; i < windowDays; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dateKey = getDateKey(d);
+
+    // Find entries for this date/symptom
+    Object.entries(entries).forEach(([key, entry]) => {
+      if (key.includes(dateKey) && key.includes(symptomId)) {
+        if (i < midpoint) {
+          recentEntries.push(entry.severity);
+        } else {
+          olderEntries.push(entry.severity);
+        }
+      }
+    });
+  }
+
+  // Need minimum data (at least 1 entry in each half)
+  if (recentEntries.length < 1 || olderEntries.length < 1) return 'stable';
+
+  const recentAvg = recentEntries.reduce((a, b) => a + b, 0) / recentEntries.length;
+  const olderAvg = olderEntries.reduce((a, b) => a + b, 0) / olderEntries.length;
+
+  // Avoid division by zero
+  if (olderAvg === 0) return recentAvg > 0.5 ? 'worsening' : 'stable';
+
+  const percentChange = ((recentAvg - olderAvg) / olderAvg) * 100;
+
+  if (percentChange <= -20) return 'improving';  // severity decreased
+  if (percentChange >= 20) return 'worsening';   // severity increased
+  return 'stable';
+};
+
 // CSV Export
 export const exportCSV = (days, entries, symptoms, trackingMode) => {
   const today = new Date();
