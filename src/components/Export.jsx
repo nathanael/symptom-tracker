@@ -71,7 +71,7 @@ export default function Export({
           COPY TO CLIPBOARD
         </div>
         <div style={{
-          background: 'rgba(30, 27, 75, 0.5)',
+          background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           padding: '16px',
           marginBottom: '20px',
@@ -117,7 +117,7 @@ export default function Export({
           DOWNLOAD TRACKING DATA
         </div>
         <div style={{
-          background: 'rgba(30, 27, 75, 0.5)',
+          background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           overflow: 'hidden',
         }}>

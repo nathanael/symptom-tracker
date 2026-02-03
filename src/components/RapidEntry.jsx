@@ -1,3 +1,4 @@
+import confetti from 'canvas-confetti';
 import { severityColors } from '../utils/constants';
 import { isMobile, getDateKey, haptic } from '../utils/helpers';
 
@@ -47,7 +48,7 @@ export default function RapidEntry({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
+        background: '#08090A',
         zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',
@@ -199,7 +200,7 @@ export default function RapidEntry({
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
+      background: '#08090A',
       zIndex: 1000,
       display: 'flex',
       flexDirection: 'column',
@@ -360,7 +361,12 @@ export default function RapidEntry({
                     if (rapidEntryIndex < activeSymptomsList.length - 1) {
                       setRapidEntryIndex(prev => prev + 1);
                     } else {
-                      // At end - show completion
+                      // At end - show completion with confetti
+                      confetti({
+                        particleCount: 100,
+                        spread: 70,
+                        origin: { y: 0.6 }
+                      });
                       setRapidEntryMode(false);
                       setRapidEntryIndex(0);
                       setCopyToastMessage('✓ All symptoms logged!');

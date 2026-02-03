@@ -6,7 +6,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: #0c0a1d;
+  background: #08090A;
   overflow: hidden;
   height: 100%;
   width: 100%;
@@ -23,7 +23,7 @@ html, body {
   padding: 20px;
   font-family: monospace;
   white-space: pre-wrap;
-  background: #1a1333;
+  background: #0F1115;
 }
 
 /* No scroll class for drag operations */

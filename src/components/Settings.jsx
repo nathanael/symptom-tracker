@@ -138,14 +138,14 @@ export default function Settings({
         left: 0,
         right: 0,
         bottom: 0,
-        background: '#0c0a1d',
+        background: '#08090A',
         zIndex: 100,
         overflowY: 'auto',
-        padding: '20px 16px 120px 16px',
+        padding: '20px 24px 120px 24px',
         paddingTop: 'calc(20px + env(safe-area-inset-top))',
       }}
     >
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
         {/* Header */}
         <h2 style={{
           color: '#f8fafc',
@@ -162,7 +162,7 @@ export default function Settings({
           CLOUD SYNC
         </div>
         <div style={{
-          background: 'rgba(30, 27, 75, 0.5)',
+          background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           padding: '16px',
           marginBottom: '20px',
@@ -268,7 +268,7 @@ export default function Settings({
                   autoComplete="email"
                   style={{
                     width: '100%',
-                    background: 'rgba(30, 27, 75, 0.8)',
+                    background: 'rgba(15, 17, 21, 0.8)',
                     border: '1px solid rgba(139, 92, 246, 0.3)',
                     borderRadius: '3px',
                     padding: '12px',
@@ -285,7 +285,7 @@ export default function Settings({
                   autoComplete={isSignUp ? 'new-password' : 'current-password'}
                   style={{
                     width: '100%',
-                    background: 'rgba(30, 27, 75, 0.8)',
+                    background: 'rgba(15, 17, 21, 0.8)',
                     border: '1px solid rgba(139, 92, 246, 0.3)',
                     borderRadius: '3px',
                     padding: '12px',
@@ -371,7 +371,7 @@ export default function Settings({
                     disabled={syncing}
                     style={{
                       width: '100%',
-                      background: 'rgba(30, 27, 75, 0.6)',
+                      background: 'rgba(15, 17, 21, 0.6)',
                       border: '1px solid rgba(100, 116, 139, 0.3)',
                       borderRadius: '3px',
                       padding: '12px 16px',
@@ -418,7 +418,7 @@ export default function Settings({
           TRACKING MODE
         </div>
         <div style={{
-          background: 'rgba(30, 27, 75, 0.5)',
+          background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           marginBottom: '20px',
           overflow: 'hidden',
@@ -456,7 +456,7 @@ export default function Settings({
           QUICK COPY
         </div>
         <div style={{
-          background: 'rgba(30, 27, 75, 0.5)',
+          background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           marginBottom: '20px',
           overflow: 'hidden',
@@ -494,7 +494,7 @@ export default function Settings({
           BACKUP
         </div>
         <div style={{
-          background: 'rgba(30, 27, 75, 0.5)',
+          background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           marginBottom: '20px',
           overflow: 'hidden',
@@ -552,7 +552,7 @@ export default function Settings({
           DANGER ZONE
         </div>
         <div style={{
-          background: 'rgba(30, 27, 75, 0.5)',
+          background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           marginBottom: '20px',
           overflow: 'hidden',
@@ -682,7 +682,7 @@ export default function Settings({
           ABOUT
         </div>
         <div style={{
-          background: 'rgba(30, 27, 75, 0.5)',
+          background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           marginBottom: '20px',
           overflow: 'hidden',

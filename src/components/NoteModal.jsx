@@ -47,7 +47,7 @@ export default function NoteModal({
         style={{
           width: '100%',
           maxWidth: '500px',
-          background: 'rgba(30, 27, 75, 0.95)',
+          background: 'rgba(15, 17, 21, 0.95)',
           borderRadius: '12px',
           border: '1px solid rgba(99, 102, 241, 0.3)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',

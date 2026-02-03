@@ -299,37 +299,17 @@ export default function SymptomList({
   return (
     <div
       ref={containerRef}
-      style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '0' }}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleEnd}
       onTouchCancel={handleEnd}
     >
-      {/* Search handle */}
-      {symptoms.filter(s => s.active).length > 8 && (
-        <div
-          onClick={() => setSearchVisible(!searchVisible)}
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            padding: '4px 0 8px 0',
-            cursor: 'pointer',
-          }}
-        >
-          <div style={{
-            width: '40px',
-            height: '4px',
-            background: searchVisible ? 'rgba(99, 102, 241, 0.5)' : 'rgba(100, 116, 139, 0.3)',
-            borderRadius: '2px',
-          }} />
-        </div>
-      )}
-
-      {/* Search Input */}
-      {searchVisible && symptoms.filter(s => s.active).length > 8 && (
+      {/* Search Input - only show when searchVisible (pull to search) */}
+      {searchVisible && (
         <div style={{
           position: 'relative',
           marginBottom: '8px',
-          animation: 'slideDown 0.2s ease',
+          padding: '0 20px',
         }}>
           <input
             type="text"
@@ -340,59 +320,76 @@ export default function SymptomList({
             style={{
               width: '100%',
               padding: '12px 40px 12px 16px',
-              background: 'rgba(30, 27, 75, 0.6)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              borderRadius: '3px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '8px',
               color: '#f8fafc',
-              fontSize: '15px',
+              fontSize: '14px',
               outline: 'none',
               boxSizing: 'border-box',
             }}
           />
-          {symptomSearch && (
-            <button
-              onClick={() => setSymptomSearch('')}
-              style={{
-                position: 'absolute',
-                right: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'rgba(99, 102, 241, 0.3)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '24px',
-                height: '24px',
-                color: '#a5b4fc',
-                fontSize: '14px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              ✕
-            </button>
-          )}
+          <button
+            onClick={() => { setSymptomSearch(''); setSearchVisible(false); }}
+            style={{
+              position: 'absolute',
+              right: '28px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'transparent',
+              border: 'none',
+              color: '#6b7280',
+              fontSize: '12px',
+              cursor: 'pointer',
+              padding: '4px 8px',
+            }}
+          >
+            Cancel
+          </button>
         </div>
       )}
 
       {/* No results */}
       {activeSymptoms.length === 0 && symptomSearch && (
         <div style={{
-          padding: '24px',
+          padding: '24px 20px',
           textAlign: 'center',
-          color: '#64748b',
+          color: '#6b7280',
           fontSize: '14px',
         }}>
           No symptoms match "{symptomSearch}"
         </div>
       )}
 
-      {/* Symptom tiles */}
-      {activeSymptoms.map((symptom) => {
+      {/* Symptom rows - flat design */}
+      {activeSymptoms.map((symptom, index) => {
         const symptomEntries = getSymptomEntries(symptom.id);
         const isQuickLog = quickLogSymptom === symptom.id;
         const isPinned = pinnedSymptoms.has(symptom.id);
+
+        // Color based on severity
+        const getBadgeColor = (sev) => {
+          if (sev === null) return { bg: 'transparent', border: 'rgba(255,255,255,0.1)', text: '#6b7280' };
+          if (sev === 0) return { bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', text: '#6b7280' };
+          if (sev <= 1) return { bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)', text: '#34d399' };
+          if (sev === 2) return { bg: 'rgba(234,179,8,0.1)', border: 'rgba(234,179,8,0.2)', text: '#facc15' };
+          return { bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', text: '#fbbf24' };
+        };
+
+        // For AM/PM mode, get both entries
+        const amEntry = trackingMode === 'ampm' ? symptomEntries.find(e => e.time === 'morning') : null;
+        const pmEntry = trackingMode === 'ampm' ? symptomEntries.find(e => e.time === 'evening') : null;
+
+        // For simple mode, get max entry
+        const maxEntry = trackingMode !== 'ampm' && symptomEntries.length > 0
+          ? symptomEntries.reduce((max, e) => e.severity > max.severity ? e : max, symptomEntries[0])
+          : null;
+
+        // Check if any entry exists for dimming the name
+        const hasAnyEntry = trackingMode === 'ampm'
+          ? (amEntry || pmEntry)
+          : maxEntry;
+        const isDimmed = !hasAnyEntry || (trackingMode !== 'ampm' && maxEntry?.severity === 0);
 
         return (
           <div
@@ -402,23 +399,21 @@ export default function SymptomList({
                 setQuickLogSymptom(null);
               } else {
                 setQuickLogSymptom(symptom.id);
-                if (trackingMode === 'ampm' && !quickLogTime) {
-                  setQuickLogTime(getCurrentTimePeriod());
-                }
+                // Always set to current time of day when clicking on row
+                setQuickLogTime(getCurrentTimePeriod());
               }
             }}
             onTouchStart={(e) => handleTouchStart(e, symptom.id)}
             style={{
-              background: 'rgba(30, 27, 75, 0.6)',
-              borderRadius: '5px',
+              background: isQuickLog ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
               overflow: 'hidden',
               cursor: 'pointer',
-              border: isQuickLog ? '2px solid rgba(99, 102, 241, 0.5)' : '1px solid transparent',
             }}
           >
             {/* Main row */}
             <div style={{
-              padding: '14px 16px',
+              padding: '16px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -429,129 +424,190 @@ export default function SymptomList({
                   <span style={{ color: '#fbbf24', fontSize: '12px' }}>⊙</span>
                 )}
                 <span style={{
-                  color: '#e2e8f0',
+                  color: isDimmed ? '#9ca3af' : '#e5e7eb',
                   fontSize: '15px',
-                  fontWeight: '500',
+                  fontWeight: '400',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                 }}>{symptom.name}</span>
               </div>
 
-              {/* Entry indicators - fixed positions for AM/PM */}
-              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+              {/* Right side: AM/PM badges - minus circle for unentered */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                 {trackingMode === 'ampm' ? (
-                  // Fixed positions: AM always left, PM always right
+                  /* AM/PM mode - two fixed positions */
                   <>
-                    {['morning', 'evening'].map((timeId) => {
-                      const entry = symptomEntries.find(e => e.time === timeId);
-                      const period = timePeriods.find(t => t.id === timeId);
-
-                      if (entry) {
-                        return (
-                          <div
-                            key={timeId}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Remove this entry
-                              const dateKey = getDateKey(selectedDate);
-                              const entryKey = `${dateKey}-${symptom.id}-${timeId}`;
-                              setEntries(prev => {
-                                const newEntries = { ...prev };
-                                delete newEntries[entryKey];
-                                return newEntries;
-                              });
-                              setLastAction(`Removed ${symptom.name} ${period?.label || timeId}`);
-                              haptic('light');
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '4px 10px',
-                              borderRadius: '3px',
-                              background: `${severityColors[entry.severity]}20`,
-                              cursor: 'pointer',
-                              minWidth: '32px',
-                            }}
-                          >
-                            <span style={{
-                              color: severityColors[entry.severity],
-                              fontSize: '14px',
-                              fontWeight: '700',
-                            }}>{entry.severity}</span>
-                          </div>
-                        );
-                      } else {
-                        return (
-                          <div
-                            key={timeId}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '4px 10px',
-                              borderRadius: '3px',
-                              background: 'rgba(100, 116, 139, 0.1)',
-                              minWidth: '32px',
-                            }}
-                          >
-                            <span style={{
-                              color: '#475569',
-                              fontSize: '14px',
-                              fontWeight: '700',
-                            }}>-</span>
-                          </div>
-                        );
-                      }
-                    })}
+                    {/* AM Position */}
+                    {amEntry ? (
+                      /* Has entry - show severity badge */
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const dateKey = getDateKey(selectedDate);
+                          const entryKey = `${dateKey}-${symptom.id}-morning`;
+                          setEntries(prev => {
+                            const newEntries = { ...prev };
+                            delete newEntries[entryKey];
+                            return newEntries;
+                          });
+                          setLastAction(`Removed ${symptom.name} AM`);
+                          haptic('light');
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '6px',
+                          border: `1px solid ${getBadgeColor(amEntry.severity).border}`,
+                          background: getBadgeColor(amEntry.severity).bg,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{ color: getBadgeColor(amEntry.severity).text, fontSize: '14px', fontWeight: '600' }}>
+                          {amEntry.severity}
+                        </span>
+                      </div>
+                    ) : (
+                      /* No entry - show minus circle */
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuickLogSymptom(symptom.id);
+                          setQuickLogTime('morning');
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                      </div>
+                    )}
+                    {/* PM Position */}
+                    {pmEntry ? (
+                      /* Has entry - show severity badge */
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const dateKey = getDateKey(selectedDate);
+                          const entryKey = `${dateKey}-${symptom.id}-evening`;
+                          setEntries(prev => {
+                            const newEntries = { ...prev };
+                            delete newEntries[entryKey];
+                            return newEntries;
+                          });
+                          setLastAction(`Removed ${symptom.name} PM`);
+                          haptic('light');
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '6px',
+                          border: `1px solid ${getBadgeColor(pmEntry.severity).border}`,
+                          background: getBadgeColor(pmEntry.severity).bg,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <span style={{ color: getBadgeColor(pmEntry.severity).text, fontSize: '14px', fontWeight: '600' }}>
+                          {pmEntry.severity}
+                        </span>
+                      </div>
+                    ) : (
+                      /* No entry - show minus circle */
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuickLogSymptom(symptom.id);
+                          setQuickLogTime('evening');
+                        }}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                      </div>
+                    )}
                   </>
-                ) : symptomEntries.length === 0 ? (
-                  <span style={{
-                    color: '#475569',
-                    fontSize: '12px',
-                    fontStyle: 'italic',
-                  }}>not logged</span>
                 ) : (
-                  symptomEntries.map((entry, idx) => (
+                  /* Simple mode - single position */
+                  maxEntry ? (
+                    /* Has entry - show severity badge */
                     <div
-                      key={idx}
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Remove this entry
                         const dateKey = getDateKey(selectedDate);
-                        const entryKey = `${dateKey}-${symptom.id}-${entry.time}`;
+                        const entryKey = `${dateKey}-${symptom.id}-${maxEntry.time}`;
                         setEntries(prev => {
                           const newEntries = { ...prev };
                           delete newEntries[entryKey];
                           return newEntries;
                         });
-                        const period = timePeriods.find(t => t.id === entry.time);
-                        setLastAction(`Removed ${symptom.name} ${period?.label || entry.time}`);
+                        setLastAction(`Removed ${symptom.name}`);
                         haptic('light');
                       }}
                       style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        border: `1px solid ${getBadgeColor(maxEntry.severity).border}`,
+                        background: getBadgeColor(maxEntry.severity).bg,
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px',
-                        padding: '4px 8px',
-                        borderRadius: '3px',
-                        background: `${severityColors[entry.severity]}20`,
+                        justifyContent: 'center',
                         cursor: 'pointer',
                       }}
                     >
-                      {timePeriods.length > 1 && (
-                        <span style={{ color: '#a5b4fc', fontSize: '11px' }}>
-                          {timePeriods.find(t => t.id === entry.time)?.icon}
-                        </span>
-                      )}
-                      <span style={{
-                        color: severityColors[entry.severity],
-                        fontSize: '14px',
-                        fontWeight: '700',
-                      }}>{entry.severity}</span>
+                      <span style={{ color: getBadgeColor(maxEntry.severity).text, fontSize: '14px', fontWeight: '600' }}>
+                        {maxEntry.severity}
+                      </span>
                     </div>
-                  ))
+                  ) : (
+                    /* No entry - show minus circle */
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQuickLogSymptom(symptom.id);
+                        setQuickLogTime(getCurrentTimePeriod());
+                      }}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    </div>
+                  )
                 )}
               </div>
             </div>
@@ -637,6 +693,31 @@ export default function SymptomList({
         );
       })}
 
+      {/* Add Symptom Button - at bottom of list */}
+      {!showAddSymptom && (
+        <button
+          onClick={() => setShowAddSymptom(true)}
+          style={{
+            width: '100%',
+            padding: '16px 20px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+            color: '#6b7280',
+            fontSize: '14px',
+            fontWeight: '400',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>+</span>
+          Add symptom
+        </button>
+      )}
+
       {/* Floating Add Note Button */}
       <button
         onClick={() => setShowNoteModal(true)}
@@ -673,15 +754,16 @@ export default function SymptomList({
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.92)',
+            background: '#08090A',
             zIndex: 1000,
             overflowY: 'auto',
             padding: '20px',
+            paddingTop: 'calc(20px + env(safe-area-inset-top))',
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '600px', margin: '0 auto' }}
+            style={{ maxWidth: '500px', margin: '0 auto' }}
           >
             <div style={{
               display: 'flex',
@@ -709,7 +791,7 @@ export default function SymptomList({
 
             {/* Add new symptom(s) */}
             <div style={{
-              background: 'rgba(30, 27, 75, 0.6)',
+              background: 'rgba(15, 17, 21, 0.6)',
               borderRadius: '3px',
               padding: '16px',
               marginBottom: '20px',
@@ -783,7 +865,7 @@ export default function SymptomList({
                     <div
                       key={symptom.id}
                       style={{
-                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(30, 27, 75, 0.6)',
+                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
                         borderRadius: '3px',
                         padding: '10px 12px',
                         display: 'flex',
@@ -889,7 +971,7 @@ export default function SymptomList({
                     <div
                       key={symptom.id}
                       style={{
-                        background: 'rgba(30, 27, 75, 0.3)',
+                        background: 'rgba(15, 17, 21, 0.3)',
                         borderRadius: '3px',
                         padding: '12px 16px',
                         display: 'flex',

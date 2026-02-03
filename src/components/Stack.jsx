@@ -171,14 +171,15 @@ export default function Stack({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
       {/* Progress indicator and actions */}
       {activeItems.length > 0 && (
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '8px',
+          marginBottom: '12px',
+          padding: '0 4px',
           gap: '8px',
         }}>
           <button
@@ -208,7 +209,7 @@ export default function Stack({
               padding: '6px 10px',
             }}
           >
-            ✓ All
+            All
           </button>
           <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '600' }}>
             {getStackProgress().taken}/{getStackProgress().total}
@@ -235,13 +236,13 @@ export default function Stack({
               padding: '6px 10px',
             }}
           >
-            ✕ Clear
+            Clear
           </button>
         </div>
       )}
 
-      {/* Stack items */}
-      {activeItems.map((item) => {
+      {/* Stack items - flat row design */}
+      {activeItems.map((item, index) => {
         const entry = getStackEntry(item.id);
         const isTaken = !!entry;
         const isEditing = editingStackItem === item.id;
@@ -251,68 +252,31 @@ export default function Stack({
           <div
             key={item.id}
             style={{
-              background: isTaken
-                ? multiplier > 1
-                  ? 'rgba(139, 92, 246, 0.1)'
-                  : 'rgba(34, 197, 94, 0.1)'
-                : 'rgba(30, 27, 75, 0.6)',
-              borderRadius: '5px',
-              padding: '14px 16px',
+              background: 'transparent',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+              padding: '16px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: '12px',
-              border: isTaken
-                ? multiplier > 1
-                  ? '1px solid rgba(139, 92, 246, 0.4)'
-                  : '1px solid rgba(34, 197, 94, 0.3)'
-                : '1px solid transparent',
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
             }}
             onClick={() => !isEditing && toggleStackItem(item.id)}
           >
-            {/* Left side: checkbox + name */}
+            {/* Left side: name */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '3px',
-                background: isTaken ? '#22c55e' : 'rgba(100, 116, 139, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: isTaken ? '#fff' : '#64748b',
-                fontSize: '14px',
-                fontWeight: '700',
-                flexShrink: 0,
-              }}>
-                {isTaken ? '✓' : ''}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                <span style={{
-                  color: isTaken ? '#e2e8f0' : '#94a3b8',
-                  fontSize: '15px',
-                  fontWeight: '500',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>{item.name}</span>
-                {multiplier > 1 && (
-                  <span style={{
-                    color: '#a78bfa',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                  }}>
-                    {multiplier}× dose today
-                  </span>
-                )}
-              </div>
+              <span style={{
+                color: isTaken ? '#e5e7eb' : '#9ca3af',
+                fontSize: '15px',
+                fontWeight: '400',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>{item.name}</span>
             </div>
 
-            {/* Right side: dose + multiplier */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+            {/* Right side: dose + checkbox */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
               {isEditing ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                      onClick={(e) => e.stopPropagation()}>
@@ -324,12 +288,12 @@ export default function Stack({
                     style={{
                       width: '60px',
                       background: 'rgba(99, 102, 241, 0.15)',
-                      border: '2px solid rgba(99, 102, 241, 0.5)',
-                      borderRadius: '3px',
+                      border: '1px solid rgba(99, 102, 241, 0.5)',
+                      borderRadius: '4px',
                       padding: '8px 10px',
                       color: '#f8fafc',
-                      fontSize: '16px',
-                      fontWeight: '600',
+                      fontSize: '14px',
+                      fontWeight: '500',
                       textAlign: 'center',
                       outline: 'none',
                     }}
@@ -343,17 +307,14 @@ export default function Stack({
                     }}
                     onBlur={(e) => updateStackDose(item.id, e.target.value)}
                   />
-                  <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '500' }}>{item.unit}</span>
+                  <span style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500' }}>{item.unit}</span>
                 </div>
               ) : (
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'baseline',
-                    gap: '4px',
-                    padding: '4px 8px',
-                    borderRadius: '3px',
-                    background: isTaken ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
+                    gap: '3px',
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -361,14 +322,14 @@ export default function Stack({
                   }}
                 >
                   <span style={{
-                    color: isTaken ? '#4ade80' : '#64748b',
-                    fontSize: '15px',
-                    fontWeight: '600',
+                    color: isTaken ? '#e5e7eb' : '#6b7280',
+                    fontSize: '13px',
+                    fontWeight: '500',
                   }}>
                     {entry?.dose || item.defaultDose}
                   </span>
                   <span style={{
-                    color: isTaken ? '#4ade80' : '#64748b',
+                    color: '#6b7280',
                     fontSize: '11px',
                   }}>
                     {item.unit}
@@ -376,60 +337,59 @@ export default function Stack({
                 </div>
               )}
 
-              {/* Multiplier button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!isTaken) return;
-                  haptic('light');
-                  const entryKey = `${dateKey}-${item.id}`;
-                  const currentMultiplier = entry?.multiplier || 1;
-                  const nextMultiplier = currentMultiplier >= 3 ? 1 : currentMultiplier + 1;
-                  setStackEntries(prev => ({
-                    ...prev,
-                    [entryKey]: {
-                      ...prev[entryKey],
-                      multiplier: nextMultiplier,
-                    }
-                  }));
-                }}
+              {/* Checkbox badge */}
+              <div
                 style={{
-                  minWidth: multiplier > 1 ? '36px' : '32px',
-                  height: multiplier > 1 ? '36px' : '32px',
-                  borderRadius: '3px',
-                  background: isTaken
-                    ? multiplier > 1
-                      ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
-                      : 'rgba(34, 197, 94, 0.2)'
-                    : 'rgba(100, 116, 139, 0.15)',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '4px',
                   border: isTaken
-                    ? multiplier > 1
-                      ? '2px solid rgba(167, 139, 250, 0.6)'
-                      : '1px solid rgba(34, 197, 94, 0.3)'
-                    : '1px solid transparent',
+                    ? '1px solid rgba(16,185,129,0.2)'
+                    : '1px solid rgba(255,255,255,0.05)',
+                  background: isTaken
+                    ? 'rgba(16,185,129,0.1)'
+                    : 'rgba(255,255,255,0.05)',
+                  boxShadow: isTaken ? '0 0 10px -3px rgba(16,185,129,0.3)' : 'none',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isTaken
-                    ? multiplier > 1
-                      ? '#fff'
-                      : '#22c55e'
-                    : '#475569',
-                  fontSize: multiplier > 1 ? '14px' : '12px',
-                  fontWeight: '700',
-                  cursor: isTaken ? 'pointer' : 'default',
-                  opacity: isTaken ? 1 : 0.4,
+                  color: isTaken ? '#34d399' : '#6b7280',
+                  fontSize: '12px',
+                  fontWeight: '500',
                   flexShrink: 0,
-                  transition: 'all 0.15s ease',
-                  boxShadow: multiplier > 1 ? '0 2px 8px rgba(139, 92, 246, 0.4)' : 'none',
                 }}
               >
-                {multiplier}x
-              </button>
+                {isTaken ? '✓' : ''}
+              </div>
             </div>
           </div>
         );
       })}
+
+      {/* Add Supplement Button - at bottom of list */}
+      {!showManageStack && (
+        <button
+          onClick={() => setShowManageStack(true)}
+          style={{
+            width: '100%',
+            padding: '16px 20px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+            color: '#6b7280',
+            fontSize: '14px',
+            fontWeight: '400',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>+</span>
+          Add supplement
+        </button>
+      )}
 
       {/* Manage Stack Modal */}
       {showManageStack && (
@@ -438,15 +398,16 @@ export default function Stack({
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.92)',
+            background: '#08090A',
             zIndex: 1000,
             overflowY: 'auto',
             padding: '20px',
+            paddingTop: 'calc(20px + env(safe-area-inset-top))',
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '600px', margin: '0 auto' }}
+            style={{ maxWidth: '500px', margin: '0 auto' }}
           >
             <div style={{
               display: 'flex',
@@ -474,7 +435,7 @@ export default function Stack({
 
             {/* Add new item */}
             <div style={{
-              background: 'rgba(30, 27, 75, 0.6)',
+              background: 'rgba(15, 17, 21, 0.6)',
               borderRadius: '3px',
               padding: '16px',
               marginBottom: '20px',
@@ -588,7 +549,7 @@ export default function Stack({
                     <div
                       key={item.id}
                       style={{
-                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(30, 27, 75, 0.6)',
+                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
                         borderRadius: '3px',
                         padding: '10px 12px',
                         display: 'flex',
@@ -713,7 +674,7 @@ export default function Stack({
                     <div
                       key={item.id}
                       style={{
-                        background: 'rgba(30, 27, 75, 0.3)',
+                        background: 'rgba(15, 17, 21, 0.3)',
                         borderRadius: '3px',
                         padding: '12px 16px',
                         display: 'flex',

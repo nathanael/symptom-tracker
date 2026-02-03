@@ -79,7 +79,7 @@ export default function Calendar({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'rgba(30, 27, 75, 0.95)',
+          background: 'rgba(15, 17, 21, 0.95)',
           borderRadius: '12px',
           padding: '20px',
           width: '100%',

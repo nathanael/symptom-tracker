@@ -389,7 +389,7 @@ function App() {
     <div
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
+        background: '#08090A',
         minHeight: '100%',
         color: '#f8fafc',
         userSelect: 'none',
@@ -415,7 +415,7 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
+        background: '#08090A',
         boxShadow: window.innerWidth > 500 ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
       }}
     >
@@ -472,12 +472,11 @@ function App() {
         flex: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
-        padding: '16px 16px 220px 16px',
+        padding: '0 0 220px 0',
         WebkitOverflowScrolling: 'touch',
       }}>
         <div style={{
-          maxWidth: '600px',
-          margin: '0 auto',
+          width: '100%',
         }}>
           {appMode === 'symptoms' ? (
             <SymptomList

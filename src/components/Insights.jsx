@@ -33,14 +33,14 @@ export default function Insights({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'linear-gradient(180deg, #0c0a1d 0%, #1a1333 100%)',
+        background: '#08090A',
         zIndex: 100,
         overflowY: 'auto',
         padding: '20px 20px 120px 20px',
         paddingTop: 'calc(20px + env(safe-area-inset-top))',
       }}
     >
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>
           <h2 style={{ color: '#f8fafc', fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
