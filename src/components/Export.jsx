@@ -14,7 +14,7 @@ export default function Export({
     const data = generateAIDataExport(days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode);
     navigator.clipboard.writeText(data);
     onClose();
-    setCopyToastMessage(`Copied ${days} days to clipboard`);
+    setCopyToastMessage(`Copied ${days} days of tracking for AI chat`);
     haptic('light');
     setTimeout(() => setCopyToastMessage(''), 1500);
   };

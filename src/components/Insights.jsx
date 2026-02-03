@@ -20,7 +20,7 @@ export default function Insights({
   const handleCopy = () => {
     const exportData = generateAIDataExport(60, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode);
     navigator.clipboard.writeText(exportData);
-    setCopyToastMessage('Copied 60 days to clipboard');
+    setCopyToastMessage('Copied 60 days of tracking for AI chat');
     haptic('light');
     setTimeout(() => setCopyToastMessage(''), 1500);
   };

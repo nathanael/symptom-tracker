@@ -273,7 +273,7 @@ function App() {
   const quickCopyData = useCallback(() => {
     const data = generateAIDataExport(copyDays, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode);
     navigator.clipboard.writeText(data);
-    setCopyToastMessage(`Copied ${copyDays} day${copyDays > 1 ? 's' : ''} to clipboard`);
+    setCopyToastMessage(`Copied ${copyDays} day${copyDays > 1 ? 's' : ''} of tracking for AI chat`);
     haptic('light');
     setTimeout(() => setCopyToastMessage(''), 1500);
   }, [copyDays, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode]);

@@ -536,7 +536,7 @@ export default function Settings({
                 onClick={() => {
                   const data = generateAIDataExport(days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode);
                   navigator.clipboard.writeText(data);
-                  setCopyToastMessage(`Copied ${days} days to clipboard`);
+                  setCopyToastMessage(`Copied ${days} days of tracking for AI chat`);
                   haptic('light');
                   setTimeout(() => setCopyToastMessage(''), 1500);
                 }}
@@ -655,7 +655,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v3.7.14
+              v3.7.15
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}
