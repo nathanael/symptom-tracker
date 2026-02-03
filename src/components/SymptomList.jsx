@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { severityColors, trackingModes, HOLD_DELAY, DRAG_SENSITIVITY } from '../utils/constants';
 import { getDateKey, haptic } from '../utils/helpers';
 
@@ -29,6 +29,17 @@ export default function SymptomList({
   getMostRecentEntry,
   getCurrentTimePeriod,
   setShowNoteModal,
+  // Copy/Rapid props
+  copyDays,
+  setCopyDays,
+  showCopyDropdown,
+  setShowCopyDropdown,
+  quickCopyData,
+  copyLongPressTimer,
+  setRapidEntryMode,
+  setRapidEntryConfirm,
+  incompleteSymptoms,
+  totalActiveSymptoms,
 }) {
   // Drag state for hold-to-edit
   const [activeSymptom, setActiveSymptom] = useState(null);
@@ -53,6 +64,24 @@ export default function SymptomList({
   const holdTimerRef = useRef(null);
   const pendingSymptomRef = useRef(null);
   const isDraggingRef = useRef(false);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (showAddSymptom) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, [showAddSymptom]);
 
   // Hold-to-edit handlers
   const enterEditMode = (symptomId, clientX, clientY) => {
@@ -97,13 +126,6 @@ export default function SymptomList({
     }, HOLD_DELAY);
   };
 
-  const handleTouchMove = (e) => {
-    if (isDragging) {
-      e.preventDefault();
-    }
-    const touch = e.touches[0];
-    handleMove(touch.clientX, touch.clientY);
-  };
 
   const handleMove = (clientX, clientY) => {
     if (pendingSymptomRef.current && !isDragging) {
@@ -299,10 +321,11 @@ export default function SymptomList({
   return (
     <div
       ref={containerRef}
-      style={{ display: 'flex', flexDirection: 'column', gap: '0' }}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleEnd}
-      onTouchCancel={handleEnd}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0',
+      }}
     >
       {/* Search Input - only show when searchVisible (pull to search) */}
       {searchVisible && (
@@ -403,7 +426,6 @@ export default function SymptomList({
                 setQuickLogTime(getCurrentTimePeriod());
               }
             }}
-            onTouchStart={(e) => handleTouchStart(e, symptom.id)}
             style={{
               background: isQuickLog ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
               borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
@@ -718,131 +740,305 @@ export default function SymptomList({
         </button>
       )}
 
-      {/* Floating Add Note Button */}
-      <button
-        onClick={() => setShowNoteModal(true)}
-        style={{
-          position: 'fixed',
-          bottom: 'calc(70px + env(safe-area-inset-bottom))',
-          right: '12px',
-          background: 'rgba(99, 102, 241, 0.15)',
-          border: '1px solid rgba(99, 102, 241, 0.3)',
-          borderRadius: '5px',
-          padding: '12px 14px',
-          color: '#a5b4fc',
-          fontSize: '13px',
-          fontWeight: '500',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          zIndex: 150,
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 20h9"/>
-          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-        </svg>
-        Note
-      </button>
+      {/* Floating Action Buttons */}
+      <div style={{
+        position: 'fixed',
+        bottom: 'calc(90px + env(safe-area-inset-bottom))',
+        right: '12px',
+        display: 'flex',
+        gap: '8px',
+        zIndex: 150,
+      }}>
+        {/* Copy Button - green */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onTouchStart={() => {
+              copyLongPressTimer.current = setTimeout(() => {
+                copyLongPressTimer.current = 'longpress';
+                setShowCopyDropdown(true);
+                haptic('medium');
+              }, 500);
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              if (copyLongPressTimer.current && copyLongPressTimer.current !== 'longpress') {
+                clearTimeout(copyLongPressTimer.current);
+                quickCopyData();
+                copyLongPressTimer.current = null;
+              } else if (copyLongPressTimer.current === 'longpress') {
+                copyLongPressTimer.current = 'justopened';
+                setTimeout(() => {
+                  if (copyLongPressTimer.current === 'justopened') {
+                    copyLongPressTimer.current = null;
+                  }
+                }, 300);
+              }
+            }}
+            onTouchCancel={() => {
+              if (copyLongPressTimer.current && copyLongPressTimer.current !== 'longpress' && copyLongPressTimer.current !== 'justopened') {
+                clearTimeout(copyLongPressTimer.current);
+              }
+              copyLongPressTimer.current = null;
+            }}
+            onClick={(e) => {
+              if (e.nativeEvent.pointerType === 'mouse' || (!('ontouchstart' in window) && !showCopyDropdown)) {
+                quickCopyData();
+              }
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setShowCopyDropdown(true);
+            }}
+            style={{
+              background: 'rgba(16, 185, 129, 0.2)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '8px',
+              padding: '12px 14px',
+              color: '#34d399',
+              fontSize: '13px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+            }}
+            title={`Copy last ${copyDays} days to clipboard (hold for options)`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>{copyDays}</span>
+          </button>
+
+          {/* Dropdown for selecting days */}
+          {showCopyDropdown && (
+            <>
+              <div
+                onClick={() => {
+                  if (copyLongPressTimer.current === 'justopened') return;
+                  setShowCopyDropdown(false);
+                }}
+                onTouchEnd={(e) => {
+                  if (copyLongPressTimer.current === 'justopened') {
+                    e.preventDefault();
+                    return;
+                  }
+                  setShowCopyDropdown(false);
+                }}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 199,
+                }}
+              />
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                marginBottom: '4px',
+                background: '#1a1a1a',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                zIndex: 200,
+                overflow: 'hidden',
+                minWidth: '100px',
+              }}>
+                {[1, 7, 14, 30].map((days, index, arr) => (
+                  <button
+                    key={days}
+                    onClick={() => {
+                      setCopyDays(days);
+                      setShowCopyDropdown(false);
+                      haptic('light');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      background: days === copyDays ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
+                      border: 'none',
+                      borderBottom: index < arr.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                      color: days === copyDays ? '#34d399' : '#e5e7eb',
+                      fontSize: '14px',
+                      fontWeight: days === copyDays ? '500' : '400',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>{days} day{days > 1 ? 's' : ''}</span>
+                    {days === copyDays && <span style={{ color: '#34d399' }}>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Rapid Button - green */}
+        <button
+          onClick={() => {
+            if (trackingMode === 'ampm' && !quickLogTime) {
+              setQuickLogTime(getCurrentTimePeriod());
+            }
+            if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
+              setRapidEntryConfirm(true);
+              setRapidEntryMode(true);
+            } else {
+              setRapidEntryMode(true);
+            }
+          }}
+          style={{
+            background: 'rgba(16, 185, 129, 0.2)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            color: '#34d399',
+            fontSize: '13px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+          title="Rapid Entry Mode"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          Rapid
+        </button>
+
+        {/* Note Button - purple */}
+        <button
+          onClick={() => setShowNoteModal(true)}
+          style={{
+            background: 'rgba(99, 102, 241, 0.2)',
+            border: '1px solid rgba(99, 102, 241, 0.3)',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            color: '#a5b4fc',
+            fontSize: '13px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+          </svg>
+          Note
+        </button>
+      </div>
 
 
       {/* Manage Symptoms Modal */}
       {showAddSymptom && (
         <div
-          onClick={() => setShowAddSymptom(false)}
           style={{
             position: 'fixed',
             inset: 0,
             background: '#08090A',
             zIndex: 1000,
-            overflowY: 'auto',
-            padding: '20px',
-            paddingTop: 'calc(20px + env(safe-area-inset-top))',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '500px', margin: '0 auto' }}
-          >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px',
-            }}>
-              <h2 style={{ color: '#f8fafc', fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
+          {/* Sticky Header + Add Section */}
+          <div style={{
+            flexShrink: 0,
+            background: '#08090A',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            padding: '20px',
+          }}>
+            <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+              <h2 style={{ color: '#f8fafc', fontSize: '24px', fontWeight: '700', margin: '0 0 16px 0', letterSpacing: '-0.5px' }}>
                 Symptoms
               </h2>
-              <button
-                onClick={() => setShowAddSymptom(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#8b5cf6',
-                  fontSize: '17px',
-                  cursor: 'pointer',
-                  padding: '8px',
-                }}
-              >
-                Done
-              </button>
+              {/* Add new symptom(s) */}
+              <div style={{
+                background: 'rgba(15, 17, 21, 0.6)',
+                borderRadius: '3px',
+                padding: '16px',
+              }}>
+                <label style={{
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                }}>Add Symptoms</label>
+                <textarea
+                  value={bulkSymptomInput}
+                  onChange={(e) => setBulkSymptomInput(e.target.value)}
+                  placeholder="Enter one or more symptoms (separate with commas or new lines)"
+                  style={{
+                    width: '100%',
+                    minHeight: '60px',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                    borderRadius: '5px',
+                    padding: '12px 14px',
+                    marginTop: '10px',
+                    color: '#f8fafc',
+                    fontSize: '15px',
+                    resize: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <button
+                  onClick={addBulkSymptoms}
+                  disabled={!bulkSymptomInput.trim()}
+                  style={{
+                    marginTop: '10px',
+                    width: '100%',
+                    background: bulkSymptomInput.trim() ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
+                    border: 'none',
+                    borderRadius: '5px',
+                    padding: '12px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: bulkSymptomInput.trim() ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Add Symptoms
+                </button>
+              </div>
             </div>
+          </div>
 
-            {/* Add new symptom(s) */}
-            <div style={{
-              background: 'rgba(15, 17, 21, 0.6)',
-              borderRadius: '3px',
-              padding: '16px',
-              marginBottom: '20px',
-            }}>
-              <label style={{
-                color: '#94a3b8',
-                fontSize: '12px',
-                textTransform: 'uppercase',
-                letterSpacing: '1px',
-              }}>Add Symptoms</label>
-              <textarea
-                value={bulkSymptomInput}
-                onChange={(e) => setBulkSymptomInput(e.target.value)}
-                placeholder="Enter one or more symptoms (separate with commas or new lines)"
-                style={{
-                  width: '100%',
-                  minHeight: '80px',
-                  background: 'rgba(15, 23, 42, 0.8)',
-                  border: '2px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '5px',
-                  padding: '12px 14px',
-                  marginTop: '10px',
-                  color: '#f8fafc',
-                  fontSize: '15px',
-                  resize: 'vertical',
-                  fontFamily: 'inherit',
-                }}
-              />
-              <button
-                onClick={addBulkSymptoms}
-                disabled={!bulkSymptomInput.trim()}
-                style={{
-                  marginTop: '10px',
-                  width: '100%',
-                  background: bulkSymptomInput.trim() ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
-                  border: 'none',
-                  borderRadius: '5px',
-                  padding: '12px',
-                  color: '#fff',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: bulkSymptomInput.trim() ? 'pointer' : 'not-allowed',
-                }}
-              >
-                Add Symptoms
-              </button>
-            </div>
+          {/* Scrollable Content */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              padding: '20px',
+              paddingBottom: '120px',
+            }}
+          >
+          <div style={{ maxWidth: '500px', margin: '0 auto' }}>
 
             {/* Active symptoms list */}
             {symptoms.filter(s => s.active).length > 0 && (() => {
               const activeList = symptoms.filter(s => s.active).sort((a, b) => (a.order || 0) - (b.order || 0));
+              const dragCurrentIndex = dragReorderId ? activeList.findIndex(s => s.id === dragReorderId) : -1;
+              const itemHeight = 52;
+              const dragTargetIndex = dragReorderId ? Math.max(0, Math.min(activeList.length - 1, dragCurrentIndex + Math.round(dragReorderY / itemHeight))) : -1;
+
               return (
               <div
                 style={{ marginBottom: '20px' }}
@@ -861,6 +1057,15 @@ export default function SymptomList({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {activeList.map((symptom, index) => {
                     const isDraggingThis = dragReorderId === symptom.id;
+                    // Calculate offset for non-dragged items to show drop position
+                    let offsetY = 0;
+                    if (dragReorderId && !isDraggingThis) {
+                      if (index > dragCurrentIndex && index <= dragTargetIndex) {
+                        offsetY = -itemHeight - 6; // Move up
+                      } else if (index < dragCurrentIndex && index >= dragTargetIndex) {
+                        offsetY = itemHeight + 6; // Move down
+                      }
+                    }
                     return (
                     <div
                       key={symptom.id}
@@ -871,7 +1076,7 @@ export default function SymptomList({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',
-                        transform: isDraggingThis ? `translateY(${dragReorderY}px)` : 'none',
+                        transform: isDraggingThis ? `translateY(${dragReorderY}px)` : `translateY(${offsetY}px)`,
                         zIndex: isDraggingThis ? 10 : 1,
                         position: 'relative',
                         transition: isDraggingThis ? 'none' : 'transform 0.15s ease',
@@ -910,6 +1115,7 @@ export default function SymptomList({
                             }
                           }}
                           autoFocus
+                          enterKeyHint="done"
                           style={{
                             flex: 1,
                             background: 'rgba(99, 102, 241, 0.15)',
@@ -1007,64 +1213,32 @@ export default function SymptomList({
               </div>
             )}
           </div>
+          </div>
+
+          {/* Floating Done Button */}
+          <button
+            onClick={() => setShowAddSymptom(false)}
+            style={{
+              position: 'absolute',
+              bottom: '30px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: '#8b5cf6',
+              border: 'none',
+              borderRadius: '25px',
+              color: '#fff',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              padding: '14px 40px',
+              boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
+            }}
+          >
+            Done
+          </button>
         </div>
       )}
 
-      {/* Drag overlay */}
-      {isDragging && activeSymptom && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 1000,
-            background: 'rgba(12, 10, 29, 0.95)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '20px',
-          }}
-        >
-          <div style={{ color: '#f8fafc', fontSize: '20px', fontWeight: '600', marginBottom: '30px', textAlign: 'center' }}>
-            {symptoms.find(s => s.id === activeSymptom)?.name}
-          </div>
-
-          {/* Time period indicator */}
-          {timePeriods.length > 1 && (
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-              {timePeriods.map((period, idx) => (
-                <div
-                  key={period.id}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '5px',
-                    background: idx === dragPosition.x ? 'rgba(139, 92, 246, 0.3)' : 'rgba(100, 116, 139, 0.1)',
-                    border: idx === dragPosition.x ? '2px solid rgba(139, 92, 246, 0.6)' : '2px solid transparent',
-                    color: idx === dragPosition.x ? '#c4b5fd' : '#64748b',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                  }}
-                >
-                  {period.icon} {period.label}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Severity display */}
-          <div style={{
-            fontSize: '80px',
-            fontWeight: '800',
-            color: severityColors[dragPosition.y],
-            marginBottom: '10px',
-          }}>
-            {dragPosition.y}
-          </div>
-          <div style={{ color: '#94a3b8', fontSize: '14px' }}>
-            Drag up/down to adjust
-          </div>
-        </div>
-      )}
     </div>
   );
 }

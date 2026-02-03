@@ -85,6 +85,6 @@ export const defaultStackItems = [
 
 // UI Constants
 export const DRAG_SENSITIVITY = 19;
-export const HOLD_DELAY = 200;
+export const HOLD_DELAY = 600;
 export const SWIPE_THRESHOLD = 50;
 export const SWIPE_TIME_LIMIT = 300;

@@ -92,7 +92,9 @@ export default function NoteModal({
             ref={textareaRef}
             value={dailyNotes[dateKey] || ''}
             onChange={(e) => handleNoteChange(e.target.value)}
+            onBlur={onClose}
             placeholder="Add notes about today... (diet, sleep, stress, activities, etc.)"
+            enterKeyHint="done"
             style={{
               width: '100%',
               minHeight: '300px',

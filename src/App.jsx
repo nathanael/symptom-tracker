@@ -441,38 +441,26 @@ function App() {
         />
       )}
 
-      {/* Header */}
-      <Header
-        selectedDate={selectedDate}
-        changeDate={changeDate}
-        canGoForward={canGoForward}
-        setShowCalendar={setShowCalendar}
-        setCalendarMonth={setCalendarMonth}
-        appMode={appMode}
-        copyDays={copyDays}
-        setCopyDays={setCopyDays}
-        showCopyDropdown={showCopyDropdown}
-        setShowCopyDropdown={setShowCopyDropdown}
-        quickCopyData={quickCopyData}
-        copyLongPressTimer={copyLongPressTimer}
-        trackingMode={trackingMode}
-        quickLogTime={quickLogTime}
-        setQuickLogTime={setQuickLogTime}
-        setRapidEntryMode={setRapidEntryMode}
-        setRapidEntryConfirm={setRapidEntryConfirm}
-        incompleteSymptoms={incompleteSymptoms}
-        totalActiveSymptoms={totalActiveSymptoms}
-        getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
-        setShowAddSymptom={setShowAddSymptom}
-        setShowManageStack={setShowManageStack}
-      />
+      {/* Header - hide when in edit modes */}
+      {!showAddSymptom && !showManageStack && (
+        <Header
+          selectedDate={selectedDate}
+          changeDate={changeDate}
+          canGoForward={canGoForward}
+          setShowCalendar={setShowCalendar}
+          setCalendarMonth={setCalendarMonth}
+          appMode={appMode}
+          setShowAddSymptom={setShowAddSymptom}
+          setShowManageStack={setShowManageStack}
+        />
+      )}
 
       {/* Scrollable Content Area */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
-        paddingBottom: 'calc(70px + env(safe-area-inset-bottom))',
+        paddingBottom: '140px',
         WebkitOverflowScrolling: 'touch',
       }}>
         <div style={{
@@ -506,6 +494,16 @@ function App() {
               getMostRecentEntry={getMostRecentEntry}
               getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
               setShowNoteModal={setShowNoteModal}
+              copyDays={copyDays}
+              setCopyDays={setCopyDays}
+              showCopyDropdown={showCopyDropdown}
+              setShowCopyDropdown={setShowCopyDropdown}
+              quickCopyData={quickCopyData}
+              copyLongPressTimer={copyLongPressTimer}
+              setRapidEntryMode={setRapidEntryMode}
+              setRapidEntryConfirm={setRapidEntryConfirm}
+              incompleteSymptoms={incompleteSymptoms}
+              totalActiveSymptoms={totalActiveSymptoms}
             />
           ) : (
             <Stack
@@ -610,6 +608,8 @@ function App() {
           setCopyDays={setCopyDays}
           setLastAction={setLastAction}
           setCopyToastMessage={setCopyToastMessage}
+          setShowExport={setShowExport}
+          setShowSettings={setShowSettings}
         />
       )}
 
@@ -627,18 +627,19 @@ function App() {
         />
       )}
 
-      {/* Bottom Navigation */}
-      <BottomNav
-        appMode={appMode}
-        setAppMode={setAppMode}
-        showInsights={showInsights}
-        setShowInsights={setShowInsights}
-        showSettings={showSettings}
-        setShowSettings={setShowSettings}
-        showExport={showExport}
-        setShowExport={setShowExport}
-        tabBadges={tabBadges}
-      />
+      {/* Bottom Navigation - hide when in edit modes */}
+      {!showAddSymptom && !showManageStack && (
+        <BottomNav
+          appMode={appMode}
+          setAppMode={setAppMode}
+          showInsights={showInsights}
+          setShowInsights={setShowInsights}
+          showSettings={showSettings}
+          setShowSettings={setShowSettings}
+          showExport={showExport}
+          setShowExport={setShowExport}
+        />
+      )}
     </div>
     </div>
   );

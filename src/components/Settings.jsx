@@ -31,6 +31,8 @@ export default function Settings({
   setCopyDays,
   setLastAction,
   setCopyToastMessage,
+  setShowExport,
+  setShowSettings,
 }) {
   const [confirmClearData, setConfirmClearData] = useState(false);
   const [confirmFullReset, setConfirmFullReset] = useState(false);
@@ -489,6 +491,45 @@ export default function Settings({
           </div>
         </div>
 
+        {/* Export Section */}
+        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
+          EXPORT
+        </div>
+        <div style={{
+          background: 'rgba(15, 17, 21, 0.5)',
+          borderRadius: '12px',
+          marginBottom: '20px',
+          overflow: 'hidden',
+        }}>
+          <button
+            onClick={() => {
+              setShowSettings(false);
+              setShowExport(true);
+            }}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              padding: '14px 16px',
+              color: '#f8fafc',
+              fontSize: '15px',
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <div>
+              <div>Export Data</div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>CSV or clipboard for AI analysis</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
+
         {/* Backup Section */}
         <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '4px' }}>
           BACKUP
@@ -690,7 +731,7 @@ export default function Settings({
           <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
             <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
             <div style={{ color: '#64748b', fontSize: '13px' }}>
-              3.5.5 ({isStandalone() ? 'Home Screen App' : 'Browser'})
+              3.6.8 ({isStandalone() ? 'Home Screen App' : 'Browser'})
             </div>
           </div>
           <button

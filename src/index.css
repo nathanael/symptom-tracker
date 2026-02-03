@@ -7,8 +7,6 @@ html {
   margin: 0;
   padding: 0;
   background: #08090A;
-  /* Fix iOS PWA bottom gap when using viewport-fit=cover */
-  min-height: calc(100% + env(safe-area-inset-top));
   height: 100%;
 }
 
@@ -72,6 +70,26 @@ body.no-scroll {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Reorder animation for list items */
+.reorder-item {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.reorder-item.dragging {
+  transition: box-shadow 0.2s ease, background 0.2s ease;
 }
 
 /* Custom scrollbar for webkit browsers */

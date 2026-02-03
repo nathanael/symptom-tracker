@@ -41,13 +41,6 @@ export default function Insights({
       }}
     >
       <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '24px' }}>
-          <h2 style={{ color: '#f8fafc', fontSize: '28px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
-            Insights
-          </h2>
-        </div>
-
         {/* Window Selector */}
         <div style={{
           display: 'flex',
