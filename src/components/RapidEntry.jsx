@@ -474,6 +474,15 @@ export default function RapidEntry({
               opacity: rapidEntryIndex > 0 ? 1 : 0.5,
             }}
           >
+            {!isMobile() && (
+              <span style={{
+                background: 'rgba(100, 116, 139, 0.3)',
+                padding: '2px 6px',
+                borderRadius: '3px',
+                marginRight: '8px',
+                fontSize: '12px',
+              }}>←</span>
+            )}
             Back
           </button>
 
@@ -497,23 +506,33 @@ export default function RapidEntry({
             }}
           >
             {rapidEntryIndex < activeSymptomsList.length - 1 ? 'Skip' : 'Done'}
+            {!isMobile() && (
+              <span style={{
+                background: 'rgba(100, 116, 139, 0.3)',
+                padding: '2px 6px',
+                borderRadius: '3px',
+                marginLeft: '8px',
+                fontSize: '12px',
+              }}>→</span>
+            )}
           </button>
         </div>
       </div>
 
-      {/* Keyboard shortcuts bar - typeform style */}
+      {/* Keyboard shortcuts bar - typeform style (desktop only) */}
       {!isMobile() && (
-        <div style={{
-          position: 'absolute',
-          bottom: '20px',
-          left: '20px',
-          right: '20px',
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '24px',
-          color: '#64748b',
-          fontSize: '13px',
-        }}>
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '20px',
+        right: '20px',
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '16px',
+        color: '#64748b',
+        fontSize: '12px',
+        flexWrap: 'wrap',
+      }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{
               background: 'rgba(100, 116, 139, 0.2)',

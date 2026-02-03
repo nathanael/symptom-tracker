@@ -76,12 +76,14 @@ export default function Export({
           padding: '16px',
           marginBottom: '20px',
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
             {[
               { label: '7 days', days: 7 },
               { label: '14 days', days: 14 },
               { label: '30 days', days: 30 },
               { label: '60 days', days: 60 },
+              { label: '90 days', days: 90 },
+              { label: '180 days', days: 180 },
             ].map(({ label, days }) => (
               <button
                 key={days}

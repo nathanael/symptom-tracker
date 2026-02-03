@@ -119,7 +119,7 @@ export default function Insights({
                       background: insight.direction === 'improving'
                         ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(74, 222, 128, 0.1) 100%)'
                         : 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%)',
-                      border: `2px solid ${insight.direction === 'improving' ? 'rgba(74, 222, 128, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                      border: `1px solid ${insight.direction === 'improving' ? 'rgba(74, 222, 128, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
                       borderRadius: '3px',
                       padding: '20px',
                       display: 'flex',
@@ -152,7 +152,7 @@ export default function Insights({
             {data.topCluster && (
               <div style={{
                 background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.15) 0%, rgba(251, 191, 36, 0.1) 100%)',
-                border: '2px solid rgba(251, 146, 60, 0.4)',
+                border: '1px solid rgba(251, 146, 60, 0.4)',
                 borderRadius: '3px',
                 padding: '20px',
                 marginBottom: '20px',
@@ -180,7 +180,7 @@ export default function Insights({
               style={{
                 width: '100%',
                 background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%)',
-                border: '2px solid rgba(139, 92, 246, 0.4)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
                 borderRadius: '3px',
                 padding: '20px',
                 color: '#c4b5fd',

@@ -145,20 +145,20 @@ export default function Settings({
         background: '#08090A',
         zIndex: 100,
         overflowY: 'auto',
-        padding: '20px 20px 120px 20px',
-        paddingTop: 'calc(20px + env(safe-area-inset-top))',
+        padding: '16px 16px 120px 16px',
+        paddingTop: 'calc(16px + env(safe-area-inset-top))',
       }}
     >
       <div style={{ maxWidth: '500px', margin: '0 auto' }}>
         {/* Cloud Sync Section */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+        <div style={{ marginBottom: '8px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           CLOUD SYNC
         </div>
         <div style={{
           background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           padding: '16px',
-          marginBottom: '20px',
+          marginBottom: '12px',
         }}>
           {firebaseError ? (
             <div style={{
@@ -407,51 +407,47 @@ export default function Settings({
         </div>
 
         {/* Tracking Mode Selection */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           TRACKING MODE
         </div>
         <div style={{
           background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
-          marginBottom: '20px',
-          overflow: 'hidden',
+          marginBottom: '12px',
+          padding: '4px',
+          display: 'flex',
+          gap: '4px',
         }}>
-          {Object.entries(trackingModes).map(([key, mode], index, arr) => (
+          {Object.entries(trackingModes).map(([key, mode]) => (
             <button
               key={key}
               onClick={() => setTrackingMode(key)}
               style={{
-                width: '100%',
-                background: 'transparent',
-                border: 'none',
-                borderBottom: index < arr.length - 1 ? '1px solid rgba(100, 116, 139, 0.15)' : 'none',
-                padding: '14px 16px',
-                color: '#f8fafc',
-                fontSize: '15px',
+                flex: 1,
+                background: trackingMode === key ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.05)',
+                border: trackingMode === key ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid rgba(99, 102, 241, 0.15)',
+                borderRadius: '8px',
+                padding: '10px 8px',
+                color: trackingMode === key ? '#a5b4fc' : '#64748b',
+                fontSize: '13px',
+                fontWeight: trackingMode === key ? '600' : '500',
                 cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                textAlign: 'center',
               }}
             >
-              <div>
-                <div>{mode.label}</div>
-                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{mode.description}</div>
-              </div>
-              {trackingMode === key && <span style={{ color: '#8b5cf6', fontSize: '18px' }}>✓</span>}
+              {mode.label}
             </button>
           ))}
         </div>
 
         {/* Copy Days Setting */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           QUICK COPY
         </div>
         <div style={{
           background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
-          marginBottom: '20px',
+          marginBottom: '12px',
           overflow: 'hidden',
         }}>
           <div style={{ padding: '14px 16px' }}>
@@ -466,10 +462,10 @@ export default function Settings({
                   style={{
                     flex: 1,
                     padding: '10px 0',
-                    background: copyDays === days ? 'rgba(34, 197, 94, 0.2)' : 'rgba(99, 102, 241, 0.1)',
-                    border: copyDays === days ? '2px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(99, 102, 241, 0.2)',
+                    background: copyDays === days ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.05)',
+                    border: copyDays === days ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid rgba(99, 102, 241, 0.15)',
                     borderRadius: '8px',
-                    color: copyDays === days ? '#4ade80' : '#94a3b8',
+                    color: copyDays === days ? '#a5b4fc' : '#64748b',
                     fontSize: '14px',
                     fontWeight: copyDays === days ? '600' : '400',
                     cursor: 'pointer',
@@ -483,13 +479,13 @@ export default function Settings({
         </div>
 
         {/* Trend Indicator Window Setting */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           TREND INDICATOR
         </div>
         <div style={{
           background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
-          marginBottom: '20px',
+          marginBottom: '12px',
           overflow: 'hidden',
         }}>
           <div style={{ padding: '14px 16px' }}>
@@ -504,10 +500,10 @@ export default function Settings({
                   style={{
                     flex: 1,
                     padding: '10px 0',
-                    background: trendWindow === days ? 'rgba(34, 197, 94, 0.2)' : 'rgba(99, 102, 241, 0.1)',
-                    border: trendWindow === days ? '2px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(99, 102, 241, 0.2)',
+                    background: trendWindow === days ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.05)',
+                    border: trendWindow === days ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid rgba(99, 102, 241, 0.15)',
                     borderRadius: '8px',
-                    color: trendWindow === days ? '#4ade80' : '#94a3b8',
+                    color: trendWindow === days ? '#a5b4fc' : '#64748b',
                     fontSize: '14px',
                     fontWeight: trendWindow === days ? '600' : '400',
                     cursor: 'pointer',
@@ -521,14 +517,14 @@ export default function Settings({
         </div>
 
         {/* Quick Copy for AI Section */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           QUICK COPY FOR AI
         </div>
         <div style={{
           background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
           padding: '16px',
-          marginBottom: '20px',
+          marginBottom: '12px',
         }}>
           <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px' }}>
             Copy symptoms & supplements to clipboard
@@ -587,13 +583,13 @@ export default function Settings({
         </div>
 
         {/* Backup Section */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           BACKUP
         </div>
         <div style={{
           background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
-          marginBottom: '20px',
+          marginBottom: '12px',
           overflow: 'hidden',
         }}>
           <div style={{ padding: '14px 16px' }}>
@@ -645,19 +641,24 @@ export default function Settings({
         </div>
 
         {/* About Section */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           ABOUT
         </div>
         <div style={{
           background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
-          marginBottom: '20px',
-          overflow: 'hidden',
+          marginBottom: '12px',
+          padding: '14px 16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
-            <div style={{ color: '#f8fafc', fontSize: '15px', marginBottom: '4px' }}>Version</div>
-            <div style={{ color: '#64748b', fontSize: '13px' }}>
-              3.7.7 ({isStandalone() ? 'Home Screen App' : 'Browser'})
+          <div>
+            <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
+              v3.7.13
+            </div>
+            <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
+              {isStandalone() ? 'Home Screen App' : 'Browser'}
             </div>
           </div>
           <button
@@ -680,42 +681,46 @@ export default function Settings({
             }}
             disabled={checkingForUpdates}
             style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              padding: '14px 16px',
-              color: checkingForUpdates ? '#64748b' : '#8b5cf6',
-              fontSize: '15px',
+              background: 'rgba(139, 92, 246, 0.15)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '6px',
+              padding: '8px 12px',
+              color: checkingForUpdates ? '#64748b' : '#a5b4fc',
+              fontSize: '13px',
+              fontWeight: '500',
               cursor: checkingForUpdates ? 'default' : 'pointer',
-              textAlign: 'left',
-              opacity: checkingForUpdates ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{checkingForUpdates ? 'Checking...' : 'Check for Updates'}</span>
-              {checkingForUpdates && (
+            {checkingForUpdates ? (
+              <>
                 <span style={{
                   display: 'inline-block',
-                  width: '16px',
-                  height: '16px',
+                  width: '14px',
+                  height: '14px',
                   border: '2px solid #64748b',
                   borderTopColor: '#8b5cf6',
                   borderRadius: '50%',
                   animation: 'spin 1s linear infinite',
                 }} />
-              )}
-            </div>
+                Checking
+              </>
+            ) : (
+              'Check for Updates'
+            )}
           </button>
         </div>
 
         {/* Danger Zone */}
-        <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '13px', fontWeight: '500', paddingLeft: '20px' }}>
+        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           DANGER ZONE
         </div>
         <div style={{
           background: 'rgba(15, 17, 21, 0.5)',
           borderRadius: '12px',
-          marginBottom: '20px',
+          marginBottom: '12px',
           overflow: 'hidden',
         }}>
           {!confirmClearData ? (
