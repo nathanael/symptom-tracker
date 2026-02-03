@@ -27,8 +27,8 @@ export default function Header({
   return (
     <div style={{
       flexShrink: 0,
-      padding: '16px 24px',
-      paddingTop: 'calc(24px + env(safe-area-inset-top))',
+      padding: '12px 12px',
+      paddingTop: 'calc(12px + env(safe-area-inset-top))',
       zIndex: 100,
       borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
     }}>
