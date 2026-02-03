@@ -3,13 +3,21 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body {
+html {
+  margin: 0;
+  padding: 0;
+  background: #08090A;
+  /* Fix iOS PWA bottom gap when using viewport-fit=cover */
+  min-height: calc(100% + env(safe-area-inset-top));
+  height: 100%;
+}
+
+body {
   margin: 0;
   padding: 0;
   background: #08090A;
   overflow: hidden;
   height: 100%;
-  height: 100dvh;
   width: 100%;
 }
 

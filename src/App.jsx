@@ -472,7 +472,7 @@ function App() {
         flex: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
-        paddingBottom: '60px',
+        paddingBottom: 'calc(70px + env(safe-area-inset-bottom))',
         WebkitOverflowScrolling: 'touch',
       }}>
         <div style={{
