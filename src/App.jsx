@@ -151,10 +151,10 @@ function App() {
     });
   }, [symptoms, entries, selectedDate, quickLogTime, trackingMode, pinnedSymptoms]);
 
-  // Check for date changes (midnight)
-  const currentDateKey = new Date().toISOString().split('T')[0];
+  // Check for date changes (midnight) - uses local time
+  const currentDateKey = getDateKey(new Date());
   if (lastCurrentDateRef.current !== null && lastCurrentDateRef.current !== currentDateKey) {
-    const selectedDateKey = selectedDate.toISOString().split('T')[0];
+    const selectedDateKey = getDateKey(selectedDate);
     if (selectedDateKey === lastCurrentDateRef.current) {
       lastCurrentDateRef.current = currentDateKey;
       setTimeout(() => setSelectedDate(new Date()), 0);

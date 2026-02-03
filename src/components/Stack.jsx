@@ -12,9 +12,9 @@ export default function Stack({
   setShowManageStack,
 }) {
   const [editingStackItem, setEditingStackItem] = useState(null);
-  const [newStackItem, setNewStackItem] = useState({ name: '', unit: 'mg', defaultDose: '' });
+  const [newStackItem, setNewStackItem] = useState({ name: '', unit: 'mg', defaultDose: '', description: '' });
   const [editingStackItemId, setEditingStackItemId] = useState(null);
-  const [editingStackItemData, setEditingStackItemData] = useState({ name: '', defaultDose: '', unit: 'mg' });
+  const [editingStackItemData, setEditingStackItemData] = useState({ name: '', defaultDose: '', unit: 'mg', description: '' });
 
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
@@ -80,7 +80,7 @@ export default function Stack({
   const addStackItem = () => {
     if (!newStackItem.name.trim() || !newStackItem.defaultDose) return;
 
-    const id = newStackItem.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const id = newStackItem.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
     const maxOrder = Math.max(-1, ...stackItems.map(i => i.order || 0));
 
     setStackItems([...stackItems, {
@@ -88,11 +88,12 @@ export default function Stack({
       name: newStackItem.name.trim(),
       unit: newStackItem.unit,
       defaultDose: parseFloat(newStackItem.defaultDose),
+      description: newStackItem.description.trim() || '',
       active: true,
       order: maxOrder + 1
     }]);
 
-    setNewStackItem({ name: '', unit: 'mg', defaultDose: '' });
+    setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '' });
     setLastAction(`Added ${newStackItem.name}`);
   };
 
@@ -104,19 +105,19 @@ export default function Stack({
 
   const startEditingStackItem = (item) => {
     setEditingStackItemId(item.id);
-    setEditingStackItemData({ name: item.name, defaultDose: item.defaultDose, unit: item.unit });
+    setEditingStackItemData({ name: item.name, defaultDose: item.defaultDose, unit: item.unit, description: item.description || '' });
   };
 
   const saveStackItemEdit = () => {
     if (editingStackItemData.name.trim() && editingStackItemId) {
       setStackItems(stackItems.map(item =>
         item.id === editingStackItemId
-          ? { ...item, name: editingStackItemData.name.trim(), defaultDose: editingStackItemData.defaultDose, unit: editingStackItemData.unit }
+          ? { ...item, name: editingStackItemData.name.trim(), defaultDose: editingStackItemData.defaultDose, unit: editingStackItemData.unit, description: editingStackItemData.description.trim() }
           : item
       ));
     }
     setEditingStackItemId(null);
-    setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg' });
+    setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '' });
   };
 
   const deleteStackItem = (itemId) => {
@@ -178,66 +179,80 @@ export default function Stack({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '12px',
-          padding: '0 4px',
-          gap: '8px',
+          padding: '16px 20px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
         }}>
-          <button
-            onClick={() => {
-              const newEntries = { ...stackEntries };
-              activeItems.forEach(item => {
-                const entryKey = `${dateKey}-${item.id}`;
-                newEntries[entryKey] = {
-                  date: dateKey,
-                  itemId: item.id,
-                  dose: item.defaultDose,
-                  taken: true
-                };
-              });
-              setStackEntries(newEntries);
-              haptic('success');
-              setLastAction('All selected');
-            }}
-            style={{
-              background: 'rgba(74, 222, 128, 0.1)',
-              border: '1px solid rgba(74, 222, 128, 0.3)',
-              borderRadius: '3px',
-              color: '#4ade80',
-              fontSize: '11px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              padding: '6px 10px',
-            }}
-          >
-            All
-          </button>
-          <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '600' }}>
-            {getStackProgress().taken}/{getStackProgress().total}
-          </span>
-          <button
-            onClick={() => {
-              const newEntries = { ...stackEntries };
-              Object.keys(newEntries).forEach(key => {
-                if (key.startsWith(dateKey)) {
-                  delete newEntries[key];
-                }
-              });
-              setStackEntries(newEntries);
-              setLastAction('All cleared');
-            }}
-            style={{
-              background: 'rgba(248, 113, 113, 0.1)',
-              border: '1px solid rgba(248, 113, 113, 0.3)',
-              borderRadius: '3px',
-              color: '#f87171',
-              fontSize: '11px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              padding: '6px 10px',
-            }}
-          >
-            Clear
-          </button>
+          {/* Left: progress */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: getStackProgress().taken === getStackProgress().total ? '#34d399' : '#4b5563',
+            }} />
+            <span style={{ color: '#e5e7eb', fontSize: '14px' }}>
+              {getStackProgress().taken} of {getStackProgress().total} completed
+            </span>
+          </div>
+          {/* Right: actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => {
+                const newEntries = { ...stackEntries };
+                activeItems.forEach(item => {
+                  const entryKey = `${dateKey}-${item.id}`;
+                  newEntries[entryKey] = {
+                    date: dateKey,
+                    itemId: item.id,
+                    dose: item.defaultDose,
+                    taken: true
+                  };
+                });
+                setStackEntries(newEntries);
+                haptic('success');
+                setLastAction('All selected');
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#9ca3af',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: '4px 0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}
+            >
+              Check All
+            </button>
+            <span style={{ color: '#4b5563' }}>|</span>
+            <button
+              onClick={() => {
+                const newEntries = { ...stackEntries };
+                Object.keys(newEntries).forEach(key => {
+                  if (key.startsWith(dateKey)) {
+                    delete newEntries[key];
+                  }
+                });
+                setStackEntries(newEntries);
+                setLastAction('All cleared');
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#9ca3af',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: '4px 0',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
 
@@ -246,7 +261,6 @@ export default function Stack({
         const entry = getStackEntry(item.id);
         const isTaken = !!entry;
         const isEditing = editingStackItem === item.id;
-        const multiplier = entry?.multiplier || 1;
 
         return (
           <div
@@ -254,29 +268,36 @@ export default function Stack({
             style={{
               background: 'transparent',
               borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-              padding: '16px 20px',
+              padding: '20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '12px',
+              gap: '16px',
               cursor: 'pointer',
             }}
             onClick={() => !isEditing && toggleStackItem(item.id)}
           >
-            {/* Left side: name */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+            {/* Left side: name + description */}
+            <div style={{ flex: 1, minWidth: 0 }}>
               <span style={{
-                color: isTaken ? '#e5e7eb' : '#9ca3af',
-                fontSize: '15px',
+                color: isTaken ? '#9ca3af' : '#e5e7eb',
+                fontSize: '16px',
                 fontWeight: '400',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
+                                display: 'block',
               }}>{item.name}</span>
+              {item.description && (
+                <span style={{
+                  color: '#6b7280',
+                  fontSize: '13px',
+                  fontWeight: '400',
+                                    display: 'block',
+                  marginTop: '2px',
+                }}>({item.description})</span>
+              )}
             </div>
 
             {/* Right side: dose + checkbox */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
               {isEditing ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                      onClick={(e) => e.stopPropagation()}>
@@ -307,59 +328,59 @@ export default function Stack({
                     }}
                     onBlur={(e) => updateStackDose(item.id, e.target.value)}
                   />
-                  <span style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500' }}>{item.unit}</span>
+                  <span style={{ color: '#9ca3af', fontSize: '13px' }}>{item.unit}</span>
                 </div>
               ) : (
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'baseline',
-                    gap: '3px',
-                  }}
+                    gap: '4px',
+                                      }}
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditingStackItem(item.id);
                   }}
                 >
                   <span style={{
-                    color: isTaken ? '#e5e7eb' : '#6b7280',
-                    fontSize: '13px',
-                    fontWeight: '500',
+                    color: isTaken ? '#6b7280' : '#9ca3af',
+                    fontSize: '14px',
+                    fontWeight: '400',
                   }}>
                     {entry?.dose || item.defaultDose}
                   </span>
                   <span style={{
                     color: '#6b7280',
-                    fontSize: '11px',
+                    fontSize: '13px',
                   }}>
                     {item.unit}
                   </span>
                 </div>
               )}
 
-              {/* Checkbox badge */}
+              {/* Checkbox */}
               <div
                 style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '4px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
                   border: isTaken
-                    ? '1px solid rgba(16,185,129,0.2)'
-                    : '1px solid rgba(255,255,255,0.05)',
+                    ? '1px solid rgba(16,185,129,0.3)'
+                    : '1px solid rgba(255,255,255,0.1)',
                   background: isTaken
-                    ? 'rgba(16,185,129,0.1)'
-                    : 'rgba(255,255,255,0.05)',
-                  boxShadow: isTaken ? '0 0 10px -3px rgba(16,185,129,0.3)' : 'none',
+                    ? 'rgba(16,185,129,0.15)'
+                    : 'transparent',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isTaken ? '#34d399' : '#6b7280',
-                  fontSize: '12px',
-                  fontWeight: '500',
                   flexShrink: 0,
                 }}
               >
-                {isTaken ? '✓' : ''}
+                {isTaken && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                )}
               </div>
             </div>
           </div>
@@ -446,14 +467,14 @@ export default function Stack({
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
               }}>Add New Supplement</label>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '10px', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
                 <input
                   type="text"
                   placeholder="Supplement name"
                   value={newStackItem.name}
                   onChange={(e) => setNewStackItem({...newStackItem, name: e.target.value})}
                   style={{
-                    flex: 1,
+                    width: '100%',
                     background: 'rgba(15, 23, 42, 0.8)',
                     border: '2px solid rgba(99, 102, 241, 0.3)',
                     borderRadius: '5px',
@@ -461,68 +482,86 @@ export default function Stack({
                     color: '#f8fafc',
                     fontSize: '15px',
                     outline: 'none',
+                    boxSizing: 'border-box',
                   }}
                 />
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="text"
-                  inputMode="decimal"
-                  placeholder="Dose"
-                  value={newStackItem.defaultDose}
-                  onChange={(e) => setNewStackItem({...newStackItem, defaultDose: e.target.value})}
+                  placeholder="Description (optional)"
+                  value={newStackItem.description}
+                  onChange={(e) => setNewStackItem({...newStackItem, description: e.target.value})}
                   style={{
-                    width: '80px',
+                    width: '100%',
                     background: 'rgba(15, 23, 42, 0.8)',
                     border: '2px solid rgba(99, 102, 241, 0.3)',
                     borderRadius: '5px',
                     padding: '12px 14px',
                     color: '#f8fafc',
                     fontSize: '15px',
-                    textAlign: 'center',
                     outline: 'none',
+                    boxSizing: 'border-box',
                   }}
                 />
-                <select
-                  value={newStackItem.unit}
-                  onChange={(e) => setNewStackItem({...newStackItem, unit: e.target.value})}
-                  style={{
-                    width: '80px',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    border: '2px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '5px',
-                    padding: '12px 10px',
-                    color: '#f8fafc',
-                    fontSize: '15px',
-                  }}
-                >
-                  <option value="mg">mg</option>
-                  <option value="mcg">mcg</option>
-                  <option value="g">g</option>
-                  <option value="IU">IU</option>
-                  <option value="ml">ml</option>
-                  <option value="drops">drops</option>
-                  <option value="caps">caps</option>
-                </select>
-                <button
-                  onClick={addStackItem}
-                  disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
-                  style={{
-                    flex: 1,
-                    background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
-                      ? 'rgba(99, 102, 241, 0.3)'
-                      : '#6366f1',
-                    border: 'none',
-                    borderRadius: '5px',
-                    padding: '12px',
-                    color: '#fff',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  Add
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Dose"
+                    value={newStackItem.defaultDose}
+                    onChange={(e) => setNewStackItem({...newStackItem, defaultDose: e.target.value})}
+                    style={{
+                      width: '80px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 14px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      textAlign: 'center',
+                      outline: 'none',
+                    }}
+                  />
+                  <select
+                    value={newStackItem.unit}
+                    onChange={(e) => setNewStackItem({...newStackItem, unit: e.target.value})}
+                    style={{
+                      width: '80px',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 10px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                    }}
+                  >
+                    <option value="mg">mg</option>
+                    <option value="mcg">mcg</option>
+                    <option value="g">g</option>
+                    <option value="IU">IU</option>
+                    <option value="ml">ml</option>
+                    <option value="drops">drops</option>
+                    <option value="caps">caps</option>
+                  </select>
+                  <button
+                    onClick={addStackItem}
+                    disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
+                    style={{
+                      flex: 1,
+                      background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
+                        ? 'rgba(99, 102, 241, 0.3)'
+                        : '#6366f1',
+                      border: 'none',
+                      borderRadius: '5px',
+                      padding: '12px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -582,59 +621,119 @@ export default function Stack({
                       </div>
 
                       {editingStackItemId === item.id ? (
-                        <div style={{ flex: 1, display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <input
                             value={editingStackItemData.name}
                             onChange={(e) => setEditingStackItemData({...editingStackItemData, name: e.target.value})}
+                            placeholder="Name"
                             autoFocus
                             style={{
-                              flex: 1,
+                              width: '100%',
                               background: 'rgba(99, 102, 241, 0.15)',
                               border: '2px solid rgba(99, 102, 241, 0.5)',
                               borderRadius: '3px',
                               padding: '8px 12px',
                               color: '#f8fafc',
                               fontSize: '14px',
+                              boxSizing: 'border-box',
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') saveStackItemEdit();
                               if (e.key === 'Escape') {
                                 setEditingStackItemId(null);
-                                setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg' });
+                                setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '' });
                               }
                             }}
                           />
-                          <button
-                            onClick={saveStackItemEdit}
+                          <input
+                            value={editingStackItemData.description}
+                            onChange={(e) => setEditingStackItemData({...editingStackItemData, description: e.target.value})}
+                            placeholder="Description (optional)"
                             style={{
-                              background: '#6366f1',
-                              border: 'none',
+                              width: '100%',
+                              background: 'rgba(99, 102, 241, 0.15)',
+                              border: '2px solid rgba(99, 102, 241, 0.5)',
                               borderRadius: '3px',
                               padding: '8px 12px',
-                              color: '#fff',
-                              fontSize: '12px',
-                              cursor: 'pointer',
+                              color: '#f8fafc',
+                              fontSize: '14px',
+                              boxSizing: 'border-box',
                             }}
-                          >
-                            Save
-                          </button>
+                          />
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <input
+                              value={editingStackItemData.defaultDose}
+                              onChange={(e) => setEditingStackItemData({...editingStackItemData, defaultDose: e.target.value})}
+                              placeholder="Dose"
+                              style={{
+                                width: '70px',
+                                background: 'rgba(99, 102, 241, 0.15)',
+                                border: '2px solid rgba(99, 102, 241, 0.5)',
+                                borderRadius: '3px',
+                                padding: '8px 12px',
+                                color: '#f8fafc',
+                                fontSize: '14px',
+                                textAlign: 'center',
+                              }}
+                            />
+                            <select
+                              value={editingStackItemData.unit}
+                              onChange={(e) => setEditingStackItemData({...editingStackItemData, unit: e.target.value})}
+                              style={{
+                                width: '70px',
+                                background: 'rgba(99, 102, 241, 0.15)',
+                                border: '2px solid rgba(99, 102, 241, 0.5)',
+                                borderRadius: '3px',
+                                padding: '8px',
+                                color: '#f8fafc',
+                                fontSize: '14px',
+                              }}
+                            >
+                              <option value="mg">mg</option>
+                              <option value="mcg">mcg</option>
+                              <option value="g">g</option>
+                              <option value="IU">IU</option>
+                              <option value="ml">ml</option>
+                              <option value="drops">drops</option>
+                              <option value="caps">caps</option>
+                            </select>
+                            <button
+                              onClick={saveStackItemEdit}
+                              style={{
+                                background: '#6366f1',
+                                border: 'none',
+                                borderRadius: '3px',
+                                padding: '8px 12px',
+                                color: '#fff',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Save
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <>
-                          <span
+                          <div
                             onClick={() => startEditingStackItem(item)}
                             style={{
-                              color: '#e2e8f0',
-                              fontSize: '15px',
                               cursor: 'pointer',
                               flex: 1,
                             }}
                           >
-                            {item.name}
+                            <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                              {item.name}
+                            </span>
                             <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
                               {item.defaultDose}{item.unit}
                             </span>
-                          </span>
+                            {item.description && (
+                              <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
+                                ({item.description})
+                              </div>
+                            )}
+                          </div>
                           <button
                             onClick={() => toggleStackItemActive(item.id)}
                             style={{
@@ -645,6 +744,7 @@ export default function Stack({
                               color: '#f87171',
                               fontSize: '12px',
                               cursor: 'pointer',
+                              flexShrink: 0,
                             }}
                           >
                             Hide

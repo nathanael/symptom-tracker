@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { severityColors } from '../utils/constants';
 import { isMobile, getDateKey, haptic } from '../utils/helpers';
@@ -38,6 +39,38 @@ export default function RapidEntry({
     setRapidEntryConfirm(false);
     setRapidEntryIndex(0);
   };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft' && rapidEntryIndex > 0) {
+        setRapidEntryIndex(prev => prev - 1);
+      } else if (e.key === 'ArrowRight') {
+        if (rapidEntryIndex < activeSymptomsList.length - 1) {
+          setRapidEntryIndex(prev => prev + 1);
+        } else {
+          handleClose();
+        }
+      } else if (e.key === 'Escape') {
+        handleClose();
+      } else if (e.key >= '0' && e.key <= '5' && currentSymptom) {
+        const severity = parseInt(e.key);
+        quickLog(currentSymptom.id, severity, logTime);
+        if (rapidEntryIndex < activeSymptomsList.length - 1) {
+          setRapidEntryIndex(prev => prev + 1);
+        } else {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+          setRapidEntryMode(false);
+          setRapidEntryIndex(0);
+          setCopyToastMessage('✓ All symptoms logged!');
+          setTimeout(() => setCopyToastMessage(''), 3000);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [rapidEntryIndex, activeSymptomsList.length, currentSymptom, logTime]);
 
   // If all complete, show confirmation screen
   if (rapidEntryConfirm) {
@@ -439,8 +472,8 @@ export default function RapidEntry({
               opacity: rapidEntryIndex > 0 ? 1 : 0.5,
             }}
           >
-            ← Back
-            {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>Z</span>}
+            Back
+            {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>←</span>}
           </button>
 
           <button
@@ -462,8 +495,8 @@ export default function RapidEntry({
               cursor: 'pointer',
             }}
           >
-            {rapidEntryIndex < activeSymptomsList.length - 1 ? 'Skip →' : 'Done'}
-            {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>Space</span>}
+            {rapidEntryIndex < activeSymptomsList.length - 1 ? 'Skip' : 'Done'}
+            {!isMobile() && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#475569', fontWeight: '400' }}>→</span>}
           </button>
         </div>
       </div>
