@@ -723,7 +723,7 @@ export default function SymptomList({
         onClick={() => setShowNoteModal(true)}
         style={{
           position: 'fixed',
-          bottom: 'calc(65px + env(safe-area-inset-bottom))',
+          bottom: '80px',
           right: '12px',
           background: 'rgba(99, 102, 241, 0.15)',
           border: '1px solid rgba(99, 102, 241, 0.3)',

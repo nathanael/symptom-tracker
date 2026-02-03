@@ -15,10 +15,7 @@ export default function BottomNav({
 
   return (
     <div style={{
-      position: 'fixed',
-      bottom: 0,
-      left: 0,
-      right: 0,
+      flexShrink: 0,
       background: 'rgba(8, 9, 10, 0.95)',
       borderTop: '1px solid rgba(255, 255, 255, 0.05)',
       paddingBottom: 'env(safe-area-inset-bottom)',
