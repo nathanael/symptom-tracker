@@ -88,6 +88,9 @@ function App() {
   const [rapidEntryConfirm, setRapidEntryConfirm] = useState(false);
   const [rapidEntryIndex, setRapidEntryIndex] = useState(0);
 
+  // Flash column indicator
+  const [flashColumn, setFlashColumn] = useState(null);
+
   // Manage symptoms/stack screens
   const [showAddSymptom, setShowAddSymptom] = useState(false);
   const [showManageStack, setShowManageStack] = useState(false);
@@ -493,6 +496,7 @@ function App() {
               getMostRecentEntry={getMostRecentEntry}
               getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
               trendWindow={trendWindow}
+              flashColumn={flashColumn}
             />
           ) : (
             <Stack
@@ -540,8 +544,8 @@ function App() {
           <button
             onClick={() => {
               setQuickLogTime('morning');
-              setCopyToastMessage('New entries will be recorded as AM');
-              setTimeout(() => setCopyToastMessage(''), 2000);
+              setFlashColumn('morning');
+              setTimeout(() => setFlashColumn(null), 400);
             }}
             style={{
               padding: '10px 16px',
@@ -564,8 +568,8 @@ function App() {
           <button
             onClick={() => {
               setQuickLogTime('evening');
-              setCopyToastMessage('New entries will be recorded as PM');
-              setTimeout(() => setCopyToastMessage(''), 2000);
+              setFlashColumn('evening');
+              setTimeout(() => setFlashColumn(null), 400);
             }}
             style={{
               padding: '10px 16px',

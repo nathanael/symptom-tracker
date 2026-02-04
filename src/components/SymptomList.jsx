@@ -29,6 +29,7 @@ export default function SymptomList({
   getMostRecentEntry,
   getCurrentTimePeriod,
   trendWindow,
+  flashColumn,
 }) {
   // Drag state for hold-to-edit
   const [activeSymptom, setActiveSymptom] = useState(null);
@@ -513,12 +514,15 @@ export default function SymptomList({
                           width: '32px',
                           height: '32px',
                           borderRadius: '6px',
-                          border: `1px solid ${getBadgeColor(amEntry.severity).border}`,
+                          border: flashColumn === 'morning'
+                            ? '1px solid rgba(99, 102, 241, 0.7)'
+                            : `1px solid ${getBadgeColor(amEntry.severity).border}`,
                           background: getBadgeColor(amEntry.severity).bg,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
+                          transition: flashColumn === 'morning' ? 'none' : 'border-color 0.5s ease-out',
                         }}
                       >
                         <span style={{ color: getBadgeColor(amEntry.severity).text, fontSize: '14px', fontWeight: '600' }}>
@@ -539,11 +543,14 @@ export default function SymptomList({
                           width: '32px',
                           height: '32px',
                           borderRadius: '50%',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          border: flashColumn === 'morning'
+                            ? '1px solid rgba(99, 102, 241, 0.7)'
+                            : '1px solid rgba(255, 255, 255, 0.1)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
+                          transition: flashColumn === 'morning' ? 'none' : 'border-color 0.5s ease-out',
                         }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -571,12 +578,15 @@ export default function SymptomList({
                           width: '32px',
                           height: '32px',
                           borderRadius: '6px',
-                          border: `1px solid ${getBadgeColor(pmEntry.severity).border}`,
+                          border: flashColumn === 'evening'
+                            ? '1px solid rgba(99, 102, 241, 0.7)'
+                            : `1px solid ${getBadgeColor(pmEntry.severity).border}`,
                           background: getBadgeColor(pmEntry.severity).bg,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
+                          transition: flashColumn === 'evening' ? 'none' : 'border-color 0.5s ease-out',
                         }}
                       >
                         <span style={{ color: getBadgeColor(pmEntry.severity).text, fontSize: '14px', fontWeight: '600' }}>
@@ -597,11 +607,14 @@ export default function SymptomList({
                           width: '32px',
                           height: '32px',
                           borderRadius: '50%',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          border: flashColumn === 'evening'
+                            ? '1px solid rgba(99, 102, 241, 0.7)'
+                            : '1px solid rgba(255, 255, 255, 0.1)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
+                          transition: flashColumn === 'evening' ? 'none' : 'border-color 0.5s ease-out',
                         }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
