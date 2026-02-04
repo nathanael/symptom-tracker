@@ -351,6 +351,9 @@ export default function Stack({
                 display: 'block',
               }}>
                 {item.name}
+                {formatSchedule(item.schedule) && (
+                  <span style={{ color: '#9ca3af', fontSize: '13px', marginLeft: '6px' }}>{formatSchedule(item.schedule)}</span>
+                )}
                 {!item.active && (
                   <span style={{ color: '#6b7280', fontSize: '11px', marginLeft: '4px' }}>(hidden)</span>
                 )}
@@ -363,15 +366,6 @@ export default function Stack({
                   display: 'block',
                   marginTop: '2px',
                 }}>({item.description})</span>
-              )}
-              {formatSchedule(item.schedule) && (
-                <span style={{
-                  color: '#818cf8',
-                  fontSize: '11px',
-                  fontWeight: '500',
-                  display: 'block',
-                  marginTop: '2px',
-                }}>{formatSchedule(item.schedule)}</span>
               )}
             </div>
 
@@ -919,6 +913,9 @@ export default function Stack({
                           >
                             <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
                               {item.name}
+                              {formatSchedule(item.schedule) && (
+                                <span style={{ color: '#9ca3af', fontSize: '13px', marginLeft: '6px' }}>{formatSchedule(item.schedule)}</span>
+                              )}
                             </span>
                             <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
                               {item.defaultDose}{item.unit}
@@ -926,16 +923,6 @@ export default function Stack({
                             {item.description && (
                               <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
                                 ({item.description})
-                              </div>
-                            )}
-                            {formatSchedule(item.schedule) && (
-                              <div style={{
-                                color: '#818cf8',
-                                fontSize: '11px',
-                                marginTop: '2px',
-                                fontWeight: '500',
-                              }}>
-                                {formatSchedule(item.schedule)}
                               </div>
                             )}
                           </div>
