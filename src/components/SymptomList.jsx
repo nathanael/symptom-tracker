@@ -47,6 +47,9 @@ export default function SymptomList({
   const dragReorderStartY = useRef(0);
   const dragReorderItemRects = useRef([]);
 
+  // Popup position state
+  const [popupPosition, setPopupPosition] = useState(null);
+
   // Refs
   const containerRef = useRef(null);
   const startPosRef = useRef({ x: 0, y: 0 });
@@ -409,17 +412,22 @@ export default function SymptomList({
         return (
           <div
             key={symptom.id}
-            onClick={() => {
+            data-symptom-row
+            onClick={(e) => {
               if (quickLogSymptom !== null) {
                 setQuickLogSymptom(null);
+                setPopupPosition(null);
               } else {
+                // Get the row's position for popup placement
+                const rect = e.currentTarget.getBoundingClientRect();
+                setPopupPosition({ top: rect.top, left: rect.left, width: rect.width });
                 setQuickLogSymptom(symptom.id);
                 // Always set to current time of day when clicking on row
                 setQuickLogTime(getCurrentTimePeriod());
               }
             }}
             style={{
-              background: isQuickLog ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+              background: 'transparent',
               borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
               overflow: 'hidden',
               cursor: 'pointer',
@@ -499,6 +507,8 @@ export default function SymptomList({
                       <div
                         onClick={(e) => {
                           e.stopPropagation();
+                          const rowRect = e.currentTarget.closest('[data-symptom-row]').getBoundingClientRect();
+                          setPopupPosition({ top: rowRect.top, left: rowRect.left, width: rowRect.width });
                           setQuickLogSymptom(symptom.id);
                           setQuickLogTime('morning');
                         }}
@@ -555,6 +565,8 @@ export default function SymptomList({
                       <div
                         onClick={(e) => {
                           e.stopPropagation();
+                          const rowRect = e.currentTarget.closest('[data-symptom-row]').getBoundingClientRect();
+                          setPopupPosition({ top: rowRect.top, left: rowRect.left, width: rowRect.width });
                           setQuickLogSymptom(symptom.id);
                           setQuickLogTime('evening');
                         }}
@@ -613,6 +625,8 @@ export default function SymptomList({
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
+                        const rowRect = e.currentTarget.closest('[data-symptom-row]').getBoundingClientRect();
+                        setPopupPosition({ top: rowRect.top, left: rowRect.left, width: rowRect.width });
                         setQuickLogSymptom(symptom.id);
                         setQuickLogTime(getCurrentTimePeriod());
                       }}
@@ -636,84 +650,90 @@ export default function SymptomList({
               </div>
             </div>
 
-            {/* Quick log overlay */}
-            {isQuickLog && (
-              <div onClick={(e) => e.stopPropagation()}>
-                {/* Time period selector for AM/PM mode */}
-                {timePeriods.length > 1 && (
+            {/* Quick log popup - positioned over the symptom */}
+            {isQuickLog && popupPosition && (
+              <>
+                {/* Backdrop */}
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setQuickLogSymptom(null);
+                    setPopupPosition(null);
+                  }}
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    zIndex: 500,
+                  }}
+                />
+                {/* Popup */}
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'fixed',
+                    top: popupPosition.top,
+                    left: popupPosition.left,
+                    width: popupPosition.width,
+                    background: 'rgba(15, 17, 21, 0.98)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+                    zIndex: 501,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Symptom name header */}
                   <div style={{
-                    padding: '8px 16px 0',
-                    display: 'flex',
-                    gap: '8px',
+                    padding: '12px 16px',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                    color: '#e5e7eb',
+                    fontSize: '14px',
+                    fontWeight: '500',
                   }}>
-                    {timePeriods.map(period => {
-                      const currentTime = quickLogTime || getCurrentTimePeriod();
-                      const isSelected = currentTime === period.id;
+                    {symptom.name}
+                  </div>
+                  {/* Severity buttons */}
+                  <div style={{
+                    padding: '12px 16px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '6px',
+                  }}>
+                    {[0, 1, 2, 3, 4, 5].map(severity => {
+                      const logTime = quickLogTime || getCurrentTimePeriod();
+                      const recentEntry = getMostRecentEntry(symptom.id, logTime);
+                      const isRecentSeverity = recentEntry?.severity === severity;
+                      const subtleColors = ['#6b7280', '#9ca3af', '#b0b7c0', '#c9cdd3', '#dfe2e6', '#f1f3f5'];
+                      const color = subtleColors[severity];
+
                       return (
                         <button
-                          key={period.id}
+                          key={severity}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setQuickLogTime(period.id);
+                            quickLog(symptom.id, severity, logTime);
+                            setPopupPosition(null);
                           }}
                           style={{
                             flex: 1,
-                            padding: '8px',
-                            background: isSelected ? 'rgba(139, 92, 246, 0.2)' : 'rgba(100, 116, 139, 0.1)',
-                            border: isSelected ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid transparent',
+                            padding: '14px 0',
+                            background: `rgba(255,255,255,${0.03 + severity * 0.01})`,
+                            border: isRecentSeverity ? `1px solid rgba(255,255,255,0.25)` : '1px solid transparent',
                             borderRadius: '3px',
-                            color: isSelected ? '#c4b5fd' : '#94a3b8',
-                            fontSize: '12px',
-                            fontWeight: '600',
+                            color: color,
+                            fontSize: '18px',
+                            fontWeight: '700',
                             cursor: 'pointer',
                           }}
                         >
-                          {period.icon} {period.label}
+                          {severity}
                         </button>
                       );
                     })}
                   </div>
-                )}
-
-                {/* Severity buttons */}
-                <div style={{
-                  padding: '12px 16px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: '6px',
-                }}>
-                  {[0, 1, 2, 3, 4, 5].map(severity => {
-                    const logTime = quickLogTime || getCurrentTimePeriod();
-                    const recentEntry = getMostRecentEntry(symptom.id, logTime);
-                    const isRecentSeverity = recentEntry?.severity === severity;
-                    const subtleColors = ['#6b7280', '#9ca3af', '#b0b7c0', '#c9cdd3', '#dfe2e6', '#f1f3f5'];
-                    const color = subtleColors[severity];
-
-                    return (
-                      <button
-                        key={severity}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          quickLog(symptom.id, severity, logTime);
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '12px 0',
-                          background: `rgba(255,255,255,${0.03 + severity * 0.01})`,
-                          border: isRecentSeverity ? `1px solid rgba(255,255,255,0.25)` : '1px solid transparent',
-                          borderRadius: '3px',
-                          color: color,
-                          fontSize: '18px',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {severity}
-                      </button>
-                    );
-                  })}
                 </div>
-              </div>
+              </>
             )}
           </div>
         );

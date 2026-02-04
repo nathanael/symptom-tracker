@@ -518,6 +518,102 @@ function App() {
         />
       )}
 
+      {/* Floating AM/PM + Rapid Entry Pill - only on symptoms page in AM/PM mode */}
+      {appMode === 'symptoms' && trackingMode === 'ampm' && !showAddSymptom && !showManageStack && !showInsights && !showSettings && !rapidEntryMode && (
+        <div style={{
+          position: 'fixed',
+          bottom: 'calc(70px + env(safe-area-inset-bottom))',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '2px',
+          background: 'rgba(15, 17, 21, 0.95)',
+          borderRadius: '24px',
+          padding: '4px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          zIndex: 200,
+        }}>
+          {/* AM Button */}
+          <button
+            onClick={() => setQuickLogTime('morning')}
+            style={{
+              padding: '10px 16px',
+              background: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'morning'
+                ? 'rgba(139, 92, 246, 0.3)'
+                : 'transparent',
+              border: 'none',
+              borderRadius: '20px',
+              color: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'morning'
+                ? '#c4b5fd'
+                : '#6b7280',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            AM
+          </button>
+          {/* PM Button */}
+          <button
+            onClick={() => setQuickLogTime('evening')}
+            style={{
+              padding: '10px 16px',
+              background: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening'
+                ? 'rgba(139, 92, 246, 0.3)'
+                : 'transparent',
+              border: 'none',
+              borderRadius: '20px',
+              color: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening'
+                ? '#c4b5fd'
+                : '#6b7280',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            PM
+          </button>
+          {/* Divider */}
+          <div style={{
+            width: '1px',
+            height: '20px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            margin: '0 4px',
+          }} />
+          {/* Rapid Entry Button */}
+          <button
+            onClick={() => {
+              if (!quickLogTime) {
+                setQuickLogTime(getCurrentTimePeriod(trackingMode));
+              }
+              if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
+                setRapidEntryConfirm(true);
+                setRapidEntryMode(true);
+              } else {
+                setRapidEntryMode(true);
+              }
+            }}
+            style={{
+              padding: '10px 14px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '20px',
+              color: '#fbbf24',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Copy Toast Notification */}
       {copyToastMessage && (
         <div style={{
