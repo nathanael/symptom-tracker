@@ -450,9 +450,6 @@ function App() {
           canGoForward={canGoForward}
           setShowCalendar={setShowCalendar}
           setCalendarMonth={setCalendarMonth}
-          appMode={appMode}
-          setShowAddSymptom={setShowAddSymptom}
-          setShowManageStack={setShowManageStack}
         />
       )}
 

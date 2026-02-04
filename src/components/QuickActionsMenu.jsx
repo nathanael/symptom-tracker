@@ -180,6 +180,21 @@ export default function QuickActionsMenu({
         {appMode === 'symptoms' ? (
           <>
             <MenuItem
+              icon={GearIcon}
+              label="Settings"
+              subtext="Sync, tracking mode, backups"
+              color="#e5e7eb"
+              onClick={onOpenSettings}
+            />
+            <MenuItem
+              icon={ListIcon}
+              label="Edit Symptoms"
+              subtext="Manage your symptom list"
+              color="#e5e7eb"
+              onClick={onEditSymptoms}
+            />
+            <Divider />
+            <MenuItem
               icon={CopyIcon}
               label={`Copy ${copyDays} Days Tracking Data`}
               subtext="Copy tracking data for AI conversation"
@@ -197,23 +212,24 @@ export default function QuickActionsMenu({
               subtext="Add notes about today"
               onClick={onEditNote}
             />
-            <Divider />
-            <MenuItem
-              icon={ListIcon}
-              label="Edit Symptoms"
-              subtext="Manage your symptom list"
-              onClick={onEditSymptoms}
-            />
+          </>
+        ) : (
+          <>
             <MenuItem
               icon={GearIcon}
               label="Settings"
               subtext="Sync, tracking mode, backups"
-              color="#9ca3af"
+              color="#e5e7eb"
               onClick={onOpenSettings}
             />
-          </>
-        ) : (
-          <>
+            <MenuItem
+              icon={ListIcon}
+              label="Edit Supplement Stack"
+              subtext="Manage your supplement list"
+              color="#e5e7eb"
+              onClick={onEditStack}
+            />
+            <Divider />
             <MenuItem
               icon={CheckIcon}
               label="Check All"
@@ -225,20 +241,6 @@ export default function QuickActionsMenu({
               label="Clear"
               subtext="Remove all entries for today"
               onClick={onClear}
-            />
-            <Divider />
-            <MenuItem
-              icon={ListIcon}
-              label="Edit Supplement Stack"
-              subtext="Manage your supplement list"
-              onClick={onEditStack}
-            />
-            <MenuItem
-              icon={GearIcon}
-              label="Settings"
-              subtext="Sync, tracking mode, backups"
-              color="#9ca3af"
-              onClick={onOpenSettings}
             />
           </>
         )}
