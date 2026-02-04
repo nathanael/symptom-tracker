@@ -1,5 +1,25 @@
 import { trackingModes, severityColors } from './constants';
 
+// Schedule Helpers
+export const isScheduledForDate = (schedule, date) => {
+  if (!schedule || schedule.type === 'daily') return true;
+
+  if (schedule.type === 'days') {
+    return schedule.days?.includes(date.getDay()) ?? true;
+  }
+
+  if (schedule.type === 'interval') {
+    const start = new Date(schedule.startDate);
+    start.setHours(0, 0, 0, 0);
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((targetDate - start) / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays % schedule.interval === 0;
+  }
+
+  return true;
+};
+
 // Date Helpers - uses LOCAL time, not UTC
 export const getDateKey = (date) => {
   const year = date.getFullYear();

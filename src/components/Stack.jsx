@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { getDateKey, haptic } from '../utils/helpers';
+import { getDateKey, haptic, isScheduledForDate } from '../utils/helpers';
+import SchedulePicker, { formatSchedule } from './SchedulePicker';
 
 export default function Stack({
   stackItems,
@@ -12,9 +13,9 @@ export default function Stack({
   setShowManageStack,
 }) {
   const [editingStackItem, setEditingStackItem] = useState(null);
-  const [newStackItem, setNewStackItem] = useState({ name: '', unit: 'mg', defaultDose: '', description: '' });
+  const [newStackItem, setNewStackItem] = useState({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
   const [editingStackItemId, setEditingStackItemId] = useState(null);
-  const [editingStackItemData, setEditingStackItemData] = useState({ name: '', defaultDose: '', unit: 'mg', description: '' });
+  const [editingStackItemData, setEditingStackItemData] = useState({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
   const [showLogPicker, setShowLogPicker] = useState(false);
 
   // Drag reorder state
@@ -96,7 +97,8 @@ export default function Stack({
 
     let itemsToCount;
     if (isToday) {
-      itemsToCount = active;
+      // Only count items scheduled for today
+      itemsToCount = active.filter(item => isScheduledForDate(item.schedule, selectedDate));
     } else {
       // Past dates: ONLY show items that have entries for this date
       const itemIdsWithEntries = new Set(
@@ -125,11 +127,12 @@ export default function Stack({
       unit: newStackItem.unit,
       defaultDose: parseFloat(newStackItem.defaultDose),
       description: newStackItem.description.trim() || '',
+      schedule: newStackItem.schedule,
       active: true,
       order: maxOrder + 1
     }]);
 
-    setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '' });
+    setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
     setLastAction(`Added ${newStackItem.name}`);
   };
 
@@ -141,19 +144,32 @@ export default function Stack({
 
   const startEditingStackItem = (item) => {
     setEditingStackItemId(item.id);
-    setEditingStackItemData({ name: item.name, defaultDose: item.defaultDose, unit: item.unit, description: item.description || '' });
+    setEditingStackItemData({
+      name: item.name,
+      defaultDose: item.defaultDose,
+      unit: item.unit,
+      description: item.description || '',
+      schedule: item.schedule || { type: 'daily' }
+    });
   };
 
   const saveStackItemEdit = () => {
     if (editingStackItemData.name.trim() && editingStackItemId) {
       setStackItems(stackItems.map(item =>
         item.id === editingStackItemId
-          ? { ...item, name: editingStackItemData.name.trim(), defaultDose: editingStackItemData.defaultDose, unit: editingStackItemData.unit, description: editingStackItemData.description.trim() }
+          ? {
+              ...item,
+              name: editingStackItemData.name.trim(),
+              defaultDose: editingStackItemData.defaultDose,
+              unit: editingStackItemData.unit,
+              description: editingStackItemData.description.trim(),
+              schedule: editingStackItemData.schedule
+            }
           : item
       ));
     }
     setEditingStackItemId(null);
-    setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '' });
+    setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
   };
 
   const handleEditBlur = (e) => {
@@ -181,9 +197,9 @@ export default function Stack({
   const displayItems = (() => {
     const active = stackItems.filter(i => i.active);
 
-    // Today: show all active items (so you can log them)
+    // Today: show active items that are scheduled for today
     if (isToday) {
-      return active;
+      return active.filter(item => isScheduledForDate(item.schedule, selectedDate));
     }
 
     // Past dates: ONLY show items that have entries for this date
@@ -312,9 +328,18 @@ export default function Stack({
                   color: '#6b7280',
                   fontSize: '13px',
                   fontWeight: '400',
-                                    display: 'block',
+                  display: 'block',
                   marginTop: '2px',
                 }}>({item.description})</span>
+              )}
+              {formatSchedule(item.schedule) && (
+                <span style={{
+                  color: '#818cf8',
+                  fontSize: '11px',
+                  fontWeight: '500',
+                  display: 'block',
+                  marginTop: '2px',
+                }}>{formatSchedule(item.schedule)}</span>
               )}
             </div>
 
@@ -571,26 +596,41 @@ export default function Stack({
                       <option value="drops">drops</option>
                       <option value="caps">caps</option>
                     </select>
-                    <button
-                      onClick={addStackItem}
-                      disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
-                      style={{
-                        flex: 1,
-                        background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
-                          ? 'rgba(99, 102, 241, 0.3)'
-                          : '#6366f1',
-                        border: 'none',
-                        borderRadius: '5px',
-                        padding: '12px',
-                        color: '#fff',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      Add
-                    </button>
                   </div>
+                  <div style={{ marginTop: '4px' }}>
+                    <label style={{
+                      color: '#64748b',
+                      fontSize: '11px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '8px',
+                      display: 'block',
+                    }}>Schedule</label>
+                    <SchedulePicker
+                      schedule={newStackItem.schedule}
+                      onChange={(schedule) => setNewStackItem({...newStackItem, schedule})}
+                    />
+                  </div>
+                  <button
+                    onClick={addStackItem}
+                    disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
+                    style={{
+                      width: '100%',
+                      background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
+                        ? 'rgba(99, 102, 241, 0.3)'
+                        : '#6366f1',
+                      border: 'none',
+                      borderRadius: '5px',
+                      padding: '12px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
+                      marginTop: '4px',
+                    }}
+                  >
+                    Add
+                  </button>
                 </div>
               </div>
             </div>
@@ -701,7 +741,7 @@ export default function Stack({
                               if (e.key === 'Enter') saveStackItemEdit();
                               if (e.key === 'Escape') {
                                 setEditingStackItemId(null);
-                                setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '' });
+                                setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
                               }
                             }}
                           />
@@ -768,21 +808,29 @@ export default function Stack({
                               <option value="drops">drops</option>
                               <option value="caps">caps</option>
                             </select>
-                            <button
-                              onClick={saveStackItemEdit}
-                              style={{
-                                background: '#6366f1',
-                                border: 'none',
-                                borderRadius: '3px',
-                                padding: '8px 12px',
-                                color: '#fff',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              Save
-                            </button>
                           </div>
+                          <div style={{ marginTop: '4px' }}>
+                            <SchedulePicker
+                              schedule={editingStackItemData.schedule}
+                              onChange={(schedule) => setEditingStackItemData({...editingStackItemData, schedule})}
+                            />
+                          </div>
+                          <button
+                            onClick={saveStackItemEdit}
+                            style={{
+                              width: '100%',
+                              background: '#6366f1',
+                              border: 'none',
+                              borderRadius: '3px',
+                              padding: '8px 12px',
+                              color: '#fff',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              marginTop: '4px',
+                            }}
+                          >
+                            Save
+                          </button>
                         </div>
                       ) : (
                         <>
@@ -802,6 +850,16 @@ export default function Stack({
                             {item.description && (
                               <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
                                 ({item.description})
+                              </div>
+                            )}
+                            {formatSchedule(item.schedule) && (
+                              <div style={{
+                                color: '#818cf8',
+                                fontSize: '11px',
+                                marginTop: '2px',
+                                fontWeight: '500',
+                              }}>
+                                {formatSchedule(item.schedule)}
                               </div>
                             )}
                           </div>
