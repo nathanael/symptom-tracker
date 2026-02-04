@@ -68,7 +68,7 @@ function DatePickerModal({ selectedDate, onSelect, onClose }) {
         position: 'fixed',
         inset: 0,
         background: 'rgba(0, 0, 0, 0.92)',
-        zIndex: 1001,
+        zIndex: 2000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
