@@ -774,7 +774,7 @@ export default function SymptomList({
             gap: '8px',
           }}
         >
-          Manage symptoms
+          + Manage symptoms
         </button>
       )}
 
