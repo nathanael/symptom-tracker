@@ -18,13 +18,23 @@ export function useLocalStorage(key, initialValue) {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-    timeoutRef.current = setTimeout(() => {
+
+    const write = () => {
       try {
         localStorage.setItem(key, JSON.stringify(storedValue));
       } catch (error) {
         console.error(`Error setting localStorage key "${key}":`, error);
       }
-    }, 100);
+    };
+
+    // Use longer debounce and requestIdleCallback for non-blocking writes on iOS
+    timeoutRef.current = setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(write, { timeout: 1000 });
+      } else {
+        write();
+      }
+    }, 500);
 
     return () => {
       if (timeoutRef.current) {
@@ -54,13 +64,23 @@ export function useLocalStorageSet(key, initialValue) {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-    timeoutRef.current = setTimeout(() => {
+
+    const write = () => {
       try {
         localStorage.setItem(key, JSON.stringify([...storedValue]));
       } catch (error) {
         console.error(`Error setting localStorage key "${key}":`, error);
       }
-    }, 100);
+    };
+
+    // Use longer debounce and requestIdleCallback for non-blocking writes on iOS
+    timeoutRef.current = setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(write, { timeout: 1000 });
+      } else {
+        write();
+      }
+    }, 500);
 
     return () => {
       if (timeoutRef.current) {

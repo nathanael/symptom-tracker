@@ -175,9 +175,7 @@ export default function QuickActionsMenu({
           position: 'fixed',
           bottom: '80px',
           right: '16px',
-          background: 'rgba(20, 22, 26, 0.95)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          background: 'rgba(20, 22, 26, 0.98)',
           borderRadius: '16px',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
@@ -214,12 +212,6 @@ export default function QuickActionsMenu({
             />
             <Divider />
             <MenuItem
-              icon={CopyIcon}
-              label={`Copy ${copyDays} Days Tracking Data`}
-              subtext="Copy tracking data for AI conversation"
-              onClick={onCopyData}
-            />
-            <MenuItem
               icon={LightningIcon}
               label="Rapid Entry Mode"
               subtext="Quickly log all symptoms in sequence"
@@ -230,6 +222,12 @@ export default function QuickActionsMenu({
               label="Edit Day's Note"
               subtext="Add notes about today"
               onClick={onEditNote}
+            />
+            <MenuItem
+              icon={CopyIcon}
+              label={`Copy ${copyDays} Days Tracking Data`}
+              subtext="Copy tracking data for AI conversation"
+              onClick={onCopyData}
             />
           </>
         ) : (

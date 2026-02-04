@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { getDateKey } from '../utils/helpers';
 
 export default function NoteModal({
@@ -10,6 +10,9 @@ export default function NoteModal({
   const textareaRef = useRef(null);
   const dateKey = getDateKey(selectedDate);
 
+  // Local state for immediate input response
+  const [localNote, setLocalNote] = useState(dailyNotes[dateKey] || '');
+
   useEffect(() => {
     // Focus textarea on mount
     if (textareaRef.current) {
@@ -20,11 +23,18 @@ export default function NoteModal({
     }
   }, []);
 
+  // Debounced sync to parent state
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localNote !== (dailyNotes[dateKey] || '')) {
+        setDailyNotes(prev => ({ ...prev, [dateKey]: localNote }));
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [localNote, dateKey, dailyNotes, setDailyNotes]);
+
   const handleNoteChange = (value) => {
-    setDailyNotes(prev => ({
-      ...prev,
-      [dateKey]: value
-    }));
+    setLocalNote(value);
   };
 
   return (
@@ -90,7 +100,7 @@ export default function NoteModal({
         <div style={{ padding: '16px 20px 20px' }}>
           <textarea
             ref={textareaRef}
-            value={dailyNotes[dateKey] || ''}
+            value={localNote}
             onChange={(e) => handleNoteChange(e.target.value)}
             onBlur={onClose}
             placeholder="Add notes about today... (diet, sleep, stress, activities, etc.)"
