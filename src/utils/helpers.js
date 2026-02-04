@@ -2,6 +2,15 @@ import { trackingModes, severityColors } from './constants';
 
 // Schedule Helpers
 export const isScheduledForDate = (schedule, date) => {
+  // Check startDate for all schedule types first
+  if (schedule?.startDate) {
+    const start = new Date(schedule.startDate);
+    start.setHours(0, 0, 0, 0);
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+    if (target < start) return false;
+  }
+
   if (!schedule || schedule.type === 'daily') return true;
 
   if (schedule.type === 'days') {
@@ -18,6 +27,41 @@ export const isScheduledForDate = (schedule, date) => {
   }
 
   return true;
+};
+
+// History Tracking Helpers
+export const createHistoryEntry = (item) => {
+  return {
+    timestamp: new Date().toISOString(),
+    type: 'created',
+    snapshot: {
+      name: item.name,
+      defaultDose: item.defaultDose,
+      unit: item.unit,
+      description: item.description || '',
+      schedule: item.schedule,
+      active: item.active
+    }
+  };
+};
+
+export const recordHistoryChange = (item, newValues) => {
+  const changes = {};
+  const fields = ['name', 'defaultDose', 'unit', 'description', 'schedule', 'active'];
+
+  for (const field of fields) {
+    if (JSON.stringify(item[field]) !== JSON.stringify(newValues[field])) {
+      changes[field] = { from: item[field], to: newValues[field] };
+    }
+  }
+
+  if (Object.keys(changes).length === 0) return null;
+
+  return {
+    timestamp: new Date().toISOString(),
+    type: 'updated',
+    changes
+  };
 };
 
 // Date Helpers - uses LOCAL time, not UTC

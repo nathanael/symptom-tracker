@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { getDateKey, haptic, isScheduledForDate } from '../utils/helpers';
+import { getDateKey, haptic, isScheduledForDate, createHistoryEntry, recordHistoryChange } from '../utils/helpers';
 import SchedulePicker, { formatSchedule } from './SchedulePicker';
 
 export default function Stack({
@@ -17,6 +17,7 @@ export default function Stack({
   const [editingStackItemId, setEditingStackItemId] = useState(null);
   const [editingStackItemData, setEditingStackItemData] = useState({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
   const [showLogPicker, setShowLogPicker] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
@@ -121,25 +122,46 @@ export default function Stack({
     const id = newStackItem.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
     const maxOrder = Math.max(-1, ...stackItems.map(i => i.order || 0));
 
-    setStackItems([...stackItems, {
+    // Ensure schedule has a startDate (default to today)
+    const schedule = newStackItem.schedule?.startDate
+      ? newStackItem.schedule
+      : { ...newStackItem.schedule, startDate: new Date().toISOString().split('T')[0] };
+
+    const newItem = {
       id: id,
       name: newStackItem.name.trim(),
       unit: newStackItem.unit,
       defaultDose: parseFloat(newStackItem.defaultDose),
       description: newStackItem.description.trim() || '',
-      schedule: newStackItem.schedule,
+      schedule: schedule,
       active: true,
       order: maxOrder + 1
-    }]);
+    };
+
+    // Add history entry for creation
+    newItem.history = [createHistoryEntry(newItem)];
+
+    setStackItems([...stackItems, newItem]);
 
     setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
+    setShowAddForm(false);
     setLastAction(`Added ${newStackItem.name}`);
   };
 
   const toggleStackItemActive = (itemId) => {
-    setStackItems(stackItems.map(item =>
-      item.id === itemId ? { ...item, active: !item.active } : item
-    ));
+    setStackItems(stackItems.map(item => {
+      if (item.id !== itemId) return item;
+
+      const newActive = !item.active;
+      const historyEntry = recordHistoryChange(item, { ...item, active: newActive });
+      const history = item.history || [];
+
+      return {
+        ...item,
+        active: newActive,
+        history: historyEntry ? [...history, historyEntry] : history
+      };
+    }));
   };
 
   const startEditingStackItem = (item) => {
@@ -155,18 +177,28 @@ export default function Stack({
 
   const saveStackItemEdit = () => {
     if (editingStackItemData.name.trim() && editingStackItemId) {
-      setStackItems(stackItems.map(item =>
-        item.id === editingStackItemId
-          ? {
-              ...item,
-              name: editingStackItemData.name.trim(),
-              defaultDose: editingStackItemData.defaultDose,
-              unit: editingStackItemData.unit,
-              description: editingStackItemData.description.trim(),
-              schedule: editingStackItemData.schedule
-            }
-          : item
-      ));
+      setStackItems(stackItems.map(item => {
+        if (item.id !== editingStackItemId) return item;
+
+        const newValues = {
+          name: editingStackItemData.name.trim(),
+          defaultDose: parseFloat(editingStackItemData.defaultDose) || item.defaultDose,
+          unit: editingStackItemData.unit,
+          description: editingStackItemData.description.trim(),
+          schedule: editingStackItemData.schedule,
+          active: item.active
+        };
+
+        // Record history change if values differ
+        const historyEntry = recordHistoryChange(item, newValues);
+        const history = item.history || [];
+
+        return {
+          ...item,
+          ...newValues,
+          history: historyEntry ? [...history, historyEntry] : history
+        };
+      }));
     }
     setEditingStackItemId(null);
     setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
@@ -457,7 +489,7 @@ export default function Stack({
             }}
           >
             <span style={{ fontSize: '14px' }}>+</span>
-            Add supplement
+            Manage stack
           </button>
         ) : availableToLog.length > 0 && (
           <button
@@ -498,141 +530,185 @@ export default function Stack({
             animation: 'modalIn 0.2s ease-out',
           }}
         >
-          {/* Sticky Header + Add Section */}
+          {/* Collapsible Add Section */}
           <div style={{
             flexShrink: 0,
             background: '#08090A',
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            padding: '20px',
+            padding: '16px 20px',
           }}>
             <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-              <h2 style={{ color: '#f8fafc', fontSize: '24px', fontWeight: '700', margin: '0 0 16px 0', letterSpacing: '-0.5px' }}>
-                Supplements
-              </h2>
-              {/* Add new item */}
-              <div style={{
-                background: 'rgba(15, 17, 21, 0.6)',
-                borderRadius: '3px',
-                padding: '16px',
-              }}>
-                <label style={{
-                  color: '#94a3b8',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                }}>Add New Supplement</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                  <input
-                    type="text"
-                    placeholder="Supplement name"
-                    value={newStackItem.name}
-                    onChange={(e) => setNewStackItem({...newStackItem, name: e.target.value})}
-                    style={{
-                      width: '100%',
-                      background: 'rgba(15, 23, 42, 0.8)',
-                      border: '2px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '5px',
-                      padding: '12px 14px',
-                      color: '#f8fafc',
-                      fontSize: '15px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Description (optional)"
-                    value={newStackItem.description}
-                    onChange={(e) => setNewStackItem({...newStackItem, description: e.target.value})}
-                    style={{
-                      width: '100%',
-                      background: 'rgba(15, 23, 42, 0.8)',
-                      border: '2px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '5px',
-                      padding: '12px 14px',
-                      color: '#f8fafc',
-                      fontSize: '15px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <div style={{ display: 'flex', gap: '8px' }}>
+              {/* Toggle button */}
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                style={{
+                  width: '100%',
+                  background: showAddForm ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                  border: showAddForm ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  color: showAddForm ? '#a5b4fc' : '#6b7280',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span style={{
+                  fontSize: '16px',
+                  fontWeight: '300',
+                  transition: 'transform 0.2s ease',
+                  transform: showAddForm ? 'rotate(45deg)' : 'none',
+                }}>+</span>
+                Add supplement
+              </button>
+
+              {/* Expandable form */}
+              {showAddForm && (
+                <div style={{
+                  marginTop: '12px',
+                  background: 'rgba(15, 17, 21, 0.6)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  animation: 'slideDown 0.2s ease-out',
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <input
                       type="text"
-                      inputMode="decimal"
-                      placeholder="Dose"
-                      value={newStackItem.defaultDose}
-                      onChange={(e) => setNewStackItem({...newStackItem, defaultDose: e.target.value})}
+                      placeholder="Supplement name"
+                      value={newStackItem.name}
+                      onChange={(e) => setNewStackItem({...newStackItem, name: e.target.value})}
+                      autoFocus
                       style={{
-                        width: '80px',
+                        width: '100%',
                         background: 'rgba(15, 23, 42, 0.8)',
                         border: '2px solid rgba(99, 102, 241, 0.3)',
                         borderRadius: '5px',
                         padding: '12px 14px',
                         color: '#f8fafc',
                         fontSize: '15px',
-                        textAlign: 'center',
                         outline: 'none',
+                        boxSizing: 'border-box',
                       }}
                     />
-                    <select
-                      value={newStackItem.unit}
-                      onChange={(e) => setNewStackItem({...newStackItem, unit: e.target.value})}
+                    <input
+                      type="text"
+                      placeholder="Description (optional)"
+                      value={newStackItem.description}
+                      onChange={(e) => setNewStackItem({...newStackItem, description: e.target.value})}
                       style={{
-                        width: '80px',
+                        width: '100%',
                         background: 'rgba(15, 23, 42, 0.8)',
                         border: '2px solid rgba(99, 102, 241, 0.3)',
                         borderRadius: '5px',
-                        padding: '12px 10px',
+                        padding: '12px 14px',
                         color: '#f8fafc',
                         fontSize: '15px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
                       }}
-                    >
-                      <option value="mg">mg</option>
-                      <option value="mcg">mcg</option>
-                      <option value="g">g</option>
-                      <option value="IU">IU</option>
-                      <option value="ml">ml</option>
-                      <option value="drops">drops</option>
-                      <option value="caps">caps</option>
-                    </select>
-                  </div>
-                  <div style={{ marginTop: '4px' }}>
-                    <label style={{
-                      color: '#64748b',
-                      fontSize: '11px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      marginBottom: '8px',
-                      display: 'block',
-                    }}>Schedule</label>
-                    <SchedulePicker
-                      schedule={newStackItem.schedule}
-                      onChange={(schedule) => setNewStackItem({...newStackItem, schedule})}
                     />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Dose"
+                        value={newStackItem.defaultDose}
+                        onChange={(e) => setNewStackItem({...newStackItem, defaultDose: e.target.value})}
+                        style={{
+                          width: '80px',
+                          background: 'rgba(15, 23, 42, 0.8)',
+                          border: '2px solid rgba(99, 102, 241, 0.3)',
+                          borderRadius: '5px',
+                          padding: '12px 14px',
+                          color: '#f8fafc',
+                          fontSize: '15px',
+                          textAlign: 'center',
+                          outline: 'none',
+                        }}
+                      />
+                      <select
+                        value={newStackItem.unit}
+                        onChange={(e) => setNewStackItem({...newStackItem, unit: e.target.value})}
+                        style={{
+                          width: '80px',
+                          background: 'rgba(15, 23, 42, 0.8)',
+                          border: '2px solid rgba(99, 102, 241, 0.3)',
+                          borderRadius: '5px',
+                          padding: '12px 10px',
+                          color: '#f8fafc',
+                          fontSize: '15px',
+                        }}
+                      >
+                        <option value="mg">mg</option>
+                        <option value="mcg">mcg</option>
+                        <option value="g">g</option>
+                        <option value="IU">IU</option>
+                        <option value="ml">ml</option>
+                        <option value="drops">drops</option>
+                        <option value="caps">caps</option>
+                      </select>
+                    </div>
+                    <div style={{ marginTop: '4px' }}>
+                      <label style={{
+                        color: '#64748b',
+                        fontSize: '11px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '8px',
+                        display: 'block',
+                      }}>Schedule</label>
+                      <SchedulePicker
+                        schedule={newStackItem.schedule}
+                        onChange={(schedule) => setNewStackItem({...newStackItem, schedule})}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                      <button
+                        onClick={() => {
+                          setShowAddForm(false);
+                          setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
+                        }}
+                        style={{
+                          flex: 1,
+                          background: 'transparent',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '5px',
+                          padding: '12px',
+                          color: '#9ca3af',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={addStackItem}
+                        disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
+                        style={{
+                          flex: 1,
+                          background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
+                            ? 'rgba(99, 102, 241, 0.3)'
+                            : '#6366f1',
+                          border: 'none',
+                          borderRadius: '5px',
+                          padding: '12px',
+                          color: '#fff',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={addStackItem}
-                    disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
-                    style={{
-                      width: '100%',
-                      background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
-                        ? 'rgba(99, 102, 241, 0.3)'
-                        : '#6366f1',
-                      border: 'none',
-                      borderRadius: '5px',
-                      padding: '12px',
-                      color: '#fff',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
-                      marginTop: '4px',
-                    }}
-                  >
-                    Add
-                  </button>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 

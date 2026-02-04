@@ -1,21 +1,261 @@
+import { useState, useMemo } from 'react';
+
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const getTodayString = () => new Date().toISOString().split('T')[0];
+
+const formatFriendlyDate = (dateString) => {
+  const date = new Date(dateString + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (date.getTime() === today.getTime()) return 'Today';
+  if (date.getTime() === tomorrow.getTime()) return 'Tomorrow';
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${DAY_NAMES[date.getDay()]}, ${monthNames[date.getMonth()]} ${date.getDate()}`;
+};
+
+function DatePickerModal({ selectedDate, onSelect, onClose }) {
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const calendarDays = useMemo(() => {
+    const year = viewMonth.getFullYear();
+    const month = viewMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDayOfWeek = firstDay.getDay();
+    const daysInMonth = lastDay.getDate();
+
+    const days = [];
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day));
+    }
+    return days;
+  }, [viewMonth]);
+
+  const changeMonth = (delta) => {
+    setViewMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(newDate.getMonth() + delta);
+      return newDate;
+    });
+  };
+
+  const handleSelectDate = (day) => {
+    if (day < today) return;
+    const dateStr = day.toISOString().split('T')[0];
+    onSelect(dateStr);
+    onClose();
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.92)',
+        zIndex: 1001,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'rgba(15, 17, 21, 0.95)',
+          borderRadius: '12px',
+          padding: '20px',
+          width: '100%',
+          maxWidth: '360px',
+          border: '1px solid rgba(99, 102, 241, 0.3)',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px',
+        }}>
+          <button
+            onClick={() => changeMonth(-1)}
+            style={{
+              background: 'rgba(99, 102, 241, 0.15)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              borderRadius: '5px',
+              width: '36px',
+              height: '36px',
+              color: '#a5b4fc',
+              fontSize: '18px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            ‹
+          </button>
+
+          <h3 style={{
+            color: '#f8fafc',
+            fontSize: '18px',
+            fontWeight: '600',
+            margin: 0,
+          }}>
+            {viewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </h3>
+
+          <button
+            onClick={() => changeMonth(1)}
+            style={{
+              background: 'rgba(99, 102, 241, 0.15)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              borderRadius: '5px',
+              width: '36px',
+              height: '36px',
+              color: '#a5b4fc',
+              fontSize: '18px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            ›
+          </button>
+        </div>
+
+        {/* Day labels */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: '4px',
+          marginBottom: '8px',
+        }}>
+          {DAY_LABELS.map((day, i) => (
+            <div
+              key={i}
+              style={{
+                textAlign: 'center',
+                color: '#64748b',
+                fontSize: '12px',
+                fontWeight: '600',
+                padding: '4px',
+              }}
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: '4px',
+        }}>
+          {calendarDays.map((day, i) => {
+            if (!day) {
+              return <div key={i} />;
+            }
+
+            const dateStr = day.toISOString().split('T')[0];
+            const isSelected = dateStr === selectedDate;
+            const isToday = day.getTime() === today.getTime();
+            const isPast = day < today;
+
+            return (
+              <button
+                key={i}
+                onClick={() => handleSelectDate(day)}
+                disabled={isPast}
+                style={{
+                  aspectRatio: '1',
+                  background: isSelected
+                    ? 'rgba(139, 92, 246, 0.4)'
+                    : 'transparent',
+                  border: isToday
+                    ? '2px solid #8b5cf6'
+                    : isSelected
+                    ? '2px solid rgba(139, 92, 246, 0.6)'
+                    : '1px solid transparent',
+                  borderRadius: '8px',
+                  color: isPast ? '#475569' : isSelected ? '#fff' : '#e2e8f0',
+                  fontSize: '14px',
+                  fontWeight: isToday || isSelected ? '700' : '400',
+                  cursor: isPast ? 'default' : 'pointer',
+                  opacity: isPast ? 0.4 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {day.getDate()}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Today button */}
+        <button
+          onClick={() => handleSelectDate(today)}
+          style={{
+            width: '100%',
+            marginTop: '16px',
+            padding: '10px',
+            background: 'rgba(139, 92, 246, 0.2)',
+            border: '1px solid rgba(139, 92, 246, 0.4)',
+            borderRadius: '8px',
+            color: '#c4b5fd',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: 'pointer',
+          }}
+        >
+          Start Today
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SchedulePicker({ schedule, onChange }) {
-  const currentSchedule = schedule || { type: 'daily' };
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const currentSchedule = schedule || { type: 'daily', startDate: getTodayString() };
 
   const handleTypeChange = (type) => {
+    const startDate = currentSchedule.startDate || getTodayString();
     if (type === 'daily') {
-      onChange({ type: 'daily' });
+      onChange({ type: 'daily', startDate });
     } else if (type === 'days') {
-      onChange({ type: 'days', days: currentSchedule.days || [1, 3, 5] }); // Default Mon/Wed/Fri
+      onChange({ type: 'days', days: currentSchedule.days || [1, 3, 5], startDate }); // Default Mon/Wed/Fri
     } else if (type === 'interval') {
       onChange({
         type: 'interval',
         interval: currentSchedule.interval || 2,
-        startDate: currentSchedule.startDate || new Date().toISOString().split('T')[0]
+        startDate
       });
     }
+  };
+
+  const handleStartDateChange = (value) => {
+    onChange({ ...currentSchedule, startDate: value });
   };
 
   const toggleDay = (dayIndex) => {
@@ -30,8 +270,9 @@ export default function SchedulePicker({ schedule, onChange }) {
     onChange({ ...currentSchedule, days: newDays });
   };
 
-  const handleIntervalChange = (value) => {
-    const interval = Math.max(2, Math.min(30, parseInt(value) || 2));
+  const handleIntervalChange = (delta) => {
+    const current = currentSchedule.interval || 2;
+    const interval = Math.max(2, Math.min(30, current + delta));
     onChange({ ...currentSchedule, interval });
   };
 
@@ -107,30 +348,98 @@ export default function SchedulePicker({ schedule, onChange }) {
         </div>
       )}
 
-      {/* Interval selector */}
+      {/* Interval selector with date picker - all on one row */}
       {currentSchedule.type === 'interval' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ color: '#9ca3af', fontSize: '14px' }}>Every</span>
-          <input
-            type="number"
-            min="2"
-            max="30"
-            value={currentSchedule.interval || 2}
-            onChange={(e) => handleIntervalChange(e.target.value)}
-            style={{
-              width: '60px',
-              background: 'rgba(15, 23, 42, 0.8)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              borderRadius: '4px',
-              padding: '8px 10px',
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#9ca3af', fontSize: '14px' }}>Every</span>
+            <button
+              type="button"
+              onClick={() => handleIntervalChange(-1)}
+              disabled={(currentSchedule.interval || 2) <= 2}
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                color: (currentSchedule.interval || 2) <= 2 ? '#4b5563' : '#a5b4fc',
+                fontSize: '18px',
+                fontWeight: '500',
+                cursor: (currentSchedule.interval || 2) <= 2 ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              −
+            </button>
+            <span style={{
               color: '#f8fafc',
-              fontSize: '14px',
+              fontSize: '15px',
+              fontWeight: '600',
+              minWidth: '20px',
               textAlign: 'center',
-              outline: 'none',
+            }}>
+              {currentSchedule.interval || 2}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleIntervalChange(1)}
+              disabled={(currentSchedule.interval || 2) >= 30}
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                color: (currentSchedule.interval || 2) >= 30 ? '#4b5563' : '#a5b4fc',
+                fontSize: '18px',
+                fontWeight: '500',
+                cursor: (currentSchedule.interval || 2) >= 30 ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              +
+            </button>
+            <span style={{ color: '#9ca3af', fontSize: '14px' }}>days</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDatePicker(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 10px',
+              background: 'rgba(15, 23, 42, 0.5)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '13px',
             }}
-          />
-          <span style={{ color: '#9ca3af', fontSize: '14px' }}>days</span>
+          >
+            <span style={{ color: '#9ca3af' }}>starting</span>
+            <span style={{ color: '#f8fafc' }}>{formatFriendlyDate(currentSchedule.startDate || getTodayString())}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </button>
         </div>
+      )}
+
+      {/* Full-screen date picker modal */}
+      {showDatePicker && (
+        <DatePickerModal
+          selectedDate={currentSchedule.startDate || getTodayString()}
+          onSelect={handleStartDateChange}
+          onClose={() => setShowDatePicker(false)}
+        />
       )}
     </div>
   );
