@@ -144,24 +144,24 @@ export default function BottomNav({
           </span>
         </button>
 
-        {/* Actions Tab */}
+        {/* Actions Tab - hidden when Settings is open */}
         <button
           onClick={() => {
+            if (showSettings) return; // Don't open menu when Settings is open
             setShowQuickActions(!showQuickActions);
-            setShowInsights(false);
-            setShowSettings(false);
-            setShowExport(false);
           }}
+          disabled={showSettings}
           style={{
             flex: 1,
             background: 'transparent',
             border: 'none',
             padding: '8px',
-            cursor: 'pointer',
+            cursor: showSettings ? 'default' : 'pointer',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             gap: '4px',
+            opacity: showSettings ? 0.3 : 1,
           }}
         >
           {/* Ellipsis (three dots) icon */}
@@ -181,9 +181,10 @@ export default function BottomNav({
       </div>
 
       {/* Quick Actions Menu */}
-      {showQuickActions && (
+      {showQuickActions && !showSettings && (
         <QuickActionsMenu
           appMode={appMode}
+          showInsights={showInsights}
           onClose={() => setShowQuickActions(false)}
           onCopyData={onCopyData}
           copyDays={copyDays}
@@ -197,6 +198,7 @@ export default function BottomNav({
           onOpenSettings={() => {
             setShowSettings(true);
             setShowQuickActions(false);
+            setShowInsights(false);
           }}
         />
       )}

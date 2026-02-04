@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 export default function QuickActionsMenu({
   appMode,
+  showInsights,
   onClose,
   // Symptoms page actions
   onCopyData,
@@ -186,7 +187,16 @@ export default function QuickActionsMenu({
           maxWidth: 'calc(100vw - 32px)',
         }}
       >
-        {appMode === 'symptoms' ? (
+        {showInsights ? (
+          // Insights page - only show Settings
+          <MenuItem
+            icon={GearIcon}
+            label="Settings"
+            subtext="Sync, tracking mode, backups"
+            color="#e5e7eb"
+            onClick={onOpenSettings}
+          />
+        ) : appMode === 'symptoms' ? (
           <>
             <MenuItem
               icon={GearIcon}
