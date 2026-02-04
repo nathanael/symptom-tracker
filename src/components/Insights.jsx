@@ -43,27 +43,32 @@ export default function Insights({
       <div style={{ maxWidth: '500px', margin: '0 auto' }}>
         {/* Window Selector */}
         <div style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '20px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '4px',
+          padding: '4px',
+          marginBottom: '32px',
+          borderRadius: '12px',
+          background: 'rgba(23, 23, 23, 0.5)',
+          border: '1px solid rgba(255,255,255,0.1)',
         }}>
-          {[30, 60, 90].map(days => (
+          {[30, 60, 90].map((days) => (
             <button
               key={days}
               onClick={() => setInsightsWindow(days)}
               style={{
-                flex: 1,
                 padding: '10px',
-                borderRadius: '5px',
-                border: insightsWindow === days
-                  ? '2px solid rgba(99, 102, 241, 0.6)'
-                  : '1px solid rgba(99, 102, 241, 0.2)',
+                borderRadius: '8px',
+                border: 'none',
                 background: insightsWindow === days
-                  ? 'rgba(99, 102, 241, 0.2)'
-                  : 'rgba(99, 102, 241, 0.05)',
-                color: insightsWindow === days ? '#fff' : '#94a3b8',
-                fontSize: '13px',
-                fontWeight: insightsWindow === days ? '600' : '400',
+                  ? 'rgba(255,255,255,0.1)'
+                  : 'transparent',
+                boxShadow: insightsWindow === days
+                  ? '0 1px 2px rgba(0,0,0,0.05), inset 0 0 0 1px rgba(255,255,255,0.05)'
+                  : 'none',
+                color: insightsWindow === days ? '#fff' : '#a3a3a3',
+                fontSize: '14px',
+                fontWeight: '500',
                 cursor: 'pointer',
               }}
             >
@@ -111,35 +116,39 @@ export default function Insights({
           <>
             {/* Insights tiles */}
             {data.insights.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
                 {data.insights.map(insight => (
                   <div
                     key={insight.symptomId}
                     style={{
                       background: insight.direction === 'improving'
-                        ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(74, 222, 128, 0.1) 100%)'
-                        : 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%)',
-                      border: `1px solid ${insight.direction === 'improving' ? 'rgba(74, 222, 128, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
-                      borderRadius: '3px',
+                        ? 'rgba(16, 185, 129, 0.05)'
+                        : 'rgba(244, 63, 94, 0.05)',
+                      border: `1px solid ${insight.direction === 'improving' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)'}`,
+                      borderRadius: '16px',
                       padding: '20px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '16px',
+                      gap: '20px',
                     }}
                   >
                     <div style={{
-                      fontSize: '36px',
-                      fontWeight: '800',
-                      color: insight.direction === 'improving' ? '#4ade80' : '#f87171',
-                      minWidth: '90px',
+                      fontSize: '30px',
+                      fontWeight: '700',
+                      letterSpacing: '-0.025em',
+                      color: insight.direction === 'improving' ? '#34d399' : '#fb7185',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
                     }}>
-                      {insight.direction === 'improving' ? '↓' : '↑'}{insight.percentChange}%
+                      <span style={{ fontSize: '24px' }}>{insight.direction === 'improving' ? '↓' : '↑'}</span>
+                      {insight.percentChange}%
                     </div>
                     <div>
-                      <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '600' }}>
+                      <div style={{ color: insight.direction === 'improving' ? '#d1fae5' : '#ffe4e6', fontSize: '16px', fontWeight: '500' }}>
                         {insight.name}
                       </div>
-                      <div style={{ color: '#94a3b8', fontSize: '13px', marginTop: '4px' }}>
+                      <div style={{ color: insight.direction === 'improving' ? 'rgba(110, 231, 183, 0.6)' : 'rgba(251, 113, 133, 0.6)', fontSize: '14px', marginTop: '2px' }}>
                         {insight.direction === 'improving' ? 'Improved' : 'Increased'} over {insightsWindow} days
                       </div>
                     </div>
@@ -151,11 +160,11 @@ export default function Insights({
             {/* Symptom cluster */}
             {data.topCluster && (
               <div style={{
-                background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.15) 0%, rgba(251, 191, 36, 0.1) 100%)',
-                border: '1px solid rgba(251, 146, 60, 0.4)',
-                borderRadius: '3px',
+                background: 'rgba(251, 146, 60, 0.05)',
+                border: '1px solid rgba(251, 146, 60, 0.2)',
+                borderRadius: '16px',
                 padding: '20px',
-                marginBottom: '20px',
+                marginBottom: '32px',
               }}>
                 <div style={{
                   fontSize: '28px',
@@ -179,29 +188,39 @@ export default function Insights({
               onClick={handleCopy}
               style={{
                 width: '100%',
-                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%)',
-                border: '1px solid rgba(139, 92, 246, 0.4)',
-                borderRadius: '3px',
-                padding: '20px',
-                color: '#c4b5fd',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                background: '#4f46e5',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '16px',
+                padding: '16px 24px',
+                color: '#fff',
                 fontSize: '15px',
-                fontWeight: '600',
+                fontWeight: '500',
                 cursor: 'pointer',
-                textAlign: 'center',
-                marginBottom: '20px',
+                marginBottom: '24px',
+                boxShadow: '0 10px 15px -3px rgba(49, 46, 129, 0.2)',
               }}
             >
-              <span style={{ fontSize: '20px', marginRight: '8px' }}>📋</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(199, 210, 254, 0.8)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+              </svg>
               Copy Tracking Data
             </button>
 
             <p style={{
-              color: '#64748b',
-              fontSize: '11px',
+              color: '#737373',
+              fontSize: '12px',
               textAlign: 'center',
-              margin: 0,
+              margin: '0 auto',
+              maxWidth: '320px',
+              lineHeight: '1.625',
             }}>
-              Based on {data.entriesCount} entries over {data.daysOfData} days. For informational purposes only.
+              Based on {data.entriesCount} entries over {data.daysOfData} days.<br />
+              For informational purposes only.
             </p>
           </>
         )}

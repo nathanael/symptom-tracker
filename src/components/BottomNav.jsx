@@ -98,9 +98,9 @@ export default function BottomNav({
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={appMode === 'stack' && !isViewOpen ? '#8b5cf6' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10.5 20.5L3.5 13.5c-1.4-1.4-1.4-3.6 0-5s3.6-1.4 5 0"/>
-            <path d="M13.5 3.5L20.5 10.5c1.4 1.4 1.4 3.6 0 5s-3.6 1.4-5 0"/>
-            <path d="M8.5 15.5l7-7"/>
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
           </svg>
           <span style={{
             fontSize: '11px',
@@ -132,8 +132,9 @@ export default function BottomNav({
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={showInsights ? '#8b5cf6' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 3v18h18"/>
-            <path d="M18 9l-5 5-4-4-3 3"/>
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
           </svg>
           <span style={{
             fontSize: '11px',
