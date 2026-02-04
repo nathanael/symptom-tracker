@@ -546,6 +546,8 @@ function App() {
               setQuickLogTime('morning');
               setFlashColumn('morning');
               setTimeout(() => setFlashColumn(null), 400);
+              setCopyToastMessage('New entries will be recorded as AM');
+              setTimeout(() => setCopyToastMessage(''), 2000);
             }}
             style={{
               padding: '10px 16px',
@@ -570,6 +572,8 @@ function App() {
               setQuickLogTime('evening');
               setFlashColumn('evening');
               setTimeout(() => setFlashColumn(null), 400);
+              setCopyToastMessage('New entries will be recorded as PM');
+              setTimeout(() => setCopyToastMessage(''), 2000);
             }}
             style={{
               padding: '10px 16px',
