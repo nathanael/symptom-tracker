@@ -18,6 +18,8 @@ export default function Stack({
   const [editingStackItemData, setEditingStackItemData] = useState({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
   const [showLogPicker, setShowLogPicker] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showHiddenItems, setShowHiddenItems] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
@@ -204,13 +206,14 @@ export default function Stack({
     setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
   };
 
-
-  const deleteStackItem = (itemId) => {
-    setStackItems(stackItems.filter(item => item.id !== itemId));
-  };
-
   const activeItems = stackItems.filter(i => i.active).sort((a, b) => (a.order || 0) - (b.order || 0));
   const inactiveItems = stackItems.filter(i => !i.active);
+
+  // Autocomplete suggestions from hidden supplements
+  const suggestions = inactiveItems.filter(item =>
+    newStackItem.name.trim() &&
+    item.name.toLowerCase().includes(newStackItem.name.toLowerCase())
+  );
 
   // Supplements available to log retroactively (active items without entries for this date)
   const availableToLog = stackItems.filter(i =>
@@ -562,24 +565,73 @@ export default function Stack({
                   animation: 'slideDown 0.2s ease-out',
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <input
-                      type="text"
-                      placeholder="Supplement name"
-                      value={newStackItem.name}
-                      onChange={(e) => setNewStackItem({...newStackItem, name: e.target.value})}
-                      autoFocus
-                      style={{
-                        width: '100%',
-                        background: 'rgba(15, 23, 42, 0.8)',
-                        border: '2px solid rgba(99, 102, 241, 0.3)',
-                        borderRadius: '5px',
-                        padding: '12px 14px',
-                        color: '#f8fafc',
-                        fontSize: '15px',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        placeholder="Supplement name"
+                        value={newStackItem.name}
+                        onChange={(e) => setNewStackItem({...newStackItem, name: e.target.value})}
+                        onFocus={() => setShowSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                        autoFocus
+                        style={{
+                          width: '100%',
+                          background: 'rgba(15, 23, 42, 0.8)',
+                          border: '2px solid rgba(99, 102, 241, 0.3)',
+                          borderRadius: '5px',
+                          padding: '12px 14px',
+                          color: '#f8fafc',
+                          fontSize: '15px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      {/* Autocomplete dropdown for hidden supplements */}
+                      {showSuggestions && suggestions.length > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          background: 'rgba(15, 17, 21, 0.98)',
+                          border: '1px solid rgba(99, 102, 241, 0.3)',
+                          borderRadius: '5px',
+                          marginTop: '4px',
+                          maxHeight: '150px',
+                          overflowY: 'auto',
+                          zIndex: 10,
+                        }}>
+                          {suggestions.map((item) => (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                toggleStackItemActive(item.id);
+                                setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
+                                setShowSuggestions(false);
+                                setShowAddForm(false);
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '12px 14px',
+                                background: 'transparent',
+                                border: 'none',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                color: '#e5e7eb',
+                                fontSize: '14px',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <span>{item.name}</span>
+                              <span style={{ color: '#6b7280', fontSize: '12px' }}>Restore</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <input
                       type="text"
                       placeholder="Description (optional)"
@@ -939,35 +991,70 @@ export default function Stack({
               );
             })()}
 
-            {/* Inactive Items */}
+            {/* Inactive Items - Collapsible */}
             {inactiveItems.length > 0 && (
               <div>
-                <label style={{
-                  color: '#94a3b8',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  marginBottom: '12px',
-                  display: 'block',
-                }}>Hidden ({inactiveItems.length})</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {inactiveItems.map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        background: 'rgba(15, 17, 21, 0.3)',
-                        borderRadius: '3px',
-                        padding: '12px 16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                      }}
-                    >
-                      <span style={{ color: '#64748b', fontSize: '15px', flex: 1 }}>
-                        {item.name}
-                      </span>
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setShowHiddenItems(!showHiddenItems)}
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: showHiddenItems ? '12px' : '0',
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#94a3b8"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      transition: 'transform 0.2s ease',
+                      transform: showHiddenItems ? 'rotate(90deg)' : 'rotate(0deg)',
+                    }}
+                  >
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                  <label style={{
+                    color: '#94a3b8',
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    cursor: 'pointer',
+                  }}>Hidden ({inactiveItems.length})</label>
+                </button>
+                {showHiddenItems && (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    animation: 'slideDown 0.2s ease-out',
+                  }}>
+                    {inactiveItems.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          background: 'rgba(15, 17, 21, 0.3)',
+                          borderRadius: '3px',
+                          padding: '12px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                        }}
+                      >
+                        <span style={{ color: '#64748b', fontSize: '15px', flex: 1 }}>
+                          {item.name}
+                        </span>
                         <button
                           onClick={() => toggleStackItemActive(item.id)}
                           style={{
@@ -982,24 +1069,10 @@ export default function Stack({
                         >
                           Restore
                         </button>
-                        <button
-                          onClick={() => deleteStackItem(item.id)}
-                          style={{
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                            borderRadius: '3px',
-                            padding: '6px 12px',
-                            color: '#f87171',
-                            fontSize: '12px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Delete
-                        </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

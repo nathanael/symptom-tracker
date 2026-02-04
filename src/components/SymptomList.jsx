@@ -42,6 +42,8 @@ export default function SymptomList({
   const [editingSymptomDescription, setEditingSymptomDescription] = useState('');
   const [newSymptomName, setNewSymptomName] = useState('');
   const [newSymptomDescription, setNewSymptomDescription] = useState('');
+  const [showHiddenSymptoms, setShowHiddenSymptoms] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
@@ -264,6 +266,12 @@ export default function SymptomList({
   };
 
   const inactiveSymptoms = symptoms.filter(s => !s.active);
+
+  // Autocomplete suggestions from hidden symptoms
+  const suggestions = inactiveSymptoms.filter(s =>
+    newSymptomName.trim() &&
+    s.name.toLowerCase().includes(newSymptomName.toLowerCase())
+  );
 
   // Drag reorder handlers
   const handleDragStart = (e, symptomId, itemRects) => {
@@ -814,24 +822,73 @@ export default function SymptomList({
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
                 }}>Add Symptom</label>
-                <input
-                  value={newSymptomName}
-                  onChange={(e) => setNewSymptomName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newSymptomName.trim()) addSymptom();
-                  }}
-                  placeholder="Symptom name"
-                  style={{
-                    width: '100%',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    border: '2px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '5px',
-                    padding: '12px 14px',
-                    marginTop: '10px',
-                    color: '#f8fafc',
-                    fontSize: '15px',
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    value={newSymptomName}
+                    onChange={(e) => setNewSymptomName(e.target.value)}
+                    onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newSymptomName.trim()) addSymptom();
+                    }}
+                    placeholder="Symptom name"
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 14px',
+                      marginTop: '10px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {/* Autocomplete dropdown for hidden symptoms */}
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: 'rgba(15, 17, 21, 0.98)',
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      marginTop: '4px',
+                      maxHeight: '150px',
+                      overflowY: 'auto',
+                      zIndex: 10,
+                    }}>
+                      {suggestions.map((symptom) => (
+                        <button
+                          key={symptom.id}
+                          onClick={() => {
+                            reactivateSymptom(symptom.id);
+                            setNewSymptomName('');
+                            setShowSuggestions(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            background: 'transparent',
+                            border: 'none',
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                            color: '#e5e7eb',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <span>{symptom.name}</span>
+                          <span style={{ color: '#6b7280', fontSize: '12px' }}>Restore</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <input
                   value={newSymptomDescription}
                   onChange={(e) => setNewSymptomDescription(e.target.value)}
@@ -1055,55 +1112,92 @@ export default function SymptomList({
               );
             })()}
 
-            {/* Inactive symptoms */}
+            {/* Inactive symptoms - Collapsible */}
             {inactiveSymptoms.length > 0 && (
               <div>
-                <label style={{
-                  color: '#94a3b8',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  marginBottom: '12px',
-                  display: 'block',
-                }}>Hidden Symptoms ({inactiveSymptoms.length})</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {inactiveSymptoms.map((symptom) => (
-                    <div
-                      key={symptom.id}
-                      style={{
-                        background: 'rgba(15, 17, 21, 0.3)',
-                        borderRadius: '3px',
-                        padding: '12px 16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                      }}
-                    >
-                      <span style={{
-                        color: '#64748b',
-                        fontSize: '15px',
-                        flex: 1,
-                      }}>
-                        {symptom.name}
-                      </span>
-                      <button
-                        onClick={() => reactivateSymptom(symptom.id)}
+                <button
+                  onClick={() => setShowHiddenSymptoms(!showHiddenSymptoms)}
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: showHiddenSymptoms ? '12px' : '0',
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#94a3b8"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      transition: 'transform 0.2s ease',
+                      transform: showHiddenSymptoms ? 'rotate(90deg)' : 'rotate(0deg)',
+                    }}
+                  >
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                  <label style={{
+                    color: '#94a3b8',
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    cursor: 'pointer',
+                  }}>Hidden Symptoms ({inactiveSymptoms.length})</label>
+                </button>
+                {showHiddenSymptoms && (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    animation: 'slideDown 0.2s ease-out',
+                  }}>
+                    {inactiveSymptoms.map((symptom) => (
+                      <div
+                        key={symptom.id}
                         style={{
-                          background: 'rgba(34, 197, 94, 0.15)',
-                          border: '1px solid rgba(34, 197, 94, 0.3)',
+                          background: 'rgba(15, 17, 21, 0.3)',
                           borderRadius: '3px',
-                          padding: '6px 12px',
-                          color: '#4ade80',
-                          fontSize: '12px',
-                          cursor: 'pointer',
+                          padding: '12px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
                         }}
                       >
-                        Restore
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                        <span style={{
+                          color: '#64748b',
+                          fontSize: '15px',
+                          flex: 1,
+                        }}>
+                          {symptom.name}
+                        </span>
+                        <button
+                          onClick={() => reactivateSymptom(symptom.id)}
+                          style={{
+                            background: 'rgba(34, 197, 94, 0.15)',
+                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                            borderRadius: '3px',
+                            padding: '6px 12px',
+                            color: '#4ade80',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
