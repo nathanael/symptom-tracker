@@ -676,6 +676,38 @@ function App() {
             setStackEntries(newEntries);
             setLastAction('All cleared');
           }}
+          onMatchYesterday={() => {
+            const dateKey = getDateKey(selectedDate);
+            const yesterday = new Date(selectedDate);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayKey = getDateKey(yesterday);
+
+            const yesterdayEntries = Object.entries(stackEntries).filter(([key]) => key.startsWith(yesterdayKey));
+            if (yesterdayEntries.length === 0) {
+              setLastAction('No entries from yesterday');
+              return;
+            }
+
+            const newEntries = { ...stackEntries };
+            let copiedCount = 0;
+            yesterdayEntries.forEach(([key, entry]) => {
+              const itemId = key.substring(yesterdayKey.length + 1);
+              const item = stackItems.find(i => i.id === itemId);
+              if (item && item.active) {
+                newEntries[`${dateKey}-${itemId}`] = {
+                  date: dateKey,
+                  itemId: itemId,
+                  dose: entry.dose,
+                  taken: true
+                };
+                copiedCount++;
+              }
+            });
+
+            setStackEntries(newEntries);
+            haptic('success');
+            setLastAction(`Matched ${copiedCount} from yesterday`);
+          }}
           onEditStack={() => setShowManageStack(true)}
         />
       )}

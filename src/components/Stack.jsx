@@ -25,44 +25,6 @@ export default function Stack({
   const today = new Date();
   const isToday = selectedDate.toDateString() === today.toDateString();
 
-  // Auto-populate today's stack from yesterday if no entries exist
-  useEffect(() => {
-    if (!isToday) return;
-
-    // Check if today has any entries
-    const todayEntries = Object.keys(stackEntries).filter(key => key.startsWith(dateKey));
-    if (todayEntries.length > 0) return;
-
-    // Get yesterday's date key
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayKey = getDateKey(yesterday);
-
-    // Get yesterday's entries
-    const yesterdayEntries = Object.entries(stackEntries).filter(([key]) => key.startsWith(yesterdayKey));
-    if (yesterdayEntries.length === 0) return;
-
-    // Copy yesterday's entries to today
-    const newEntries = { ...stackEntries };
-    yesterdayEntries.forEach(([key, entry]) => {
-      const itemId = key.substring(yesterdayKey.length + 1);
-      const item = stackItems.find(i => i.id === itemId);
-      // Only copy if item is still active
-      if (item && item.active) {
-        newEntries[`${dateKey}-${itemId}`] = {
-          date: dateKey,
-          itemId: itemId,
-          dose: entry.dose,
-          taken: true
-        };
-      }
-    });
-
-    if (Object.keys(newEntries).length > Object.keys(stackEntries).length) {
-      setStackEntries(newEntries);
-    }
-  }, [dateKey, isToday]);
-
   // Lock body scroll when modal is open
   useEffect(() => {
     if (showManageStack) {

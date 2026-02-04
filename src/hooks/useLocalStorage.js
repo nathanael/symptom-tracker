@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export function useLocalStorage(key, initialValue) {
   const [storedValue, setStoredValue] = useState(() => {
@@ -11,12 +11,26 @@ export function useLocalStorage(key, initialValue) {
     }
   });
 
+  const timeoutRef = useRef(null);
+
   useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify(storedValue));
-    } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
+    // Debounce localStorage writes to avoid blocking UI
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
+    timeoutRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(key, JSON.stringify(storedValue));
+      } catch (error) {
+        console.error(`Error setting localStorage key "${key}":`, error);
+      }
+    }, 100);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [key, storedValue]);
 
   return [storedValue, setStoredValue];
@@ -33,12 +47,26 @@ export function useLocalStorageSet(key, initialValue) {
     }
   });
 
+  const timeoutRef = useRef(null);
+
   useEffect(() => {
-    try {
-      localStorage.setItem(key, JSON.stringify([...storedValue]));
-    } catch (error) {
-      console.error(`Error setting localStorage key "${key}":`, error);
+    // Debounce localStorage writes to avoid blocking UI
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
+    timeoutRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(key, JSON.stringify([...storedValue]));
+      } catch (error) {
+        console.error(`Error setting localStorage key "${key}":`, error);
+      }
+    }, 100);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [key, storedValue]);
 
   return [storedValue, setStoredValue];

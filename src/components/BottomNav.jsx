@@ -19,6 +19,7 @@ export default function BottomNav({
   onEditSymptoms,
   onCheckAll,
   onClear,
+  onMatchYesterday,
   onEditStack,
 }) {
   const isViewOpen = showInsights || showSettings || showExport;
@@ -191,6 +192,7 @@ export default function BottomNav({
           onEditSymptoms={onEditSymptoms}
           onCheckAll={onCheckAll}
           onClear={onClear}
+          onMatchYesterday={onMatchYesterday}
           onEditStack={onEditStack}
           onOpenSettings={() => {
             setShowSettings(true);
