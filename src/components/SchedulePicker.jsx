@@ -348,23 +348,22 @@ export default function SchedulePicker({ schedule, onChange }) {
         </div>
       )}
 
-      {/* Interval selector with date picker - all on one row */}
+      {/* Interval selector with date picker - compact single row */}
       {currentSchedule.type === 'interval' && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#9ca3af', fontSize: '14px' }}>Every</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               type="button"
               onClick={() => handleIntervalChange(-1)}
               disabled={(currentSchedule.interval || 2) <= 2}
               style={{
-                width: '32px',
-                height: '32px',
+                width: '28px',
+                height: '28px',
                 borderRadius: '50%',
                 background: 'rgba(15, 23, 42, 0.8)',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
                 color: (currentSchedule.interval || 2) <= 2 ? '#4b5563' : '#a5b4fc',
-                fontSize: '18px',
+                fontSize: '16px',
                 fontWeight: '500',
                 cursor: (currentSchedule.interval || 2) <= 2 ? 'default' : 'pointer',
                 display: 'flex',
@@ -376,9 +375,9 @@ export default function SchedulePicker({ schedule, onChange }) {
             </button>
             <span style={{
               color: '#f8fafc',
-              fontSize: '15px',
+              fontSize: '14px',
               fontWeight: '600',
-              minWidth: '20px',
+              minWidth: '18px',
               textAlign: 'center',
             }}>
               {currentSchedule.interval || 2}
@@ -388,13 +387,13 @@ export default function SchedulePicker({ schedule, onChange }) {
               onClick={() => handleIntervalChange(1)}
               disabled={(currentSchedule.interval || 2) >= 30}
               style={{
-                width: '32px',
-                height: '32px',
+                width: '28px',
+                height: '28px',
                 borderRadius: '50%',
                 background: 'rgba(15, 23, 42, 0.8)',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
                 color: (currentSchedule.interval || 2) >= 30 ? '#4b5563' : '#a5b4fc',
-                fontSize: '18px',
+                fontSize: '16px',
                 fontWeight: '500',
                 cursor: (currentSchedule.interval || 2) >= 30 ? 'default' : 'pointer',
                 display: 'flex',
@@ -404,7 +403,7 @@ export default function SchedulePicker({ schedule, onChange }) {
             >
               +
             </button>
-            <span style={{ color: '#9ca3af', fontSize: '14px' }}>days</span>
+            <span style={{ color: '#9ca3af', fontSize: '13px' }}>days</span>
           </div>
           <button
             type="button"
@@ -412,23 +411,17 @@ export default function SchedulePicker({ schedule, onChange }) {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '6px 10px',
+              gap: '4px',
+              padding: '5px 8px',
               background: 'rgba(15, 23, 42, 0.5)',
               border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '6px',
+              borderRadius: '4px',
               cursor: 'pointer',
-              fontSize: '13px',
+              fontSize: '12px',
             }}
           >
-            <span style={{ color: '#9ca3af' }}>starting</span>
+            <span style={{ color: '#9ca3af' }}>from</span>
             <span style={{ color: '#f8fafc' }}>{formatFriendlyDate(currentSchedule.startDate || getTodayString())}</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
           </button>
         </div>
       )}
