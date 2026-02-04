@@ -537,7 +537,11 @@ function App() {
         }}>
           {/* AM Button */}
           <button
-            onClick={() => setQuickLogTime('morning')}
+            onClick={() => {
+              setQuickLogTime('morning');
+              setCopyToastMessage('New entries will be recorded as AM');
+              setTimeout(() => setCopyToastMessage(''), 2000);
+            }}
             style={{
               padding: '10px 16px',
               background: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'morning'
@@ -557,7 +561,11 @@ function App() {
           </button>
           {/* PM Button */}
           <button
-            onClick={() => setQuickLogTime('evening')}
+            onClick={() => {
+              setQuickLogTime('evening');
+              setCopyToastMessage('New entries will be recorded as PM');
+              setTimeout(() => setCopyToastMessage(''), 2000);
+            }}
             style={{
               padding: '10px 16px',
               background: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening'
@@ -614,14 +622,14 @@ function App() {
         </div>
       )}
 
-      {/* Copy Toast Notification */}
+      {/* Toast Notification */}
       {copyToastMessage && (
         <div style={{
           position: 'fixed',
-          bottom: '100px',
+          top: 'calc(20px + env(safe-area-inset-top))',
           left: '50%',
           transform: 'translateX(-50%)',
-          background: 'rgba(16, 185, 129, 0.95)',
+          background: 'rgba(99, 102, 241, 0.95)',
           color: '#fff',
           padding: '12px 20px',
           borderRadius: '8px',
