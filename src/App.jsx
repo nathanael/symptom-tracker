@@ -522,7 +522,7 @@ function App() {
       {appMode === 'symptoms' && trackingMode === 'ampm' && !showAddSymptom && !showManageStack && !showInsights && !showSettings && !rapidEntryMode && (
         <div style={{
           position: 'fixed',
-          bottom: 'calc(90px + env(safe-area-inset-bottom))',
+          bottom: 'calc(105px + env(safe-area-inset-bottom))',
           left: '50%',
           transform: 'translateX(-50%)',
           display: 'flex',
