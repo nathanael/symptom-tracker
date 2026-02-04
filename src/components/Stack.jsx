@@ -757,7 +757,7 @@ export default function Stack({
                       style={{
                         background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
                         borderRadius: '3px',
-                        padding: '10px 12px',
+                        padding: '10px 12px 10px 0',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',
