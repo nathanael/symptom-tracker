@@ -704,46 +704,26 @@ export default function Stack({
                         onChange={(schedule) => setNewStackItem({...newStackItem, schedule})}
                       />
                     </div>
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                      <button
-                        onClick={() => {
-                          setShowAddForm(false);
-                          setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
-                        }}
-                        style={{
-                          flex: 1,
-                          background: 'transparent',
-                          border: '1px solid rgba(255, 255, 255, 0.1)',
-                          borderRadius: '5px',
-                          padding: '12px',
-                          color: '#9ca3af',
-                          fontSize: '14px',
-                          fontWeight: '500',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={addStackItem}
-                        disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
-                        style={{
-                          flex: 1,
-                          background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
-                            ? 'rgba(99, 102, 241, 0.3)'
-                            : '#6366f1',
-                          border: 'none',
-                          borderRadius: '5px',
-                          padding: '12px',
-                          color: '#fff',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        Add
-                      </button>
-                    </div>
+                    <button
+                      onClick={addStackItem}
+                      disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
+                      style={{
+                        marginTop: '10px',
+                        width: '100%',
+                        background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
+                          ? 'rgba(99, 102, 241, 0.3)'
+                          : '#6366f1',
+                        border: 'none',
+                        borderRadius: '5px',
+                        padding: '12px',
+                        color: '#fff',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Add Supplement
+                    </button>
                   </div>
                 </div>
               )}
