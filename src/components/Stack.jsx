@@ -713,11 +713,10 @@ export default function Stack({
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
-              padding: '20px',
+              padding: '12px 16px',
               paddingBottom: '120px',
             }}
           >
-          <div style={{ maxWidth: '500px', margin: '0 auto' }}>
 
             {/* Active Items */}
             {activeItems.length > 0 && (() => {
@@ -1014,7 +1013,6 @@ export default function Stack({
                 </div>
               </div>
             )}
-          </div>
           </div>
 
           {/* Floating Done Button */}

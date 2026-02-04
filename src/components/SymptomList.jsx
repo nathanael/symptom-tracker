@@ -878,11 +878,10 @@ export default function SymptomList({
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
-              padding: '20px',
+              padding: '12px 16px',
               paddingBottom: '120px',
             }}
           >
-          <div style={{ maxWidth: '500px', margin: '0 auto' }}>
 
             {/* Active symptoms list */}
             {symptoms.filter(s => s.active).length > 0 && (() => {
@@ -1106,7 +1105,6 @@ export default function SymptomList({
                 </div>
               </div>
             )}
-          </div>
           </div>
 
           {/* Floating Done Button */}
