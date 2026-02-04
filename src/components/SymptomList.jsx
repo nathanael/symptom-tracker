@@ -826,11 +826,11 @@ export default function SymptomList({
                 onClick={() => setShowAddForm(!showAddForm)}
                 style={{
                   width: '100%',
-                  background: showAddForm ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                  border: showAddForm ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: showAddForm ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
                   borderRadius: '8px',
                   padding: '12px 16px',
-                  color: showAddForm ? '#a5b4fc' : '#6b7280',
+                  color: showAddForm ? '#a5b4fc' : '#818cf8',
                   fontSize: '14px',
                   fontWeight: '500',
                   cursor: 'pointer',
