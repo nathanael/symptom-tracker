@@ -365,7 +365,7 @@ export default function Stack({
                   fontWeight: '400',
                   display: 'block',
                   marginTop: '2px',
-                }}>({item.description})</span>
+                }}>{item.description}</span>
               )}
             </div>
 
@@ -922,7 +922,7 @@ export default function Stack({
                             </span>
                             {item.description && (
                               <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
-                                ({item.description})
+                                {item.description}
                               </div>
                             )}
                           </div>
@@ -1129,7 +1129,7 @@ export default function Stack({
                     <span>{item.name}</span>
                     {item.description && (
                       <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: '8px' }}>
-                        ({item.description})
+                        {item.description}
                       </span>
                     )}
                   </div>

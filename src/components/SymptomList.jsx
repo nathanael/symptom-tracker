@@ -39,6 +39,7 @@ export default function SymptomList({
   // Edit symptom state
   const [editingSymptomId, setEditingSymptomId] = useState(null);
   const [editingSymptomName, setEditingSymptomName] = useState('');
+  const [editingSymptomDescription, setEditingSymptomDescription] = useState('');
   const [bulkSymptomInput, setBulkSymptomInput] = useState('');
 
   // Drag reorder state
@@ -245,17 +246,23 @@ export default function SymptomList({
   const startEditingSymptom = (symptom) => {
     setEditingSymptomId(symptom.id);
     setEditingSymptomName(symptom.name);
+    setEditingSymptomDescription(symptom.description || '');
   };
 
-  const saveSymptomName = () => {
+  const saveSymptomEdit = () => {
     if (editingSymptomName.trim() && editingSymptomId) {
       setSymptoms(symptoms.map(s =>
-        s.id === editingSymptomId ? { ...s, name: editingSymptomName.trim() } : s
+        s.id === editingSymptomId ? {
+          ...s,
+          name: editingSymptomName.trim(),
+          description: editingSymptomDescription.trim() || undefined
+        } : s
       ));
-      setLastAction('Symptom renamed');
+      setLastAction('Symptom updated');
     }
     setEditingSymptomId(null);
     setEditingSymptomName('');
+    setEditingSymptomDescription('');
   };
 
   const inactiveSymptoms = symptoms.filter(s => !s.active);
@@ -455,14 +462,24 @@ export default function SymptomList({
                 }}>
                   {trend === 'improving' ? '↓' : trend === 'worsening' ? '↑' : ''}
                 </span>
-                <span style={{
-                  color: isDimmed ? '#9ca3af' : '#e5e7eb',
-                  fontSize: '15px',
-                  fontWeight: '400',
+                <div style={{
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
-                }}>{symptom.name}</span>
+                }}>
+                  <span style={{
+                    color: isDimmed ? '#9ca3af' : '#e5e7eb',
+                    fontSize: '15px',
+                    fontWeight: '400',
+                  }}>{symptom.name}</span>
+                  {symptom.description && (
+                    <span style={{
+                      color: '#6b7280',
+                      fontSize: '13px',
+                      marginLeft: '6px',
+                    }}>{symptom.description}</span>
+                  )}
+                </div>
               </div>
 
               {/* Right side: AM/PM badges - minus circle for unentered */}
@@ -759,8 +776,7 @@ export default function SymptomList({
             gap: '8px',
           }}
         >
-          <span style={{ fontSize: '14px' }}>+</span>
-          Add symptom
+          Manage symptoms
         </button>
       )}
 
@@ -923,41 +939,83 @@ export default function SymptomList({
                       </div>
 
                       {editingSymptomId === symptom.id ? (
-                        <input
-                          value={editingSymptomName}
-                          onChange={(e) => setEditingSymptomName(e.target.value)}
-                          onBlur={saveSymptomName}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveSymptomName();
-                            if (e.key === 'Escape') {
-                              setEditingSymptomId(null);
-                              setEditingSymptomName('');
-                            }
-                          }}
-                          autoFocus
-                          enterKeyHint="done"
-                          style={{
-                            flex: 1,
-                            background: 'rgba(99, 102, 241, 0.15)',
-                            border: '2px solid rgba(99, 102, 241, 0.5)',
-                            borderRadius: '3px',
-                            padding: '8px 12px',
-                            color: '#f8fafc',
-                            fontSize: '15px',
-                          }}
-                        />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <input
+                            value={editingSymptomName}
+                            onChange={(e) => setEditingSymptomName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveSymptomEdit();
+                              if (e.key === 'Escape') {
+                                setEditingSymptomId(null);
+                                setEditingSymptomName('');
+                                setEditingSymptomDescription('');
+                              }
+                            }}
+                            autoFocus
+                            placeholder="Name"
+                            style={{
+                              background: 'rgba(99, 102, 241, 0.15)',
+                              border: '2px solid rgba(99, 102, 241, 0.5)',
+                              borderRadius: '3px',
+                              padding: '8px 12px',
+                              color: '#f8fafc',
+                              fontSize: '15px',
+                            }}
+                          />
+                          <input
+                            value={editingSymptomDescription}
+                            onChange={(e) => setEditingSymptomDescription(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveSymptomEdit();
+                              if (e.key === 'Escape') {
+                                setEditingSymptomId(null);
+                                setEditingSymptomName('');
+                                setEditingSymptomDescription('');
+                              }
+                            }}
+                            placeholder="Description (optional)"
+                            style={{
+                              background: 'rgba(99, 102, 241, 0.1)',
+                              border: '1px solid rgba(99, 102, 241, 0.3)',
+                              borderRadius: '3px',
+                              padding: '6px 12px',
+                              color: '#9ca3af',
+                              fontSize: '13px',
+                            }}
+                          />
+                          <button
+                            onClick={saveSymptomEdit}
+                            style={{
+                              background: 'rgba(99, 102, 241, 0.3)',
+                              border: '1px solid rgba(99, 102, 241, 0.5)',
+                              borderRadius: '3px',
+                              padding: '6px 12px',
+                              color: '#a5b4fc',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              alignSelf: 'flex-start',
+                            }}
+                          >
+                            Save
+                          </button>
+                        </div>
                       ) : (
-                        <span
+                        <div
                           onClick={() => startEditingSymptom(symptom)}
                           style={{
-                            color: '#e2e8f0',
-                            fontSize: '15px',
                             cursor: 'pointer',
                             flex: 1,
                           }}
                         >
-                          {symptom.name}
-                        </span>
+                          <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                            {symptom.name}
+                          </span>
+                          {symptom.description && (
+                            <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: '6px' }}>
+                              {symptom.description}
+                            </span>
+                          )}
+                        </div>
                       )}
                       <button
                         onClick={() => removeSymptom(symptom.id)}
