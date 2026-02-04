@@ -226,7 +226,7 @@ export default function QuickActionsMenu({
             />
             <MenuItem
               icon={SparklesIcon}
-              label={`Copy ${copyDays} Days' Tracking Data for AI`}
+              label={`Copy ${copyDays} Days for AI`}
               subtext="Paste into ChatGPT, Gemini or Claude"
               onClick={onCopyData}
             />
