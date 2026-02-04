@@ -761,6 +761,7 @@ export default function SymptomList({
           style={{
             width: '100%',
             padding: '16px 20px',
+            marginBottom: '12px',
             background: 'transparent',
             border: 'none',
             borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
