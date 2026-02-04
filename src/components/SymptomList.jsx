@@ -40,7 +40,8 @@ export default function SymptomList({
   const [editingSymptomId, setEditingSymptomId] = useState(null);
   const [editingSymptomName, setEditingSymptomName] = useState('');
   const [editingSymptomDescription, setEditingSymptomDescription] = useState('');
-  const [bulkSymptomInput, setBulkSymptomInput] = useState('');
+  const [newSymptomName, setNewSymptomName] = useState('');
+  const [newSymptomDescription, setNewSymptomDescription] = useState('');
 
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
@@ -196,37 +197,34 @@ export default function SymptomList({
   };
 
   // Symptom management
-  const parseBulkSymptoms = (input) => {
-    return input
-      .split(/[,\t\n\r;]+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-  };
+  const addSymptom = () => {
+    const name = newSymptomName.trim();
+    if (!name) return;
 
-  const addBulkSymptoms = () => {
-    const names = parseBulkSymptoms(bulkSymptomInput);
-    if (names.length === 0) return;
-
-    const newSymptoms = [...symptoms];
-    let addedCount = 0;
-
-    names.forEach(name => {
-      const existing = newSymptoms.find(s => s.name.toLowerCase() === name.toLowerCase());
-      if (existing) {
-        if (!existing.active) {
-          existing.active = true;
-          addedCount++;
-        }
+    const existing = symptoms.find(s => s.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      if (!existing.active) {
+        setSymptoms(symptoms.map(s =>
+          s.id === existing.id ? { ...s, active: true, description: newSymptomDescription.trim() || s.description } : s
+        ));
+        setLastAction('Symptom restored');
       } else {
-        const id = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now() + Math.random();
-        newSymptoms.push({ id, name, active: true });
-        addedCount++;
+        setLastAction('Symptom already exists');
+        return;
       }
-    });
+    } else {
+      const id = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now() + Math.random();
+      setSymptoms([...symptoms, {
+        id,
+        name,
+        description: newSymptomDescription.trim() || undefined,
+        active: true
+      }]);
+      setLastAction('Symptom added');
+    }
 
-    setSymptoms(newSymptoms);
-    setBulkSymptomInput('');
-    setLastAction(`Added ${addedCount} symptom${addedCount !== 1 ? 's' : ''}`);
+    setNewSymptomName('');
+    setNewSymptomDescription('');
   };
 
   const removeSymptom = (symptomId) => {
@@ -442,7 +440,7 @@ export default function SymptomList({
           >
             {/* Main row */}
             <div style={{
-              padding: '16px 20px',
+              padding: '14px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -469,7 +467,7 @@ export default function SymptomList({
                 }}>
                   <span style={{
                     color: isDimmed ? '#9ca3af' : '#e5e7eb',
-                    fontSize: '15px',
+                    fontSize: '17px',
                     fontWeight: '400',
                   }}>{symptom.name}</span>
                   {symptom.description && (
@@ -803,7 +801,7 @@ export default function SymptomList({
               <h2 style={{ color: '#f8fafc', fontSize: '24px', fontWeight: '700', margin: '0 0 16px 0', letterSpacing: '-0.5px' }}>
                 Symptoms
               </h2>
-              {/* Add new symptom(s) */}
+              {/* Add new symptom */}
               <div style={{
                 background: 'rgba(15, 17, 21, 0.6)',
                 borderRadius: '3px',
@@ -814,14 +812,16 @@ export default function SymptomList({
                   fontSize: '12px',
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
-                }}>Add Symptoms</label>
-                <textarea
-                  value={bulkSymptomInput}
-                  onChange={(e) => setBulkSymptomInput(e.target.value)}
-                  placeholder="Enter one or more symptoms (separate with commas or new lines)"
+                }}>Add Symptom</label>
+                <input
+                  value={newSymptomName}
+                  onChange={(e) => setNewSymptomName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newSymptomName.trim()) addSymptom();
+                  }}
+                  placeholder="Symptom name"
                   style={{
                     width: '100%',
-                    minHeight: '60px',
                     background: 'rgba(15, 23, 42, 0.8)',
                     border: '2px solid rgba(99, 102, 241, 0.3)',
                     borderRadius: '5px',
@@ -829,27 +829,43 @@ export default function SymptomList({
                     marginTop: '10px',
                     color: '#f8fafc',
                     fontSize: '15px',
-                    resize: 'none',
-                    fontFamily: 'inherit',
+                  }}
+                />
+                <input
+                  value={newSymptomDescription}
+                  onChange={(e) => setNewSymptomDescription(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newSymptomName.trim()) addSymptom();
+                  }}
+                  placeholder="Description (optional)"
+                  style={{
+                    width: '100%',
+                    background: 'rgba(15, 23, 42, 0.5)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    borderRadius: '5px',
+                    padding: '10px 14px',
+                    marginTop: '8px',
+                    color: '#9ca3af',
+                    fontSize: '14px',
                   }}
                 />
                 <button
-                  onClick={addBulkSymptoms}
-                  disabled={!bulkSymptomInput.trim()}
+                  onClick={addSymptom}
+                  disabled={!newSymptomName.trim()}
                   style={{
                     marginTop: '10px',
                     width: '100%',
-                    background: bulkSymptomInput.trim() ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
+                    background: newSymptomName.trim() ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
                     border: 'none',
                     borderRadius: '5px',
                     padding: '12px',
                     color: '#fff',
                     fontSize: '14px',
                     fontWeight: '600',
-                    cursor: bulkSymptomInput.trim() ? 'pointer' : 'not-allowed',
+                    cursor: newSymptomName.trim() ? 'pointer' : 'not-allowed',
                   }}
                 >
-                  Add Symptoms
+                  Add Symptom
                 </button>
               </div>
             </div>

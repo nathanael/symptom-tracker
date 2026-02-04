@@ -333,7 +333,7 @@ export default function Stack({
             style={{
               background: 'transparent',
               borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-              padding: '20px',
+              padding: '17px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -346,7 +346,7 @@ export default function Stack({
             <div style={{ flex: 1, minWidth: 0 }}>
               <span style={{
                 color: '#e5e7eb',
-                fontSize: '15px',
+                fontSize: '17px',
                 fontWeight: '400',
                 display: 'block',
               }}>
