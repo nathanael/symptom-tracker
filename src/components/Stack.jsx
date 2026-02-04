@@ -97,16 +97,13 @@ export default function Stack({
     if (isToday) {
       itemsToCount = active;
     } else {
-      // Past date: include hidden items with entries
+      // Past dates: ONLY show items that have entries for this date
       const itemIdsWithEntries = new Set(
         Object.keys(stackEntries)
           .filter(key => key.startsWith(dateKey))
           .map(key => key.substring(dateKey.length + 1))
       );
-      const hiddenWithEntries = stackItems.filter(
-        i => !i.active && itemIdsWithEntries.has(i.id)
-      );
-      itemsToCount = [...active, ...hiddenWithEntries];
+      itemsToCount = stackItems.filter(i => itemIdsWithEntries.has(i.id));
     }
 
     const takenCount = itemsToCount.filter(item =>
@@ -178,23 +175,20 @@ export default function Stack({
   const displayItems = (() => {
     const active = stackItems.filter(i => i.active);
 
-    // Today: only show active items
+    // Today: show all active items (so you can log them)
     if (isToday) {
       return active;
     }
 
-    // Past date: show active + any hidden items with entries for this date
+    // Past dates: ONLY show items that have entries for this date
+    // This makes history show what you actually took, not what you could have taken
     const itemIdsWithEntries = new Set(
       Object.keys(stackEntries)
         .filter(key => key.startsWith(dateKey))
         .map(key => key.substring(dateKey.length + 1))
     );
 
-    const hiddenWithEntries = stackItems.filter(
-      i => !i.active && itemIdsWithEntries.has(i.id)
-    );
-
-    return [...active, ...hiddenWithEntries];
+    return stackItems.filter(i => itemIdsWithEntries.has(i.id));
   })().sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Drag reorder handlers
