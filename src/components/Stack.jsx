@@ -889,6 +889,7 @@ export default function Stack({
               cursor: 'pointer',
               padding: '14px 40px',
               boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
+              zIndex: 10,
             }}
           >
             Done
