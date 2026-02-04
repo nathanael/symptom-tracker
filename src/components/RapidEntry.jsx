@@ -21,9 +21,6 @@ export default function RapidEntry({
   getMostRecentEntry,
   setCopyToastMessage,
 }) {
-  const activeSymptomsList = symptoms.filter(s => s.active);
-  const currentSymptom = activeSymptomsList[rapidEntryIndex];
-
   const getCurrentTimePeriod = () => {
     if (trackingMode !== 'ampm') return 'daily';
     const hour = new Date().getHours();
@@ -33,6 +30,16 @@ export default function RapidEntry({
   const logTime = quickLogTime || getCurrentTimePeriod();
   const dateKey = getDateKey(selectedDate);
   const timeKey = trackingMode === 'ampm' ? logTime : 'daily';
+
+  const activeSymptomsList = symptoms.filter(s => s.active);
+
+  // Filter to only show unmarked symptoms
+  const unmarkedSymptoms = activeSymptomsList.filter(symptom => {
+    const entryKey = `${dateKey}-${symptom.id}-${timeKey}`;
+    return !entries[entryKey];
+  });
+
+  const currentSymptom = unmarkedSymptoms[rapidEntryIndex];
 
   const handleClose = () => {
     setRapidEntryMode(false);
@@ -46,7 +53,7 @@ export default function RapidEntry({
       if (e.key === 'ArrowLeft' && rapidEntryIndex > 0) {
         setRapidEntryIndex(prev => prev - 1);
       } else if (e.key === 'ArrowRight') {
-        if (rapidEntryIndex < activeSymptomsList.length - 1) {
+        if (rapidEntryIndex < unmarkedSymptoms.length - 1) {
           setRapidEntryIndex(prev => prev + 1);
         } else {
           handleClose();
@@ -56,21 +63,25 @@ export default function RapidEntry({
       } else if (e.key >= '0' && e.key <= '5' && currentSymptom) {
         const severity = parseInt(e.key);
         quickLog(currentSymptom.id, severity, logTime);
-        if (rapidEntryIndex < activeSymptomsList.length - 1) {
-          setRapidEntryIndex(prev => prev + 1);
-        } else {
+        // After logging, the symptom will be filtered out, so stay at same index
+        // (which will now show the next unmarked symptom)
+        // Check if this was the last unmarked symptom
+        if (unmarkedSymptoms.length <= 1) {
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
           setRapidEntryMode(false);
           setRapidEntryIndex(0);
           setCopyToastMessage('✓ All symptoms logged!');
           setTimeout(() => setCopyToastMessage(''), 3000);
+        } else if (rapidEntryIndex >= unmarkedSymptoms.length - 1) {
+          // Was at end, move back to stay in bounds after filter
+          setRapidEntryIndex(prev => Math.max(0, prev - 1));
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [rapidEntryIndex, activeSymptomsList.length, currentSymptom, logTime]);
+  }, [rapidEntryIndex, unmarkedSymptoms.length, currentSymptom, logTime]);
 
   // If all complete, show confirmation screen
   if (rapidEntryConfirm) {
@@ -218,13 +229,28 @@ export default function RapidEntry({
     );
   }
 
-  if (!currentSymptom) {
-    handleClose();
+  // If no unmarked symptoms, show completion or close
+  if (!currentSymptom || unmarkedSymptoms.length === 0) {
+    // Check if opposite period has incomplete symptoms (for AM/PM mode)
+    if (trackingMode === 'ampm') {
+      const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
+      const oppositeIncomplete = activeSymptomsList.filter(symptom => {
+        const entryKey = `${dateKey}-${symptom.id}-${oppositePeriod}`;
+        return !entries[entryKey];
+      });
+      if (oppositeIncomplete.length > 0) {
+        setRapidEntryConfirm(true);
+        return null;
+      }
+    }
+    // All done
+    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    setRapidEntryMode(false);
+    setRapidEntryIndex(0);
+    setCopyToastMessage('✓ All symptoms logged!');
+    setTimeout(() => setCopyToastMessage(''), 3000);
     return null;
   }
-
-  const entryKey = `${dateKey}-${currentSymptom.id}-${timeKey}`;
-  const currentEntry = entries[entryKey];
 
   return (
     <div style={{
@@ -270,15 +296,16 @@ export default function RapidEntry({
         </button>
       </div>
 
-      {/* Progress indicator */}
+      {/* Progress indicator - shows all symptoms */}
       <div style={{
         display: 'flex',
         gap: '4px',
         marginBottom: '20px',
       }}>
-        {activeSymptomsList.map((symptom, idx) => {
+        {activeSymptomsList.map((symptom) => {
           const symptomEntryKey = `${dateKey}-${symptom.id}-${timeKey}`;
           const hasEntry = !!entries[symptomEntryKey];
+          const isCurrent = currentSymptom && symptom.id === currentSymptom.id;
 
           return (
             <div
@@ -287,7 +314,7 @@ export default function RapidEntry({
                 flex: 1,
                 height: '4px',
                 borderRadius: '2px',
-                background: idx === rapidEntryIndex
+                background: isCurrent
                   ? '#8b5cf6'
                   : hasEntry
                     ? '#10b981'
@@ -309,7 +336,7 @@ export default function RapidEntry({
       }}>
         {/* Counter */}
         <div style={{ color: '#64748b', fontSize: '14px' }}>
-          {rapidEntryIndex + 1} of {activeSymptomsList.length}
+          {rapidEntryIndex + 1} of {unmarkedSymptoms.length} remaining
         </div>
 
         {/* Symptom name */}
@@ -371,79 +398,70 @@ export default function RapidEntry({
           maxWidth: '400px',
         }}>
           {[0, 1, 2, 3, 4, 5].map(severity => {
-            const isCurrentSelection = currentEntry?.severity === severity;
             const recentEntry = getMostRecentEntry(currentSymptom.id, logTime);
-            const isRecentSeverity = recentEntry?.severity === severity && !currentEntry;
+            const isRecentSeverity = recentEntry?.severity === severity;
 
             return (
               <button
                 key={severity}
                 onClick={() => {
-                  if (isCurrentSelection) {
-                    // Clear selection
-                    setEntries(prev => {
-                      const newEntries = { ...prev };
-                      delete newEntries[entryKey];
-                      return newEntries;
-                    });
-                  } else {
-                    // Set/change value and advance
-                    quickLog(currentSymptom.id, severity, logTime);
+                  // Set value - the symptom will be filtered out after this
+                  quickLog(currentSymptom.id, severity, logTime);
 
-                    if (rapidEntryIndex < activeSymptomsList.length - 1) {
-                      setRapidEntryIndex(prev => prev + 1);
-                    } else {
-                      // At end - show completion with confetti
-                      confetti({
-                        particleCount: 100,
-                        spread: 70,
-                        origin: { y: 0.6 }
+                  // Check if this was the last unmarked symptom
+                  if (unmarkedSymptoms.length <= 1) {
+                    // Check for opposite period in AM/PM mode
+                    if (trackingMode === 'ampm') {
+                      const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
+                      const oppositeIncomplete = activeSymptomsList.filter(symptom => {
+                        const ek = `${dateKey}-${symptom.id}-${oppositePeriod}`;
+                        return !entries[ek];
                       });
-                      setRapidEntryMode(false);
-                      setRapidEntryIndex(0);
-                      setCopyToastMessage('✓ All symptoms logged!');
-                      setTimeout(() => setCopyToastMessage(''), 3000);
+                      if (oppositeIncomplete.length > 0) {
+                        setRapidEntryConfirm(true);
+                        return;
+                      }
                     }
+                    // All done
+                    confetti({
+                      particleCount: 100,
+                      spread: 70,
+                      origin: { y: 0.6 }
+                    });
+                    setRapidEntryMode(false);
+                    setRapidEntryIndex(0);
+                    setCopyToastMessage('✓ All symptoms logged!');
+                    setTimeout(() => setCopyToastMessage(''), 3000);
+                  } else if (rapidEntryIndex >= unmarkedSymptoms.length - 1) {
+                    // Was at end, move index back to stay in bounds
+                    setRapidEntryIndex(prev => Math.max(0, prev - 1));
                   }
+                  // Otherwise stay at same index - next unmarked will appear
                 }}
                 style={{
                   padding: '24px',
-                  background: isCurrentSelection
-                    ? `${severityColors[severity]}40`
-                    : `${severityColors[severity]}20`,
-                  border: isCurrentSelection
-                    ? `3px solid ${severityColors[severity]}`
-                    : isRecentSeverity
-                      ? `2px solid ${severityColors[severity]}40`
-                      : '2px solid transparent',
+                  background: `${severityColors[severity]}20`,
+                  border: isRecentSeverity
+                    ? `2px solid ${severityColors[severity]}40`
+                    : '2px solid transparent',
                   borderRadius: '3px',
                   color: severityColors[severity],
                   fontSize: '32px',
                   fontWeight: '700',
                   cursor: 'pointer',
                   position: 'relative',
-                  boxShadow: isCurrentSelection ? `0 0 12px ${severityColors[severity]}50` : 'none',
                 }}
               >
                 {severity}
-                {isCurrentSelection && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '4px',
-                    right: '6px',
-                    fontSize: '12px',
-                    color: severityColors[severity],
-                  }}>✓</span>
-                )}
                 {!isMobile() && (
                   <span style={{
                     position: 'absolute',
                     top: '4px',
                     left: '6px',
                     fontSize: '11px',
-                    color: isCurrentSelection ? severityColors[severity] : '#64748b',
+                    color: '#64748b',
                     fontWeight: '600',
-                    background: isCurrentSelection ? 'transparent' : 'rgba(0,0,0,0.3)',
+                    background: 'rgba(0,0,0,0.3)',
                     padding: '2px 5px',
                     borderRadius: '3px',
                   }}>{severity}</span>
@@ -488,7 +506,7 @@ export default function RapidEntry({
 
           <button
             onClick={() => {
-              if (rapidEntryIndex < activeSymptomsList.length - 1) {
+              if (rapidEntryIndex < unmarkedSymptoms.length - 1) {
                 setRapidEntryIndex(prev => prev + 1);
               } else {
                 handleClose();
@@ -505,7 +523,7 @@ export default function RapidEntry({
               cursor: 'pointer',
             }}
           >
-            {rapidEntryIndex < activeSymptomsList.length - 1 ? 'Skip' : 'Done'}
+            {rapidEntryIndex < unmarkedSymptoms.length - 1 ? 'Skip' : 'Done'}
             {!isMobile() && (
               <span style={{
                 background: 'rgba(100, 116, 139, 0.3)',
