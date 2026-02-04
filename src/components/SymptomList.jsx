@@ -461,9 +461,9 @@ export default function SymptomList({
                   <span style={{ color: '#fbbf24', fontSize: '12px' }}>⊙</span>
                 )}
                 <span style={{
-                  width: '16px',
+                  width: '21px',
                   display: 'inline-block',
-                  fontSize: '12px',
+                  fontSize: '16px',
                   opacity: 0.7,
                   color: trend === 'improving' ? '#4ade80' : '#fbbf24',
                   flexShrink: 0,
