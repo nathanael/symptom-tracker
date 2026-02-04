@@ -88,11 +88,30 @@ export default function Stack({
   };
 
   const getStackProgress = () => {
-    const activeItems = stackItems.filter(i => i.active);
-    const takenCount = activeItems.filter(item =>
+    // Use same logic as displayItems to count what's actually shown
+    const active = stackItems.filter(i => i.active);
+    const today = new Date();
+
+    let itemsToCount;
+    if (selectedDate.toDateString() === today.toDateString()) {
+      itemsToCount = active;
+    } else {
+      // Past date: include hidden items with entries
+      const itemIdsWithEntries = new Set(
+        Object.keys(stackEntries)
+          .filter(key => key.startsWith(dateKey))
+          .map(key => key.substring(dateKey.length + 1))
+      );
+      const hiddenWithEntries = stackItems.filter(
+        i => !i.active && itemIdsWithEntries.has(i.id)
+      );
+      itemsToCount = [...active, ...hiddenWithEntries];
+    }
+
+    const takenCount = itemsToCount.filter(item =>
       stackEntries[`${dateKey}-${item.id}`]
     ).length;
-    return { taken: takenCount, total: activeItems.length };
+    return { taken: takenCount, total: itemsToCount.length };
   };
 
   const addStackItem = () => {
@@ -145,6 +164,30 @@ export default function Stack({
   const activeItems = stackItems.filter(i => i.active).sort((a, b) => (a.order || 0) - (b.order || 0));
   const inactiveItems = stackItems.filter(i => !i.active);
 
+  // Determine which items to display based on date
+  const displayItems = (() => {
+    const active = stackItems.filter(i => i.active);
+
+    // Today: only show active items
+    const today = new Date();
+    if (selectedDate.toDateString() === today.toDateString()) {
+      return active;
+    }
+
+    // Past date: show active + any hidden items with entries for this date
+    const itemIdsWithEntries = new Set(
+      Object.keys(stackEntries)
+        .filter(key => key.startsWith(dateKey))
+        .map(key => key.substring(dateKey.length + 1))
+    );
+
+    const hiddenWithEntries = stackItems.filter(
+      i => !i.active && itemIdsWithEntries.has(i.id)
+    );
+
+    return [...active, ...hiddenWithEntries];
+  })().sort((a, b) => (a.order || 0) - (b.order || 0));
+
   // Drag reorder handlers
   const handleDragStart = (e, itemId) => {
     e.stopPropagation();
@@ -191,91 +234,34 @@ export default function Stack({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-      {/* Progress indicator and actions */}
-      {activeItems.length > 0 && (
+      {/* Progress indicator */}
+      {displayItems.length > 0 && (
         <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
+          gap: '8px',
           padding: '16px 20px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
         }}>
-          {/* Left: progress */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: getStackProgress().taken === getStackProgress().total ? '#34d399' : '#4b5563',
-            }} />
-            <span style={{ color: '#e5e7eb', fontSize: '14px' }}>
-              {getStackProgress().taken} of {getStackProgress().total} completed
-            </span>
-          </div>
-          {/* Right: actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button
-              onClick={() => {
-                const newEntries = { ...stackEntries };
-                activeItems.forEach(item => {
-                  const entryKey = `${dateKey}-${item.id}`;
-                  newEntries[entryKey] = {
-                    date: dateKey,
-                    itemId: item.id,
-                    dose: item.defaultDose,
-                    taken: true
-                  };
-                });
-                setStackEntries(newEntries);
-                haptic('success');
-                setLastAction('All selected');
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#9ca3af',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                padding: '4px 0',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}
-            >
-              Check All
-            </button>
-            <span style={{ color: '#4b5563' }}>|</span>
-            <button
-              onClick={() => {
-                const newEntries = { ...stackEntries };
-                Object.keys(newEntries).forEach(key => {
-                  if (key.startsWith(dateKey)) {
-                    delete newEntries[key];
-                  }
-                });
-                setStackEntries(newEntries);
-                setLastAction('All cleared');
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#9ca3af',
-                fontSize: '12px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                padding: '4px 0',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}
-            >
-              Clear
-            </button>
-          </div>
+          <div style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: (() => {
+              const { taken, total } = getStackProgress();
+              if (taken === 0) return '#4b5563';      // gray - none
+              if (taken === total) return '#3b82f6';  // blue - all
+              return '#f59e0b';                        // orange - some
+            })(),
+          }} />
+          <span style={{ color: '#e5e7eb', fontSize: '14px' }}>
+            {getStackProgress().taken} of {getStackProgress().total} completed
+          </span>
         </div>
       )}
 
       {/* Stack items - flat row design */}
-      {activeItems.map((item, index) => {
+      {displayItems.map((item, index) => {
         const entry = getStackEntry(item.id);
         const isTaken = !!entry;
         const isEditing = editingStackItem === item.id;
@@ -302,7 +288,12 @@ export default function Stack({
                 fontSize: '15px',
                 fontWeight: '400',
                 display: 'block',
-              }}>{item.name}</span>
+              }}>
+                {item.name}
+                {!item.active && (
+                  <span style={{ color: '#6b7280', fontSize: '11px', marginLeft: '4px' }}>(hidden)</span>
+                )}
+              </span>
               {item.description && (
                 <span style={{
                   color: '#6b7280',

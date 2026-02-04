@@ -1,3 +1,5 @@
+import QuickActionsMenu from './QuickActionsMenu';
+
 export default function BottomNav({
   appMode,
   setAppMode,
@@ -7,6 +9,17 @@ export default function BottomNav({
   setShowSettings,
   showExport,
   setShowExport,
+  showQuickActions,
+  setShowQuickActions,
+  // Action handlers
+  onCopyData,
+  copyDays,
+  onRapidEntry,
+  onEditNote,
+  onEditSymptoms,
+  onCheckAll,
+  onClear,
+  onEditStack,
 }) {
   const isViewOpen = showInsights || showSettings || showExport;
 
@@ -36,6 +49,7 @@ export default function BottomNav({
             setShowInsights(false);
             setShowSettings(false);
             setShowExport(false);
+            setShowQuickActions(false);
           }}
           style={{
             flex: 1,
@@ -68,6 +82,7 @@ export default function BottomNav({
             setShowInsights(false);
             setShowSettings(false);
             setShowExport(false);
+            setShowQuickActions(false);
           }}
           style={{
             flex: 1,
@@ -101,6 +116,7 @@ export default function BottomNav({
             setShowInsights(!showInsights);
             setShowSettings(false);
             setShowExport(false);
+            setShowQuickActions(false);
           }}
           style={{
             flex: 1,
@@ -127,11 +143,12 @@ export default function BottomNav({
           </span>
         </button>
 
-        {/* Settings Tab */}
+        {/* Actions Tab */}
         <button
           onClick={() => {
-            setShowSettings(!showSettings);
+            setShowQuickActions(!showQuickActions);
             setShowInsights(false);
+            setShowSettings(false);
             setShowExport(false);
           }}
           style={{
@@ -146,19 +163,41 @@ export default function BottomNav({
             gap: '4px',
           }}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={showSettings ? '#8b5cf6' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+          {/* Ellipsis (three dots) icon */}
+          <svg width="24" height="24" viewBox="0 0 24 24" fill={showQuickActions ? '#8b5cf6' : '#64748b'}>
+            <circle cx="12" cy="12" r="2"/>
+            <circle cx="5" cy="12" r="2"/>
+            <circle cx="19" cy="12" r="2"/>
           </svg>
           <span style={{
             fontSize: '11px',
-            color: showSettings ? '#8b5cf6' : '#64748b',
-            fontWeight: showSettings ? '600' : '400',
+            color: showQuickActions ? '#8b5cf6' : '#64748b',
+            fontWeight: showQuickActions ? '600' : '400',
           }}>
-            Settings
+            Actions
           </span>
         </button>
       </div>
+
+      {/* Quick Actions Menu */}
+      {showQuickActions && (
+        <QuickActionsMenu
+          appMode={appMode}
+          onClose={() => setShowQuickActions(false)}
+          onCopyData={onCopyData}
+          copyDays={copyDays}
+          onRapidEntry={onRapidEntry}
+          onEditNote={onEditNote}
+          onEditSymptoms={onEditSymptoms}
+          onCheckAll={onCheckAll}
+          onClear={onClear}
+          onEditStack={onEditStack}
+          onOpenSettings={() => {
+            setShowSettings(true);
+            setShowQuickActions(false);
+          }}
+        />
+      )}
     </div>
   );
 }

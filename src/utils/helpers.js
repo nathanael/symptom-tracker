@@ -111,22 +111,25 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
     }
   });
 
-  // Stack summary
+  // Stack summary - include ALL items with entries, regardless of active state
   output.push('\n## Supplements Taken');
-  const activeStack = stackItems.filter(i => i.active);
 
   for (let i = 0; i < days; i++) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dateKey = getDateKey(date);
 
-    const takenItems = activeStack.filter(item => {
-      const entry = stackEntries[`${dateKey}-${item.id}`];
-      return entry && entry.taken;
-    });
+    // Find ALL entries for this date, regardless of active state
+    const takenItems = Object.entries(stackEntries)
+      .filter(([key, entry]) => key.startsWith(dateKey) && entry.taken)
+      .map(([key, entry]) => {
+        const item = stackItems.find(i => i.id === entry.itemId);
+        return item ? `${item.name} (${entry.dose}${item.unit})` : null;
+      })
+      .filter(Boolean);
 
     if (takenItems.length > 0) {
-      output.push(`\n**${formatTableDate(dateKey)}**: ${takenItems.map(i => i.name).join(', ')}`);
+      output.push(`\n**${formatTableDate(dateKey)}**: ${takenItems.join(', ')}`);
     }
   }
 

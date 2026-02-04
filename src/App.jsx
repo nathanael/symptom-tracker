@@ -71,6 +71,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
 
   // UI state
   const [lastAction, setLastAction] = useState('');
@@ -81,7 +82,6 @@ function App() {
   const [quickLogTime, setQuickLogTime] = useState(null);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [insightsWindow, setInsightsWindow] = useState(60);
-  const [showCopyDropdown, setShowCopyDropdown] = useState(false);
 
   // Rapid entry state
   const [rapidEntryMode, setRapidEntryMode] = useState(false);
@@ -96,7 +96,6 @@ function App() {
   const firebase = useFirebase();
 
   // Refs
-  const copyLongPressTimer = useRef(null);
   const justLoggedRef = useRef(false);
 
   // Derived values
@@ -424,7 +423,7 @@ function App() {
       {/* Rapid Entry Mode */}
       {rapidEntryMode && (
         <RapidEntry
-          symptoms={symptoms}
+          symptoms={activeSymptoms}
           entries={entries}
           selectedDate={selectedDate}
           trackingMode={trackingMode}
@@ -495,19 +494,7 @@ function App() {
               getSymptomEntries={getSymptomEntries}
               getMostRecentEntry={getMostRecentEntry}
               getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
-              setShowNoteModal={setShowNoteModal}
-              copyDays={copyDays}
-              setCopyDays={setCopyDays}
-              showCopyDropdown={showCopyDropdown}
-              setShowCopyDropdown={setShowCopyDropdown}
-              quickCopyData={quickCopyData}
-              copyLongPressTimer={copyLongPressTimer}
-              setRapidEntryMode={setRapidEntryMode}
-              setRapidEntryConfirm={setRapidEntryConfirm}
-              incompleteSymptoms={incompleteSymptoms}
-              totalActiveSymptoms={totalActiveSymptoms}
               trendWindow={trendWindow}
-              showActions={!showInsights && !showSettings && !showExport}
             />
           ) : (
             <Stack
@@ -645,6 +632,54 @@ function App() {
           setShowSettings={setShowSettings}
           showExport={showExport}
           setShowExport={setShowExport}
+          showQuickActions={showQuickActions}
+          setShowQuickActions={setShowQuickActions}
+          // Symptoms page actions
+          onCopyData={quickCopyData}
+          copyDays={copyDays}
+          onRapidEntry={() => {
+            if (trackingMode === 'ampm' && !quickLogTime) {
+              setQuickLogTime(getCurrentTimePeriod(trackingMode));
+            }
+            if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
+              setRapidEntryConfirm(true);
+              setRapidEntryMode(true);
+            } else {
+              setRapidEntryMode(true);
+            }
+          }}
+          onEditNote={() => setShowNoteModal(true)}
+          onEditSymptoms={() => setShowAddSymptom(true)}
+          // Stack page actions
+          onCheckAll={() => {
+            const dateKey = getDateKey(selectedDate);
+            const activeItems = stackItems.filter(i => i.active);
+            const newEntries = { ...stackEntries };
+            activeItems.forEach(item => {
+              const entryKey = `${dateKey}-${item.id}`;
+              newEntries[entryKey] = {
+                date: dateKey,
+                itemId: item.id,
+                dose: item.defaultDose,
+                taken: true
+              };
+            });
+            setStackEntries(newEntries);
+            haptic('success');
+            setLastAction('All selected');
+          }}
+          onClear={() => {
+            const dateKey = getDateKey(selectedDate);
+            const newEntries = { ...stackEntries };
+            Object.keys(newEntries).forEach(key => {
+              if (key.startsWith(dateKey)) {
+                delete newEntries[key];
+              }
+            });
+            setStackEntries(newEntries);
+            setLastAction('All cleared');
+          }}
+          onEditStack={() => setShowManageStack(true)}
         />
       )}
     </div>
