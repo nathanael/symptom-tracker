@@ -204,14 +204,6 @@ export default function Stack({
     setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
   };
 
-  const handleEditBlur = (e) => {
-    // Check if focus is moving to another element within the same edit form
-    const container = e.currentTarget.closest('[data-edit-form]');
-    if (container && container.contains(e.relatedTarget)) {
-      return; // Don't save yet, user is moving to another field in the form
-    }
-    saveStackItemEdit();
-  };
 
   const deleteStackItem = (itemId) => {
     setStackItems(stackItems.filter(item => item.id !== itemId));
@@ -795,8 +787,7 @@ export default function Stack({
                             placeholder="Name"
                             autoFocus
                             enterKeyHint="done"
-                            onBlur={handleEditBlur}
-                            style={{
+                                                        style={{
                               width: '100%',
                               background: 'rgba(99, 102, 241, 0.15)',
                               border: '2px solid rgba(99, 102, 241, 0.5)',
@@ -819,8 +810,7 @@ export default function Stack({
                             onChange={(e) => setEditingStackItemData({...editingStackItemData, description: e.target.value})}
                             placeholder="Description (optional)"
                             enterKeyHint="done"
-                            onBlur={handleEditBlur}
-                            onKeyDown={(e) => {
+                                                        onKeyDown={(e) => {
                               if (e.key === 'Enter') saveStackItemEdit();
                             }}
                             style={{
@@ -841,8 +831,7 @@ export default function Stack({
                               placeholder="Dose"
                               inputMode="decimal"
                               enterKeyHint="done"
-                              onBlur={handleEditBlur}
-                              onKeyDown={(e) => {
+                                                            onKeyDown={(e) => {
                                 if (e.key === 'Enter') saveStackItemEdit();
                               }}
                               style={{
