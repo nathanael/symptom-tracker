@@ -8,4 +8,4 @@ When committing changes:
    - `src/components/Settings.jsx`
    - `src/components/QuickActionsMenu.jsx`
 2. Commit and push to main
-3. Run `npm run deploy` to deploy to GitHub Pages
+3. Run `npm run build && npm run deploy` to build and deploy to GitHub Pages
