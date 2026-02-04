@@ -15,6 +15,7 @@ export default function Stack({
   const [newStackItem, setNewStackItem] = useState({ name: '', unit: 'mg', defaultDose: '', description: '' });
   const [editingStackItemId, setEditingStackItemId] = useState(null);
   const [editingStackItemData, setEditingStackItemData] = useState({ name: '', defaultDose: '', unit: 'mg', description: '' });
+  const [showLogPicker, setShowLogPicker] = useState(false);
 
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
@@ -170,6 +171,11 @@ export default function Stack({
 
   const activeItems = stackItems.filter(i => i.active).sort((a, b) => (a.order || 0) - (b.order || 0));
   const inactiveItems = stackItems.filter(i => !i.active);
+
+  // Supplements available to log retroactively (active items without entries for this date)
+  const availableToLog = stackItems.filter(i =>
+    i.active && !stackEntries[`${dateKey}-${i.id}`]
+  ).sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Determine which items to display based on date
   const displayItems = (() => {
@@ -404,29 +410,53 @@ export default function Stack({
         );
       })}
 
-      {/* Add Supplement Button - at bottom of list */}
+      {/* Add/Log Supplement Button - at bottom of list */}
       {!showManageStack && (
-        <button
-          onClick={() => setShowManageStack(true)}
-          style={{
-            width: '100%',
-            padding: '16px 20px',
-            background: 'transparent',
-            border: 'none',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-            color: '#6b7280',
-            fontSize: '14px',
-            fontWeight: '400',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-          }}
-        >
-          <span style={{ fontSize: '14px' }}>+</span>
-          Add supplement
-        </button>
+        isToday ? (
+          <button
+            onClick={() => setShowManageStack(true)}
+            style={{
+              width: '100%',
+              padding: '16px 20px',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+              color: '#6b7280',
+              fontSize: '14px',
+              fontWeight: '400',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            <span style={{ fontSize: '14px' }}>+</span>
+            Add supplement
+          </button>
+        ) : availableToLog.length > 0 && (
+          <button
+            onClick={() => setShowLogPicker(true)}
+            style={{
+              width: '100%',
+              padding: '16px 20px',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+              color: '#6b7280',
+              fontSize: '14px',
+              fontWeight: '400',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            <span style={{ fontSize: '14px' }}>+</span>
+            Log supplement
+          </button>
+        )
       )}
 
 
@@ -888,6 +918,107 @@ export default function Stack({
           >
             Done
           </button>
+        </div>
+      )}
+
+      {/* Log Picker Modal (for past dates) */}
+      {showLogPicker && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+          }}
+          onClick={() => setShowLogPicker(false)}
+        >
+          <div
+            style={{
+              background: '#1a1b1e',
+              borderRadius: '16px 16px 0 0',
+              width: '100%',
+              maxWidth: '500px',
+              maxHeight: '60vh',
+              display: 'flex',
+              flexDirection: 'column',
+              animation: 'modalIn 0.2s ease-out',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+                Log supplement
+              </h3>
+              <button
+                onClick={() => setShowLogPicker(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#6b7280',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  padding: '8px 12px',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+
+            {/* Supplement list */}
+            <div style={{
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              flex: 1,
+            }}>
+              {availableToLog.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    haptic('light');
+                    toggleStackItem(item.id);
+                    setShowLogPicker(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '16px 20px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                    color: '#e5e7eb',
+                    fontSize: '15px',
+                    fontWeight: '400',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div>
+                    <span>{item.name}</span>
+                    {item.description && (
+                      <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: '8px' }}>
+                        ({item.description})
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                    {item.defaultDose} {item.unit}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
