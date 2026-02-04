@@ -660,13 +660,8 @@ function App() {
         <Insights
           entries={entries}
           symptoms={symptoms}
-          dailyNotes={dailyNotes}
-          stackItems={stackItems}
-          stackEntries={stackEntries}
-          trackingMode={trackingMode}
           insightsWindow={insightsWindow}
           setInsightsWindow={setInsightsWindow}
-          setCopyToastMessage={setCopyToastMessage}
         />
       )}
 

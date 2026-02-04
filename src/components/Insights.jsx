@@ -1,28 +1,59 @@
-import { useMemo } from 'react';
-import { getInsights, generateAIDataExport, haptic } from '../utils/helpers';
+import { useMemo, useState } from 'react';
+import { getInsights, haptic } from '../utils/helpers';
+
+// Simple SVG sparkline component with moving average smoothing
+const Sparkline = ({ data, color, width = 280, height = 60 }) => {
+  if (!data || data.length < 2) return null;
+
+  const maxSeverity = 5;
+  const padding = 2; // Padding for stroke width
+  const windowSize = Math.min(5, Math.ceil(data.length / 6));
+
+  // Calculate moving average
+  const smoothed = data.map((d, i) => {
+    const half = Math.floor(windowSize / 2);
+    const start = Math.max(0, i - half);
+    const end = Math.min(data.length, i + half + 1);
+    const slice = data.slice(start, end);
+    const avg = slice.reduce((sum, p) => sum + p.severity, 0) / slice.length;
+    return avg;
+  });
+
+  const drawHeight = height - padding * 2;
+  const points = smoothed.map((severity, i) => {
+    const x = (i / (smoothed.length - 1)) * width;
+    const y = padding + drawHeight - (severity / maxSeverity) * drawHeight;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        points={points}
+      />
+    </svg>
+  );
+};
 
 export default function Insights({
   entries,
   symptoms,
-  dailyNotes,
-  stackItems,
-  stackEntries,
-  trackingMode,
   insightsWindow,
   setInsightsWindow,
-  setCopyToastMessage,
 }) {
+  const [expandedId, setExpandedId] = useState(null);
+
   const data = useMemo(() =>
     getInsights(insightsWindow, entries, symptoms),
     [insightsWindow, entries, symptoms]
   );
 
-  const handleCopy = () => {
-    const exportData = generateAIDataExport(60, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode);
-    navigator.clipboard.writeText(exportData);
-    setCopyToastMessage('Copied 60 days of tracking for AI chat');
+  const handleCardClick = (symptomId) => {
     haptic('light');
-    setTimeout(() => setCopyToastMessage(''), 2250);
+    setExpandedId(expandedId === symptomId ? null : symptomId);
   };
 
   return (
@@ -117,43 +148,103 @@ export default function Insights({
             {/* Insights tiles */}
             {data.insights.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-                {data.insights.map(insight => (
-                  <div
-                    key={insight.symptomId}
-                    style={{
-                      background: insight.direction === 'improving'
-                        ? 'rgba(16, 185, 129, 0.05)'
-                        : 'rgba(244, 63, 94, 0.05)',
-                      border: `1px solid ${insight.direction === 'improving' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)'}`,
-                      borderRadius: '16px',
-                      padding: '20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '20px',
-                    }}
-                  >
-                    <div style={{
-                      fontSize: '30px',
-                      fontWeight: '700',
-                      letterSpacing: '-0.025em',
-                      color: insight.direction === 'improving' ? '#34d399' : '#fb7185',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}>
-                      <span style={{ fontSize: '24px' }}>{insight.direction === 'improving' ? '↓' : '↑'}</span>
-                      {insight.percentChange}%
-                    </div>
-                    <div>
-                      <div style={{ color: insight.direction === 'improving' ? '#d1fae5' : '#ffe4e6', fontSize: '16px', fontWeight: '500' }}>
-                        {insight.name}
+                {data.insights.map(insight => {
+                  const isExpanded = expandedId === insight.symptomId;
+                  const lineColor = insight.direction === 'improving' ? '#34d399' : '#fb7185';
+
+                  return (
+                    <div
+                      key={insight.symptomId}
+                      onClick={() => handleCardClick(insight.symptomId)}
+                      style={{
+                        background: insight.direction === 'improving'
+                          ? 'rgba(16, 185, 129, 0.05)'
+                          : 'rgba(244, 63, 94, 0.05)',
+                        border: `1px solid ${insight.direction === 'improving' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.2)'}`,
+                        borderRadius: '16px',
+                        padding: '20px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '20px',
+                      }}>
+                        <div style={{
+                          fontSize: '30px',
+                          fontWeight: '700',
+                          letterSpacing: '-0.025em',
+                          color: lineColor,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}>
+                          <span style={{ fontSize: '24px' }}>{insight.direction === 'improving' ? '↓' : '↑'}</span>
+                          {insight.percentChange}%
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ color: insight.direction === 'improving' ? '#d1fae5' : '#ffe4e6', fontSize: '16px', fontWeight: '500' }}>
+                            {insight.name}
+                          </div>
+                          <div style={{ color: insight.direction === 'improving' ? 'rgba(110, 231, 183, 0.6)' : 'rgba(251, 113, 133, 0.6)', fontSize: '14px', marginTop: '2px' }}>
+                            {insight.direction === 'improving' ? 'Improved' : 'Increased'} over {insightsWindow} days
+                          </div>
+                        </div>
+                        <div style={{
+                          color: insight.direction === 'improving' ? 'rgba(110, 231, 183, 0.4)' : 'rgba(251, 113, 133, 0.4)',
+                          fontSize: '18px',
+                          transition: 'transform 0.2s ease',
+                          transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        }}>
+                          ▾
+                        </div>
                       </div>
-                      <div style={{ color: insight.direction === 'improving' ? 'rgba(110, 231, 183, 0.6)' : 'rgba(251, 113, 133, 0.6)', fontSize: '14px', marginTop: '2px' }}>
-                        {insight.direction === 'improving' ? 'Improved' : 'Increased'} over {insightsWindow} days
-                      </div>
+
+                      {isExpanded && (
+                        <div style={{
+                          marginTop: '16px',
+                          paddingTop: '16px',
+                          borderTop: `1px solid ${insight.direction === 'improving' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)'}`,
+                        }}>
+                          {/* Before/After Averages */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '12px',
+                            color: insight.direction === 'improving' ? 'rgba(209, 250, 229, 0.8)' : 'rgba(255, 228, 230, 0.8)',
+                            fontSize: '14px',
+                          }}>
+                            <span style={{ fontWeight: '500' }}>Avg:</span>
+                            <span>{insight.firstAvg}</span>
+                            <span style={{ opacity: 0.5 }}>→</span>
+                            <span style={{ fontWeight: '600' }}>{insight.secondAvg}</span>
+                          </div>
+
+                          {/* Sparkline */}
+                          {insight.chartData && insight.chartData.length >= 2 && (
+                            <div style={{ marginBottom: '12px' }}>
+                              <Sparkline
+                                data={insight.chartData}
+                                color={lineColor}
+                              />
+                            </div>
+                          )}
+
+                          {/* Entry Count */}
+                          <div style={{
+                            color: insight.direction === 'improving' ? 'rgba(110, 231, 183, 0.5)' : 'rgba(251, 113, 133, 0.5)',
+                            fontSize: '12px',
+                          }}>
+                            Based on {insight.entryCount} entries
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -182,34 +273,6 @@ export default function Insights({
                 </div>
               </div>
             )}
-
-            {/* Copy button */}
-            <button
-              onClick={handleCopy}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px',
-                background: '#4f46e5',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '16px',
-                padding: '16px 24px',
-                color: '#fff',
-                fontSize: '15px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                marginBottom: '24px',
-                boxShadow: '0 10px 15px -3px rgba(49, 46, 129, 0.2)',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(199, 210, 254, 0.8)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-              </svg>
-              Copy Tracking Data
-            </button>
 
             <p style={{
               color: '#737373',

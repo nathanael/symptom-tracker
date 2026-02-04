@@ -332,6 +332,11 @@ export const getInsights = (windowDays, entries, symptoms) => {
     const percentChange = Math.round((change / Math.max(firstAvg, 0.5)) * 100);
 
     if (Math.abs(percentChange) >= 20) {
+      // Build chart data from all symptom entries, sorted by date
+      const chartData = symptomEntries
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(e => ({ date: e.date, severity: e.severity }));
+
       insights.push({
         symptomId: symptom.id,
         name: symptom.name,
@@ -339,6 +344,8 @@ export const getInsights = (windowDays, entries, symptoms) => {
         percentChange: Math.abs(percentChange),
         firstAvg: Math.round(firstAvg * 10) / 10,
         secondAvg: Math.round(secondAvg * 10) / 10,
+        chartData,
+        entryCount: symptomEntries.length,
       });
     }
   });
