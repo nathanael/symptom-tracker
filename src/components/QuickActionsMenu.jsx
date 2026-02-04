@@ -97,10 +97,11 @@ export default function QuickActionsMenu({
   );
 
   // Icons
-  const CopyIcon = (
+  const SparklesIcon = (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/>
+      <path d="M5 19l1 3 1-3 3-1-3-1-1-3-1 3-3 1 3 1z"/>
+      <path d="M19 12l1 2 1-2 2-1-2-1-1-2-1 2-2 1 2 1z"/>
     </svg>
   );
 
@@ -224,9 +225,9 @@ export default function QuickActionsMenu({
               onClick={onEditNote}
             />
             <MenuItem
-              icon={CopyIcon}
-              label={`Copy ${copyDays} Days Tracking Data`}
-              subtext="Copy tracking data for AI conversation"
+              icon={SparklesIcon}
+              label={`Copy ${copyDays} days' data for AI`}
+              subtext="Paste into ChatGPT, Gemini or Claude"
               onClick={onCopyData}
             />
           </>

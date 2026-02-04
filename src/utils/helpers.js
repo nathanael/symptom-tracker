@@ -75,17 +75,20 @@ export const haptic = (type = 'light') => {
 };
 
 // Data Export Helpers
-export const generateAIDataExport = (days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode) => {
+export const generateAIDataExport = (days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, insights = null) => {
   const today = new Date();
   const timePeriods = trackingModes[trackingMode].periods;
   let output = [];
 
+  // AI-friendly intro framing
+  output.push(`I've been tracking my health symptoms. Please analyze this data and help me understand patterns. Focus on pattern recognition, not medical advice.\n`);
+
   // Header
-  output.push(`# Symptom Data (${days} days)`);
+  output.push(`## Symptom Tracking (last ${days} days)`);
   output.push(`Generated: ${today.toLocaleDateString()}\n`);
 
   // Symptoms table
-  output.push('## Symptoms');
+  output.push('### Symptoms');
   const headers = ['Date', ...timePeriods.map(p => p.label)];
 
   // Get symptom data for each symptom
@@ -112,7 +115,7 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
   });
 
   // Stack summary - include ALL items with entries, regardless of active state
-  output.push('\n## Supplements Taken');
+  output.push('\n### Supplements Taken');
 
   for (let i = 0; i < days; i++) {
     const date = new Date(today);
@@ -134,7 +137,7 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
   }
 
   // Notes
-  output.push('\n## Notes');
+  output.push('\n### Daily Notes');
   for (let i = 0; i < days; i++) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
@@ -142,9 +145,25 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
     const note = dailyNotes[dateKey];
 
     if (note && note.trim()) {
-      output.push(`\n**${formatTableDate(dateKey)}**: ${note}`);
+      output.push(`- ${formatTableDate(dateKey)}: ${note}`);
     }
   }
+
+  // Detected patterns section (if insights provided)
+  if (insights && insights.hasEnoughData && insights.insights && insights.insights.length > 0) {
+    output.push('\n## Patterns Already Detected');
+    insights.insights.forEach(insight => {
+      const direction = insight.direction === 'improving' ? 'improved' : 'worsened';
+      output.push(`- ${insight.name}: ${direction} ${insight.percentChange}% (avg ${insight.firstAvg} → ${insight.secondAvg})`);
+    });
+  }
+
+  // Suggested questions for AI
+  output.push('\n## Questions to explore');
+  output.push('1. What patterns do you notice in my symptoms?');
+  output.push('2. Which symptoms seem to correlate with each other?');
+  output.push('3. Do my supplements appear to affect any symptoms?');
+  output.push('4. What questions should I ask my doctor based on this data?');
 
   return output.join('\n');
 };
