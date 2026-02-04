@@ -157,6 +157,30 @@ export default function QuickActionsMenu({
     </svg>
   );
 
+  const RefreshIcon = (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9h-4m-5 9a9 9 0 0 1-9-9m9 9v-4m-9-5a9 9 0 0 1 9-9m-9 9h4m5-9v4"/>
+    </svg>
+  );
+
+  const currentVersion = 'v3.8.19';
+
+  const handleCheckForUpdates = () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        if (registration) {
+          registration.update().then(() => {
+            window.location.reload();
+          });
+        } else {
+          window.location.reload();
+        }
+      });
+    } else {
+      window.location.reload();
+    }
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -186,6 +210,16 @@ export default function QuickActionsMenu({
           maxWidth: 'calc(100vw - 32px)',
         }}
       >
+        {/* Check for updates - shown on all pages */}
+        <MenuItem
+          icon={RefreshIcon}
+          label="Check for updates"
+          subtext={`Current version: ${currentVersion}`}
+          color="#9ca3af"
+          onClick={handleCheckForUpdates}
+        />
+        <Divider />
+
         {showInsights ? (
           // Insights page - only show Settings
           <MenuItem
