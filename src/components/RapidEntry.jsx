@@ -83,6 +83,13 @@ export default function RapidEntry({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [rapidEntryIndex, unmarkedSymptoms.length, currentSymptom, logTime]);
 
+  // Trigger confetti when entering confirmation screen
+  useEffect(() => {
+    if (rapidEntryConfirm) {
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    }
+  }, [rapidEntryConfirm]);
+
   // If all complete, show confirmation screen
   if (rapidEntryConfirm) {
     return (
@@ -179,10 +186,7 @@ export default function RapidEntry({
             return null;
           })()}
 
-          <div style={{ color: '#94a3b8', fontSize: '14px', textAlign: 'center', marginTop: '8px' }}>
-            Or start over to re-enter this period?
-          </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
             <button
               onClick={handleClose}
               style={{
