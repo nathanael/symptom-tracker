@@ -54,38 +54,41 @@ export default function Stack({
     const entryKey = `${dateKey}-${itemId}`;
     const item = stackItems.find(i => i.id === itemId);
 
-    if (stackEntries[entryKey]) {
-      const newEntries = { ...stackEntries };
-      delete newEntries[entryKey];
-      setStackEntries(newEntries);
-      setLastAction(`Removed ${item?.name}`);
-    } else {
-      setStackEntries({
-        ...stackEntries,
-        [entryKey]: {
-          date: dateKey,
-          itemId: itemId,
-          dose: item?.defaultDose || 0,
-          taken: true
-        }
-      });
-      setLastAction(`Took ${item?.name}`);
-    }
+    setStackEntries(prev => {
+      if (prev[entryKey]) {
+        const newEntries = { ...prev };
+        delete newEntries[entryKey];
+        setLastAction(`Removed ${item?.name}`);
+        return newEntries;
+      } else {
+        setLastAction(`Took ${item?.name}`);
+        return {
+          ...prev,
+          [entryKey]: {
+            date: dateKey,
+            itemId: itemId,
+            dose: item?.defaultDose || 0,
+            taken: true
+          }
+        };
+      }
+    });
   };
 
   const updateStackDose = (itemId, newDose) => {
     const entryKey = `${dateKey}-${itemId}`;
     const item = stackItems.find(i => i.id === itemId);
 
-    setStackEntries({
-      ...stackEntries,
+    setStackEntries(prev => ({
+      ...prev,
       [entryKey]: {
+        ...prev[entryKey],
         date: dateKey,
         itemId: itemId,
         dose: parseFloat(newDose) || 0,
-        taken: true
+        taken: prev[entryKey]?.taken ?? true
       }
-    });
+    }));
     setEditingStackItem(null);
     setLastAction(`Updated ${item?.name} to ${newDose}${item?.unit}`);
   };
@@ -206,13 +209,16 @@ export default function Stack({
 
       // Also update today's entry if it exists, so display updates immediately
       const entryKey = `${dateKey}-${editingStackItemId}`;
-      if (stackEntries[entryKey] && newDefaultDose) {
-        setStackEntries({
-          ...stackEntries,
-          [entryKey]: {
-            ...stackEntries[entryKey],
-            dose: newDefaultDose
-          }
+      if (newDefaultDose) {
+        setStackEntries(prev => {
+          if (!prev[entryKey]) return prev;
+          return {
+            ...prev,
+            [entryKey]: {
+              ...prev[entryKey],
+              dose: newDefaultDose
+            }
+          };
         });
       }
     }
