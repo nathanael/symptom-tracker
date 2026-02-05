@@ -185,7 +185,7 @@ function App() {
   const isLoadingDataRef = useRef(true);
 
   useEffect(() => {
-    if (!firebase.user || firebase.syncing) return;
+    if (!firebase.user || firebase.syncing || isLoadingDataRef.current) return;
 
     const currentData = JSON.stringify({
       symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms: [...pinnedSymptoms], trackingMode
@@ -193,28 +193,18 @@ function App() {
 
     if (currentData === lastSyncDataRef.current) return;
 
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-
-    syncTimeoutRef.current = setTimeout(async () => {
-      await firebase.saveToCloud({
-        symptoms,
-        entries,
-        dailyNotes,
-        stackItems,
-        stackEntries,
-        pinnedSymptoms: [...pinnedSymptoms],
-        trackingMode,
-      });
+    // Sync immediately without debounce
+    firebase.saveToCloud({
+      symptoms,
+      entries,
+      dailyNotes,
+      stackItems,
+      stackEntries,
+      pinnedSymptoms: [...pinnedSymptoms],
+      trackingMode,
+    }).then(() => {
       lastSyncDataRef.current = currentData;
-    }, 1500);
-
-    return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-    };
+    });
   }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
 
   // Track local update timestamp for sync conflict resolution
