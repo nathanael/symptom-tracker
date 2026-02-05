@@ -179,12 +179,14 @@ export default function Stack({
 
   const saveStackItemEdit = () => {
     if (editingStackItemData.name.trim() && editingStackItemId) {
+      const newDefaultDose = parseFloat(editingStackItemData.defaultDose);
+
       setStackItems(stackItems.map(item => {
         if (item.id !== editingStackItemId) return item;
 
         const newValues = {
           name: editingStackItemData.name.trim(),
-          defaultDose: parseFloat(editingStackItemData.defaultDose) || item.defaultDose,
+          defaultDose: newDefaultDose || item.defaultDose,
           unit: editingStackItemData.unit,
           description: editingStackItemData.description.trim(),
           schedule: editingStackItemData.schedule,
@@ -201,6 +203,18 @@ export default function Stack({
           history: historyEntry ? [...history, historyEntry] : history
         };
       }));
+
+      // Also update today's entry if it exists, so display updates immediately
+      const entryKey = `${dateKey}-${editingStackItemId}`;
+      if (stackEntries[entryKey] && newDefaultDose) {
+        setStackEntries({
+          ...stackEntries,
+          [entryKey]: {
+            ...stackEntries[entryKey],
+            dose: newDefaultDose
+          }
+        });
+      }
     }
     setEditingStackItemId(null);
     setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
@@ -817,7 +831,6 @@ export default function Stack({
                             value={editingStackItemData.name}
                             onChange={(e) => setEditingStackItemData({...editingStackItemData, name: e.target.value})}
                             placeholder="Name"
-                            autoFocus
                             enterKeyHint="done"
                                                         style={{
                               width: '100%',
@@ -1059,7 +1072,13 @@ export default function Stack({
 
           {/* Floating Done Button */}
           <button
-            onClick={() => setShowManageStack(false)}
+            onClick={() => {
+              // Save any unsaved edit before closing
+              if (editingStackItemId) {
+                saveStackItemEdit();
+              }
+              setShowManageStack(false);
+            }}
             style={{
               position: 'absolute',
               bottom: '30px',

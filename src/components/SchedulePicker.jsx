@@ -240,18 +240,17 @@ export default function SchedulePicker({ schedule, onChange }) {
   const currentSchedule = schedule || { type: 'daily', startDate: getTodayString() };
 
   const handleTypeChange = (type) => {
+    // Preserve all existing schedule values when switching types
+    // This prevents losing interval/days values when just peeking at other options
     const startDate = currentSchedule.startDate || getTodayString();
-    if (type === 'daily') {
-      onChange({ type: 'daily', startDate });
-    } else if (type === 'days') {
-      onChange({ type: 'days', days: currentSchedule.days || [1, 3, 5], startDate }); // Default Mon/Wed/Fri
-    } else if (type === 'interval') {
-      onChange({
-        type: 'interval',
-        interval: currentSchedule.interval || 2,
-        startDate
-      });
-    }
+    onChange({
+      ...currentSchedule,
+      type,
+      startDate,
+      // Set defaults only if they don't already exist
+      days: currentSchedule.days || [1, 3, 5],
+      interval: currentSchedule.interval || 2,
+    });
   };
 
   const handleStartDateChange = (value) => {
