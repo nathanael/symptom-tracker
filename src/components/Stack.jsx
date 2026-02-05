@@ -1162,7 +1162,16 @@ export default function Stack({
               WebkitOverflowScrolling: 'touch',
               flex: 1,
             }}>
-              {availableToLog.map((item) => (
+              {availableToLog.length === 0 ? (
+                <div style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  color: '#6b7280',
+                  fontSize: '14px',
+                }}>
+                  All supplements have been logged for this day.
+                </div>
+              ) : availableToLog.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => {
