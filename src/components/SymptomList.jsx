@@ -391,6 +391,40 @@ export default function SymptomList({
         </div>
       )}
 
+      {/* AM/PM Column Headers - only show in ampm mode */}
+      {trackingMode === 'ampm' && activeSymptoms.length > 0 && (() => {
+        const currentHour = new Date().getHours();
+        const defaultPeriod = currentHour < 12 ? 'morning' : 'evening';
+        const activePeriod = quickLogTime || defaultPeriod;
+        return (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '8px',
+            padding: '8px 20px',
+            position: 'sticky',
+            top: 0,
+            background: '#08090A',
+            zIndex: 10,
+          }}>
+            <span style={{
+              width: '32px',
+              textAlign: 'center',
+              fontSize: '11px',
+              color: '#6b7280',
+              opacity: activePeriod === 'morning' ? 1 : 0.4,
+            }}>AM</span>
+            <span style={{
+              width: '32px',
+              textAlign: 'center',
+              fontSize: '11px',
+              color: '#6b7280',
+              opacity: activePeriod === 'evening' ? 1 : 0.4,
+            }}>PM</span>
+          </div>
+        );
+      })()}
+
       {/* Symptom rows - flat design */}
       {activeSymptoms.map((symptom, index) => {
         const symptomEntries = getSymptomEntries(symptom.id);
@@ -398,20 +432,21 @@ export default function SymptomList({
         const isPinned = pinnedSymptoms.has(symptom.id);
         const trend = getSymptomTrend(symptom.id, entries, trendWindow);
 
-        // Color based on severity - subtle off-white scale
-        const getBadgeColor = (sev) => {
-          if (sev === null) return { bg: 'transparent', border: 'rgba(255,255,255,0.1)', text: '#6b7280' };
-          if (sev === 0) return { bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.08)', text: '#6b7280' };
-          if (sev === 1) return { bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.10)', text: '#9ca3af' };
-          if (sev === 2) return { bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.12)', text: '#b0b7c0' };
-          if (sev === 3) return { bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.14)', text: '#c9cdd3' };
-          if (sev === 4) return { bg: 'rgba(255,255,255,0.07)', border: 'rgba(255,255,255,0.16)', text: '#dfe2e6' };
-          return { bg: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.18)', text: '#f1f3f5' };
-        };
+        // Uniform badge color (no severity-based variation)
+        const getBadgeColor = () => ({
+          bg: 'rgba(255,255,255,0.05)',
+          border: 'rgba(255,255,255,0.12)',
+          text: '#e5e7eb'
+        });
 
         // For AM/PM mode, get both entries
         const amEntry = trackingMode === 'ampm' ? symptomEntries.find(e => e.time === 'morning') : null;
         const pmEntry = trackingMode === 'ampm' ? symptomEntries.find(e => e.time === 'evening') : null;
+
+        // Determine active time period for dimming (use toggle selection if set, else time of day)
+        const currentHour = new Date().getHours();
+        const defaultPeriod = currentHour < 12 ? 'morning' : 'evening';
+        const activePeriod = quickLogTime || defaultPeriod;
 
         // For simple mode, get max entry
         const maxEntry = trackingMode !== 'ampm' && symptomEntries.length > 0
@@ -517,16 +552,17 @@ export default function SymptomList({
                           borderRadius: '6px',
                           border: flashColumn === 'morning'
                             ? '1px solid rgba(99, 102, 241, 0.7)'
-                            : `1px solid ${getBadgeColor(amEntry.severity).border}`,
-                          background: getBadgeColor(amEntry.severity).bg,
+                            : `1px solid ${getBadgeColor().border}`,
+                          background: getBadgeColor().bg,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: flashColumn === 'morning' ? 'none' : 'border-color 0.5s ease-out',
+                          opacity: activePeriod === 'morning' ? 1 : 0.4,
                         }}
                       >
-                        <span style={{ color: getBadgeColor(amEntry.severity).text, fontSize: '14px', fontWeight: '600' }}>
+                        <span style={{ color: getBadgeColor().text, fontSize: '14px', fontWeight: '600' }}>
                           {amEntry.severity}
                         </span>
                       </div>
@@ -552,6 +588,7 @@ export default function SymptomList({
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: flashColumn === 'morning' ? 'none' : 'border-color 0.5s ease-out',
+                          opacity: activePeriod === 'morning' ? 1 : 0.4,
                         }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -581,16 +618,17 @@ export default function SymptomList({
                           borderRadius: '6px',
                           border: flashColumn === 'evening'
                             ? '1px solid rgba(99, 102, 241, 0.7)'
-                            : `1px solid ${getBadgeColor(pmEntry.severity).border}`,
-                          background: getBadgeColor(pmEntry.severity).bg,
+                            : `1px solid ${getBadgeColor().border}`,
+                          background: getBadgeColor().bg,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: flashColumn === 'evening' ? 'none' : 'border-color 0.5s ease-out',
+                          opacity: activePeriod === 'evening' ? 1 : 0.4,
                         }}
                       >
-                        <span style={{ color: getBadgeColor(pmEntry.severity).text, fontSize: '14px', fontWeight: '600' }}>
+                        <span style={{ color: getBadgeColor().text, fontSize: '14px', fontWeight: '600' }}>
                           {pmEntry.severity}
                         </span>
                       </div>
@@ -616,6 +654,7 @@ export default function SymptomList({
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: flashColumn === 'evening' ? 'none' : 'border-color 0.5s ease-out',
+                          opacity: activePeriod === 'evening' ? 1 : 0.4,
                         }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -645,15 +684,15 @@ export default function SymptomList({
                         width: '32px',
                         height: '32px',
                         borderRadius: '6px',
-                        border: `1px solid ${getBadgeColor(maxEntry.severity).border}`,
-                        background: getBadgeColor(maxEntry.severity).bg,
+                        border: `1px solid ${getBadgeColor().border}`,
+                        background: getBadgeColor().bg,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
                       }}
                     >
-                      <span style={{ color: getBadgeColor(maxEntry.severity).text, fontSize: '14px', fontWeight: '600' }}>
+                      <span style={{ color: getBadgeColor().text, fontSize: '14px', fontWeight: '600' }}>
                         {maxEntry.severity}
                       </span>
                     </div>

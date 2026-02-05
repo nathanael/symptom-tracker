@@ -1114,19 +1114,21 @@ export default function Stack({
             display: 'flex',
             alignItems: 'flex-end',
             justifyContent: 'center',
+            paddingBottom: '76px', // Account for bottom nav height
           }}
           onClick={() => setShowLogPicker(false)}
         >
           <div
             style={{
               background: '#1a1b1e',
-              borderRadius: '16px 16px 0 0',
-              width: '100%',
+              borderRadius: '16px',
+              width: 'calc(100% - 32px)',
               maxWidth: '500px',
-              maxHeight: '60vh',
+              maxHeight: '50vh',
               display: 'flex',
               flexDirection: 'column',
               animation: 'modalIn 0.2s ease-out',
+              marginBottom: '8px',
             }}
             onClick={(e) => e.stopPropagation()}
           >
