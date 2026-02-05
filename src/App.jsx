@@ -208,7 +208,7 @@ function App() {
         trackingMode,
       });
       lastSyncDataRef.current = currentData;
-    }, 5000);
+    }, 1500);
 
     return () => {
       if (syncTimeoutRef.current) {
