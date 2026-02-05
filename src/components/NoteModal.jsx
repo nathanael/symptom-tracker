@@ -23,6 +23,10 @@ export default function NoteModal({
     }
   }, []);
 
+  // Track the latest note value for saving on unmount
+  const localNoteRef = useRef(localNote);
+  localNoteRef.current = localNote;
+
   // Debounced sync to parent state
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -32,6 +36,13 @@ export default function NoteModal({
     }, 300);
     return () => clearTimeout(timer);
   }, [localNote, dateKey, dailyNotes, setDailyNotes]);
+
+  // Save immediately on unmount (in case debounce hasn't fired yet)
+  useEffect(() => {
+    return () => {
+      setDailyNotes(prev => ({ ...prev, [dateKey]: localNoteRef.current }));
+    };
+  }, [dateKey, setDailyNotes]);
 
   const handleNoteChange = (value) => {
     setLocalNote(value);
