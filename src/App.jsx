@@ -229,17 +229,7 @@ function App() {
     if (firebase.user && firebase.firebaseReady) {
       firebase.loadFromCloud().then(data => {
         if (data) {
-          // Compare timestamps - only apply cloud data if it's newer than local
-          const cloudUpdatedAt = data.updatedAt?.toDate?.()?.getTime() || data.updatedAt?.getTime?.() || 0;
-          const localUpdatedAt = parseInt(localStorage.getItem(STORAGE_KEY_LOCAL_UPDATED_AT) || '0', 10);
-
-          // If local data is newer (within 10 second tolerance for sync delay), keep local
-          if (localUpdatedAt > cloudUpdatedAt + 10000) {
-            console.log('Local data is newer, keeping local changes');
-            setTimeout(() => { isLoadingDataRef.current = false; }, 100);
-            return;
-          }
-
+          // Always apply cloud data - local changes sync within 5s anyway
           if (data.symptoms) setSymptoms(data.symptoms);
           if (data.entries) setEntries(data.entries);
           if (data.dailyNotes) setDailyNotes(data.dailyNotes);
