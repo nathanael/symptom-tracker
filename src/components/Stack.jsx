@@ -78,19 +78,20 @@ export default function Stack({
   const updateStackDose = (itemId, newDose) => {
     const entryKey = `${dateKey}-${itemId}`;
     const item = stackItems.find(i => i.id === itemId);
+    const existingEntry = stackEntries[entryKey];
 
-    setStackEntries(prev => ({
-      ...prev,
-      [entryKey]: {
-        ...prev[entryKey],
-        date: dateKey,
-        itemId: itemId,
-        dose: parseFloat(newDose) || 0,
-        taken: prev[entryKey]?.taken ?? true
-      }
-    }));
+    // Only update dose if there's an existing entry (item was marked as taken)
+    if (existingEntry) {
+      setStackEntries(prev => ({
+        ...prev,
+        [entryKey]: {
+          ...prev[entryKey],
+          dose: parseFloat(newDose) || 0,
+        }
+      }));
+      setLastAction(`Updated ${item?.name} to ${newDose}${item?.unit}`);
+    }
     setEditingStackItem(null);
-    setLastAction(`Updated ${item?.name} to ${newDose}${item?.unit}`);
   };
 
   const getStackEntry = (itemId) => {
