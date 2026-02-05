@@ -11,6 +11,7 @@ import {
   STORAGE_KEY_PINNED,
   STORAGE_KEY_COPY_DAYS,
   STORAGE_KEY_TREND_WINDOW,
+  STORAGE_KEY_LOCAL_UPDATED_AT,
   severityColors,
   trackingModes,
   defaultSymptoms,
@@ -214,11 +215,26 @@ function App() {
     };
   }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
 
+  // Track local update timestamp for sync conflict resolution
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_LOCAL_UPDATED_AT, Date.now().toString());
+  }, [symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
+
   // Load from cloud on sign in
   useEffect(() => {
     if (firebase.user && firebase.firebaseReady) {
       firebase.loadFromCloud().then(data => {
         if (data) {
+          // Compare timestamps - only apply cloud data if it's newer than local
+          const cloudUpdatedAt = data.updatedAt?.toDate?.()?.getTime() || data.updatedAt?.getTime?.() || 0;
+          const localUpdatedAt = parseInt(localStorage.getItem(STORAGE_KEY_LOCAL_UPDATED_AT) || '0', 10);
+
+          // If local data is newer (within 10 second tolerance for sync delay), keep local
+          if (localUpdatedAt > cloudUpdatedAt + 10000) {
+            console.log('Local data is newer, keeping local changes');
+            return;
+          }
+
           if (data.symptoms) setSymptoms(data.symptoms);
           if (data.entries) setEntries(data.entries);
           if (data.dailyNotes) setDailyNotes(data.dailyNotes);
