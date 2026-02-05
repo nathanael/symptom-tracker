@@ -181,6 +181,7 @@ function App() {
   // Auto-sync to cloud
   const syncTimeoutRef = useRef(null);
   const lastSyncDataRef = useRef('');
+  const isLoadingFromCloudRef = useRef(false);
 
   useEffect(() => {
     if (!firebase.user || firebase.syncing) return;
@@ -216,7 +217,9 @@ function App() {
   }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
 
   // Track local update timestamp for sync conflict resolution
+  // Only update when user makes changes, not when loading from cloud
   useEffect(() => {
+    if (isLoadingFromCloudRef.current) return;
     localStorage.setItem(STORAGE_KEY_LOCAL_UPDATED_AT, Date.now().toString());
   }, [symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
 
@@ -235,6 +238,8 @@ function App() {
             return;
           }
 
+          // Mark that we're loading from cloud so timestamp doesn't update
+          isLoadingFromCloudRef.current = true;
           if (data.symptoms) setSymptoms(data.symptoms);
           if (data.entries) setEntries(data.entries);
           if (data.dailyNotes) setDailyNotes(data.dailyNotes);
@@ -242,6 +247,8 @@ function App() {
           if (data.stackEntries) setStackEntries(data.stackEntries);
           if (data.trackingMode) setTrackingMode(data.trackingMode);
           if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
+          // Reset after state updates have processed
+          setTimeout(() => { isLoadingFromCloudRef.current = false; }, 100);
         }
       });
     }
@@ -642,6 +649,33 @@ function App() {
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          </button>
+          {/* Divider */}
+          <div style={{
+            width: '1px',
+            height: '20px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            margin: '0 4px',
+          }} />
+          {/* Edit Note Button */}
+          <button
+            onClick={() => setShowNoteModal(true)}
+            style={{
+              padding: '10px 14px',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '20px',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
             </svg>
           </button>
         </div>
