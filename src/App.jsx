@@ -181,7 +181,8 @@ function App() {
   // Auto-sync to cloud
   const syncTimeoutRef = useRef(null);
   const lastSyncDataRef = useRef('');
-  const isLoadingFromCloudRef = useRef(false);
+  // Start true to prevent initial localStorage load from updating timestamp
+  const isLoadingDataRef = useRef(true);
 
   useEffect(() => {
     if (!firebase.user || firebase.syncing) return;
@@ -217,9 +218,9 @@ function App() {
   }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
 
   // Track local update timestamp for sync conflict resolution
-  // Only update when user makes changes, not when loading from cloud
+  // Only update when user makes changes, not during initial load or cloud sync
   useEffect(() => {
-    if (isLoadingFromCloudRef.current) return;
+    if (isLoadingDataRef.current) return;
     localStorage.setItem(STORAGE_KEY_LOCAL_UPDATED_AT, Date.now().toString());
   }, [symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
 
@@ -235,11 +236,10 @@ function App() {
           // If local data is newer (within 10 second tolerance for sync delay), keep local
           if (localUpdatedAt > cloudUpdatedAt + 10000) {
             console.log('Local data is newer, keeping local changes');
+            setTimeout(() => { isLoadingDataRef.current = false; }, 100);
             return;
           }
 
-          // Mark that we're loading from cloud so timestamp doesn't update
-          isLoadingFromCloudRef.current = true;
           if (data.symptoms) setSymptoms(data.symptoms);
           if (data.entries) setEntries(data.entries);
           if (data.dailyNotes) setDailyNotes(data.dailyNotes);
@@ -247,12 +247,28 @@ function App() {
           if (data.stackEntries) setStackEntries(data.stackEntries);
           if (data.trackingMode) setTrackingMode(data.trackingMode);
           if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
-          // Reset after state updates have processed
-          setTimeout(() => { isLoadingFromCloudRef.current = false; }, 100);
         }
+        // Enable timestamp updates after cloud sync completes
+        setTimeout(() => { isLoadingDataRef.current = false; }, 100);
+      }).catch(() => {
+        // Enable timestamp updates even if cloud load fails
+        setTimeout(() => { isLoadingDataRef.current = false; }, 100);
       });
+    } else if (!firebase.user && !firebase.authLoading) {
+      // No user logged in, enable timestamp updates
+      setTimeout(() => { isLoadingDataRef.current = false; }, 100);
     }
-  }, [firebase.user, firebase.firebaseReady]);
+  }, [firebase.user, firebase.firebaseReady, firebase.authLoading]);
+
+  // Fallback: ensure timestamp updates are enabled after 10s even if Firebase never loads
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (isLoadingDataRef.current) {
+        isLoadingDataRef.current = false;
+      }
+    }, 10000);
+    return () => clearTimeout(fallbackTimer);
+  }, []);
 
   // Handlers
   const changeDate = useCallback((days) => {
