@@ -552,7 +552,9 @@ export default function SymptomList({
                           borderRadius: '6px',
                           border: flashColumn === 'morning'
                             ? '1px solid rgba(99, 102, 241, 0.7)'
-                            : `1px solid ${getBadgeColor().border}`,
+                            : activePeriod === 'morning'
+                              ? '1px solid rgba(255, 255, 255, 0.42)'
+                              : `1px solid ${getBadgeColor().border}`,
                           background: getBadgeColor().bg,
                           display: 'flex',
                           alignItems: 'center',
@@ -582,7 +584,9 @@ export default function SymptomList({
                           borderRadius: '50%',
                           border: flashColumn === 'morning'
                             ? '1px solid rgba(99, 102, 241, 0.7)'
-                            : '1px solid rgba(255, 255, 255, 0.1)',
+                            : activePeriod === 'morning'
+                              ? '1px solid rgba(255, 255, 255, 0.40)'
+                              : '1px solid rgba(255, 255, 255, 0.1)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -618,7 +622,9 @@ export default function SymptomList({
                           borderRadius: '6px',
                           border: flashColumn === 'evening'
                             ? '1px solid rgba(99, 102, 241, 0.7)'
-                            : `1px solid ${getBadgeColor().border}`,
+                            : activePeriod === 'evening'
+                              ? '1px solid rgba(255, 255, 255, 0.42)'
+                              : `1px solid ${getBadgeColor().border}`,
                           background: getBadgeColor().bg,
                           display: 'flex',
                           alignItems: 'center',
@@ -648,7 +654,9 @@ export default function SymptomList({
                           borderRadius: '50%',
                           border: flashColumn === 'evening'
                             ? '1px solid rgba(99, 102, 241, 0.7)'
-                            : '1px solid rgba(255, 255, 255, 0.1)',
+                            : activePeriod === 'evening'
+                              ? '1px solid rgba(255, 255, 255, 0.40)'
+                              : '1px solid rgba(255, 255, 255, 0.1)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
