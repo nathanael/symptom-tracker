@@ -33,13 +33,29 @@ export default function RapidEntry({
 
   const activeSymptomsList = symptoms.filter(s => s.active);
 
-  // Filter to only show unmarked symptoms
+  // Filter to only show unmarked symptoms (for counting remaining)
   const unmarkedSymptoms = activeSymptomsList.filter(symptom => {
     const entryKey = `${dateKey}-${symptom.id}-${timeKey}`;
     return !entries[entryKey];
   });
 
-  const currentSymptom = unmarkedSymptoms[rapidEntryIndex];
+  // Current symptom comes from full list (allows navigating back to tracked items)
+  const currentSymptom = activeSymptomsList[rapidEntryIndex];
+
+  // Check if current symptom is marked
+  const isCurrentMarked = currentSymptom ? !!entries[`${dateKey}-${currentSymptom.id}-${timeKey}`] : false;
+
+  // Find next unmarked symptom index (for forward navigation)
+  const findNextUnmarkedIndex = (fromIndex) => {
+    for (let i = fromIndex + 1; i < activeSymptomsList.length; i++) {
+      const sym = activeSymptomsList[i];
+      const entryKey = `${dateKey}-${sym.id}-${timeKey}`;
+      if (!entries[entryKey]) {
+        return i;
+      }
+    }
+    return -1; // No more unmarked
+  };
 
   const handleClose = () => {
     setRapidEntryMode(false);
@@ -51,10 +67,13 @@ export default function RapidEntry({
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowLeft' && rapidEntryIndex > 0) {
+        // Back: go to previous symptom in full list (allows reviewing tracked items)
         setRapidEntryIndex(prev => prev - 1);
       } else if (e.key === 'ArrowRight') {
-        if (rapidEntryIndex < unmarkedSymptoms.length - 1) {
-          setRapidEntryIndex(prev => prev + 1);
+        // Forward: skip to next unmarked symptom
+        const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
+        if (nextUnmarked !== -1) {
+          setRapidEntryIndex(nextUnmarked);
         } else {
           handleClose();
         }
@@ -63,25 +82,29 @@ export default function RapidEntry({
       } else if (e.key >= '0' && e.key <= '5' && currentSymptom) {
         const severity = parseInt(e.key);
         quickLog(currentSymptom.id, severity, logTime);
-        // After logging, the symptom will be filtered out, so stay at same index
-        // (which will now show the next unmarked symptom)
-        // Check if this was the last unmarked symptom
-        if (unmarkedSymptoms.length <= 1) {
+        // After logging, move to next unmarked symptom
+        // Check if this was the last unmarked symptom (or only one remaining which is current)
+        const remainingUnmarked = unmarkedSymptoms.filter(s => s.id !== currentSymptom.id);
+        if (remainingUnmarked.length === 0) {
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
           setRapidEntryMode(false);
           setRapidEntryIndex(0);
           setCopyToastMessage('✓ All symptoms logged!');
           setTimeout(() => setCopyToastMessage(''), 3000);
-        } else if (rapidEntryIndex >= unmarkedSymptoms.length - 1) {
-          // Was at end, move back to stay in bounds after filter
-          setRapidEntryIndex(prev => Math.max(0, prev - 1));
+        } else {
+          // Move to next unmarked symptom
+          const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
+          if (nextUnmarked !== -1) {
+            setRapidEntryIndex(nextUnmarked);
+          }
+          // If no next unmarked, stay on current (user can press right to close)
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [rapidEntryIndex, unmarkedSymptoms.length, currentSymptom, logTime]);
+  }, [rapidEntryIndex, unmarkedSymptoms.length, currentSymptom, logTime, activeSymptomsList]);
 
   // Trigger confetti when entering confirmation screen
   useEffect(() => {
@@ -233,8 +256,8 @@ export default function RapidEntry({
     );
   }
 
-  // If no unmarked symptoms, show completion or close
-  if (!currentSymptom || unmarkedSymptoms.length === 0) {
+  // If no current symptom or no unmarked symptoms left, show completion or close
+  if (!currentSymptom || (unmarkedSymptoms.length === 0 && rapidEntryIndex === 0)) {
     // Check if opposite period has incomplete symptoms (for AM/PM mode)
     if (trackingMode === 'ampm') {
       const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
@@ -340,7 +363,11 @@ export default function RapidEntry({
       }}>
         {/* Counter */}
         <div style={{ color: '#64748b', fontSize: '14px' }}>
-          {rapidEntryIndex + 1} of {unmarkedSymptoms.length} remaining
+          {isCurrentMarked ? (
+            <span style={{ color: '#10b981' }}>✓ Already logged</span>
+          ) : (
+            `${unmarkedSymptoms.findIndex(s => s.id === currentSymptom?.id) + 1} of ${unmarkedSymptoms.length} remaining`
+          )}
         </div>
 
         {/* Symptom name */}
@@ -409,11 +436,12 @@ export default function RapidEntry({
               <button
                 key={severity}
                 onClick={() => {
-                  // Set value - the symptom will be filtered out after this
+                  // Set value
                   quickLog(currentSymptom.id, severity, logTime);
 
-                  // Check if this was the last unmarked symptom
-                  if (unmarkedSymptoms.length <= 1) {
+                  // Check if this was the last unmarked symptom (or only remaining is current)
+                  const remainingUnmarked = unmarkedSymptoms.filter(s => s.id !== currentSymptom.id);
+                  if (remainingUnmarked.length === 0) {
                     // Check for opposite period in AM/PM mode
                     if (trackingMode === 'ampm') {
                       const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
@@ -436,11 +464,14 @@ export default function RapidEntry({
                     setRapidEntryIndex(0);
                     setCopyToastMessage('✓ All symptoms logged!');
                     setTimeout(() => setCopyToastMessage(''), 3000);
-                  } else if (rapidEntryIndex >= unmarkedSymptoms.length - 1) {
-                    // Was at end, move index back to stay in bounds
-                    setRapidEntryIndex(prev => Math.max(0, prev - 1));
+                  } else {
+                    // Move to next unmarked symptom
+                    const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
+                    if (nextUnmarked !== -1) {
+                      setRapidEntryIndex(nextUnmarked);
+                    }
+                    // If no next unmarked after current, stay (user navigated back)
                   }
-                  // Otherwise stay at same index - next unmarked will appear
                 }}
                 style={{
                   padding: '24px',
@@ -510,8 +541,10 @@ export default function RapidEntry({
 
           <button
             onClick={() => {
-              if (rapidEntryIndex < unmarkedSymptoms.length - 1) {
-                setRapidEntryIndex(prev => prev + 1);
+              // Forward: skip to next unmarked symptom
+              const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
+              if (nextUnmarked !== -1) {
+                setRapidEntryIndex(nextUnmarked);
               } else {
                 handleClose();
               }
@@ -527,7 +560,7 @@ export default function RapidEntry({
               cursor: 'pointer',
             }}
           >
-            {rapidEntryIndex < unmarkedSymptoms.length - 1 ? 'Skip' : 'Done'}
+            {findNextUnmarkedIndex(rapidEntryIndex) !== -1 ? 'Skip' : 'Done'}
             {!isMobile() && (
               <span style={{
                 background: 'rgba(100, 116, 139, 0.3)',

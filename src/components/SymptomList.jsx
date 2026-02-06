@@ -412,14 +412,14 @@ export default function SymptomList({
               textAlign: 'center',
               fontSize: '11px',
               color: '#6b7280',
-              opacity: activePeriod === 'morning' ? 1 : 0.4,
+              opacity: activePeriod === 'morning' ? 1 : 0.25,
             }}>AM</span>
             <span style={{
               width: '32px',
               textAlign: 'center',
               fontSize: '11px',
               color: '#6b7280',
-              opacity: activePeriod === 'evening' ? 1 : 0.4,
+              opacity: activePeriod === 'evening' ? 1 : 0.25,
             }}>PM</span>
           </div>
         );
@@ -559,7 +559,7 @@ export default function SymptomList({
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: flashColumn === 'morning' ? 'none' : 'border-color 0.5s ease-out',
-                          opacity: activePeriod === 'morning' ? 1 : 0.4,
+                          opacity: activePeriod === 'morning' ? 1 : 0.25,
                         }}
                       >
                         <span style={{ color: getBadgeColor().text, fontSize: '14px', fontWeight: '600' }}>
@@ -588,7 +588,7 @@ export default function SymptomList({
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: flashColumn === 'morning' ? 'none' : 'border-color 0.5s ease-out',
-                          opacity: activePeriod === 'morning' ? 1 : 0.4,
+                          opacity: activePeriod === 'morning' ? 1 : 0.25,
                         }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -625,7 +625,7 @@ export default function SymptomList({
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: flashColumn === 'evening' ? 'none' : 'border-color 0.5s ease-out',
-                          opacity: activePeriod === 'evening' ? 1 : 0.4,
+                          opacity: activePeriod === 'evening' ? 1 : 0.25,
                         }}
                       >
                         <span style={{ color: getBadgeColor().text, fontSize: '14px', fontWeight: '600' }}>
@@ -654,7 +654,7 @@ export default function SymptomList({
                           justifyContent: 'center',
                           cursor: 'pointer',
                           transition: flashColumn === 'evening' ? 'none' : 'border-color 0.5s ease-out',
-                          opacity: activePeriod === 'evening' ? 1 : 0.4,
+                          opacity: activePeriod === 'evening' ? 1 : 0.25,
                         }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -766,8 +766,21 @@ export default function SymptomList({
                     color: '#e5e7eb',
                     fontSize: '14px',
                     fontWeight: '500',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                   }}>
-                    {symptom.name}
+                    <span>{symptom.name}</span>
+                    {trackingMode === 'ampm' && (
+                      <span style={{
+                        fontSize: '11px',
+                        color: '#6b7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}>
+                        {(quickLogTime || getCurrentTimePeriod()) === 'morning' ? 'am' : 'pm'}
+                      </span>
+                    )}
                   </div>
                   {/* Severity buttons */}
                   <div style={{
