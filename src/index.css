@@ -83,6 +83,11 @@ body.no-scroll {
   }
 }
 
+@keyframes revertFlash {
+  0% { background: rgba(139, 92, 246, 0.3); }
+  100% { background: rgba(15, 23, 42, 0.6); }
+}
+
 /* Reorder animation for list items */
 .reorder-item {
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;

@@ -64,6 +64,47 @@ export const recordHistoryChange = (item, newValues) => {
   };
 };
 
+// Reconstruct supplement state at a specific history entry
+export const reconstructStateAtEntry = (historyArray, targetIndex) => {
+  const createdEntry = historyArray.find(h => h.type === 'created');
+  if (!createdEntry) return null;
+
+  let state = { ...createdEntry.snapshot };
+
+  for (let i = 0; i <= targetIndex; i++) {
+    const entry = historyArray[i];
+    if (entry.type === 'updated' && entry.changes) {
+      Object.entries(entry.changes).forEach(([field, change]) => {
+        state[field] = change.to;
+      });
+    }
+  }
+  return state;
+};
+
+// Format timestamp as relative time
+export const formatRelativeTime = (timestamp) => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) return 'Just now';
+  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+
+  // For older dates, show formatted date
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
 // Date Helpers - uses LOCAL time, not UTC
 export const getDateKey = (date) => {
   const year = date.getFullYear();

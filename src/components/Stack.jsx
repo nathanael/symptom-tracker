@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { getDateKey, haptic, isScheduledForDate, createHistoryEntry, recordHistoryChange } from '../utils/helpers';
 import SchedulePicker, { formatSchedule } from './SchedulePicker';
+import SupplementEdit from './SupplementEdit';
 
 export default function Stack({
   stackItems,
@@ -14,8 +15,7 @@ export default function Stack({
 }) {
   const [editingStackItem, setEditingStackItem] = useState(null);
   const [newStackItem, setNewStackItem] = useState({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
-  const [editingStackItemId, setEditingStackItemId] = useState(null);
-  const [editingStackItemData, setEditingStackItemData] = useState({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
+  const [editingSupplementId, setEditingSupplementId] = useState(null);
   const [showLogPicker, setShowLogPicker] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showHiddenItems, setShowHiddenItems] = useState(false);
@@ -170,30 +170,19 @@ export default function Stack({
     }));
   };
 
-  const startEditingStackItem = (item) => {
-    setEditingStackItemId(item.id);
-    setEditingStackItemData({
-      name: item.name,
-      defaultDose: item.defaultDose,
-      unit: item.unit,
-      description: item.description || '',
-      schedule: item.schedule || { type: 'daily' }
-    });
-  };
-
-  const saveStackItemEdit = () => {
-    if (editingStackItemData.name.trim() && editingStackItemId) {
-      const newDefaultDose = parseFloat(editingStackItemData.defaultDose);
+  const handleSupplementSave = (updatedData) => {
+    if (updatedData.name.trim() && editingSupplementId) {
+      const newDefaultDose = parseFloat(updatedData.defaultDose);
 
       setStackItems(stackItems.map(item => {
-        if (item.id !== editingStackItemId) return item;
+        if (item.id !== editingSupplementId) return item;
 
         const newValues = {
-          name: editingStackItemData.name.trim(),
+          name: updatedData.name.trim(),
           defaultDose: newDefaultDose || item.defaultDose,
-          unit: editingStackItemData.unit,
-          description: editingStackItemData.description.trim(),
-          schedule: editingStackItemData.schedule,
+          unit: updatedData.unit,
+          description: updatedData.description.trim(),
+          schedule: updatedData.schedule,
           active: item.active
         };
 
@@ -209,7 +198,7 @@ export default function Stack({
       }));
 
       // Also update today's entry if it exists, so display updates immediately
-      const entryKey = `${dateKey}-${editingStackItemId}`;
+      const entryKey = `${dateKey}-${editingSupplementId}`;
       if (newDefaultDose) {
         setStackEntries(prev => {
           if (!prev[entryKey]) return prev;
@@ -223,8 +212,7 @@ export default function Stack({
         });
       }
     }
-    setEditingStackItemId(null);
-    setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
+    setEditingSupplementId(null);
   };
 
   const activeItems = stackItems.filter(i => i.active).sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -833,157 +821,43 @@ export default function Stack({
                         <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
                       </div>
 
-                      {editingStackItemId === item.id ? (
-                        <div data-edit-form style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <input
-                            value={editingStackItemData.name}
-                            onChange={(e) => setEditingStackItemData({...editingStackItemData, name: e.target.value})}
-                            placeholder="Name"
-                            enterKeyHint="done"
-                                                        style={{
-                              width: '100%',
-                              background: 'rgba(99, 102, 241, 0.15)',
-                              border: '2px solid rgba(99, 102, 241, 0.5)',
-                              borderRadius: '3px',
-                              padding: '8px 12px',
-                              color: '#f8fafc',
-                              fontSize: '14px',
-                              boxSizing: 'border-box',
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveStackItemEdit();
-                              if (e.key === 'Escape') {
-                                setEditingStackItemId(null);
-                                setEditingStackItemData({ name: '', defaultDose: '', unit: 'mg', description: '', schedule: { type: 'daily' } });
-                              }
-                            }}
-                          />
-                          <input
-                            value={editingStackItemData.description}
-                            onChange={(e) => setEditingStackItemData({...editingStackItemData, description: e.target.value})}
-                            placeholder="Description (optional)"
-                            enterKeyHint="done"
-                                                        onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveStackItemEdit();
-                            }}
-                            style={{
-                              width: '100%',
-                              background: 'rgba(99, 102, 241, 0.15)',
-                              border: '2px solid rgba(99, 102, 241, 0.5)',
-                              borderRadius: '3px',
-                              padding: '8px 12px',
-                              color: '#f8fafc',
-                              fontSize: '14px',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <input
-                              value={editingStackItemData.defaultDose}
-                              onChange={(e) => setEditingStackItemData({...editingStackItemData, defaultDose: e.target.value})}
-                              placeholder="Dose"
-                              inputMode="decimal"
-                              enterKeyHint="done"
-                                                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') saveStackItemEdit();
-                              }}
-                              style={{
-                                width: '70px',
-                                background: 'rgba(99, 102, 241, 0.15)',
-                                border: '2px solid rgba(99, 102, 241, 0.5)',
-                                borderRadius: '3px',
-                                padding: '8px 12px',
-                                color: '#f8fafc',
-                                fontSize: '14px',
-                                textAlign: 'center',
-                              }}
-                            />
-                            <select
-                              value={editingStackItemData.unit}
-                              onChange={(e) => setEditingStackItemData({...editingStackItemData, unit: e.target.value})}
-                              style={{
-                                width: '70px',
-                                background: 'rgba(99, 102, 241, 0.15)',
-                                border: '2px solid rgba(99, 102, 241, 0.5)',
-                                borderRadius: '3px',
-                                padding: '8px',
-                                color: '#f8fafc',
-                                fontSize: '14px',
-                              }}
-                            >
-                              <option value="mg">mg</option>
-                              <option value="mcg">mcg</option>
-                              <option value="g">g</option>
-                              <option value="IU">IU</option>
-                              <option value="ml">ml</option>
-                              <option value="drops">drops</option>
-                              <option value="caps">caps</option>
-                            </select>
+                      <div
+                        onClick={() => setEditingSupplementId(item.id)}
+                        style={{
+                          cursor: 'pointer',
+                          flex: 1,
+                        }}
+                      >
+                        <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                          {item.name}
+                          {formatSchedule(item.schedule) && (
+                            <span style={{ color: '#9ca3af', fontSize: '13px', marginLeft: '6px' }}>{formatSchedule(item.schedule)}</span>
+                          )}
+                        </span>
+                        <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
+                          {item.defaultDose}{item.unit}
+                        </span>
+                        {item.description && (
+                          <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
+                            {item.description}
                           </div>
-                          <div style={{ marginTop: '4px' }}>
-                            <SchedulePicker
-                              schedule={editingStackItemData.schedule}
-                              onChange={(schedule) => setEditingStackItemData({...editingStackItemData, schedule})}
-                            />
-                          </div>
-                          <button
-                            onClick={saveStackItemEdit}
-                            style={{
-                              width: '100%',
-                              background: '#6366f1',
-                              border: 'none',
-                              borderRadius: '3px',
-                              padding: '8px 12px',
-                              color: '#fff',
-                              fontSize: '12px',
-                              cursor: 'pointer',
-                              marginTop: '4px',
-                            }}
-                          >
-                            Save
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <div
-                            onClick={() => startEditingStackItem(item)}
-                            style={{
-                              cursor: 'pointer',
-                              flex: 1,
-                            }}
-                          >
-                            <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
-                              {item.name}
-                              {formatSchedule(item.schedule) && (
-                                <span style={{ color: '#9ca3af', fontSize: '13px', marginLeft: '6px' }}>{formatSchedule(item.schedule)}</span>
-                              )}
-                            </span>
-                            <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
-                              {item.defaultDose}{item.unit}
-                            </span>
-                            {item.description && (
-                              <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
-                                {item.description}
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => toggleStackItemActive(item.id)}
-                            style={{
-                              background: 'rgba(239, 68, 68, 0.15)',
-                              border: '1px solid rgba(239, 68, 68, 0.3)',
-                              borderRadius: '3px',
-                              padding: '6px 12px',
-                              color: '#f87171',
-                              fontSize: '12px',
-                              cursor: 'pointer',
-                              flexShrink: 0,
-                            }}
-                          >
-                            Hide
-                          </button>
-                        </>
-                      )}
+                        )}
+                      </div>
+                      <button
+                        onClick={() => toggleStackItemActive(item.id)}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          borderRadius: '3px',
+                          padding: '6px 12px',
+                          color: '#f87171',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        Hide
+                      </button>
                     </div>
                   );
                   })}
@@ -1082,10 +956,6 @@ export default function Stack({
           {/* Floating Done Button */}
           <button
             onClick={() => {
-              // Save any unsaved edit before closing
-              if (editingStackItemId) {
-                saveStackItemEdit();
-              }
               setShowManageStack(false);
             }}
             style={{
@@ -1220,6 +1090,15 @@ export default function Stack({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Full-screen Supplement Edit */}
+      {editingSupplementId && (
+        <SupplementEdit
+          item={stackItems.find(i => i.id === editingSupplementId)}
+          onSave={handleSupplementSave}
+          onCancel={() => setEditingSupplementId(null)}
+        />
       )}
     </div>
   );
