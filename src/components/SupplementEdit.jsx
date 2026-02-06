@@ -73,22 +73,31 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
         if (field === 'active') {
           parts.push(change.to ? 'Restored' : 'Hidden');
         } else if (field === 'defaultDose') {
-          parts.push(`Dose: ${change.from}${item.unit} → ${change.to}${item.unit}`);
+          if (change.from !== change.to) {
+            parts.push(`Dose: ${change.from}${item.unit} → ${change.to}${item.unit}`);
+          }
         } else if (field === 'name') {
-          parts.push(`Name: ${change.from} → ${change.to}`);
+          if (change.from !== change.to) {
+            parts.push(`Name: ${change.from} → ${change.to}`);
+          }
         } else if (field === 'unit') {
-          parts.push(`Unit: ${change.from} → ${change.to}`);
+          if (change.from !== change.to) {
+            parts.push(`Unit: ${change.from} → ${change.to}`);
+          }
         } else if (field === 'description') {
-          const fromText = change.from || '(none)';
-          const toText = change.to || '(none)';
-          parts.push(`Description changed`);
+          if (change.from !== change.to) {
+            parts.push(`Description changed`);
+          }
         } else if (field === 'schedule') {
           const fromSchedule = formatSchedule(change.from) || 'Daily';
           const toSchedule = formatSchedule(change.to) || 'Daily';
-          parts.push(`Schedule: ${fromSchedule} → ${toSchedule}`);
+          // Only show if the displayed schedules actually differ
+          if (fromSchedule !== toSchedule) {
+            parts.push(`Schedule: ${fromSchedule} → ${toSchedule}`);
+          }
         }
       });
-      return parts.join(', ') || 'Updated';
+      return parts.join(', ') || null;
     }
     return 'Updated';
   };
@@ -310,63 +319,69 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
                 </label>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {sortedHistory.map((entry, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        background: revertedIndex === index
-                          ? 'rgba(139, 92, 246, 0.3)'
-                          : 'rgba(15, 17, 21, 0.6)',
-                        borderRadius: '8px',
-                        padding: '12px 16px',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                        transition: 'background 0.4s ease',
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{
-                          color: '#94a3b8',
-                          fontSize: '12px',
-                          marginBottom: '4px',
-                        }}>
-                          {formatRelativeTime(entry.timestamp)}
-                        </div>
-                        <div style={{
-                          color: '#e2e8f0',
-                          fontSize: '14px',
-                        }}>
-                          {formatChangeText(entry)}
-                        </div>
-                      </div>
+                  {sortedHistory.map((entry, index) => {
+                    const changeText = formatChangeText(entry);
+                    // Skip entries with no meaningful changes to display
+                    if (!changeText) return null;
 
-                      {/* Revert button - don't show for the first entry (creation) unless there are changes */}
-                      <button
-                        onClick={() => handleRevert(entry, index)}
-                        title="Revert to this state"
+                    return (
+                      <div
+                        key={index}
                         style={{
-                          background: 'rgba(139, 92, 246, 0.15)',
-                          border: '1px solid rgba(139, 92, 246, 0.3)',
-                          borderRadius: '6px',
-                          padding: '8px 10px',
-                          color: '#a78bfa',
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          flexShrink: 0,
+                          background: revertedIndex === index
+                            ? 'rgba(139, 92, 246, 0.3)'
+                            : 'rgba(15, 17, 21, 0.6)',
+                          borderRadius: '8px',
+                          padding: '12px 16px',
                           display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          transition: 'background 0.4s ease',
                         }}
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="1 4 1 10 7 10"></polyline>
-                          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            color: '#94a3b8',
+                            fontSize: '12px',
+                            marginBottom: '4px',
+                          }}>
+                            {formatRelativeTime(entry.timestamp)}
+                          </div>
+                          <div style={{
+                            color: '#e2e8f0',
+                            fontSize: '14px',
+                          }}>
+                            {changeText}
+                          </div>
+                        </div>
+
+                        {/* Revert button */}
+                        <button
+                          onClick={() => handleRevert(entry, index)}
+                          title="Revert to this state"
+                          style={{
+                            background: 'rgba(139, 92, 246, 0.15)',
+                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                            borderRadius: '6px',
+                            padding: '8px 10px',
+                            color: '#a78bfa',
+                            fontSize: '14px',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

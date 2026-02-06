@@ -45,12 +45,43 @@ export const createHistoryEntry = (item) => {
   };
 };
 
+// Normalize schedule to only include relevant fields for its type
+const normalizeSchedule = (schedule) => {
+  if (!schedule) return { type: 'daily' };
+
+  const base = { type: schedule.type || 'daily' };
+
+  if (base.type === 'daily') {
+    // Daily schedules only need type and optionally startDate
+    if (schedule.startDate) base.startDate = schedule.startDate;
+  } else if (base.type === 'days') {
+    // Days schedules need type, days array, and optionally startDate
+    base.days = schedule.days || [];
+    if (schedule.startDate) base.startDate = schedule.startDate;
+  } else if (base.type === 'interval') {
+    // Interval schedules need type, interval, and startDate
+    base.interval = schedule.interval || 2;
+    if (schedule.startDate) base.startDate = schedule.startDate;
+  }
+
+  return base;
+};
+
 export const recordHistoryChange = (item, newValues) => {
   const changes = {};
   const fields = ['name', 'defaultDose', 'unit', 'description', 'schedule', 'active'];
 
   for (const field of fields) {
-    if (JSON.stringify(item[field]) !== JSON.stringify(newValues[field])) {
+    let oldVal = item[field];
+    let newVal = newValues[field];
+
+    // Normalize schedules before comparison
+    if (field === 'schedule') {
+      oldVal = normalizeSchedule(oldVal);
+      newVal = normalizeSchedule(newVal);
+    }
+
+    if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
       changes[field] = { from: item[field], to: newValues[field] };
     }
   }
