@@ -219,12 +219,39 @@ function App() {
     if (firebase.user && firebase.firebaseReady) {
       firebase.loadFromCloud().then(data => {
         if (data) {
-          // Always apply cloud data - local changes sync within 5s anyway
+          // Merge cloud data with local data - local takes priority to prevent data loss
+          // This handles cases where local changes haven't synced yet
           if (data.symptoms) setSymptoms(data.symptoms);
-          if (data.entries) setEntries(data.entries);
-          if (data.dailyNotes) setDailyNotes(data.dailyNotes);
+          if (data.entries) {
+            setEntries(prev => {
+              // Merge: cloud entries fill gaps, but local entries are preserved
+              const merged = { ...data.entries };
+              Object.keys(prev).forEach(key => {
+                // Local entry exists - keep it (it may be newer)
+                merged[key] = prev[key];
+              });
+              return merged;
+            });
+          }
+          if (data.dailyNotes) {
+            setDailyNotes(prev => {
+              const merged = { ...data.dailyNotes };
+              Object.keys(prev).forEach(key => {
+                merged[key] = prev[key];
+              });
+              return merged;
+            });
+          }
           if (data.stackItems) setStackItems(data.stackItems);
-          if (data.stackEntries) setStackEntries(data.stackEntries);
+          if (data.stackEntries) {
+            setStackEntries(prev => {
+              const merged = { ...data.stackEntries };
+              Object.keys(prev).forEach(key => {
+                merged[key] = prev[key];
+              });
+              return merged;
+            });
+          }
           if (data.trackingMode) setTrackingMode(data.trackingMode);
           if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
         }
