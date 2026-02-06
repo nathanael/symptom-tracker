@@ -313,7 +313,7 @@ export default function SchedulePicker({ schedule, onChange }) {
       {/* Days of week selector */}
       {currentSchedule.type === 'days' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <span style={{ color: '#94a3b8', fontSize: '14px' }}>
+          <span style={{ color: '#94a3b8', fontSize: '15px' }}>
             Take on these days:
           </span>
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between' }}>
@@ -357,7 +357,7 @@ export default function SchedulePicker({ schedule, onChange }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Interval row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ color: '#94a3b8', fontSize: '14px' }}>Take every</span>
+            <span style={{ color: '#94a3b8', fontSize: '15px' }}>Take every</span>
             <button
               type="button"
               onClick={() => handleIntervalChange(-1)}
@@ -381,7 +381,7 @@ export default function SchedulePicker({ schedule, onChange }) {
             </button>
             <span style={{
               color: '#f8fafc',
-              fontSize: '18px',
+              fontSize: '15px',
               fontWeight: '600',
               minWidth: '24px',
               textAlign: 'center',
@@ -409,12 +409,12 @@ export default function SchedulePicker({ schedule, onChange }) {
             >
               +
             </button>
-            <span style={{ color: '#94a3b8', fontSize: '14px' }}>days</span>
+            <span style={{ color: '#94a3b8', fontSize: '15px' }}>days</span>
           </div>
 
           {/* Start date row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ color: '#94a3b8', fontSize: '14px' }}>Starting from</span>
+            <span style={{ color: '#94a3b8', fontSize: '15px' }}>Starting from</span>
             <button
               type="button"
               onClick={() => setShowDatePicker(true)}
