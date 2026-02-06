@@ -276,9 +276,9 @@ export default function SchedulePicker({ schedule, onChange }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Type selector */}
-      <div style={{ display: 'flex', gap: '6px' }}>
+      <div style={{ display: 'flex', gap: '8px' }}>
         {[
           { type: 'daily', label: 'Daily' },
           { type: 'days', label: 'Days of Week' },
@@ -290,16 +290,16 @@ export default function SchedulePicker({ schedule, onChange }) {
             onClick={() => handleTypeChange(type)}
             style={{
               flex: 1,
-              padding: '8px 10px',
+              padding: '12px 14px',
               background: currentSchedule.type === type
                 ? 'rgba(99, 102, 241, 0.3)'
                 : 'rgba(15, 23, 42, 0.5)',
               border: currentSchedule.type === type
-                ? '1px solid rgba(99, 102, 241, 0.5)'
+                ? '2px solid rgba(99, 102, 241, 0.5)'
                 : '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '4px',
+              borderRadius: '8px',
               color: currentSchedule.type === type ? '#a5b4fc' : '#9ca3af',
-              fontSize: '12px',
+              fontSize: '14px',
               fontWeight: '500',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
@@ -312,57 +312,64 @@ export default function SchedulePicker({ schedule, onChange }) {
 
       {/* Days of week selector */}
       {currentSchedule.type === 'days' && (
-        <div style={{ display: 'flex', gap: '4px', justifyContent: 'space-between' }}>
-          {DAY_LABELS.map((label, index) => {
-            const isSelected = currentSchedule.days?.includes(index);
-            return (
-              <button
-                key={index}
-                type="button"
-                onClick={() => toggleDay(index)}
-                title={DAY_NAMES[index]}
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: isSelected
-                    ? 'rgba(99, 102, 241, 0.4)'
-                    : 'rgba(15, 23, 42, 0.5)',
-                  border: isSelected
-                    ? '1px solid rgba(99, 102, 241, 0.6)'
-                    : '1px solid rgba(255, 255, 255, 0.1)',
-                  color: isSelected ? '#c7d2fe' : '#6b7280',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <span style={{ color: '#94a3b8', fontSize: '14px' }}>
+            Take on these days:
+          </span>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between' }}>
+            {DAY_LABELS.map((label, index) => {
+              const isSelected = currentSchedule.days?.includes(index);
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => toggleDay(index)}
+                  title={DAY_NAMES[index]}
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    background: isSelected
+                      ? 'rgba(99, 102, 241, 0.4)'
+                      : 'rgba(15, 23, 42, 0.5)',
+                    border: isSelected
+                      ? '2px solid rgba(99, 102, 241, 0.6)'
+                      : '1px solid rgba(255, 255, 255, 0.1)',
+                    color: isSelected ? '#c7d2fe' : '#6b7280',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Interval selector with date picker - compact single row */}
+      {/* Interval selector with date picker */}
       {currentSchedule.type === 'interval' && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Interval row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ color: '#94a3b8', fontSize: '14px' }}>Take every</span>
             <button
               type="button"
               onClick={() => handleIntervalChange(-1)}
               disabled={(currentSchedule.interval || 2) <= 2}
               style={{
-                width: '28px',
-                height: '28px',
+                width: '36px',
+                height: '36px',
                 borderRadius: '50%',
                 background: 'rgba(15, 23, 42, 0.8)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
+                border: '2px solid rgba(99, 102, 241, 0.3)',
                 color: (currentSchedule.interval || 2) <= 2 ? '#4b5563' : '#a5b4fc',
-                fontSize: '16px',
+                fontSize: '18px',
                 fontWeight: '500',
                 cursor: (currentSchedule.interval || 2) <= 2 ? 'default' : 'pointer',
                 display: 'flex',
@@ -374,9 +381,9 @@ export default function SchedulePicker({ schedule, onChange }) {
             </button>
             <span style={{
               color: '#f8fafc',
-              fontSize: '14px',
+              fontSize: '18px',
               fontWeight: '600',
-              minWidth: '18px',
+              minWidth: '24px',
               textAlign: 'center',
             }}>
               {currentSchedule.interval || 2}
@@ -386,13 +393,13 @@ export default function SchedulePicker({ schedule, onChange }) {
               onClick={() => handleIntervalChange(1)}
               disabled={(currentSchedule.interval || 2) >= 30}
               style={{
-                width: '28px',
-                height: '28px',
+                width: '36px',
+                height: '36px',
                 borderRadius: '50%',
                 background: 'rgba(15, 23, 42, 0.8)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
+                border: '2px solid rgba(99, 102, 241, 0.3)',
                 color: (currentSchedule.interval || 2) >= 30 ? '#4b5563' : '#a5b4fc',
-                fontSize: '16px',
+                fontSize: '18px',
                 fontWeight: '500',
                 cursor: (currentSchedule.interval || 2) >= 30 ? 'default' : 'pointer',
                 display: 'flex',
@@ -402,26 +409,32 @@ export default function SchedulePicker({ schedule, onChange }) {
             >
               +
             </button>
-            <span style={{ color: '#9ca3af', fontSize: '13px' }}>days</span>
+            <span style={{ color: '#94a3b8', fontSize: '14px' }}>days</span>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowDatePicker(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '5px 8px',
-              background: 'rgba(15, 23, 42, 0.5)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-            }}
-          >
-            <span style={{ color: '#9ca3af' }}>from</span>
-            <span style={{ color: '#f8fafc' }}>{formatFriendlyDate(currentSchedule.startDate || getTodayString())}</span>
-          </button>
+
+          {/* Start date row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ color: '#94a3b8', fontSize: '14px' }}>Starting from</span>
+            <button
+              type="button"
+              onClick={() => setShowDatePicker(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 14px',
+                background: 'rgba(15, 23, 42, 0.8)',
+                border: '2px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '15px',
+                color: '#f8fafc',
+                fontWeight: '500',
+              }}
+            >
+              {formatFriendlyDate(currentSchedule.startDate || getTodayString())}
+            </button>
+          </div>
         </div>
       )}
 
