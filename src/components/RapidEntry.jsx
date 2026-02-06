@@ -432,6 +432,11 @@ export default function RapidEntry({
             const recentEntry = getMostRecentEntry(currentSymptom.id, logTime);
             const isRecentSeverity = recentEntry?.severity === severity;
 
+            // Check if this severity is the currently selected value for this symptom
+            const currentEntryKey = `${dateKey}-${currentSymptom.id}-${timeKey}`;
+            const currentEntry = entries[currentEntryKey];
+            const isCurrentValue = currentEntry?.severity === severity;
+
             return (
               <button
                 key={severity}
@@ -440,8 +445,9 @@ export default function RapidEntry({
                   quickLog(currentSymptom.id, severity, logTime);
 
                   // Check if this was the last unmarked symptom (or only remaining is current)
+                  // Note: if we're editing an existing entry, we're not adding to unmarked count
                   const remainingUnmarked = unmarkedSymptoms.filter(s => s.id !== currentSymptom.id);
-                  if (remainingUnmarked.length === 0) {
+                  if (remainingUnmarked.length === 0 && !isCurrentMarked) {
                     // Check for opposite period in AM/PM mode
                     if (trackingMode === 'ampm') {
                       const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
@@ -464,7 +470,7 @@ export default function RapidEntry({
                     setRapidEntryIndex(0);
                     setCopyToastMessage('✓ All symptoms logged!');
                     setTimeout(() => setCopyToastMessage(''), 3000);
-                  } else {
+                  } else if (!isCurrentMarked) {
                     // Move to next unmarked symptom
                     const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
                     if (nextUnmarked !== -1) {
@@ -472,13 +478,18 @@ export default function RapidEntry({
                     }
                     // If no next unmarked after current, stay (user navigated back)
                   }
+                  // If isCurrentMarked, stay on this symptom (user is editing)
                 }}
                 style={{
                   padding: '24px',
-                  background: `${severityColors[severity]}20`,
-                  border: isRecentSeverity
-                    ? `2px solid ${severityColors[severity]}40`
-                    : '2px solid transparent',
+                  background: isCurrentValue
+                    ? `${severityColors[severity]}40`
+                    : `${severityColors[severity]}20`,
+                  border: isCurrentValue
+                    ? `3px solid ${severityColors[severity]}`
+                    : isRecentSeverity
+                      ? `2px solid ${severityColors[severity]}40`
+                      : '2px solid transparent',
                   borderRadius: '3px',
                   color: severityColors[severity],
                   fontSize: '32px',
@@ -488,6 +499,15 @@ export default function RapidEntry({
                 }}
               >
                 {severity}
+                {isCurrentValue && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '6px',
+                    right: '6px',
+                    fontSize: '16px',
+                    color: severityColors[severity],
+                  }}>✓</span>
+                )}
                 {!isMobile() && (
                   <span style={{
                     position: 'absolute',
