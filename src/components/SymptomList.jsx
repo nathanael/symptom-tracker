@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { severityColors, trackingModes, HOLD_DELAY, DRAG_SENSITIVITY } from '../utils/constants';
 import { getDateKey, haptic, getSymptomTrend } from '../utils/helpers';
+import SymptomEdit from './SymptomEdit';
 
 export default function SymptomList({
   symptoms,
@@ -38,9 +39,7 @@ export default function SymptomList({
   const [fingerPosition, setFingerPosition] = useState({ x: 0, y: 0 });
 
   // Edit symptom state
-  const [editingSymptomId, setEditingSymptomId] = useState(null);
-  const [editingSymptomName, setEditingSymptomName] = useState('');
-  const [editingSymptomDescription, setEditingSymptomDescription] = useState('');
+  const [editingSymptomFullId, setEditingSymptomFullId] = useState(null);
   const [newSymptomName, setNewSymptomName] = useState('');
   const [newSymptomDescription, setNewSymptomDescription] = useState('');
   const [showHiddenSymptoms, setShowHiddenSymptoms] = useState(false);
@@ -200,6 +199,39 @@ export default function SymptomList({
     setActiveSymptom(null);
   };
 
+  // Create history entry for symptom
+  const createSymptomHistoryEntry = (symptom) => {
+    return {
+      timestamp: new Date().toISOString(),
+      type: 'created',
+      snapshot: {
+        name: symptom.name,
+        description: symptom.description || '',
+        active: symptom.active
+      }
+    };
+  };
+
+  // Record symptom history change
+  const recordSymptomHistoryChange = (symptom, newValues) => {
+    const changes = {};
+    const fields = ['name', 'description', 'active'];
+
+    for (const field of fields) {
+      if (JSON.stringify(symptom[field]) !== JSON.stringify(newValues[field])) {
+        changes[field] = { from: symptom[field], to: newValues[field] };
+      }
+    }
+
+    if (Object.keys(changes).length === 0) return null;
+
+    return {
+      timestamp: new Date().toISOString(),
+      type: 'updated',
+      changes
+    };
+  };
+
   // Symptom management
   const addSymptom = () => {
     const name = newSymptomName.trim();
@@ -208,9 +240,16 @@ export default function SymptomList({
     const existing = symptoms.find(s => s.name.toLowerCase() === name.toLowerCase());
     if (existing) {
       if (!existing.active) {
-        setSymptoms(symptoms.map(s =>
-          s.id === existing.id ? { ...s, active: true, description: newSymptomDescription.trim() || s.description } : s
-        ));
+        setSymptoms(symptoms.map(s => {
+          if (s.id !== existing.id) return s;
+          const newValues = { ...s, active: true, description: newSymptomDescription.trim() || s.description };
+          const historyEntry = recordSymptomHistoryChange(s, newValues);
+          const history = s.history || [];
+          return {
+            ...newValues,
+            history: historyEntry ? [...history, historyEntry] : history
+          };
+        }));
         setLastAction('Symptom restored');
       } else {
         setLastAction('Symptom already exists');
@@ -218,12 +257,14 @@ export default function SymptomList({
       }
     } else {
       const id = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now() + Math.random();
-      setSymptoms([...symptoms, {
+      const newSymptom = {
         id,
         name,
         description: newSymptomDescription.trim() || undefined,
         active: true
-      }]);
+      };
+      newSymptom.history = [createSymptomHistoryEntry(newSymptom)];
+      setSymptoms([...symptoms, newSymptom]);
       setLastAction('Symptom added');
     }
 
@@ -232,39 +273,56 @@ export default function SymptomList({
   };
 
   const removeSymptom = (symptomId) => {
-    setSymptoms(symptoms.map(s =>
-      s.id === symptomId ? { ...s, active: false } : s
-    ));
+    setSymptoms(symptoms.map(s => {
+      if (s.id !== symptomId) return s;
+      const newValues = { ...s, active: false };
+      const historyEntry = recordSymptomHistoryChange(s, newValues);
+      const history = s.history || [];
+      return {
+        ...newValues,
+        history: historyEntry ? [...history, historyEntry] : history
+      };
+    }));
     setLastAction('Symptom hidden (history preserved)');
   };
 
   const reactivateSymptom = (symptomId) => {
-    setSymptoms(symptoms.map(s =>
-      s.id === symptomId ? { ...s, active: true } : s
-    ));
+    setSymptoms(symptoms.map(s => {
+      if (s.id !== symptomId) return s;
+      const newValues = { ...s, active: true };
+      const historyEntry = recordSymptomHistoryChange(s, newValues);
+      const history = s.history || [];
+      return {
+        ...newValues,
+        history: historyEntry ? [...history, historyEntry] : history
+      };
+    }));
     setLastAction('Symptom restored');
   };
 
-  const startEditingSymptom = (symptom) => {
-    setEditingSymptomId(symptom.id);
-    setEditingSymptomName(symptom.name);
-    setEditingSymptomDescription(symptom.description || '');
-  };
+  const handleSymptomSave = (updatedData) => {
+    if (updatedData.name.trim() && editingSymptomFullId) {
+      setSymptoms(symptoms.map(s => {
+        if (s.id !== editingSymptomFullId) return s;
 
-  const saveSymptomEdit = () => {
-    if (editingSymptomName.trim() && editingSymptomId) {
-      setSymptoms(symptoms.map(s =>
-        s.id === editingSymptomId ? {
+        const newValues = {
+          name: updatedData.name.trim(),
+          description: updatedData.description.trim() || undefined,
+          active: s.active
+        };
+
+        const historyEntry = recordSymptomHistoryChange(s, newValues);
+        const history = s.history || [];
+
+        return {
           ...s,
-          name: editingSymptomName.trim(),
-          description: editingSymptomDescription.trim() || undefined
-        } : s
-      ));
+          ...newValues,
+          history: historyEntry ? [...history, historyEntry] : history
+        };
+      }));
       setLastAction('Symptom updated');
     }
-    setEditingSymptomId(null);
-    setEditingSymptomName('');
-    setEditingSymptomDescription('');
+    setEditingSymptomFullId(null);
   };
 
   const inactiveSymptoms = symptoms.filter(s => !s.active);
@@ -1057,6 +1115,7 @@ export default function SymptomList({
               paddingBottom: '120px',
             }}
           >
+            <div style={{ maxWidth: '500px', margin: '0 auto' }}>
 
             {/* Active symptoms list */}
             {symptoms.filter(s => s.active).length > 0 && (() => {
@@ -1128,85 +1187,22 @@ export default function SymptomList({
                         <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
                       </div>
 
-                      {editingSymptomId === symptom.id ? (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <input
-                            value={editingSymptomName}
-                            onChange={(e) => setEditingSymptomName(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveSymptomEdit();
-                              if (e.key === 'Escape') {
-                                setEditingSymptomId(null);
-                                setEditingSymptomName('');
-                                setEditingSymptomDescription('');
-                              }
-                            }}
-                            autoFocus
-                            placeholder="Name"
-                            style={{
-                              background: 'rgba(99, 102, 241, 0.15)',
-                              border: '2px solid rgba(99, 102, 241, 0.5)',
-                              borderRadius: '3px',
-                              padding: '8px 12px',
-                              color: '#f8fafc',
-                              fontSize: '15px',
-                            }}
-                          />
-                          <input
-                            value={editingSymptomDescription}
-                            onChange={(e) => setEditingSymptomDescription(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveSymptomEdit();
-                              if (e.key === 'Escape') {
-                                setEditingSymptomId(null);
-                                setEditingSymptomName('');
-                                setEditingSymptomDescription('');
-                              }
-                            }}
-                            placeholder="Description (optional)"
-                            style={{
-                              background: 'rgba(99, 102, 241, 0.1)',
-                              border: '1px solid rgba(99, 102, 241, 0.3)',
-                              borderRadius: '3px',
-                              padding: '6px 12px',
-                              color: '#9ca3af',
-                              fontSize: '13px',
-                            }}
-                          />
-                          <button
-                            onClick={saveSymptomEdit}
-                            style={{
-                              background: 'rgba(99, 102, 241, 0.3)',
-                              border: '1px solid rgba(99, 102, 241, 0.5)',
-                              borderRadius: '3px',
-                              padding: '6px 12px',
-                              color: '#a5b4fc',
-                              fontSize: '12px',
-                              cursor: 'pointer',
-                              alignSelf: 'flex-start',
-                            }}
-                          >
-                            Save
-                          </button>
-                        </div>
-                      ) : (
-                        <div
-                          onClick={() => startEditingSymptom(symptom)}
-                          style={{
-                            cursor: 'pointer',
-                            flex: 1,
-                          }}
-                        >
-                          <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
-                            {symptom.name}
+                      <div
+                        onClick={() => setEditingSymptomFullId(symptom.id)}
+                        style={{
+                          cursor: 'pointer',
+                          flex: 1,
+                        }}
+                      >
+                        <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                          {symptom.name}
+                        </span>
+                        {symptom.description && (
+                          <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: '6px' }}>
+                            {symptom.description}
                           </span>
-                          {symptom.description && (
-                            <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: '6px' }}>
-                              {symptom.description}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                        )}
+                      </div>
                       <button
                         onClick={() => removeSymptom(symptom.id)}
                         style={{
@@ -1317,6 +1313,7 @@ export default function SymptomList({
                 )}
               </div>
             )}
+            </div>
           </div>
 
           {/* Floating Done Button */}
@@ -1342,6 +1339,15 @@ export default function SymptomList({
             Done
           </button>
         </div>
+      )}
+
+      {/* Full-screen Symptom Edit */}
+      {editingSymptomFullId && (
+        <SymptomEdit
+          symptom={symptoms.find(s => s.id === editingSymptomFullId)}
+          onSave={handleSymptomSave}
+          onCancel={() => setEditingSymptomFullId(null)}
+        />
       )}
 
     </div>
