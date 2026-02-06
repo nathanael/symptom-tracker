@@ -318,7 +318,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
                   History
                 </label>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {sortedHistory.map((entry, index) => {
                     const changeText = formatChangeText(entry);
                     // Skip entries with no meaningful changes to display
@@ -328,16 +328,12 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
                       <div
                         key={index}
                         style={{
-                          background: revertedIndex === index
-                            ? 'rgba(139, 92, 246, 0.3)'
-                            : 'rgba(15, 17, 21, 0.6)',
-                          borderRadius: '8px',
-                          padding: '12px 16px',
+                          padding: '12px 0',
                           display: 'flex',
                           alignItems: 'flex-start',
                           justifyContent: 'space-between',
                           gap: '12px',
-                          transition: 'background 0.4s ease',
+                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
                         }}
                       >
                         <div style={{ flex: 1 }}>
