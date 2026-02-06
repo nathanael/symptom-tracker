@@ -163,7 +163,7 @@ export default function QuickActionsMenu({
     </svg>
   );
 
-  const currentVersion = 'v3.8.55';
+  const currentVersion = 'v3.8.56';
 
   const handleCheckForUpdates = () => {
     if ('serviceWorker' in navigator) {
@@ -247,16 +247,16 @@ export default function QuickActionsMenu({
             />
             <Divider />
             <MenuItem
-              icon={PencilIcon}
-              label="Edit Day's Note"
-              subtext="Add notes about today"
-              onClick={onEditNote}
-            />
-            <MenuItem
               icon={LightningIcon}
               label="Rapid Entry Mode"
               subtext="Quickly log all symptoms in sequence"
               onClick={onRapidEntry}
+            />
+            <MenuItem
+              icon={PencilIcon}
+              label="Edit Day's Note"
+              subtext="Add notes about today"
+              onClick={onEditNote}
             />
             <MenuItem
               icon={SparklesIcon}

@@ -727,7 +727,19 @@ export default function SymptomList({
             </div>
 
             {/* Quick log popup - positioned over the symptom */}
-            {isQuickLog && popupPosition && (
+            {isQuickLog && popupPosition && (() => {
+              // Calculate if popup would overlap with bottom controls
+              // Popup height is ~120px, pill menu is at ~160px from bottom, tab bar ~80px
+              const popupHeight = 120;
+              const bottomSafeZone = 200; // Space for pill menu + tab bar
+              const windowHeight = window.innerHeight;
+              const wouldOverlap = popupPosition.top + popupHeight > windowHeight - bottomSafeZone;
+              // If would overlap, position popup above the row (move up by popup height + row height)
+              const adjustedTop = wouldOverlap
+                ? Math.max(100, popupPosition.top - popupHeight - 10)
+                : popupPosition.top;
+
+              return (
               <>
                 {/* Backdrop */}
                 <div
@@ -748,7 +760,7 @@ export default function SymptomList({
                   onClick={(e) => e.stopPropagation()}
                   style={{
                     position: 'fixed',
-                    top: popupPosition.top,
+                    top: adjustedTop,
                     left: popupPosition.left,
                     width: popupPosition.width,
                     background: 'rgba(15, 17, 21, 0.98)',
@@ -823,7 +835,8 @@ export default function SymptomList({
                   </div>
                 </div>
               </>
-            )}
+              );
+            })()}
           </div>
         );
       })}
