@@ -113,6 +113,30 @@ export const reconstructStateAtEntry = (historyArray, targetIndex) => {
   return state;
 };
 
+// Reconstruct supplement state as it was on a given date
+export const reconstructStateAtDate = (historyArray, dateStr) => {
+  if (!historyArray || historyArray.length === 0) return null;
+  const createdEntry = historyArray.find(h => h.type === 'created');
+  if (!createdEntry) return null;
+
+  // Target is end of the given date
+  const targetEnd = new Date(dateStr + 'T23:59:59.999Z');
+
+  let state = { ...createdEntry.snapshot };
+
+  for (const entry of historyArray) {
+    if (entry.type === 'updated' && entry.changes) {
+      const entryTime = new Date(entry.timestamp);
+      if (entryTime <= targetEnd) {
+        Object.entries(entry.changes).forEach(([field, change]) => {
+          state[field] = change.to;
+        });
+      }
+    }
+  }
+  return state;
+};
+
 // Format timestamp as relative time
 export const formatRelativeTime = (timestamp) => {
   const date = new Date(timestamp);

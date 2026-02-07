@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { getDateKey, haptic, isScheduledForDate, createHistoryEntry, recordHistoryChange } from '../utils/helpers';
+import { getDateKey, haptic, isScheduledForDate, createHistoryEntry, recordHistoryChange, reconstructStateAtDate } from '../utils/helpers';
 import SchedulePicker, { formatSchedule } from './SchedulePicker';
 import SupplementEdit from './SupplementEdit';
 
@@ -248,13 +248,18 @@ export default function Stack({
     }
 
     // Past dates: ONLY show items that have entries for this date
+    // Use historical state so properties reflect what they were at that time
     const itemIdsWithEntries = new Set(
       Object.keys(stackEntries)
         .filter(key => key.startsWith(dateKey))
         .map(key => key.substring(dateKey.length + 1))
     );
 
-    return stackItems.filter(i => itemIdsWithEntries.has(i.id));
+    return stackItems.filter(i => itemIdsWithEntries.has(i.id)).map(i => {
+      const historical = reconstructStateAtDate(i.history, dateKey);
+      if (!historical) return i;
+      return { ...i, name: historical.name, description: historical.description, unit: historical.unit, defaultDose: historical.defaultDose, schedule: historical.schedule };
+    });
   })().sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Drag reorder handlers
