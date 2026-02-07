@@ -530,8 +530,10 @@ export default function SymptomList({
                 const rect = e.currentTarget.getBoundingClientRect();
                 setPopupPosition({ top: rect.top, left: rect.left, width: rect.width });
                 setQuickLogSymptom(symptom.id);
-                // Always set to current time of day when clicking on row
-                setQuickLogTime(getCurrentTimePeriod());
+                // Use the user's AM/PM selection if set, otherwise default to current time
+                if (!quickLogTime) {
+                  setQuickLogTime(getCurrentTimePeriod());
+                }
               }
             }}
             style={{
