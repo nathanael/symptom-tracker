@@ -368,10 +368,10 @@ export default function Stack({
                 display: 'block',
               }}>
                 {item.name}
-                {formatSchedule(item.schedule) && (
+                {isToday && formatSchedule(item.schedule) && (
                   <span style={{ color: '#9ca3af', fontSize: '13px', marginLeft: '6px' }}>{formatSchedule(item.schedule)}</span>
                 )}
-                {!item.active && (
+                {isToday && !item.active && (
                   <span style={{ color: '#6b7280', fontSize: '11px', marginLeft: '4px' }}>(hidden)</span>
                 )}
               </span>

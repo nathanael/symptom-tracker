@@ -1,7 +1,7 @@
 {
   "name": "symptom-tracker",
   "private": true,
-  "version": "3.8.68",
+  "version": "3.8.69",
   "type": "module",
   "scripts": {
     "dev": "vite",
