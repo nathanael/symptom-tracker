@@ -83,16 +83,21 @@ export default function Stack({
     const item = stackItems.find(i => i.id === itemId);
     const existingEntry = stackEntries[entryKey];
 
-    // Only update dose if there's an existing entry (item was marked as taken)
+    const dose = parseFloat(newDose) || item?.defaultDose || 0;
     if (existingEntry) {
       setStackEntries(prev => ({
         ...prev,
-        [entryKey]: {
-          ...prev[entryKey],
-          dose: parseFloat(newDose) || 0,
-        }
+        [entryKey]: { ...prev[entryKey], dose }
       }));
-      setLastAction(`Updated ${item?.name} to ${newDose}${item?.unit}`);
+      setLastAction(`Updated ${item?.name} to ${dose}${item?.unit}`);
+    } else {
+      // Not yet checked - create entry with the custom dose
+      setStackEntries(prev => ({
+        ...prev,
+        [entryKey]: { date: dateKey, itemId, dose, taken: true }
+      }));
+      haptic('light');
+      setLastAction(`Took ${item?.name} (${dose}${item?.unit})`);
     }
     setEditingStackItem(null);
     justSavedDose.current = true;
