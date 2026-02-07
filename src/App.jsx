@@ -185,6 +185,15 @@ function App() {
   // Start true to prevent initial localStorage load from updating timestamp
   const isLoadingDataRef = useRef(true);
 
+  // Re-lock loading flag when user signs in, BEFORE effects run
+  // This prevents auto-sync from pushing empty local data to cloud
+  // before loadFromCloud() has a chance to complete
+  const prevUserRef = useRef(firebase.user);
+  if (firebase.user && !prevUserRef.current) {
+    isLoadingDataRef.current = true;
+  }
+  prevUserRef.current = firebase.user;
+
   useEffect(() => {
     if (!firebase.user || firebase.syncing || isLoadingDataRef.current) return;
 
@@ -222,7 +231,7 @@ function App() {
         if (data) {
           // Merge cloud data with local data - local takes priority to prevent data loss
           // This handles cases where local changes haven't synced yet
-          if (data.symptoms) setSymptoms(data.symptoms);
+          if (data.symptoms?.length > 0) setSymptoms(data.symptoms);
           if (data.entries) {
             setEntries(prev => {
               // Merge: cloud entries fill gaps, but local entries are preserved
@@ -243,7 +252,7 @@ function App() {
               return merged;
             });
           }
-          if (data.stackItems) setStackItems(data.stackItems);
+          if (data.stackItems?.length > 0) setStackItems(data.stackItems);
           if (data.stackEntries) {
             setStackEntries(prev => {
               const merged = { ...data.stackEntries };
