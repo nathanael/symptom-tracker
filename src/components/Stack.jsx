@@ -21,6 +21,9 @@ export default function Stack({
   const [showHiddenItems, setShowHiddenItems] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Prevent row click from toggling right after dose blur save
+  const justSavedDose = useRef(false);
+
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
   const [dragReorderY, setDragReorderY] = useState(0);
@@ -92,6 +95,8 @@ export default function Stack({
       setLastAction(`Updated ${item?.name} to ${newDose}${item?.unit}`);
     }
     setEditingStackItem(null);
+    justSavedDose.current = true;
+    setTimeout(() => { justSavedDose.current = false; }, 300);
   };
 
   const getStackEntry = (itemId) => {
@@ -357,7 +362,7 @@ export default function Stack({
               gap: '16px',
               cursor: 'pointer',
             }}
-            onClick={() => !isEditing && toggleStackItem(item.id)}
+            onClick={() => !isEditing && !justSavedDose.current && toggleStackItem(item.id)}
           >
             {/* Left side: name + description */}
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -451,6 +456,37 @@ export default function Stack({
 
               {/* Checkbox */}
               <div
+                onClick={(e) => {
+                  if (isEditing) {
+                    e.stopPropagation();
+                    // Find the input and save its value
+                    const input = e.currentTarget.parentElement.querySelector('input');
+                    const newDose = input ? parseFloat(input.value) : null;
+                    const entryKey = `${dateKey}-${item.id}`;
+                    if (!stackEntries[entryKey]) {
+                      // Not taken yet - create entry with the custom dose
+                      setStackEntries(prev => ({
+                        ...prev,
+                        [entryKey]: {
+                          date: dateKey,
+                          itemId: item.id,
+                          dose: newDose || item.defaultDose,
+                          taken: true
+                        }
+                      }));
+                      setLastAction(`Took ${item.name}`);
+                    } else if (newDose != null) {
+                      // Already taken - just save the dose
+                      setStackEntries(prev => ({
+                        ...prev,
+                        [entryKey]: { ...prev[entryKey], dose: newDose || 0 }
+                      }));
+                      setLastAction(`Updated ${item.name} to ${newDose}${item.unit}`);
+                    }
+                    setEditingStackItem(null);
+                    haptic('light');
+                  }
+                }}
                 style={{
                   width: '32px',
                   height: '32px',
