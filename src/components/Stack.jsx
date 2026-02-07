@@ -107,13 +107,23 @@ export default function Stack({
       // Only count items scheduled for today
       itemsToCount = active.filter(item => isScheduledForDate(item.schedule, selectedDate));
     } else {
-      // Past dates: ONLY show items that have entries for this date
+      // Past dates: ONLY show items that have entries for this date AND existed at that date
       const itemIdsWithEntries = new Set(
         Object.keys(stackEntries)
           .filter(key => key.startsWith(dateKey))
           .map(key => key.substring(dateKey.length + 1))
       );
-      itemsToCount = stackItems.filter(i => itemIdsWithEntries.has(i.id));
+      itemsToCount = stackItems.filter(i => {
+        if (!itemIdsWithEntries.has(i.id)) return false;
+        if (i.schedule?.startDate) {
+          const start = new Date(i.schedule.startDate);
+          start.setHours(0, 0, 0, 0);
+          const target = new Date(selectedDate);
+          target.setHours(0, 0, 0, 0);
+          if (target < start) return false;
+        }
+        return true;
+      });
     }
 
     const takenCount = itemsToCount.filter(item =>
@@ -224,10 +234,19 @@ export default function Stack({
     item.name.toLowerCase().includes(newStackItem.name.toLowerCase())
   );
 
-  // Supplements available to log retroactively (active items without entries for this date)
-  const availableToLog = stackItems.filter(i =>
-    i.active && !stackEntries[`${dateKey}-${i.id}`]
-  ).sort((a, b) => (a.order || 0) - (b.order || 0));
+  // Supplements available to log retroactively (active items without entries for this date, respecting schedule)
+  const availableToLog = stackItems.filter(i => {
+    if (!i.active || stackEntries[`${dateKey}-${i.id}`]) return false;
+    // Don't offer to log items that didn't exist on this date
+    if (i.schedule?.startDate) {
+      const start = new Date(i.schedule.startDate);
+      start.setHours(0, 0, 0, 0);
+      const target = new Date(selectedDate);
+      target.setHours(0, 0, 0, 0);
+      if (target < start) return false;
+    }
+    return true;
+  }).sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Determine which items to display based on date
   const displayItems = (() => {
@@ -239,14 +258,25 @@ export default function Stack({
     }
 
     // Past dates: ONLY show items that have entries for this date
-    // This makes history show what you actually took, not what you could have taken
+    // AND that existed at that date (startDate check prevents showing recently-added items on old dates)
     const itemIdsWithEntries = new Set(
       Object.keys(stackEntries)
         .filter(key => key.startsWith(dateKey))
         .map(key => key.substring(dateKey.length + 1))
     );
 
-    return stackItems.filter(i => itemIdsWithEntries.has(i.id));
+    return stackItems.filter(i => {
+      if (!itemIdsWithEntries.has(i.id)) return false;
+      // Filter out items that didn't exist on this date
+      if (i.schedule?.startDate) {
+        const start = new Date(i.schedule.startDate);
+        start.setHours(0, 0, 0, 0);
+        const target = new Date(selectedDate);
+        target.setHours(0, 0, 0, 0);
+        if (target < start) return false;
+      }
+      return true;
+    });
   })().sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Drag reorder handlers

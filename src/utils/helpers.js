@@ -436,13 +436,14 @@ export const generateSampleStackData = (items) => {
 // Insights Calculation
 export const getInsights = (windowDays, entries, symptoms) => {
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const minDaysNeeded = Math.ceil(windowDays * 0.5);
 
   // Get all entries in window
   const windowEntries = Object.values(entries).filter(e => {
     const entryDate = new Date(e.date);
     const daysAgo = Math.floor((today - entryDate) / (1000 * 60 * 60 * 24));
-    return daysAgo <= windowDays;
+    return daysAgo >= 0 && daysAgo <= windowDays;
   });
 
   const daysOfData = new Set(windowEntries.map(e => e.date)).size;
@@ -461,52 +462,77 @@ export const getInsights = (windowDays, entries, symptoms) => {
   }
 
   // Calculate trends for each symptom
-  const halfWindow = Math.floor(windowDays / 2);
   const insights = [];
 
   symptoms.filter(s => s.active).forEach(symptom => {
     const symptomEntries = windowEntries.filter(e => e.symptomId === symptom.id);
     if (symptomEntries.length < 5) return;
 
-    const firstHalf = symptomEntries.filter(e => {
+    // This week entries (last 7 days)
+    const thisWeekEntries = symptomEntries.filter(e => {
       const daysAgo = Math.floor((today - new Date(e.date)) / (1000 * 60 * 60 * 24));
-      return daysAgo > halfWindow;
+      return daysAgo >= 0 && daysAgo < 7;
     });
 
-    const secondHalf = symptomEntries.filter(e => {
+    // Previous entries (rest of window, excluding this week)
+    const previousEntries = symptomEntries.filter(e => {
       const daysAgo = Math.floor((today - new Date(e.date)) / (1000 * 60 * 60 * 24));
-      return daysAgo <= halfWindow;
+      return daysAgo >= 7;
     });
 
-    if (firstHalf.length < 3 || secondHalf.length < 3) return;
+    // Need at least 3 entries in each period for meaningful comparison
+    if (thisWeekEntries.length < 3 || previousEntries.length < 3) return;
 
-    const firstAvg = firstHalf.reduce((sum, e) => sum + e.severity, 0) / firstHalf.length;
-    const secondAvg = secondHalf.reduce((sum, e) => sum + e.severity, 0) / secondHalf.length;
+    // Calculate averages - compare this week to PREVIOUS period (not including this week)
+    const thisWeekAvg = thisWeekEntries.reduce((sum, e) => sum + e.severity, 0) / thisWeekEntries.length;
+    const previousAvg = previousEntries.reduce((sum, e) => sum + e.severity, 0) / previousEntries.length;
 
-    const change = secondAvg - firstAvg;
-    const percentChange = Math.round((change / Math.max(firstAvg, 0.5)) * 100);
+    // Absolute change (positive = improving, negative = worsening)
+    const absoluteChange = previousAvg - thisWeekAvg;
 
-    if (Math.abs(percentChange) >= 20) {
-      // Build chart data from all symptom entries, sorted by date
-      const chartData = symptomEntries
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .map(e => ({ date: e.date, severity: e.severity }));
+    // Skip if change is too small (< 0.3 pts)
+    if (Math.abs(absoluteChange) < 0.3) return;
 
-      insights.push({
-        symptomId: symptom.id,
-        name: symptom.name,
-        direction: change < 0 ? 'improving' : 'worsening',
-        percentChange: Math.abs(percentChange),
-        firstAvg: Math.round(firstAvg * 10) / 10,
-        secondAvg: Math.round(secondAvg * 10) / 10,
-        chartData,
-        entryCount: symptomEntries.length,
-      });
-    }
+    // Frequency: unique days this week with this symptom
+    const daysThisWeek = new Set(thisWeekEntries.map(e => e.date)).size;
+
+    // Best and worst days (across entire window)
+    const sortedBySeverity = [...symptomEntries].sort((a, b) => a.severity - b.severity);
+    const bestEntry = sortedBySeverity[0];
+    const worstEntry = sortedBySeverity[sortedBySeverity.length - 1];
+
+    // Calculate streak from most recent day backwards
+    const streak = calculateStreak(symptomEntries, today);
+
+    // Build chart data from all symptom entries, sorted by date
+    const chartData = symptomEntries
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(e => ({ date: e.date, severity: e.severity }));
+
+    insights.push({
+      symptomId: symptom.id,
+      name: symptom.name,
+      direction: absoluteChange > 0 ? 'improving' : 'worsening',
+      absoluteChange: Math.round(Math.abs(absoluteChange) * 10) / 10,
+      thisWeekAvg: Math.round(thisWeekAvg * 10) / 10,
+      previousAvg: Math.round(previousAvg * 10) / 10,
+      daysThisWeek,
+      bestDay: {
+        severity: bestEntry.severity,
+        date: bestEntry.date,
+      },
+      worstDay: {
+        severity: worstEntry.severity,
+        date: worstEntry.date,
+      },
+      streak,
+      chartData,
+      entryCount: symptomEntries.length,
+    });
   });
 
-  // Sort by magnitude of change
-  insights.sort((a, b) => b.percentChange - a.percentChange);
+  // Sort by magnitude of absolute change
+  insights.sort((a, b) => b.absoluteChange - a.absoluteChange);
 
   return {
     hasEnoughData: true,
@@ -517,6 +543,64 @@ export const getInsights = (windowDays, entries, symptoms) => {
     topCluster: null, // Could add cluster detection here
     aiPrompt: '', // Will be generated separately
   };
+};
+
+// Calculate streak of good or bad days from most recent backwards
+const calculateStreak = (symptomEntries, today) => {
+  // Group entries by date and get average severity per day
+  const dailyAvg = {};
+  symptomEntries.forEach(e => {
+    if (!dailyAvg[e.date]) {
+      dailyAvg[e.date] = { sum: 0, count: 0 };
+    }
+    dailyAvg[e.date].sum += e.severity;
+    dailyAvg[e.date].count += 1;
+  });
+
+  // Convert to sorted array of { date, avg } from most recent
+  const days = Object.entries(dailyAvg)
+    .map(([date, data]) => ({
+      date,
+      avg: data.sum / data.count,
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date)); // Most recent first
+
+  if (days.length === 0) {
+    return { type: 'none', days: 0 };
+  }
+
+  // Determine type based on first (most recent) day
+  const firstDayAvg = days[0].avg;
+  let streakType;
+  if (firstDayAvg <= 2) {
+    streakType = 'good';
+  } else if (firstDayAvg >= 4) {
+    streakType = 'bad';
+  } else {
+    return { type: 'none', days: 0 };
+  }
+
+  // Count consecutive days of same type
+  let streakDays = 0;
+  for (const day of days) {
+    const isGood = day.avg <= 2;
+    const isBad = day.avg >= 4;
+
+    if (streakType === 'good' && isGood) {
+      streakDays++;
+    } else if (streakType === 'bad' && isBad) {
+      streakDays++;
+    } else {
+      break;
+    }
+  }
+
+  // Need at least 2 days for a streak
+  if (streakDays < 2) {
+    return { type: 'none', days: 0 };
+  }
+
+  return { type: streakType, days: streakDays };
 };
 
 // Symptom Trend Indicator

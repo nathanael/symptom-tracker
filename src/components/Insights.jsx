@@ -151,6 +151,15 @@ export default function Insights({
                 {data.insights.map(insight => {
                   const isExpanded = expandedId === insight.symptomId;
                   const lineColor = insight.direction === 'improving' ? '#34d399' : '#fb7185';
+                  const textColor = insight.direction === 'improving' ? 'rgba(209, 250, 229, 0.8)' : 'rgba(255, 228, 230, 0.8)';
+                  const mutedColor = insight.direction === 'improving' ? 'rgba(110, 231, 183, 0.6)' : 'rgba(251, 113, 133, 0.6)';
+                  const dimColor = insight.direction === 'improving' ? 'rgba(110, 231, 183, 0.5)' : 'rgba(251, 113, 133, 0.5)';
+
+                  // Format date for display
+                  const formatShortDate = (dateStr) => {
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  };
 
                   return (
                     <div
@@ -173,23 +182,24 @@ export default function Insights({
                         gap: '20px',
                       }}>
                         <div style={{
-                          fontSize: '30px',
+                          fontSize: '26px',
                           fontWeight: '700',
                           letterSpacing: '-0.025em',
                           color: lineColor,
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px',
+                          minWidth: '90px',
                         }}>
-                          <span style={{ fontSize: '24px' }}>{insight.direction === 'improving' ? '↓' : '↑'}</span>
-                          {insight.percentChange}%
+                          <span style={{ fontSize: '22px' }}>{insight.direction === 'improving' ? '↓' : '↑'}</span>
+                          {insight.absoluteChange} pts
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ color: insight.direction === 'improving' ? '#d1fae5' : '#ffe4e6', fontSize: '16px', fontWeight: '500' }}>
                             {insight.name}
                           </div>
-                          <div style={{ color: insight.direction === 'improving' ? 'rgba(110, 231, 183, 0.6)' : 'rgba(251, 113, 133, 0.6)', fontSize: '14px', marginTop: '2px' }}>
-                            {insight.direction === 'improving' ? 'Improved' : 'Increased'} over {insightsWindow} days
+                          <div style={{ color: mutedColor, fontSize: '14px', marginTop: '2px' }}>
+                            vs previous {insightsWindow - 7} days
                           </div>
                         </div>
                         <div style={{
@@ -208,38 +218,80 @@ export default function Insights({
                           paddingTop: '16px',
                           borderTop: `1px solid ${insight.direction === 'improving' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)'}`,
                         }}>
-                          {/* Before/After Averages */}
+                          {/* This Week vs Previous */}
                           <div style={{
                             display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            marginBottom: '12px',
-                            color: insight.direction === 'improving' ? 'rgba(209, 250, 229, 0.8)' : 'rgba(255, 228, 230, 0.8)',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            marginBottom: '16px',
+                            color: textColor,
                             fontSize: '14px',
                           }}>
-                            <span style={{ fontWeight: '500' }}>Avg:</span>
-                            <span>{insight.firstAvg}</span>
-                            <span style={{ opacity: 0.5 }}>→</span>
-                            <span style={{ fontWeight: '600' }}>{insight.secondAvg}</span>
+                            <div>
+                              <span style={{ fontWeight: '500' }}>This week:</span>{' '}
+                              <span style={{ fontWeight: '600' }}>{insight.thisWeekAvg}</span> avg
+                              <span style={{ color: dimColor }}> ({insight.daysThisWeek} days)</span>
+                            </div>
+                            <div>
+                              <span style={{ fontWeight: '500' }}>Previous:</span>{' '}
+                              <span>{insight.previousAvg}</span> avg
+                            </div>
+                          </div>
+
+                          {/* Best/Worst Days */}
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            marginBottom: '16px',
+                            color: textColor,
+                            fontSize: '14px',
+                          }}>
+                            <div>
+                              <span style={{ color: '#34d399' }}>Best:</span>{' '}
+                              {insight.bestDay.severity} on {formatShortDate(insight.bestDay.date)}
+                            </div>
+                            <div>
+                              <span style={{ color: '#fb7185' }}>Worst:</span>{' '}
+                              {insight.worstDay.severity} on {formatShortDate(insight.worstDay.date)}
+                            </div>
+                          </div>
+
+                          {/* Streak Info */}
+                          {insight.streak.type !== 'none' && (
+                            <div style={{
+                              marginBottom: '16px',
+                              color: textColor,
+                              fontSize: '14px',
+                            }}>
+                              Current streak:{' '}
+                              <span style={{
+                                fontWeight: '600',
+                                color: insight.streak.type === 'good' ? '#34d399' : '#fb7185'
+                              }}>
+                                {insight.streak.days} {insight.streak.type} days
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Frequency */}
+                          <div style={{
+                            marginBottom: '16px',
+                            color: dimColor,
+                            fontSize: '13px',
+                          }}>
+                            Appeared {insight.daysThisWeek} of 7 days this week
                           </div>
 
                           {/* Sparkline */}
                           {insight.chartData && insight.chartData.length >= 2 && (
-                            <div style={{ marginBottom: '12px' }}>
+                            <div style={{ marginBottom: '4px' }}>
                               <Sparkline
                                 data={insight.chartData}
                                 color={lineColor}
                               />
                             </div>
                           )}
-
-                          {/* Entry Count */}
-                          <div style={{
-                            color: insight.direction === 'improving' ? 'rgba(110, 231, 183, 0.5)' : 'rgba(251, 113, 133, 0.5)',
-                            fontSize: '12px',
-                          }}>
-                            Based on {insight.entryCount} entries
-                          </div>
                         </div>
                       )}
                     </div>

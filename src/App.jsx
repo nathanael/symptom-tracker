@@ -28,6 +28,7 @@ import {
   isMobile,
   isStandalone,
   haptic,
+  isScheduledForDate,
   generateAIDataExport,
   generateSampleData,
   generateSampleStackData,
@@ -831,7 +832,9 @@ function App() {
           // Stack page actions
           onCheckAll={() => {
             const dateKey = getDateKey(selectedDate);
-            const activeItems = stackItems.filter(i => i.active);
+            const activeItems = stackItems.filter(i =>
+              i.active && isScheduledForDate(i.schedule, selectedDate)
+            );
             const newEntries = { ...stackEntries };
             activeItems.forEach(item => {
               const entryKey = `${dateKey}-${item.id}`;
@@ -874,7 +877,7 @@ function App() {
             yesterdayEntries.forEach(([key, entry]) => {
               const itemId = key.substring(yesterdayKey.length + 1);
               const item = stackItems.find(i => i.id === itemId);
-              if (item && item.active) {
+              if (item && item.active && isScheduledForDate(item.schedule, selectedDate)) {
                 newEntries[`${dateKey}-${itemId}`] = {
                   date: dateKey,
                   itemId: itemId,
