@@ -107,23 +107,13 @@ export default function Stack({
       // Only count items scheduled for today
       itemsToCount = active.filter(item => isScheduledForDate(item.schedule, selectedDate));
     } else {
-      // Past dates: ONLY show items that have entries for this date AND existed at that date
+      // Past dates: ONLY show items that have entries for this date
       const itemIdsWithEntries = new Set(
         Object.keys(stackEntries)
           .filter(key => key.startsWith(dateKey))
           .map(key => key.substring(dateKey.length + 1))
       );
-      itemsToCount = stackItems.filter(i => {
-        if (!itemIdsWithEntries.has(i.id)) return false;
-        if (i.schedule?.startDate) {
-          const start = new Date(i.schedule.startDate);
-          start.setHours(0, 0, 0, 0);
-          const target = new Date(selectedDate);
-          target.setHours(0, 0, 0, 0);
-          if (target < start) return false;
-        }
-        return true;
-      });
+      itemsToCount = stackItems.filter(i => itemIdsWithEntries.has(i.id));
     }
 
     const takenCount = itemsToCount.filter(item =>
@@ -258,25 +248,13 @@ export default function Stack({
     }
 
     // Past dates: ONLY show items that have entries for this date
-    // AND that existed at that date (startDate check prevents showing recently-added items on old dates)
     const itemIdsWithEntries = new Set(
       Object.keys(stackEntries)
         .filter(key => key.startsWith(dateKey))
         .map(key => key.substring(dateKey.length + 1))
     );
 
-    return stackItems.filter(i => {
-      if (!itemIdsWithEntries.has(i.id)) return false;
-      // Filter out items that didn't exist on this date
-      if (i.schedule?.startDate) {
-        const start = new Date(i.schedule.startDate);
-        start.setHours(0, 0, 0, 0);
-        const target = new Date(selectedDate);
-        target.setHours(0, 0, 0, 0);
-        if (target < start) return false;
-      }
-      return true;
-    });
+    return stackItems.filter(i => itemIdsWithEntries.has(i.id));
   })().sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Drag reorder handlers
