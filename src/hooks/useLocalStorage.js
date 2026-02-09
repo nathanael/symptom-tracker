@@ -11,36 +11,19 @@ export function useLocalStorage(key, initialValue) {
     }
   });
 
-  const timeoutRef = useRef(null);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    // Debounce localStorage writes to avoid blocking UI
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+    // Skip the initial render (value came from localStorage already)
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
-
-    const write = () => {
-      try {
-        localStorage.setItem(key, JSON.stringify(storedValue));
-      } catch (error) {
-        console.error(`Error setting localStorage key "${key}":`, error);
-      }
-    };
-
-    // Use longer debounce and requestIdleCallback for non-blocking writes on iOS
-    timeoutRef.current = setTimeout(() => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(write, { timeout: 1000 });
-      } else {
-        write();
-      }
-    }, 500);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
+    try {
+      localStorage.setItem(key, JSON.stringify(storedValue));
+    } catch (error) {
+      console.error(`Error setting localStorage key "${key}":`, error);
+    }
   }, [key, storedValue]);
 
   return [storedValue, setStoredValue];
@@ -57,36 +40,18 @@ export function useLocalStorageSet(key, initialValue) {
     }
   });
 
-  const timeoutRef = useRef(null);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    // Debounce localStorage writes to avoid blocking UI
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
-
-    const write = () => {
-      try {
-        localStorage.setItem(key, JSON.stringify([...storedValue]));
-      } catch (error) {
-        console.error(`Error setting localStorage key "${key}":`, error);
-      }
-    };
-
-    // Use longer debounce and requestIdleCallback for non-blocking writes on iOS
-    timeoutRef.current = setTimeout(() => {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(write, { timeout: 1000 });
-      } else {
-        write();
-      }
-    }, 500);
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
+    try {
+      localStorage.setItem(key, JSON.stringify([...storedValue]));
+    } catch (error) {
+      console.error(`Error setting localStorage key "${key}":`, error);
+    }
   }, [key, storedValue]);
 
   return [storedValue, setStoredValue];

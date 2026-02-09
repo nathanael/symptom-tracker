@@ -336,8 +336,8 @@ export default function SymptomList({
   // Drag reorder handlers
   const handleDragStart = (e, symptomId, itemRects) => {
     e.stopPropagation();
-    const touch = e.touches[0];
-    dragReorderStartY.current = touch.clientY;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    dragReorderStartY.current = clientY;
     dragReorderItemRects.current = itemRects;
     setDragReorderId(symptomId);
     setDragReorderY(0);
@@ -347,8 +347,8 @@ export default function SymptomList({
   const handleDragMove = (e) => {
     if (!dragReorderId) return;
     e.preventDefault();
-    const touch = e.touches[0];
-    setDragReorderY(touch.clientY - dragReorderStartY.current);
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    setDragReorderY(clientY - dragReorderStartY.current);
   };
 
   const handleDragEnd = () => {
@@ -1132,6 +1132,9 @@ export default function SymptomList({
                 onTouchMove={handleDragMove}
                 onTouchEnd={handleDragEnd}
                 onTouchCancel={handleDragEnd}
+                onMouseMove={handleDragMove}
+                onMouseUp={handleDragEnd}
+                onMouseLeave={handleDragEnd}
               >
                 <label style={{
                   color: '#94a3b8',
@@ -1173,10 +1176,12 @@ export default function SymptomList({
                       {/* Drag handle (hamburger) */}
                       <div
                         onTouchStart={(e) => handleDragStart(e, symptom.id, [])}
+                        onMouseDown={(e) => handleDragStart(e, symptom.id, [])}
                         style={{
                           padding: '8px 4px',
-                          cursor: 'grab',
+                          cursor: dragReorderId ? 'grabbing' : 'grab',
                           touchAction: 'none',
+                          userSelect: 'none',
                           color: '#64748b',
                           display: 'flex',
                           flexDirection: 'column',

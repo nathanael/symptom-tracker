@@ -203,7 +203,8 @@ function App() {
 
     if (currentData === lastSyncDataRef.current) return;
 
-    // Sync immediately without debounce
+    // Set ref eagerly so the cloud listener skips the echo of our own write
+    lastSyncDataRef.current = currentData;
     firebase.saveToCloud({
       symptoms,
       entries,
@@ -212,8 +213,6 @@ function App() {
       stackEntries,
       pinnedSymptoms: [...pinnedSymptoms],
       trackingMode,
-    }).then(() => {
-      lastSyncDataRef.current = currentData;
     });
   }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
 
@@ -224,53 +223,93 @@ function App() {
     localStorage.setItem(STORAGE_KEY_LOCAL_UPDATED_AT, Date.now().toString());
   }, [symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
 
-  // Load from cloud on sign in
+  // Listen to cloud changes in real-time
+  const isInitialCloudLoad = useRef(true);
   useEffect(() => {
     if (firebase.user && firebase.firebaseReady) {
-      firebase.loadFromCloud().then(data => {
-        if (data) {
-          // Merge cloud data with local data - local takes priority to prevent data loss
-          // This handles cases where local changes haven't synced yet
-          if (data.symptoms?.length > 0) setSymptoms(data.symptoms);
+      isInitialCloudLoad.current = true;
+      const unsubscribe = firebase.listenToCloud((data) => {
+        const isInitial = isInitialCloudLoad.current;
+        isInitialCloudLoad.current = false;
+
+        // Update lastSyncDataRef so auto-sync doesn't immediately push back
+        const incomingData = JSON.stringify({
+          symptoms: data.symptoms, entries: data.entries, dailyNotes: data.dailyNotes,
+          stackItems: data.stackItems, stackEntries: data.stackEntries,
+          pinnedSymptoms: data.pinnedSymptoms || [], trackingMode: data.trackingMode
+        });
+
+        if (!isInitial && incomingData === lastSyncDataRef.current) return;
+
+        // On initial load, merge (local takes priority). On subsequent updates, accept cloud data.
+        if (isInitial) {
+          if (data.symptoms?.length > 0) {
+            setSymptoms(prev => {
+              const cloudMap = new Map(data.symptoms.map(s => [s.id, s]));
+              // Local symptoms override cloud by id
+              prev.forEach(s => cloudMap.set(s.id, s));
+              return Array.from(cloudMap.values());
+            });
+          }
           if (data.entries) {
             setEntries(prev => {
-              // Merge: cloud entries fill gaps, but local entries are preserved
               const merged = { ...data.entries };
-              Object.keys(prev).forEach(key => {
-                // Local entry exists - keep it (it may be newer)
-                merged[key] = prev[key];
-              });
+              Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
               return merged;
             });
           }
           if (data.dailyNotes) {
             setDailyNotes(prev => {
               const merged = { ...data.dailyNotes };
-              Object.keys(prev).forEach(key => {
-                merged[key] = prev[key];
-              });
+              Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
               return merged;
             });
           }
-          if (data.stackItems?.length > 0) setStackItems(data.stackItems);
+          if (data.stackItems?.length > 0) {
+            setStackItems(prev => {
+              const cloudMap = new Map(data.stackItems.map(s => [s.id, s]));
+              prev.forEach(s => cloudMap.set(s.id, s));
+              return Array.from(cloudMap.values());
+            });
+          }
           if (data.stackEntries) {
             setStackEntries(prev => {
               const merged = { ...data.stackEntries };
-              Object.keys(prev).forEach(key => {
-                merged[key] = prev[key];
-              });
+              Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
               return merged;
             });
           }
           if (data.trackingMode) setTrackingMode(data.trackingMode);
           if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
+        } else {
+          // Real-time update from another device — accept cloud data
+          if (data.symptoms?.length > 0) setSymptoms(data.symptoms);
+          if (data.entries) setEntries(data.entries);
+          if (data.dailyNotes) setDailyNotes(data.dailyNotes);
+          if (data.stackItems?.length > 0) setStackItems(data.stackItems);
+          if (data.stackEntries) setStackEntries(data.stackEntries);
+          if (data.trackingMode) setTrackingMode(data.trackingMode);
+          if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
         }
+
+        lastSyncDataRef.current = incomingData;
         // Enable timestamp updates after cloud sync completes
-        setTimeout(() => { isLoadingDataRef.current = false; }, 100);
-      }).catch(() => {
-        // Enable timestamp updates even if cloud load fails
-        setTimeout(() => { isLoadingDataRef.current = false; }, 100);
+        if (isLoadingDataRef.current) {
+          setTimeout(() => { isLoadingDataRef.current = false; }, 100);
+        }
       });
+
+      // If listener setup fails or takes too long, still unlock
+      const fallback = setTimeout(() => {
+        if (isLoadingDataRef.current) {
+          isLoadingDataRef.current = false;
+        }
+      }, 5000);
+
+      return () => {
+        if (unsubscribe) unsubscribe();
+        clearTimeout(fallback);
+      };
     } else if (!firebase.user && !firebase.authLoading) {
       // No user logged in, enable timestamp updates
       setTimeout(() => { isLoadingDataRef.current = false; }, 100);

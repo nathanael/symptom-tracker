@@ -271,6 +271,28 @@ export function useFirebase() {
     return false;
   }, []);
 
+  // Listen to cloud changes in real-time
+  const listenToCloud = useCallback((onData) => {
+    const firebaseDb = getFirebaseDb();
+    if (!user || !firebaseDb) return null;
+
+    return firebaseDb.collection('users').doc(user.uid).onSnapshot(
+      (docSnap) => {
+        if (docSnap.exists) {
+          const data = docSnap.data();
+          setLastSynced(data.updatedAt?.toDate() || new Date());
+          onData(data);
+        }
+      },
+      (error) => {
+        console.error('Cloud listener error:', error);
+        if (!error.message?.includes('offline') && error.code !== 'unavailable') {
+          setSyncError(error.message);
+        }
+      }
+    );
+  }, [user]);
+
   // Sign Out
   const signOut = useCallback(async () => {
     const firebaseAuth = getFirebaseAuth();
@@ -295,6 +317,7 @@ export function useFirebase() {
     setSyncError,
     saveToCloud,
     loadFromCloud,
+    listenToCloud,
     signInWithGoogle,
     signInWithEmail,
     forgotPassword,
