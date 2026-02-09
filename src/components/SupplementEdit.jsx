@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import SchedulePicker, { formatSchedule } from './SchedulePicker';
 import { formatRelativeTime, reconstructStateAtEntry } from '../utils/helpers';
 
 export default function SupplementEdit({ item, onSave, onCancel }) {
+  const modalRef = useRef(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -52,7 +53,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (!formData.name.trim()) return;
     onSave({
       name: formData.name.trim(),
@@ -61,7 +62,16 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
       unit: formData.unit,
       schedule: formData.schedule,
     });
-  };
+  }, [formData, item, onSave]);
+
+  // Auto-save when iOS keyboard Done button dismisses keyboard (blur leaves modal)
+  const handleFieldBlur = useCallback(() => {
+    setTimeout(() => {
+      if (modalRef.current && !modalRef.current.contains(document.activeElement)) {
+        handleSave();
+      }
+    }, 100);
+  }, [handleSave]);
 
   const formatChangeText = (entry) => {
     if (entry.type === 'created') {
@@ -104,6 +114,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
 
   return (
     <div
+      ref={modalRef}
       style={{
         position: 'fixed',
         inset: 0,
@@ -172,6 +183,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onBlur={handleFieldBlur}
               style={{
                 width: '100%',
                 background: 'rgba(15, 23, 42, 0.8)',
@@ -201,6 +213,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
               type="text"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onBlur={handleFieldBlur}
               placeholder="Optional"
               style={{
                 width: '100%',
@@ -233,6 +246,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
                 inputMode="decimal"
                 value={formData.defaultDose}
                 onChange={(e) => setFormData({ ...formData, defaultDose: e.target.value })}
+                onBlur={handleFieldBlur}
                 style={{
                   width: '100%',
                   background: 'rgba(15, 23, 42, 0.8)',

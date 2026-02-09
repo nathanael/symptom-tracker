@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { formatRelativeTime } from '../utils/helpers';
 
 // Reconstruct symptom state at a history point (simpler than supplements)
@@ -20,6 +20,7 @@ const reconstructSymptomStateAtEntry = (historyArray, targetIndex) => {
 };
 
 export default function SymptomEdit({ symptom, onSave, onCancel }) {
+  const modalRef = useRef(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -60,13 +61,22 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (!formData.name.trim()) return;
     onSave({
       name: formData.name.trim(),
       description: formData.description.trim(),
     });
-  };
+  }, [formData, onSave]);
+
+  // Auto-save when iOS keyboard Done button dismisses keyboard (blur leaves modal)
+  const handleFieldBlur = useCallback(() => {
+    setTimeout(() => {
+      if (modalRef.current && !modalRef.current.contains(document.activeElement)) {
+        handleSave();
+      }
+    }, 100);
+  }, [handleSave]);
 
   const formatChangeText = (entry) => {
     if (entry.type === 'created') {
@@ -94,6 +104,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
 
   return (
     <div
+      ref={modalRef}
       style={{
         position: 'fixed',
         inset: 0,
@@ -146,7 +157,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
         padding: '24px 20px',
         paddingBottom: '100px',
       }}>
-        <form style={{ maxWidth: '500px', margin: '0 auto' }} onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+        <div style={{ maxWidth: '500px', margin: '0 auto' }}>
           {/* Name Field */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{
@@ -162,6 +173,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onBlur={handleFieldBlur}
               style={{
                 width: '100%',
                 background: 'rgba(15, 23, 42, 0.8)',
@@ -191,6 +203,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
               type="text"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onBlur={handleFieldBlur}
               placeholder="Optional"
               style={{
                 width: '100%',
@@ -261,7 +274,6 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
 
                         {/* Revert button */}
                         <button
-                          type="button"
                           onClick={() => handleRevert(entry, index)}
                           title="Revert to this state"
                           style={{
@@ -290,7 +302,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
               </div>
             </div>
           )}
-        </form>
+        </div>
       </div>
 
       {/* Fixed Bottom Buttons */}
