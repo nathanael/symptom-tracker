@@ -568,18 +568,22 @@ export default function SymptomList({
                 <div style={{
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
                 }}>
                   <span style={{
                     color: isDimmed ? '#9ca3af' : '#e5e7eb',
                     fontSize: '17px',
                     fontWeight: '400',
+                    display: 'block',
+                    whiteSpace: 'nowrap',
                   }}>{symptom.name}</span>
                   {symptom.description && (
                     <span style={{
                       color: '#6b7280',
                       fontSize: '13px',
-                      marginLeft: '6px',
+                      fontWeight: '400',
+                      display: 'block',
+                      marginTop: '2px',
+                      whiteSpace: 'nowrap',
                     }}>{symptom.description}</span>
                   )}
                 </div>
