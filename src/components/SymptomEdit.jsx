@@ -146,7 +146,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
         padding: '24px 20px',
         paddingBottom: '100px',
       }}>
-        <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+        <form style={{ maxWidth: '500px', margin: '0 auto' }} onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
           {/* Name Field */}
           <div style={{ marginBottom: '24px' }}>
             <label style={{
@@ -261,6 +261,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
 
                         {/* Revert button */}
                         <button
+                          type="button"
                           onClick={() => handleRevert(entry, index)}
                           title="Revert to this state"
                           style={{
@@ -289,7 +290,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
               </div>
             </div>
           )}
-        </div>
+        </form>
       </div>
 
       {/* Fixed Bottom Buttons */}
