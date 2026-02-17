@@ -20,6 +20,7 @@ export default function Stack({
   const [showAddForm, setShowAddForm] = useState(false);
   const [showHiddenItems, setShowHiddenItems] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const manageScrollRef = useRef(null);
 
   // Prevent row click from toggling right after dose blur save
   const justSavedDose = useRef(false);
@@ -642,6 +643,7 @@ export default function Stack({
         >
           {/* Scrollable Content */}
           <div
+            ref={manageScrollRef}
             style={{
               flex: 1,
               overflowY: 'auto',
@@ -653,126 +655,7 @@ export default function Stack({
           >
             <div style={{ maxWidth: '500px', margin: '0 auto' }}>
 
-            {/* Active Items */}
-            {activeItems.length > 0 && (() => {
-              const dragCurrentIndex = dragReorderId ? activeItems.findIndex(i => i.id === dragReorderId) : -1;
-              const itemHeight = 52;
-              const dragTargetIndex = dragReorderId ? Math.max(0, Math.min(activeItems.length - 1, dragCurrentIndex + Math.round(dragReorderY / itemHeight))) : -1;
-
-              return (
-              <div
-                style={{ marginBottom: '20px' }}
-                onTouchMove={handleDragMove}
-                onTouchEnd={handleDragEnd}
-                onTouchCancel={handleDragEnd}
-                onMouseMove={handleDragMove}
-                onMouseUp={handleDragEnd}
-                onMouseLeave={handleDragEnd}
-              >
-                <label style={{
-                  color: '#94a3b8',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  marginBottom: '12px',
-                  display: 'block',
-                }}>Active ({activeItems.length})</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {activeItems.map((item, index) => {
-                    const isDraggingThis = dragReorderId === item.id;
-                    // Calculate offset for non-dragged items to show drop position
-                    let offsetY = 0;
-                    if (dragReorderId && !isDraggingThis) {
-                      if (index > dragCurrentIndex && index <= dragTargetIndex) {
-                        offsetY = -itemHeight - 6; // Move up
-                      } else if (index < dragCurrentIndex && index >= dragTargetIndex) {
-                        offsetY = itemHeight + 6; // Move down
-                      }
-                    }
-                    return (
-                    <div
-                      key={item.id}
-                      style={{
-                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
-                        borderRadius: '3px',
-                        padding: '10px 12px 10px 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        transform: isDraggingThis ? `translateY(${dragReorderY}px)` : `translateY(${offsetY}px)`,
-                        zIndex: isDraggingThis ? 10 : 1,
-                        position: 'relative',
-                        transition: isDraggingThis ? 'none' : 'transform 0.15s ease',
-                        boxShadow: isDraggingThis ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
-                      }}
-                    >
-                      {/* Drag handle (hamburger) */}
-                      <div
-                        onTouchStart={(e) => handleDragStart(e, item.id)}
-                        onMouseDown={(e) => handleDragStart(e, item.id)}
-                        style={{
-                          padding: '8px 4px',
-                          cursor: dragReorderId ? 'grabbing' : 'grab',
-                          touchAction: 'none',
-                          userSelect: 'none',
-                          color: '#64748b',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '3px',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
-                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
-                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
-                      </div>
-
-                      <div
-                        onClick={() => setEditingSupplementId(item.id)}
-                        style={{
-                          cursor: 'pointer',
-                          flex: 1,
-                        }}
-                      >
-                        <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
-                          {item.name}
-                          {formatSchedule(item.schedule) && (
-                            <span style={{ color: '#9ca3af', fontSize: '13px', marginLeft: '6px' }}>{formatSchedule(item.schedule)}</span>
-                          )}
-                        </span>
-                        <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
-                          {item.defaultDose}{item.unit}
-                        </span>
-                        {item.description && (
-                          <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
-                            {item.description}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => toggleStackItemActive(item.id)}
-                        style={{
-                          background: 'rgba(239, 68, 68, 0.15)',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          borderRadius: '3px',
-                          padding: '6px 12px',
-                          color: '#f87171',
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                        }}
-                      >
-                        Hide
-                      </button>
-                    </div>
-                  );
-                  })}
-                </div>
-              </div>
-              );
-            })()}
-
-            {/* Inline Add Form (when expanded) */}
+            {/* Add Form (at top, when expanded) */}
             {showAddForm && (
               <div style={{
                 background: 'rgba(15, 17, 21, 0.6)',
@@ -945,6 +828,125 @@ export default function Stack({
               </div>
             )}
 
+            {/* Active Items */}
+            {activeItems.length > 0 && (() => {
+              const dragCurrentIndex = dragReorderId ? activeItems.findIndex(i => i.id === dragReorderId) : -1;
+              const itemHeight = 52;
+              const dragTargetIndex = dragReorderId ? Math.max(0, Math.min(activeItems.length - 1, dragCurrentIndex + Math.round(dragReorderY / itemHeight))) : -1;
+
+              return (
+              <div
+                style={{ marginBottom: '20px' }}
+                onTouchMove={handleDragMove}
+                onTouchEnd={handleDragEnd}
+                onTouchCancel={handleDragEnd}
+                onMouseMove={handleDragMove}
+                onMouseUp={handleDragEnd}
+                onMouseLeave={handleDragEnd}
+              >
+                <label style={{
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  marginBottom: '12px',
+                  display: 'block',
+                }}>Active ({activeItems.length})</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {activeItems.map((item, index) => {
+                    const isDraggingThis = dragReorderId === item.id;
+                    // Calculate offset for non-dragged items to show drop position
+                    let offsetY = 0;
+                    if (dragReorderId && !isDraggingThis) {
+                      if (index > dragCurrentIndex && index <= dragTargetIndex) {
+                        offsetY = -itemHeight - 6; // Move up
+                      } else if (index < dragCurrentIndex && index >= dragTargetIndex) {
+                        offsetY = itemHeight + 6; // Move down
+                      }
+                    }
+                    return (
+                    <div
+                      key={item.id}
+                      style={{
+                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
+                        borderRadius: '3px',
+                        padding: '10px 12px 10px 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        transform: isDraggingThis ? `translateY(${dragReorderY}px)` : `translateY(${offsetY}px)`,
+                        zIndex: isDraggingThis ? 10 : 1,
+                        position: 'relative',
+                        transition: isDraggingThis ? 'none' : 'transform 0.15s ease',
+                        boxShadow: isDraggingThis ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
+                      }}
+                    >
+                      {/* Drag handle (hamburger) */}
+                      <div
+                        onTouchStart={(e) => handleDragStart(e, item.id)}
+                        onMouseDown={(e) => handleDragStart(e, item.id)}
+                        style={{
+                          padding: '8px 4px',
+                          cursor: dragReorderId ? 'grabbing' : 'grab',
+                          touchAction: 'none',
+                          userSelect: 'none',
+                          color: '#64748b',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '3px',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                      </div>
+
+                      <div
+                        onClick={() => setEditingSupplementId(item.id)}
+                        style={{
+                          cursor: 'pointer',
+                          flex: 1,
+                        }}
+                      >
+                        <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                          {item.name}
+                          {formatSchedule(item.schedule) && (
+                            <span style={{ color: '#9ca3af', fontSize: '13px', marginLeft: '6px' }}>{formatSchedule(item.schedule)}</span>
+                          )}
+                        </span>
+                        <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
+                          {item.defaultDose}{item.unit}
+                        </span>
+                        {item.description && (
+                          <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
+                            {item.description}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => toggleStackItemActive(item.id)}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          borderRadius: '3px',
+                          padding: '6px 12px',
+                          color: '#f87171',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        Hide
+                      </button>
+                    </div>
+                  );
+                  })}
+                </div>
+              </div>
+              );
+            })()}
+
             {/* Inactive Items - Collapsible */}
             {inactiveItems.length > 0 && (
               <div>
@@ -1047,7 +1049,13 @@ export default function Stack({
             zIndex: 10,
           }}>
             <button
-              onClick={() => setShowAddForm(!showAddForm)}
+              onClick={() => {
+                const opening = !showAddForm;
+                setShowAddForm(opening);
+                if (opening && manageScrollRef.current) {
+                  manageScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
               style={{
                 width: '100%',
                 maxWidth: '500px',

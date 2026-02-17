@@ -45,6 +45,7 @@ export default function SymptomList({
   const [showHiddenSymptoms, setShowHiddenSymptoms] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const manageScrollRef = useRef(null);
 
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
@@ -1032,6 +1033,7 @@ export default function SymptomList({
         >
           {/* Scrollable Content */}
           <div
+            ref={manageScrollRef}
             style={{
               flex: 1,
               overflowY: 'auto',
@@ -1043,120 +1045,7 @@ export default function SymptomList({
           >
             <div style={{ maxWidth: '500px', margin: '0 auto' }}>
 
-            {/* Active symptoms list */}
-            {symptoms.filter(s => s.active).length > 0 && (() => {
-              const activeList = symptoms.filter(s => s.active).sort((a, b) => (a.order || 0) - (b.order || 0));
-              const dragCurrentIndex = dragReorderId ? activeList.findIndex(s => s.id === dragReorderId) : -1;
-              const itemHeight = 52;
-              const dragTargetIndex = dragReorderId ? Math.max(0, Math.min(activeList.length - 1, dragCurrentIndex + Math.round(dragReorderY / itemHeight))) : -1;
-
-              return (
-              <div
-                style={{ marginBottom: '20px' }}
-                onTouchMove={handleDragMove}
-                onTouchEnd={handleDragEnd}
-                onTouchCancel={handleDragEnd}
-                onMouseMove={handleDragMove}
-                onMouseUp={handleDragEnd}
-                onMouseLeave={handleDragEnd}
-              >
-                <label style={{
-                  color: '#94a3b8',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  marginBottom: '12px',
-                  display: 'block',
-                }}>Active Symptoms ({activeList.length})</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {activeList.map((symptom, index) => {
-                    const isDraggingThis = dragReorderId === symptom.id;
-                    // Calculate offset for non-dragged items to show drop position
-                    let offsetY = 0;
-                    if (dragReorderId && !isDraggingThis) {
-                      if (index > dragCurrentIndex && index <= dragTargetIndex) {
-                        offsetY = -itemHeight - 6; // Move up
-                      } else if (index < dragCurrentIndex && index >= dragTargetIndex) {
-                        offsetY = itemHeight + 6; // Move down
-                      }
-                    }
-                    return (
-                    <div
-                      key={symptom.id}
-                      style={{
-                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
-                        borderRadius: '3px',
-                        padding: '10px 12px 10px 0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        transform: isDraggingThis ? `translateY(${dragReorderY}px)` : `translateY(${offsetY}px)`,
-                        zIndex: isDraggingThis ? 10 : 1,
-                        position: 'relative',
-                        transition: isDraggingThis ? 'none' : 'transform 0.15s ease',
-                        boxShadow: isDraggingThis ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
-                      }}
-                    >
-                      {/* Drag handle (hamburger) */}
-                      <div
-                        onTouchStart={(e) => handleDragStart(e, symptom.id, [])}
-                        onMouseDown={(e) => handleDragStart(e, symptom.id, [])}
-                        style={{
-                          padding: '8px 4px',
-                          cursor: dragReorderId ? 'grabbing' : 'grab',
-                          touchAction: 'none',
-                          userSelect: 'none',
-                          color: '#64748b',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '3px',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
-                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
-                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
-                      </div>
-
-                      <div
-                        onClick={() => setEditingSymptomFullId(symptom.id)}
-                        style={{
-                          cursor: 'pointer',
-                          flex: 1,
-                        }}
-                      >
-                        <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
-                          {symptom.name}
-                        </span>
-                        {symptom.description && (
-                          <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: '6px' }}>
-                            {symptom.description}
-                          </span>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => removeSymptom(symptom.id)}
-                        style={{
-                          background: 'rgba(239, 68, 68, 0.15)',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          borderRadius: '3px',
-                          padding: '6px 12px',
-                          color: '#f87171',
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Hide
-                      </button>
-                    </div>
-                  );
-                  })}
-                </div>
-              </div>
-              );
-            })()}
-
-            {/* Add Symptom Form (inline, when expanded) */}
+            {/* Add Symptom Form (at top, when expanded) */}
             {showAddForm && (
               <div style={{
                 background: 'rgba(15, 17, 21, 0.6)',
@@ -1279,6 +1168,119 @@ export default function SymptomList({
               </div>
             )}
 
+            {/* Active symptoms list */}
+            {symptoms.filter(s => s.active).length > 0 && (() => {
+              const activeList = symptoms.filter(s => s.active).sort((a, b) => (a.order || 0) - (b.order || 0));
+              const dragCurrentIndex = dragReorderId ? activeList.findIndex(s => s.id === dragReorderId) : -1;
+              const itemHeight = 52;
+              const dragTargetIndex = dragReorderId ? Math.max(0, Math.min(activeList.length - 1, dragCurrentIndex + Math.round(dragReorderY / itemHeight))) : -1;
+
+              return (
+              <div
+                style={{ marginBottom: '20px' }}
+                onTouchMove={handleDragMove}
+                onTouchEnd={handleDragEnd}
+                onTouchCancel={handleDragEnd}
+                onMouseMove={handleDragMove}
+                onMouseUp={handleDragEnd}
+                onMouseLeave={handleDragEnd}
+              >
+                <label style={{
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  marginBottom: '12px',
+                  display: 'block',
+                }}>Active Symptoms ({activeList.length})</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {activeList.map((symptom, index) => {
+                    const isDraggingThis = dragReorderId === symptom.id;
+                    // Calculate offset for non-dragged items to show drop position
+                    let offsetY = 0;
+                    if (dragReorderId && !isDraggingThis) {
+                      if (index > dragCurrentIndex && index <= dragTargetIndex) {
+                        offsetY = -itemHeight - 6; // Move up
+                      } else if (index < dragCurrentIndex && index >= dragTargetIndex) {
+                        offsetY = itemHeight + 6; // Move down
+                      }
+                    }
+                    return (
+                    <div
+                      key={symptom.id}
+                      style={{
+                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
+                        borderRadius: '3px',
+                        padding: '10px 12px 10px 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        transform: isDraggingThis ? `translateY(${dragReorderY}px)` : `translateY(${offsetY}px)`,
+                        zIndex: isDraggingThis ? 10 : 1,
+                        position: 'relative',
+                        transition: isDraggingThis ? 'none' : 'transform 0.15s ease',
+                        boxShadow: isDraggingThis ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
+                      }}
+                    >
+                      {/* Drag handle (hamburger) */}
+                      <div
+                        onTouchStart={(e) => handleDragStart(e, symptom.id, [])}
+                        onMouseDown={(e) => handleDragStart(e, symptom.id, [])}
+                        style={{
+                          padding: '8px 4px',
+                          cursor: dragReorderId ? 'grabbing' : 'grab',
+                          touchAction: 'none',
+                          userSelect: 'none',
+                          color: '#64748b',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '3px',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                      </div>
+
+                      <div
+                        onClick={() => setEditingSymptomFullId(symptom.id)}
+                        style={{
+                          cursor: 'pointer',
+                          flex: 1,
+                        }}
+                      >
+                        <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                          {symptom.name}
+                        </span>
+                        {symptom.description && (
+                          <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: '6px' }}>
+                            {symptom.description}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => removeSymptom(symptom.id)}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          borderRadius: '3px',
+                          padding: '6px 12px',
+                          color: '#f87171',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Hide
+                      </button>
+                    </div>
+                  );
+                  })}
+                </div>
+              </div>
+              );
+            })()}
+
             {/* Inactive symptoms - Collapsible */}
             {inactiveSymptoms.length > 0 && (
               <div>
@@ -1385,7 +1387,13 @@ export default function SymptomList({
             zIndex: 10,
           }}>
             <button
-              onClick={() => setShowAddForm(!showAddForm)}
+              onClick={() => {
+                const opening = !showAddForm;
+                setShowAddForm(opening);
+                if (opening && manageScrollRef.current) {
+                  manageScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
               style={{
                 width: '100%',
                 maxWidth: '500px',
