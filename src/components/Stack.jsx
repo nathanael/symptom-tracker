@@ -342,9 +342,94 @@ export default function Stack({
               return '#f59e0b';                        // orange - some
             })(),
           }} />
-          <span style={{ color: '#e5e7eb', fontSize: '14px' }}>
+          <span style={{ color: '#e5e7eb', fontSize: '14px', flex: 1 }}>
             {getStackProgress().taken} of {getStackProgress().total} completed
           </span>
+          {isToday && (() => {
+            const { taken, total } = getStackProgress();
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {taken > 0 && (
+                  <button
+                    onClick={() => {
+                      const newEntries = { ...stackEntries };
+                      Object.keys(newEntries).forEach(key => {
+                        if (key.startsWith(dateKey)) delete newEntries[key];
+                      });
+                      setStackEntries(newEntries);
+                      setLastAction('All cleared');
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#9ca3af',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      padding: '4px 8px',
+                    }}
+                  >
+                    Unselect
+                  </button>
+                )}
+                <div
+                  onClick={() => {
+                    if (taken === total) {
+                      // Uncheck all
+                      const newEntries = { ...stackEntries };
+                      Object.keys(newEntries).forEach(key => {
+                        if (key.startsWith(dateKey)) delete newEntries[key];
+                      });
+                      setStackEntries(newEntries);
+                      setLastAction('All cleared');
+                    } else {
+                      // Check all
+                      const newEntries = { ...stackEntries };
+                      displayItems.forEach(item => {
+                        const entryKey = `${dateKey}-${item.id}`;
+                        if (!newEntries[entryKey]) {
+                          newEntries[entryKey] = {
+                            date: dateKey,
+                            itemId: item.id,
+                            dose: item.defaultDose,
+                            taken: true,
+                          };
+                        }
+                      });
+                      setStackEntries(newEntries);
+                      haptic('success');
+                      setLastAction('All selected');
+                    }
+                  }}
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '4px',
+                    border: taken === total
+                      ? '1px solid rgba(16,185,129,0.4)'
+                      : '1px solid rgba(255,255,255,0.2)',
+                    background: taken === total
+                      ? 'rgba(16,185,129,0.15)'
+                      : taken > 0
+                        ? 'rgba(245,158,11,0.1)'
+                        : 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  {taken === total && taken > 0 ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  ) : taken > 0 ? (
+                    <div style={{ width: '10px', height: '2px', background: '#f59e0b', borderRadius: '1px' }} />
+                  ) : null}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 

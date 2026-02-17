@@ -334,6 +334,51 @@ function App() {
     return () => clearTimeout(fallbackTimer);
   }, []);
 
+  // Auto-prefill today's stack from yesterday's checked entries
+  const lastPrefillDateRef = useRef(localStorage.getItem('lastStackPrefillDate'));
+  useEffect(() => {
+    if (isLoadingDataRef.current) return;
+    const todayKey = getDateKey(new Date());
+    if (lastPrefillDateRef.current === todayKey) return;
+
+    // Check if any stack entries already exist for today
+    const hasTodayEntries = Object.keys(stackEntries).some(key => key.startsWith(todayKey));
+    if (hasTodayEntries) {
+      lastPrefillDateRef.current = todayKey;
+      localStorage.setItem('lastStackPrefillDate', todayKey);
+      return;
+    }
+
+    // Copy yesterday's entries
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = getDateKey(yesterday);
+    const yesterdayEntries = Object.entries(stackEntries).filter(([key]) => key.startsWith(yesterdayKey));
+    if (yesterdayEntries.length === 0) {
+      lastPrefillDateRef.current = todayKey;
+      localStorage.setItem('lastStackPrefillDate', todayKey);
+      return;
+    }
+
+    const newEntries = { ...stackEntries };
+    yesterdayEntries.forEach(([key, entry]) => {
+      const itemId = key.substring(yesterdayKey.length + 1);
+      const item = stackItems.find(i => i.id === itemId);
+      if (item && item.active && isScheduledForDate(item.schedule, new Date())) {
+        newEntries[`${todayKey}-${itemId}`] = {
+          date: todayKey,
+          itemId,
+          dose: entry.dose,
+          taken: true,
+        };
+      }
+    });
+
+    setStackEntries(newEntries);
+    lastPrefillDateRef.current = todayKey;
+    localStorage.setItem('lastStackPrefillDate', todayKey);
+  }, [stackEntries, stackItems]);
+
   // Handlers
   const changeDate = useCallback((days) => {
     setSelectedDate(prevDate => {
@@ -732,9 +777,22 @@ function App() {
           {/* Rapid Entry Button */}
           <button
             onClick={() => {
+              const effectiveTime = quickLogTime || getCurrentTimePeriod(trackingMode);
               if (!quickLogTime) {
-                setQuickLogTime(getCurrentTimePeriod(trackingMode));
+                setQuickLogTime(effectiveTime);
               }
+              // Compute first incomplete symptom index
+              const dateKey = getDateKey(selectedDate);
+              const timeKey = trackingMode === 'ampm' ? effectiveTime : 'daily';
+              const allActive = symptoms.filter(s => s.active).sort((a, b) => {
+                const aPinned = pinnedSymptoms.has(a.id);
+                const bPinned = pinnedSymptoms.has(b.id);
+                if (aPinned && !bPinned) return -1;
+                if (!aPinned && bPinned) return 1;
+                return (a.order || 0) - (b.order || 0);
+              });
+              const firstIncomplete = allActive.findIndex(s => !entries[`${dateKey}-${s.id}-${timeKey}`]);
+              setRapidEntryIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
               if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
                 setRapidEntryConfirm(true);
                 setRapidEntryMode(true);
@@ -873,9 +931,22 @@ function App() {
           onCopyData={quickCopyData}
           copyDays={copyDays}
           onRapidEntry={() => {
+            const effectiveTime = quickLogTime || getCurrentTimePeriod(trackingMode);
             if (trackingMode === 'ampm' && !quickLogTime) {
-              setQuickLogTime(getCurrentTimePeriod(trackingMode));
+              setQuickLogTime(effectiveTime);
             }
+            // Compute first incomplete symptom index
+            const dateKey = getDateKey(selectedDate);
+            const timeKey = trackingMode === 'ampm' ? effectiveTime : 'daily';
+            const allActive = symptoms.filter(s => s.active).sort((a, b) => {
+              const aPinned = pinnedSymptoms.has(a.id);
+              const bPinned = pinnedSymptoms.has(b.id);
+              if (aPinned && !bPinned) return -1;
+              if (!aPinned && bPinned) return 1;
+              return (a.order || 0) - (b.order || 0);
+            });
+            const firstIncomplete = allActive.findIndex(s => !entries[`${dateKey}-${s.id}-${timeKey}`]);
+            setRapidEntryIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
             if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
               setRapidEntryConfirm(true);
               setRapidEntryMode(true);

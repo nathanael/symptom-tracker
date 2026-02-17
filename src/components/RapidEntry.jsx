@@ -45,16 +45,19 @@ export default function RapidEntry({
   // Check if current symptom is marked
   const isCurrentMarked = currentSymptom ? !!entries[`${dateKey}-${currentSymptom.id}-${timeKey}`] : false;
 
-  // Find next unmarked symptom index (for forward navigation)
+  // Find next unmarked symptom index (for forward navigation, wraps around)
   const findNextUnmarkedIndex = (fromIndex) => {
-    for (let i = fromIndex + 1; i < activeSymptomsList.length; i++) {
+    const len = activeSymptomsList.length;
+    // Search forward from fromIndex+1, wrapping around
+    for (let offset = 1; offset < len; offset++) {
+      const i = (fromIndex + offset) % len;
       const sym = activeSymptomsList[i];
       const entryKey = `${dateKey}-${sym.id}-${timeKey}`;
       if (!entries[entryKey]) {
         return i;
       }
     }
-    return -1; // No more unmarked
+    return -1; // All symptoms are marked
   };
 
   const handleClose = () => {
@@ -66,9 +69,9 @@ export default function RapidEntry({
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'ArrowLeft' && rapidEntryIndex > 0) {
-        // Back: go to previous symptom in full list (allows reviewing tracked items)
-        setRapidEntryIndex(prev => prev - 1);
+      if (e.key === 'ArrowLeft') {
+        // Back: go to previous symptom in full list (wraps around)
+        setRapidEntryIndex(prev => prev > 0 ? prev - 1 : activeSymptomsList.length - 1);
       } else if (e.key === 'ArrowRight') {
         // Forward: skip to next unmarked symptom
         const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
@@ -370,14 +373,24 @@ export default function RapidEntry({
           )}
         </div>
 
-        {/* Symptom name */}
-        <div style={{
-          color: '#f8fafc',
-          fontSize: '28px',
-          fontWeight: '700',
-          textAlign: 'center',
-        }}>
-          {currentSymptom.name}
+        {/* Symptom name + description */}
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            color: '#f8fafc',
+            fontSize: '28px',
+            fontWeight: '700',
+          }}>
+            {currentSymptom.name}
+          </div>
+          {currentSymptom.description && (
+            <div style={{
+              color: '#6b7280',
+              fontSize: '15px',
+              marginTop: '8px',
+            }}>
+              {currentSymptom.description}
+            </div>
+          )}
         </div>
 
         {/* Time period indicator */}
@@ -530,21 +543,17 @@ export default function RapidEntry({
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
             onClick={() => {
-              if (rapidEntryIndex > 0) {
-                setRapidEntryIndex(prev => prev - 1);
-              }
+              setRapidEntryIndex(prev => prev > 0 ? prev - 1 : activeSymptomsList.length - 1);
             }}
-            disabled={rapidEntryIndex === 0}
             style={{
               padding: '12px 24px',
-              background: rapidEntryIndex > 0 ? 'rgba(100, 116, 139, 0.1)' : 'rgba(50, 50, 70, 0.2)',
+              background: 'rgba(100, 116, 139, 0.1)',
               border: '1px solid rgba(100, 116, 139, 0.3)',
               borderRadius: '5px',
-              color: rapidEntryIndex > 0 ? '#94a3b8' : '#475569',
+              color: '#94a3b8',
               fontSize: '14px',
               fontWeight: '600',
-              cursor: rapidEntryIndex > 0 ? 'pointer' : 'default',
-              opacity: rapidEntryIndex > 0 ? 1 : 0.5,
+              cursor: 'pointer',
             }}
           >
             {!isMobile() && (

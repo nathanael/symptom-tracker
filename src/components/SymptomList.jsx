@@ -257,11 +257,13 @@ export default function SymptomList({
       }
     } else {
       const id = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now() + Math.random();
+      const minOrder = Math.min(0, ...symptoms.map(s => s.order || 0));
       const newSymptom = {
         id,
         name,
         description: newSymptomDescription.trim() || undefined,
-        active: true
+        active: true,
+        order: minOrder - 1,
       };
       newSymptom.history = [createSymptomHistoryEntry(newSymptom)];
       setSymptoms([...symptoms, newSymptom]);
