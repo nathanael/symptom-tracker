@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { initFirebase, getFirebaseAuth, getFirebaseDb, getGoogleProvider, isAuthSupported } from '../utils/firebase';
-
+import { isStandalone } from '../utils/helpers';
 
 export function useFirebase() {
   const [user, setUser] = useState(null);
@@ -138,6 +138,11 @@ export function useFirebase() {
       } else {
         setSyncError('Sign-in not supported in this environment.');
       }
+      return;
+    }
+
+    if (isStandalone()) {
+      setSyncError('Google Sign-In is not available in home screen mode. Use email sign-in above.');
       return;
     }
 
