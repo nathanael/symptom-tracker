@@ -15,6 +15,7 @@ export default function QuickActionsMenu({
   onClear,
   onMatchYesterday,
   onEditStack,
+  onEditInputs,
   // Common
   onOpenSettings,
 }) {
@@ -163,7 +164,7 @@ export default function QuickActionsMenu({
     </svg>
   );
 
-  const currentVersion = 'v3.9.2';
+  const currentVersion = 'v3.10.0';
 
   const handleCheckForUpdates = () => {
     if ('serviceWorker' in navigator) {
@@ -280,6 +281,13 @@ export default function QuickActionsMenu({
               subtext="Manage your supplement list"
               color="#e5e7eb"
               onClick={onEditStack}
+            />
+            <MenuItem
+              icon={ListIcon}
+              label="Edit Inputs"
+              subtext="Manage foods, substances, activities"
+              color="#e5e7eb"
+              onClick={onEditInputs}
             />
             <Divider />
             <MenuItem

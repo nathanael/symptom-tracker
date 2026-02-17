@@ -27,6 +27,10 @@ export default function Settings({
   setStackEntries,
   pinnedSymptoms,
   setPinnedSymptoms,
+  inputItems,
+  setInputItems,
+  inputEntries,
+  setInputEntries,
   copyDays,
   setCopyDays,
   trendWindow,
@@ -52,6 +56,7 @@ export default function Settings({
     }
     setEntries({});
     setStackEntries({});
+    setInputEntries({});
     setDailyNotes({});
     setConfirmClearData(false);
     setLastAction('All data cleared');
@@ -77,6 +82,8 @@ export default function Settings({
       stackEntries,
       trackingMode,
       pinnedSymptoms: [...pinnedSymptoms],
+      inputItems,
+      inputEntries,
     };
 
     const json = JSON.stringify(backup, null, 2);
@@ -106,6 +113,8 @@ export default function Settings({
         if (backup.dailyNotes) setDailyNotes(backup.dailyNotes);
         if (backup.stackItems) setStackItems(backup.stackItems);
         if (backup.stackEntries) setStackEntries(backup.stackEntries);
+        if (backup.inputItems) setInputItems(backup.inputItems);
+        if (backup.inputEntries) setInputEntries(backup.inputEntries);
         if (backup.trackingMode) setTrackingMode(backup.trackingMode);
         if (backup.pinnedSymptoms) setPinnedSymptoms(new Set(backup.pinnedSymptoms));
 
@@ -530,7 +539,7 @@ export default function Settings({
               <button
                 key={days}
                 onClick={() => {
-                  const data = generateAIDataExport(days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode);
+                  const data = generateAIDataExport(days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, null, inputItems, inputEntries);
                   navigator.clipboard.writeText(data);
                   setCopyToastMessage(`Copied ${days} days of tracking for AI chat`);
                   haptic('light');
@@ -651,7 +660,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v3.9.1
+              v3.10.0
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

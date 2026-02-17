@@ -235,7 +235,7 @@ export const haptic = (type = 'light') => {
 };
 
 // Data Export Helpers
-export const generateAIDataExport = (days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, insights = null) => {
+export const generateAIDataExport = (days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, insights = null, inputItems = [], inputEntries = {}) => {
   const today = new Date();
   const timePeriods = trackingModes[trackingMode].periods;
   let output = [];
@@ -303,6 +303,37 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
     }
   }
 
+  // Inputs section
+  if (inputItems.length > 0) {
+    output.push('\n### Inputs Tracked');
+    const activeInputs = inputItems.filter(i => i.active);
+    if (activeInputs.length > 0) {
+      activeInputs.forEach(item => {
+        const verdict = item.verdict ? ` [${item.verdict}]` : '';
+        output.push(`- ${item.name} (${item.category})${verdict}`);
+      });
+    }
+
+    output.push('\n### Input Log');
+    for (let i = 0; i < days; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateKey = getDateKey(date);
+
+      const loggedInputs = Object.entries(inputEntries)
+        .filter(([key, entry]) => key.startsWith(dateKey) && entry.logged)
+        .map(([key, entry]) => {
+          const item = inputItems.find(it => it.id === entry.inputId);
+          return item ? item.name : null;
+        })
+        .filter(Boolean);
+
+      if (loggedInputs.length > 0) {
+        output.push(`\n**${formatTableDate(dateKey)}**: ${loggedInputs.join(', ')}`);
+      }
+    }
+  }
+
   // Notes
   output.push('\n### Daily Notes');
   for (let i = 0; i < days; i++) {
@@ -330,7 +361,12 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
   output.push('1. What patterns do you notice in my symptoms?');
   output.push('2. Which symptoms seem to correlate with each other?');
   output.push('3. Do my supplements appear to affect any symptoms?');
-  output.push('4. What questions should I ask my doctor based on this data?');
+  if (inputItems.length > 0) {
+    output.push('4. Do any of my inputs (foods, substances, activities) correlate with symptom changes?');
+    output.push('5. What questions should I ask my doctor based on this data?');
+  } else {
+    output.push('4. What questions should I ask my doctor based on this data?');
+  }
 
   return output.join('\n');
 };

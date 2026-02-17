@@ -7,11 +7,13 @@ export default function Export({
   stackItems,
   stackEntries,
   trackingMode,
+  inputItems,
+  inputEntries,
   setCopyToastMessage,
   onClose,
 }) {
   const copyAIData = (days) => {
-    const data = generateAIDataExport(days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode);
+    const data = generateAIDataExport(days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, null, inputItems, inputEntries);
     navigator.clipboard.writeText(data);
     onClose();
     setCopyToastMessage(`Copied ${days} days of tracking for AI chat`);

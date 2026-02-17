@@ -10,6 +10,22 @@ export const STORAGE_KEY_PINNED = 'symptomTracker_pinned';
 export const STORAGE_KEY_COPY_DAYS = 'symptomTracker_copyDays';
 export const STORAGE_KEY_TREND_WINDOW = 'symptomTracker_trendWindow';
 export const STORAGE_KEY_LOCAL_UPDATED_AT = 'symptomTracker_localUpdatedAt';
+export const STORAGE_KEY_INPUT_ITEMS = 'symptomTracker_inputItems';
+export const STORAGE_KEY_INPUT_ENTRIES = 'symptomTracker_inputEntries';
+
+// Input Categories
+export const INPUT_CATEGORIES = [
+  { id: 'food', label: 'Food', color: '#f97316' },
+  { id: 'substance', label: 'Substance', color: '#a855f7' },
+  { id: 'activity', label: 'Activity', color: '#3b82f6' },
+];
+
+// Verdict Colors
+export const VERDICT_COLORS = {
+  testing: '#f59e0b',
+  bad: '#ef4444',
+  good: '#22c55e',
+};
 
 // Severity Configuration
 export const NA_SEVERITY = -1;

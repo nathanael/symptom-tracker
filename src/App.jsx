@@ -12,6 +12,8 @@ import {
   STORAGE_KEY_COPY_DAYS,
   STORAGE_KEY_TREND_WINDOW,
   STORAGE_KEY_LOCAL_UPDATED_AT,
+  STORAGE_KEY_INPUT_ITEMS,
+  STORAGE_KEY_INPUT_ENTRIES,
   severityColors,
   NA_SEVERITY,
   trackingModes,
@@ -42,6 +44,7 @@ import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import SymptomList from './components/SymptomList';
 import Stack from './components/Stack';
+import Inputs from './components/Inputs';
 import Calendar from './components/Calendar';
 import Insights from './components/Insights';
 import Settings from './components/Settings';
@@ -61,6 +64,8 @@ function App() {
   const [stackItems, setStackItems] = useLocalStorage(STORAGE_KEY_STACK_ITEMS, []);
   const [stackEntries, setStackEntries] = useLocalStorage(STORAGE_KEY_STACK_ENTRIES, {});
   const [pinnedSymptoms, setPinnedSymptoms] = useLocalStorageSet(STORAGE_KEY_PINNED, new Set());
+  const [inputItems, setInputItems] = useLocalStorage(STORAGE_KEY_INPUT_ITEMS, []);
+  const [inputEntries, setInputEntries] = useLocalStorage(STORAGE_KEY_INPUT_ENTRIES, {});
   const [copyDays, setCopyDays] = useLocalStorage(STORAGE_KEY_COPY_DAYS, 7);
   const [trendWindow, setTrendWindow] = useLocalStorage(STORAGE_KEY_TREND_WINDOW, 7);
 
@@ -94,9 +99,10 @@ function App() {
   // Flash column indicator
   const [flashColumn, setFlashColumn] = useState(null);
 
-  // Manage symptoms/stack screens
+  // Manage symptoms/stack/inputs screens
   const [showAddSymptom, setShowAddSymptom] = useState(false);
   const [showManageStack, setShowManageStack] = useState(false);
+  const [showManageInputs, setShowManageInputs] = useState(false);
 
   // Firebase
   const firebase = useFirebase();
@@ -203,7 +209,7 @@ function App() {
     if (!firebase.user || firebase.syncing || isLoadingDataRef.current) return;
 
     const currentData = JSON.stringify({
-      symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms: [...pinnedSymptoms], trackingMode
+      symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms: [...pinnedSymptoms], trackingMode, inputItems, inputEntries
     });
 
     if (currentData === lastSyncDataRef.current) return;
@@ -218,15 +224,17 @@ function App() {
       stackEntries,
       pinnedSymptoms: [...pinnedSymptoms],
       trackingMode,
+      inputItems,
+      inputEntries,
     });
-  }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode, syncTrigger]);
+  }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode, inputItems, inputEntries, syncTrigger]);
 
   // Track local update timestamp for sync conflict resolution
   // Only update when user makes changes, not during initial load or cloud sync
   useEffect(() => {
     if (isLoadingDataRef.current) return;
     localStorage.setItem(STORAGE_KEY_LOCAL_UPDATED_AT, Date.now().toString());
-  }, [symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
+  }, [symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode, inputItems, inputEntries]);
 
   // Listen to cloud changes in real-time
   const isInitialCloudLoad = useRef(true);
@@ -241,7 +249,8 @@ function App() {
         const incomingData = JSON.stringify({
           symptoms: data.symptoms, entries: data.entries, dailyNotes: data.dailyNotes,
           stackItems: data.stackItems, stackEntries: data.stackEntries,
-          pinnedSymptoms: data.pinnedSymptoms || [], trackingMode: data.trackingMode
+          pinnedSymptoms: data.pinnedSymptoms || [], trackingMode: data.trackingMode,
+          inputItems: data.inputItems, inputEntries: data.inputEntries
         });
 
         if (!isInitial && incomingData === lastSyncDataRef.current) return;
@@ -286,6 +295,20 @@ function App() {
           }
           if (data.trackingMode) setTrackingMode(data.trackingMode);
           if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
+          if (data.inputItems?.length > 0) {
+            setInputItems(prev => {
+              const cloudMap = new Map(data.inputItems.map(s => [s.id, s]));
+              prev.forEach(s => cloudMap.set(s.id, s));
+              return Array.from(cloudMap.values());
+            });
+          }
+          if (data.inputEntries) {
+            setInputEntries(prev => {
+              const merged = { ...data.inputEntries };
+              Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
+              return merged;
+            });
+          }
         } else {
           // Real-time update from another device — accept cloud data
           if (data.symptoms?.length > 0) setSymptoms(data.symptoms);
@@ -295,6 +318,8 @@ function App() {
           if (data.stackEntries) setStackEntries(data.stackEntries);
           if (data.trackingMode) setTrackingMode(data.trackingMode);
           if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
+          if (data.inputItems?.length > 0) setInputItems(data.inputItems);
+          if (data.inputEntries) setInputEntries(data.inputEntries);
         }
 
         lastSyncDataRef.current = incomingData;
@@ -426,12 +451,12 @@ function App() {
 
   const quickCopyData = useCallback(() => {
     const insights = getInsights(copyDays, entries, symptoms);
-    const data = generateAIDataExport(copyDays, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, insights);
+    const data = generateAIDataExport(copyDays, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, insights, inputItems, inputEntries);
     navigator.clipboard.writeText(data);
     setCopyToastMessage(`Copied ${copyDays} day${copyDays > 1 ? 's' : ''} of tracking for AI chat`);
     haptic('light');
     setTimeout(() => setCopyToastMessage(''), 2250);
-  }, [copyDays, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode]);
+  }, [copyDays, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, inputItems, inputEntries]);
 
   const canGoForward = useMemo(() => {
     const tomorrow = new Date(selectedDate);
@@ -609,7 +634,7 @@ function App() {
       )}
 
       {/* Header - hide when in edit modes */}
-      {!showAddSymptom && !showManageStack && (
+      {!showAddSymptom && !showManageStack && !showManageInputs && (
         <Header
           selectedDate={selectedDate}
           changeDate={changeDate}
@@ -661,16 +686,28 @@ function App() {
               flashColumn={flashColumn}
             />
           ) : (
-            <Stack
-              stackItems={stackItems}
-              setStackItems={setStackItems}
-              stackEntries={stackEntries}
-              setStackEntries={setStackEntries}
-              selectedDate={selectedDate}
-              setLastAction={setLastAction}
-              showManageStack={showManageStack}
-              setShowManageStack={setShowManageStack}
-            />
+            <>
+              <Stack
+                stackItems={stackItems}
+                setStackItems={setStackItems}
+                stackEntries={stackEntries}
+                setStackEntries={setStackEntries}
+                selectedDate={selectedDate}
+                setLastAction={setLastAction}
+                showManageStack={showManageStack}
+                setShowManageStack={setShowManageStack}
+              />
+              <Inputs
+                inputItems={inputItems}
+                setInputItems={setInputItems}
+                inputEntries={inputEntries}
+                setInputEntries={setInputEntries}
+                selectedDate={selectedDate}
+                setLastAction={setLastAction}
+                showManageInputs={showManageInputs}
+                setShowManageInputs={setShowManageInputs}
+              />
+            </>
           )}
         </div>
       </div>
@@ -686,7 +723,7 @@ function App() {
       )}
 
       {/* Floating AM/PM + Rapid Entry Pill - only on symptoms page in AM/PM mode */}
-      {appMode === 'symptoms' && trackingMode === 'ampm' && !showAddSymptom && !showManageStack && !showInsights && !showSettings && !rapidEntryMode && (
+      {appMode === 'symptoms' && trackingMode === 'ampm' && !showAddSymptom && !showManageStack && !showManageInputs && !showInsights && !showSettings && !rapidEntryMode && (
         <div style={{
           position: 'fixed',
           bottom: 'calc(105px + env(safe-area-inset-bottom))',
@@ -903,6 +940,10 @@ function App() {
           setStackEntries={setStackEntries}
           pinnedSymptoms={pinnedSymptoms}
           setPinnedSymptoms={setPinnedSymptoms}
+          inputItems={inputItems}
+          setInputItems={setInputItems}
+          inputEntries={inputEntries}
+          setInputEntries={setInputEntries}
           copyDays={copyDays}
           setCopyDays={setCopyDays}
           trendWindow={trendWindow}
@@ -923,13 +964,15 @@ function App() {
           stackItems={stackItems}
           stackEntries={stackEntries}
           trackingMode={trackingMode}
+          inputItems={inputItems}
+          inputEntries={inputEntries}
           setCopyToastMessage={setCopyToastMessage}
           onClose={() => setShowExport(false)}
         />
       )}
 
       {/* Bottom Navigation - hide when in edit modes */}
-      {!showAddSymptom && !showManageStack && (
+      {!showAddSymptom && !showManageStack && !showManageInputs && (
         <BottomNav
           appMode={appMode}
           setAppMode={setAppMode}
@@ -1034,6 +1077,7 @@ function App() {
             setLastAction(`Matched ${copiedCount} from yesterday`);
           }}
           onEditStack={() => setShowManageStack(true)}
+          onEditInputs={() => setShowManageInputs(true)}
         />
       )}
     </div>

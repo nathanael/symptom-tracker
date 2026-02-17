@@ -21,6 +21,7 @@ export default function BottomNav({
   onClear,
   onMatchYesterday,
   onEditStack,
+  onEditInputs,
 }) {
   const isViewOpen = showInsights || showSettings || showExport;
 
@@ -196,6 +197,7 @@ export default function BottomNav({
           onClear={onClear}
           onMatchYesterday={onMatchYesterday}
           onEditStack={onEditStack}
+          onEditInputs={onEditInputs}
           onOpenSettings={() => {
             setShowSettings(true);
             setShowQuickActions(false);
