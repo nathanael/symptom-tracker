@@ -324,7 +324,9 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
         .filter(([key, entry]) => key.startsWith(dateKey) && entry.logged)
         .map(([key, entry]) => {
           const item = inputItems.find(it => it.id === entry.inputId);
-          return item ? item.name : null;
+          if (!item) return null;
+          const count = entry.count || 1;
+          return count > 1 ? `${item.name} (x${count})` : item.name;
         })
         .filter(Boolean);
 

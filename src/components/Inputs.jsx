@@ -45,17 +45,17 @@ export default function Inputs({
     };
   }, [showManageInputs]);
 
-  const toggleInput = (inputId) => {
+  const incrementInput = (inputId) => {
     haptic('light');
     const entryKey = `${dateKey}-${inputId}`;
     const item = inputItems.find(i => i.id === inputId);
 
     setInputEntries(prev => {
-      if (prev[entryKey]) {
-        const newEntries = { ...prev };
-        delete newEntries[entryKey];
-        setLastAction(`Removed ${item?.name}`);
-        return newEntries;
+      const existing = prev[entryKey];
+      if (existing) {
+        const newCount = (existing.count || 1) + 1;
+        setLastAction(`${item?.name} x${newCount}`);
+        return { ...prev, [entryKey]: { ...existing, count: newCount } };
       } else {
         setLastAction(`Logged ${item?.name}`);
         return {
@@ -64,8 +64,32 @@ export default function Inputs({
             date: dateKey,
             inputId: inputId,
             logged: true,
+            count: 1,
           }
         };
+      }
+    });
+  };
+
+  const decrementInput = (inputId, e) => {
+    e.stopPropagation();
+    haptic('light');
+    const entryKey = `${dateKey}-${inputId}`;
+    const item = inputItems.find(i => i.id === inputId);
+
+    setInputEntries(prev => {
+      const existing = prev[entryKey];
+      if (!existing) return prev;
+      const currentCount = existing.count || 1;
+      if (currentCount > 1) {
+        const newCount = currentCount - 1;
+        setLastAction(`${item?.name} x${newCount}`);
+        return { ...prev, [entryKey]: { ...existing, count: newCount } };
+      } else {
+        const newEntries = { ...prev };
+        delete newEntries[entryKey];
+        setLastAction(`Removed ${item?.name}`);
+        return newEntries;
       }
     });
   };
@@ -424,110 +448,132 @@ export default function Inputs({
             )}
 
             {/* Active Items List */}
-            {activeItems.length > 0 && (
+            {activeItems.length > 0 && (() => {
+              const dragCurrentIndex = dragReorderId ? activeItems.findIndex(i => i.id === dragReorderId) : -1;
+              const itemHeight = 52;
+              const dragTargetIndex = dragReorderId ? Math.max(0, Math.min(activeItems.length - 1, dragCurrentIndex + Math.round(dragReorderY / itemHeight))) : -1;
+
+              return (
               <div
                 onTouchMove={handleDragMove}
                 onTouchEnd={handleDragEnd}
+                onTouchCancel={handleDragEnd}
                 onMouseMove={handleDragMove}
                 onMouseUp={handleDragEnd}
+                onMouseLeave={handleDragEnd}
               >
-                {activeItems.map((item, index) => {
-                  const catInfo = getCategoryInfo(item.category);
-                  const isDragging = dragReorderId === item.id;
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {activeItems.map((item, index) => {
+                    const catInfo = getCategoryInfo(item.category);
+                    const isDragging = dragReorderId === item.id;
+                    let offsetY = 0;
+                    if (dragReorderId && !isDragging) {
+                      if (index > dragCurrentIndex && index <= dragTargetIndex) {
+                        offsetY = -itemHeight - 6;
+                      } else if (index < dragCurrentIndex && index >= dragTargetIndex) {
+                        offsetY = itemHeight + 6;
+                      }
+                    }
 
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px 0',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                        transform: isDragging ? `translateY(${dragReorderY}px)` : 'none',
-                        transition: isDragging ? 'none' : 'transform 0.15s ease',
-                        opacity: isDragging ? 0.8 : 1,
-                        zIndex: isDragging ? 10 : 1,
-                        position: 'relative',
-                      }}
-                    >
-                      {/* Drag handle */}
+                    return (
                       <div
-                        onTouchStart={(e) => handleDragStart(e, item.id)}
-                        onMouseDown={(e) => handleDragStart(e, item.id)}
+                        key={item.id}
                         style={{
-                          cursor: 'grab',
-                          color: '#4b5563',
-                          padding: '4px',
-                          touchAction: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '12px 0',
+                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                          background: isDragging ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
+                          borderRadius: isDragging ? '3px' : '0',
+                          transform: isDragging ? `translateY(${dragReorderY}px)` : `translateY(${offsetY}px)`,
+                          transition: isDragging ? 'none' : 'transform 0.15s ease',
+                          boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
+                          zIndex: isDragging ? 10 : 1,
+                          position: 'relative',
                         }}
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="9" cy="6" r="2"/><circle cx="15" cy="6" r="2"/>
-                          <circle cx="9" cy="12" r="2"/><circle cx="15" cy="12" r="2"/>
-                          <circle cx="9" cy="18" r="2"/><circle cx="15" cy="18" r="2"/>
-                        </svg>
+                        {/* Drag handle (hamburger) */}
+                        <div
+                          onTouchStart={(e) => handleDragStart(e, item.id)}
+                          onMouseDown={(e) => handleDragStart(e, item.id)}
+                          style={{
+                            padding: '8px 4px',
+                            cursor: dragReorderId ? 'grabbing' : 'grab',
+                            touchAction: 'none',
+                            userSelect: 'none',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '3px',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                          <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                          <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                        </div>
+
+                        {/* Category dot */}
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: catInfo.color,
+                          flexShrink: 0,
+                        }} />
+
+                        {/* Name - tap to edit */}
+                        <button
+                          onClick={() => setEditingInputId(item.id)}
+                          style={{
+                            flex: 1,
+                            background: 'none',
+                            border: 'none',
+                            color: '#e2e8f0',
+                            fontSize: '15px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            padding: 0,
+                          }}
+                        >
+                          {item.name}
+                          {item.verdict && (
+                            <span style={{
+                              display: 'inline-block',
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: VERDICT_COLORS[item.verdict],
+                              marginLeft: '6px',
+                              verticalAlign: 'middle',
+                            }} />
+                          )}
+                        </button>
+
+                        {/* Hide button */}
+                        <button
+                          onClick={() => toggleInputActive(item.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#4b5563',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            fontSize: '12px',
+                          }}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                            <line x1="1" y1="1" x2="23" y2="23"/>
+                          </svg>
+                        </button>
                       </div>
-
-                      {/* Category dot */}
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: catInfo.color,
-                        flexShrink: 0,
-                      }} />
-
-                      {/* Name - tap to edit */}
-                      <button
-                        onClick={() => setEditingInputId(item.id)}
-                        style={{
-                          flex: 1,
-                          background: 'none',
-                          border: 'none',
-                          color: '#e2e8f0',
-                          fontSize: '15px',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          padding: 0,
-                        }}
-                      >
-                        {item.name}
-                        {item.verdict && (
-                          <span style={{
-                            display: 'inline-block',
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            background: VERDICT_COLORS[item.verdict],
-                            marginLeft: '6px',
-                            verticalAlign: 'middle',
-                          }} />
-                        )}
-                      </button>
-
-                      {/* Hide button */}
-                      <button
-                        onClick={() => toggleInputActive(item.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#4b5563',
-                          cursor: 'pointer',
-                          padding: '4px',
-                          fontSize: '12px',
-                        }}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                          <line x1="1" y1="1" x2="23" y2="23"/>
-                        </svg>
-                      </button>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            )}
+              );
+            })()}
 
             {activeItems.length === 0 && !showAddForm && (
               <div style={{
@@ -693,12 +739,14 @@ export default function Inputs({
       {/* Input items */}
       {displayItems.map(item => {
         const catInfo = getCategoryInfo(item.category);
-        const isLogged = !!inputEntries[`${dateKey}-${item.id}`];
+        const entry = inputEntries[`${dateKey}-${item.id}`];
+        const isLogged = !!entry;
+        const count = entry?.count || 1;
 
         return (
           <button
             key={item.id}
-            onClick={() => isToday && toggleInput(item.id)}
+            onClick={() => isToday && incrementInput(item.id)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -743,23 +791,36 @@ export default function Inputs({
               }} />
             )}
 
-            {/* Checkbox */}
-            <div style={{
-              width: '22px',
-              height: '22px',
-              borderRadius: '6px',
-              border: isLogged ? 'none' : '2px solid rgba(100, 116, 139, 0.3)',
-              background: isLogged ? '#8b5cf6' : 'transparent',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              transition: 'all 0.15s ease',
-            }}>
-              {isLogged && (
+            {/* Count badge / empty circle */}
+            <div
+              onClick={isLogged && isToday ? (e) => decrementInput(item.id, e) : undefined}
+              style={{
+                width: '22px',
+                height: '22px',
+                borderRadius: '6px',
+                border: isLogged ? 'none' : '2px solid rgba(100, 116, 139, 0.3)',
+                background: isLogged ? '#8b5cf6' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {isLogged && count === 1 && (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
+              )}
+              {isLogged && count > 1 && (
+                <span style={{
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  lineHeight: 1,
+                }}>
+                  {count}
+                </span>
               )}
             </div>
           </button>
