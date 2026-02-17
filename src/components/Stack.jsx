@@ -1048,29 +1048,30 @@ export default function Stack({
             gap: '12px',
             zIndex: 10,
           }}>
-            <button
-              onClick={() => {
-                const opening = !showAddForm;
-                setShowAddForm(opening);
-                if (opening && manageScrollRef.current) {
-                  manageScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-              }}
-              style={{
-                width: '100%',
-                maxWidth: '500px',
-                padding: '14px',
-                background: showAddForm ? 'rgba(139, 92, 246, 0.15)' : 'rgba(139, 92, 246, 0.06)',
-                border: '2px dashed rgba(139, 92, 246, 0.3)',
-                borderRadius: '12px',
-                color: '#a78bfa',
-                fontSize: '15px',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}
-            >
-              + Add Supplement
-            </button>
+            {!showAddForm && (
+              <button
+                onClick={() => {
+                  setShowAddForm(true);
+                  if (manageScrollRef.current) {
+                    manageScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  maxWidth: '500px',
+                  padding: '14px',
+                  background: 'rgba(139, 92, 246, 0.06)',
+                  border: '2px dashed rgba(139, 92, 246, 0.3)',
+                  borderRadius: '12px',
+                  color: '#a78bfa',
+                  fontSize: '15px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                }}
+              >
+                + Add Supplement
+              </button>
+            )}
             <button
               onClick={() => setShowManageStack(false)}
               style={{
