@@ -184,6 +184,8 @@ function App() {
   const lastSyncDataRef = useRef('');
   // Start true to prevent initial localStorage load from updating timestamp
   const isLoadingDataRef = useRef(true);
+  // Counter to force auto-sync re-check after initial cloud merge completes
+  const [syncTrigger, setSyncTrigger] = useState(0);
 
   // Re-lock loading flag when user signs in, BEFORE effects run
   // This prevents auto-sync from pushing empty local data to cloud
@@ -214,7 +216,7 @@ function App() {
       pinnedSymptoms: [...pinnedSymptoms],
       trackingMode,
     });
-  }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode]);
+  }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode, syncTrigger]);
 
   // Track local update timestamp for sync conflict resolution
   // Only update when user makes changes, not during initial load or cloud sync
@@ -295,7 +297,12 @@ function App() {
         lastSyncDataRef.current = incomingData;
         // Enable timestamp updates after cloud sync completes
         if (isLoadingDataRef.current) {
-          setTimeout(() => { isLoadingDataRef.current = false; }, 100);
+          setTimeout(() => {
+            isLoadingDataRef.current = false;
+            // Force auto-sync to re-check — the ref change alone won't trigger a re-render,
+            // so local-only data from the merge would never get pushed to cloud
+            setSyncTrigger(prev => prev + 1);
+          }, 100);
         }
       });
 
@@ -303,6 +310,7 @@ function App() {
       const fallback = setTimeout(() => {
         if (isLoadingDataRef.current) {
           isLoadingDataRef.current = false;
+          setSyncTrigger(prev => prev + 1);
         }
       }, 5000);
 
