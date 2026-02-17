@@ -13,6 +13,7 @@ import {
   STORAGE_KEY_TREND_WINDOW,
   STORAGE_KEY_LOCAL_UPDATED_AT,
   severityColors,
+  NA_SEVERITY,
   trackingModes,
   defaultSymptoms,
   defaultStackItems,
@@ -140,6 +141,8 @@ function App() {
 
     return allActive.filter(symptom => {
       if (trackingMode === 'ampm') {
+        // Auto-N/A: symptom doesn't apply to this period
+        if (symptom.applicablePeriods && !symptom.applicablePeriods.includes(timePeriod)) return false;
         const hasTimePeriodEntry = entries[`${dateKey}-${symptom.id}-${timePeriod}`];
         if (hasTimePeriodEntry) return false;
         if (timePeriod === 'morning' && entries[`${dateKey}-${symptom.id}-daily`]) {
@@ -417,7 +420,8 @@ function App() {
     const period = timePeriods.find(p => p.id === timeId);
     haptic('light');
     setQuickLogSymptom(null);
-    setLastAction(`${symptom?.name}: ${severity} (${period?.label || timeId})`);
+    const severityLabel = severity === NA_SEVERITY ? 'N/A' : severity;
+    setLastAction(`${symptom?.name}: ${severityLabel} (${period?.label || timeId})`);
   }, [selectedDate, timePeriods, symptoms]);
 
   const quickCopyData = useCallback(() => {
@@ -474,8 +478,19 @@ function App() {
 
       if (morningEntry || eveningEntry) {
         const severities = [];
-        if (morningEntry) severities.push(morningEntry.severity);
-        if (eveningEntry) severities.push(eveningEntry.severity);
+        if (morningEntry && morningEntry.severity !== NA_SEVERITY) severities.push(morningEntry.severity);
+        if (eveningEntry && eveningEntry.severity !== NA_SEVERITY) severities.push(eveningEntry.severity);
+        if (severities.length === 0) {
+          // Both are N/A, show N/A
+          return [{
+            time: 'daily',
+            severity: NA_SEVERITY,
+            date: dateKey,
+            symptomId,
+            _synthetic: true,
+            _fromAmPm: true,
+          }];
+        }
         const avgSeverity = Math.round(severities.reduce((a, b) => a + b, 0) / severities.length);
         return [{
           time: 'daily',

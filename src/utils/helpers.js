@@ -1,4 +1,4 @@
-import { trackingModes, severityColors } from './constants';
+import { trackingModes, severityColors, NA_SEVERITY } from './constants';
 
 // Schedule Helpers
 export const isScheduledForDate = (schedule, date) => {
@@ -249,6 +249,7 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
 
   // Symptoms table
   output.push('### Symptoms');
+  output.push('Scale: 0 (none) to 5 (extreme). "-" = not recorded. "N/A" = not applicable.\n');
   const headers = ['Date', ...timePeriods.map(p => p.label)];
 
   // Get symptom data for each symptom
@@ -267,7 +268,13 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
       const row = [formatTableDate(dateKey)];
       timePeriods.forEach(period => {
         const entry = entries[`${dateKey}-${symptom.id}-${period.id}`];
-        row.push(entry ? entry.severity.toString() : '-');
+        if (entry) {
+          row.push(entry.severity === NA_SEVERITY ? 'N/A' : entry.severity.toString());
+        } else if (symptom.applicablePeriods && !symptom.applicablePeriods.includes(period.id)) {
+          row.push('N/A');
+        } else {
+          row.push('-');
+        }
       });
 
       output.push('| ' + row.join(' | ') + ' |');
@@ -463,8 +470,9 @@ export const getInsights = (windowDays, entries, symptoms) => {
   today.setHours(0, 0, 0, 0);
   const minDaysNeeded = Math.ceil(windowDays * 0.5);
 
-  // Get all entries in window
+  // Get all entries in window (exclude N/A entries)
   const windowEntries = Object.values(entries).filter(e => {
+    if (e.severity === NA_SEVERITY) return false;
     const entryDate = new Date(e.date);
     const daysAgo = Math.floor((today - entryDate) / (1000 * 60 * 60 * 24));
     return daysAgo >= 0 && daysAgo <= windowDays;
@@ -641,9 +649,9 @@ export const getSymptomTrend = (symptomId, entries, windowDays = 7) => {
     d.setDate(d.getDate() - i);
     const dateKey = getDateKey(d);
 
-    // Find entries for this date/symptom
+    // Find entries for this date/symptom (exclude N/A)
     Object.entries(entries).forEach(([key, entry]) => {
-      if (key.includes(dateKey) && key.includes(symptomId)) {
+      if (key.includes(dateKey) && key.includes(symptomId) && entry.severity !== NA_SEVERITY) {
         if (i < midpoint) {
           recentEntries.push(entry.severity);
         } else {
@@ -686,7 +694,8 @@ export const exportCSV = (days, entries, symptoms, trackingMode) => {
     .forEach(entry => {
       const symptom = symptoms.find(s => s.id === entry.symptomId);
       const period = timePeriods.find(p => p.id === entry.time);
-      csv += `${entry.date},"${symptom?.name || entry.symptomId}",${period?.label || entry.time},${entry.severity}\n`;
+      const severityVal = entry.severity === NA_SEVERITY ? 'N/A' : entry.severity;
+      csv += `${entry.date},"${symptom?.name || entry.symptomId}",${period?.label || entry.time},${severityVal}\n`;
     });
 
   const blob = new Blob([csv], { type: 'text/csv' });

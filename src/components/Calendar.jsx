@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { severityColors } from '../utils/constants';
+import { severityColors, NA_SEVERITY } from '../utils/constants';
 import { getDateKey } from '../utils/helpers';
 
 export default function Calendar({
@@ -39,6 +39,7 @@ export default function Calendar({
   const daySeverityMap = useMemo(() => {
     const map = {};
     Object.values(entries).forEach(entry => {
+      if (entry.severity === NA_SEVERITY) return;
       if (!map[entry.date]) {
         map[entry.date] = { total: 0, count: 0 };
       }

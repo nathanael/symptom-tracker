@@ -12,8 +12,10 @@ export const STORAGE_KEY_TREND_WINDOW = 'symptomTracker_trendWindow';
 export const STORAGE_KEY_LOCAL_UPDATED_AT = 'symptomTracker_localUpdatedAt';
 
 // Severity Configuration
+export const NA_SEVERITY = -1;
 export const severityLevels = [0, 1, 2, 3, 4, 5];
 export const severityColors = {
+  [-1]: '#64748b',
   0: '#22c55e',
   1: '#4ade80',
   2: '#a3e635',

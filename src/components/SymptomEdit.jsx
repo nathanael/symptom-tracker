@@ -19,11 +19,12 @@ const reconstructSymptomStateAtEntry = (historyArray, targetIndex) => {
   return state;
 };
 
-export default function SymptomEdit({ symptom, onSave, onCancel }) {
+export default function SymptomEdit({ symptom, onSave, onCancel, trackingMode }) {
   const modalRef = useRef(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    applicablePeriods: null,
   });
   const [revertedIndex, setRevertedIndex] = useState(null);
 
@@ -33,6 +34,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
       setFormData({
         name: symptom.name || '',
         description: symptom.description || '',
+        applicablePeriods: symptom.applicablePeriods || null,
       });
     }
   }, [symptom]);
@@ -66,6 +68,7 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
     onSave({
       name: formData.name.trim(),
       description: formData.description.trim(),
+      applicablePeriods: formData.applicablePeriods,
     });
   }, [formData, onSave]);
 
@@ -218,6 +221,74 @@ export default function SymptomEdit({ symptom, onSave, onCancel }) {
               }}
             />
           </div>
+
+          {/* Applies to Section - only in AM/PM mode */}
+          {trackingMode === 'ampm' && (
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{
+                color: '#94a3b8',
+                fontSize: '14px',
+                fontWeight: '500',
+                marginBottom: '8px',
+                display: 'block',
+              }}>
+                Applies to
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {[
+                  { id: 'morning', label: 'Morning' },
+                  { id: 'evening', label: 'Evening' },
+                ].map(period => {
+                  const isActive = !formData.applicablePeriods || formData.applicablePeriods.includes(period.id);
+                  return (
+                    <button
+                      key={period.id}
+                      onClick={() => {
+                        setFormData(prev => {
+                          const current = prev.applicablePeriods || ['morning', 'evening'];
+                          if (isActive) {
+                            // Don't allow unchecking both
+                            const filtered = current.filter(p => p !== period.id);
+                            if (filtered.length === 0) return prev;
+                            return { ...prev, applicablePeriods: filtered };
+                          } else {
+                            const added = [...current, period.id];
+                            // If both are checked, clear the field (default behavior)
+                            if (added.includes('morning') && added.includes('evening')) {
+                              return { ...prev, applicablePeriods: null };
+                            }
+                            return { ...prev, applicablePeriods: added };
+                          }
+                        });
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '12px 16px',
+                        background: isActive ? 'rgba(139, 92, 246, 0.2)' : 'rgba(100, 116, 139, 0.1)',
+                        border: isActive ? '2px solid rgba(139, 92, 246, 0.4)' : '2px solid rgba(100, 116, 139, 0.2)',
+                        borderRadius: '8px',
+                        color: isActive ? '#c4b5fd' : '#64748b',
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {period.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {formData.applicablePeriods && (
+                <div style={{
+                  color: '#64748b',
+                  fontSize: '12px',
+                  marginTop: '6px',
+                }}>
+                  Auto-N/A in {formData.applicablePeriods.includes('morning') ? 'PM' : 'AM'} during rapid entry
+                </div>
+              )}
+            </div>
+          )}
 
           {/* History Section */}
           {sortedHistory.length > 0 && (

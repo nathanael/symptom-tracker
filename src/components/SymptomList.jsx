@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { severityColors, trackingModes, HOLD_DELAY, DRAG_SENSITIVITY } from '../utils/constants';
+import { severityColors, trackingModes, HOLD_DELAY, DRAG_SENSITIVITY, NA_SEVERITY } from '../utils/constants';
 import { getDateKey, haptic, getSymptomTrend } from '../utils/helpers';
 import SymptomEdit from './SymptomEdit';
 
@@ -316,11 +316,20 @@ export default function SymptomList({
         const historyEntry = recordSymptomHistoryChange(s, newValues);
         const history = s.history || [];
 
-        return {
+        const updated = {
           ...s,
           ...newValues,
           history: historyEntry ? [...history, historyEntry] : history
         };
+
+        // Handle applicablePeriods
+        if (updatedData.applicablePeriods) {
+          updated.applicablePeriods = updatedData.applicablePeriods;
+        } else {
+          delete updated.applicablePeriods;
+        }
+
+        return updated;
       }));
       setLastAction('Symptom updated');
     }
@@ -621,7 +630,7 @@ export default function SymptomList({
                             : activePeriod === 'morning'
                               ? '1px solid rgba(255, 255, 255, 0.42)'
                               : `1px solid ${getBadgeColor().border}`,
-                          background: getBadgeColor().bg,
+                          background: amEntry.severity === NA_SEVERITY ? 'rgba(100, 116, 139, 0.1)' : getBadgeColor().bg,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -630,11 +639,30 @@ export default function SymptomList({
                           opacity: activePeriod === 'morning' ? 1 : 0.25,
                         }}
                       >
-                        <span style={{ color: getBadgeColor().text, fontSize: '14px', fontWeight: '600' }}>
-                          {amEntry.severity}
+                        <span style={{
+                          color: amEntry.severity === NA_SEVERITY ? '#64748b' : getBadgeColor().text,
+                          fontSize: amEntry.severity === NA_SEVERITY ? '10px' : '14px',
+                          fontWeight: '600',
+                        }}>
+                          {amEntry.severity === NA_SEVERITY ? 'N/A' : amEntry.severity}
                         </span>
                       </div>
                     ) : (
+                      /* No entry */
+                      symptom.applicablePeriods && !symptom.applicablePeriods.includes('morning') ? (
+                        /* Auto-N/A: symptom doesn't apply to morning */
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: activePeriod === 'morning' ? 0.5 : 0.15,
+                        }}>
+                          <span style={{ color: '#64748b', fontSize: '10px', fontWeight: '600' }}>N/A</span>
+                        </div>
+                      ) : (
                       /* No entry - show minus circle */
                       <div
                         onClick={(e) => {
@@ -665,6 +693,7 @@ export default function SymptomList({
                           <line x1="5" y1="12" x2="19" y2="12"></line>
                         </svg>
                       </div>
+                      )
                     )}
                     {/* PM Position */}
                     {pmEntry ? (
@@ -691,7 +720,7 @@ export default function SymptomList({
                             : activePeriod === 'evening'
                               ? '1px solid rgba(255, 255, 255, 0.42)'
                               : `1px solid ${getBadgeColor().border}`,
-                          background: getBadgeColor().bg,
+                          background: pmEntry.severity === NA_SEVERITY ? 'rgba(100, 116, 139, 0.1)' : getBadgeColor().bg,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -700,11 +729,30 @@ export default function SymptomList({
                           opacity: activePeriod === 'evening' ? 1 : 0.25,
                         }}
                       >
-                        <span style={{ color: getBadgeColor().text, fontSize: '14px', fontWeight: '600' }}>
-                          {pmEntry.severity}
+                        <span style={{
+                          color: pmEntry.severity === NA_SEVERITY ? '#64748b' : getBadgeColor().text,
+                          fontSize: pmEntry.severity === NA_SEVERITY ? '10px' : '14px',
+                          fontWeight: '600',
+                        }}>
+                          {pmEntry.severity === NA_SEVERITY ? 'N/A' : pmEntry.severity}
                         </span>
                       </div>
                     ) : (
+                      /* No entry */
+                      symptom.applicablePeriods && !symptom.applicablePeriods.includes('evening') ? (
+                        /* Auto-N/A: symptom doesn't apply to evening */
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '6px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: activePeriod === 'evening' ? 0.5 : 0.15,
+                        }}>
+                          <span style={{ color: '#64748b', fontSize: '10px', fontWeight: '600' }}>N/A</span>
+                        </div>
+                      ) : (
                       /* No entry - show minus circle */
                       <div
                         onClick={(e) => {
@@ -735,6 +783,7 @@ export default function SymptomList({
                           <line x1="5" y1="12" x2="19" y2="12"></line>
                         </svg>
                       </div>
+                      )
                     )}
                   </>
                 ) : (
@@ -759,15 +808,19 @@ export default function SymptomList({
                         height: '32px',
                         borderRadius: '6px',
                         border: `1px solid ${getBadgeColor().border}`,
-                        background: getBadgeColor().bg,
+                        background: maxEntry.severity === NA_SEVERITY ? 'rgba(100, 116, 139, 0.1)' : getBadgeColor().bg,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
                       }}
                     >
-                      <span style={{ color: getBadgeColor().text, fontSize: '14px', fontWeight: '600' }}>
-                        {maxEntry.severity}
+                      <span style={{
+                        color: maxEntry.severity === NA_SEVERITY ? '#64748b' : getBadgeColor().text,
+                        fontSize: maxEntry.severity === NA_SEVERITY ? '10px' : '14px',
+                        fontWeight: '600',
+                      }}>
+                        {maxEntry.severity === NA_SEVERITY ? 'N/A' : maxEntry.severity}
                       </span>
                     </div>
                   ) : (
@@ -906,6 +959,30 @@ export default function SymptomList({
                         </button>
                       );
                     })}
+                  </div>
+                  {/* N/A button */}
+                  <div style={{ padding: '0 16px 12px' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const logTime = quickLogTime || getCurrentTimePeriod();
+                        quickLog(symptom.id, NA_SEVERITY, logTime);
+                        setPopupPosition(null);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 0',
+                        background: 'rgba(100, 116, 139, 0.1)',
+                        border: '1px solid rgba(100, 116, 139, 0.2)',
+                        borderRadius: '3px',
+                        color: '#64748b',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      N/A
+                    </button>
                   </div>
                 </div>
               </>
@@ -1360,6 +1437,7 @@ export default function SymptomList({
           symptom={symptoms.find(s => s.id === editingSymptomFullId)}
           onSave={handleSymptomSave}
           onCancel={() => setEditingSymptomFullId(null)}
+          trackingMode={trackingMode}
         />
       )}
 

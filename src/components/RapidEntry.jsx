@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { severityColors } from '../utils/constants';
+import { severityColors, NA_SEVERITY } from '../utils/constants';
 import { isMobile, getDateKey, haptic } from '../utils/helpers';
 
 export default function RapidEntry({
@@ -31,7 +31,10 @@ export default function RapidEntry({
   const dateKey = getDateKey(selectedDate);
   const timeKey = trackingMode === 'ampm' ? logTime : 'daily';
 
-  const activeSymptomsList = symptoms.filter(s => s.active);
+  const activeSymptomsList = symptoms.filter(s => s.active).filter(s => {
+    if (!s.applicablePeriods || trackingMode !== 'ampm') return true;
+    return s.applicablePeriods.includes(logTime);
+  });
 
   // Filter to only show unmarked symptoms (for counting remaining)
   const unmarkedSymptoms = activeSymptomsList.filter(symptom => {
@@ -82,8 +85,8 @@ export default function RapidEntry({
         }
       } else if (e.key === 'Escape') {
         handleClose();
-      } else if (e.key >= '0' && e.key <= '5' && currentSymptom) {
-        const severity = parseInt(e.key);
+      } else if ((e.key >= '0' && e.key <= '5' || e.key === 'n' || e.key === 'N') && currentSymptom) {
+        const severity = (e.key === 'n' || e.key === 'N') ? NA_SEVERITY : parseInt(e.key);
         quickLog(currentSymptom.id, severity, logTime);
         // After logging, move to next unmarked symptom
         // Check if this was the last unmarked symptom (or only one remaining which is current)
@@ -181,7 +184,11 @@ export default function RapidEntry({
             const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
             const oppositeLabel = oppositePeriod === 'morning' ? 'AM' : 'PM';
 
-            const oppositeIncomplete = activeSymptomsList.filter(symptom => {
+            const oppositeApplicable = symptoms.filter(s => s.active).filter(s => {
+              if (!s.applicablePeriods) return true;
+              return s.applicablePeriods.includes(oppositePeriod);
+            });
+            const oppositeIncomplete = oppositeApplicable.filter(symptom => {
               const entryKey = `${dateKey}-${symptom.id}-${oppositePeriod}`;
               return !entries[entryKey];
             });
@@ -264,7 +271,11 @@ export default function RapidEntry({
     // Check if opposite period has incomplete symptoms (for AM/PM mode)
     if (trackingMode === 'ampm') {
       const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
-      const oppositeIncomplete = activeSymptomsList.filter(symptom => {
+      const oppositeApplicable = symptoms.filter(s => s.active).filter(s => {
+        if (!s.applicablePeriods) return true;
+        return s.applicablePeriods.includes(oppositePeriod);
+      });
+      const oppositeIncomplete = oppositeApplicable.filter(symptom => {
         const entryKey = `${dateKey}-${symptom.id}-${oppositePeriod}`;
         return !entries[entryKey];
       });
@@ -334,7 +345,9 @@ export default function RapidEntry({
       }}>
         {activeSymptomsList.map((symptom) => {
           const symptomEntryKey = `${dateKey}-${symptom.id}-${timeKey}`;
-          const hasEntry = !!entries[symptomEntryKey];
+          const entry = entries[symptomEntryKey];
+          const hasEntry = !!entry;
+          const isNA = entry?.severity === NA_SEVERITY;
           const isCurrent = currentSymptom && symptom.id === currentSymptom.id;
 
           return (
@@ -347,7 +360,7 @@ export default function RapidEntry({
                 background: isCurrent
                   ? '#8b5cf6'
                   : hasEntry
-                    ? '#10b981'
+                    ? isNA ? '#64748b' : '#10b981'
                     : 'rgba(100, 116, 139, 0.3)',
               }}
             />
@@ -426,7 +439,7 @@ export default function RapidEntry({
           if (recentEntry) {
             return (
               <div style={{ color: '#64748b', fontSize: '14px' }}>
-                Last recorded: <span style={{ color: severityColors[recentEntry.severity], fontWeight: '600' }}>{recentEntry.severity}</span>
+                Last recorded: <span style={{ color: severityColors[recentEntry.severity], fontWeight: '600' }}>{recentEntry.severity === NA_SEVERITY ? 'N/A' : recentEntry.severity}</span>
               </div>
             );
           }
@@ -464,7 +477,11 @@ export default function RapidEntry({
                     // Check for opposite period in AM/PM mode
                     if (trackingMode === 'ampm') {
                       const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
-                      const oppositeIncomplete = activeSymptomsList.filter(symptom => {
+                      const oppApplicable = symptoms.filter(s => s.active).filter(s => {
+                        if (!s.applicablePeriods) return true;
+                        return s.applicablePeriods.includes(oppositePeriod);
+                      });
+                      const oppositeIncomplete = oppApplicable.filter(symptom => {
                         const ek = `${dateKey}-${symptom.id}-${oppositePeriod}`;
                         return !entries[ek];
                       });
@@ -538,6 +555,69 @@ export default function RapidEntry({
             );
           })}
         </div>
+
+        {/* N/A Button */}
+        <button
+          onClick={() => {
+            quickLog(currentSymptom.id, NA_SEVERITY, logTime);
+
+            const remainingUnmarked = unmarkedSymptoms.filter(s => s.id !== currentSymptom.id);
+            if (remainingUnmarked.length === 0 && !isCurrentMarked) {
+              if (trackingMode === 'ampm') {
+                const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
+                const oppApplicable = symptoms.filter(s => s.active).filter(s => {
+                  if (!s.applicablePeriods) return true;
+                  return s.applicablePeriods.includes(oppositePeriod);
+                });
+                const oppositeIncomplete = oppApplicable.filter(symptom => {
+                  const ek = `${dateKey}-${symptom.id}-${oppositePeriod}`;
+                  return !entries[ek];
+                });
+                if (oppositeIncomplete.length > 0) {
+                  setRapidEntryConfirm(true);
+                  return;
+                }
+              }
+              confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+              setRapidEntryMode(false);
+              setRapidEntryIndex(0);
+              setCopyToastMessage('✓ All symptoms logged!');
+              setTimeout(() => setCopyToastMessage(''), 3000);
+            } else if (!isCurrentMarked) {
+              const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
+              if (nextUnmarked !== -1) {
+                setRapidEntryIndex(nextUnmarked);
+              }
+            }
+          }}
+          style={{
+            width: '100%',
+            maxWidth: '400px',
+            padding: '14px',
+            background: entries[`${dateKey}-${currentSymptom.id}-${timeKey}`]?.severity === NA_SEVERITY
+              ? 'rgba(100, 116, 139, 0.3)'
+              : 'rgba(100, 116, 139, 0.1)',
+            border: entries[`${dateKey}-${currentSymptom.id}-${timeKey}`]?.severity === NA_SEVERITY
+              ? '2px solid #64748b'
+              : '2px solid transparent',
+            borderRadius: '3px',
+            color: '#94a3b8',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer',
+          }}
+        >
+          N/A
+          {!isMobile() && (
+            <span style={{
+              background: 'rgba(100, 116, 139, 0.3)',
+              padding: '2px 6px',
+              borderRadius: '3px',
+              marginLeft: '8px',
+              fontSize: '12px',
+            }}>n</span>
+          )}
+        </button>
 
         {/* Navigation buttons */}
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -625,7 +705,17 @@ export default function RapidEntry({
               fontFamily: 'monospace',
               fontSize: '12px',
             }}>0-5</span>
-            <span>select value</span>
+            <span>severity</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{
+              background: 'rgba(100, 116, 139, 0.2)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+            }}>n</span>
+            <span>N/A</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{
