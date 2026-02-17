@@ -992,30 +992,6 @@ export default function SymptomList({
         );
       })}
 
-      {/* Add Symptom Button - at bottom of list */}
-      {!showAddSymptom && (
-        <button
-          onClick={() => setShowAddSymptom(true)}
-          style={{
-            width: '100%',
-            padding: '16px 20px',
-            marginBottom: '12px',
-            background: 'transparent',
-            border: 'none',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-            color: '#6b7280',
-            fontSize: '14px',
-            fontWeight: '400',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-          }}
-        >
-          + Manage symptoms
-        </button>
-      )}
 
       {/* Manage Symptoms Modal */}
       {showAddSymptom && (

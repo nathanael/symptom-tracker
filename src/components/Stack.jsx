@@ -578,53 +578,29 @@ export default function Stack({
         );
       })}
 
-      {/* Add/Log Supplement Button - at bottom of list */}
-      {!showManageStack && (
-        isToday ? (
-          <button
-            onClick={() => setShowManageStack(true)}
-            style={{
-              width: '100%',
-              padding: '16px 20px',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-              color: '#6b7280',
-              fontSize: '14px',
-              fontWeight: '400',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-            }}
-          >
-            <span style={{ fontSize: '14px' }}>+</span>
-            Manage stack
-          </button>
-        ) : availableToLog.length > 0 && (
-          <button
-            onClick={() => setShowLogPicker(true)}
-            style={{
-              width: '100%',
-              padding: '16px 20px',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-              color: '#6b7280',
-              fontSize: '14px',
-              fontWeight: '400',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-            }}
-          >
-            <span style={{ fontSize: '14px' }}>+</span>
-            Log supplement
-          </button>
-        )
+      {/* Log Supplement Button - past dates only */}
+      {!showManageStack && !isToday && availableToLog.length > 0 && (
+        <button
+          onClick={() => setShowLogPicker(true)}
+          style={{
+            width: '100%',
+            padding: '16px 20px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+            color: '#6b7280',
+            fontSize: '14px',
+            fontWeight: '400',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>+</span>
+          Log supplement
+        </button>
       )}
 
 

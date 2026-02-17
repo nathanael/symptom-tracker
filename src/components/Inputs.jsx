@@ -767,30 +767,6 @@ export default function Inputs({
         );
       })}
 
-      {/* Manage inputs link - only on today */}
-      {isToday && !showManageInputs && (
-        <button
-          onClick={() => setShowManageInputs(true)}
-          style={{
-            width: '100%',
-            padding: '16px 20px',
-            background: 'transparent',
-            border: 'none',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-            color: '#6b7280',
-            fontSize: '14px',
-            fontWeight: '400',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-          }}
-        >
-          <span style={{ fontSize: '14px' }}>+</span>
-          Manage inputs
-        </button>
-      )}
     </div>
   );
 }
