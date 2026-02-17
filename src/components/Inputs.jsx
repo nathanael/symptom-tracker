@@ -671,20 +671,10 @@ export default function Inputs({
     if (!isToday) return null;
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '16px 20px 8px',
-        }}>
-          <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-            Inputs
-          </span>
-        </div>
         <button
           onClick={() => setShowManageInputs(true)}
           style={{
-            margin: '4px 20px 12px',
+            margin: '16px 20px 12px',
             padding: '14px',
             background: 'rgba(139, 92, 246, 0.06)',
             border: '1px dashed rgba(139, 92, 246, 0.25)',
@@ -703,30 +693,6 @@ export default function Inputs({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-      {/* Section header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '16px 20px 8px',
-      }}>
-        <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-          Inputs
-        </span>
-        {progress.logged > 0 && (
-          <span style={{
-            background: 'rgba(139, 92, 246, 0.2)',
-            color: '#a78bfa',
-            fontSize: '11px',
-            fontWeight: '600',
-            padding: '2px 6px',
-            borderRadius: '10px',
-          }}>
-            {progress.logged}
-          </span>
-        )}
-      </div>
-
       {/* Input items */}
       {displayItems.map(item => {
         const catInfo = getCategoryInfo(item.category);

@@ -318,7 +318,7 @@ export default function Stack({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-      {/* Progress indicator - sticky */}
+      {/* Progress indicator */}
       {displayItems.length > 0 && (
         <div style={{
           display: 'flex',
@@ -326,10 +326,6 @@ export default function Stack({
           gap: '8px',
           padding: '16px 20px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-          position: 'sticky',
-          top: 0,
-          background: '#08090A',
-          zIndex: 10,
         }}>
           <div style={{
             width: '8px',
