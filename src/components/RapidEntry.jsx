@@ -8,7 +8,6 @@ export default function RapidEntry({
   entries,
   selectedDate,
   trackingMode,
-  timePeriods,
   quickLogTime,
   setQuickLogTime,
   rapidEntryIndex,
@@ -18,7 +17,6 @@ export default function RapidEntry({
   setRapidEntryMode,
   quickLog,
   setEntries,
-  getMostRecentEntry,
   setCopyToastMessage,
 }) {
   const getCurrentTimePeriod = () => {
@@ -368,14 +366,14 @@ export default function RapidEntry({
         })}
       </div>
 
-      {/* Current symptom */}
+      {/* Symptom name area - top section */}
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: '30px',
+        gap: '12px',
       }}>
         {/* Counter */}
         <div style={{ color: '#64748b', fontSize: '14px' }}>
@@ -405,47 +403,16 @@ export default function RapidEntry({
             </div>
           )}
         </div>
+      </div>
 
-        {/* Time period indicator */}
-        {timePeriods.length > 1 && (
-          <div style={{ display: 'flex', gap: '12px' }}>
-            {timePeriods.map(period => {
-              const isSelected = logTime === period.id;
-              return (
-                <button
-                  key={period.id}
-                  onClick={() => setQuickLogTime(period.id)}
-                  style={{
-                    padding: '10px 20px',
-                    background: isSelected ? 'rgba(139, 92, 246, 0.3)' : 'rgba(100, 116, 139, 0.1)',
-                    border: isSelected ? '2px solid rgba(139, 92, 246, 0.6)' : '2px solid transparent',
-                    borderRadius: '5px',
-                    color: isSelected ? '#c4b5fd' : '#94a3b8',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {period.icon} {period.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Most recent value hint */}
-        {(() => {
-          const recentEntry = getMostRecentEntry(currentSymptom.id, logTime);
-          if (recentEntry) {
-            return (
-              <div style={{ color: '#64748b', fontSize: '14px' }}>
-                Last recorded: <span style={{ color: severityColors[recentEntry.severity], fontWeight: '600' }}>{recentEntry.severity === NA_SEVERITY ? 'N/A' : recentEntry.severity}</span>
-              </div>
-            );
-          }
-          return null;
-        })()}
-
+      {/* Value selectors - pinned to bottom */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '12px',
+        paddingBottom: isMobile() ? '20px' : '60px',
+      }}>
         {/* Large severity buttons */}
         <div style={{
           display: 'grid',
@@ -455,9 +422,6 @@ export default function RapidEntry({
           maxWidth: '400px',
         }}>
           {[0, 1, 2, 3, 4, 5].map(severity => {
-            const recentEntry = getMostRecentEntry(currentSymptom.id, logTime);
-            const isRecentSeverity = recentEntry?.severity === severity;
-
             // Check if this severity is the currently selected value for this symptom
             const currentEntryKey = `${dateKey}-${currentSymptom.id}-${timeKey}`;
             const currentEntry = entries[currentEntryKey];
@@ -517,9 +481,7 @@ export default function RapidEntry({
                     : `${severityColors[severity]}20`,
                   border: isCurrentValue
                     ? `3px solid ${severityColors[severity]}`
-                    : isRecentSeverity
-                      ? `2px solid ${severityColors[severity]}40`
-                      : '2px solid transparent',
+                    : '2px solid transparent',
                   borderRadius: '3px',
                   color: severityColors[severity],
                   fontSize: '32px',

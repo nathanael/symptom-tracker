@@ -594,7 +594,6 @@ function App() {
           entries={entries}
           selectedDate={selectedDate}
           trackingMode={trackingMode}
-          timePeriods={timePeriods}
           quickLogTime={quickLogTime}
           setQuickLogTime={setQuickLogTime}
           rapidEntryIndex={rapidEntryIndex}
@@ -604,7 +603,6 @@ function App() {
           setRapidEntryMode={setRapidEntryMode}
           quickLog={quickLog}
           setEntries={setEntries}
-          getMostRecentEntry={getMostRecentEntry}
           setCopyToastMessage={setCopyToastMessage}
         />
       )}
