@@ -441,7 +441,7 @@ export default function Stack({
             style={{
               background: 'transparent',
               borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-              padding: '17px 20px',
+              padding: '14px 20px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',

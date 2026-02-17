@@ -262,183 +262,155 @@ export default function Inputs({
         flexDirection: 'column',
         animation: 'modalIn 0.2s ease-out',
       }}>
-        {/* Header */}
+        {/* Collapsible Add Section */}
         <div style={{
           flexShrink: 0,
-          padding: '16px 20px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
           background: '#08090A',
-        }}>
-          <h2 style={{
-            color: '#f8fafc',
-            fontSize: '18px',
-            fontWeight: '600',
-            margin: 0,
-          }}>
-            Manage Inputs
-          </h2>
-          <button
-            onClick={() => setShowManageInputs(false)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#6b7280',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '4px 8px',
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        {/* Scrollable Content */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           padding: '16px 20px',
-          paddingBottom: '100px',
         }}>
           <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-            {/* Add Input Button/Form */}
-            {!showAddForm ? (
-              <button
-                onClick={() => setShowAddForm(true)}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  border: '2px dashed rgba(139, 92, 246, 0.3)',
-                  borderRadius: '12px',
-                  color: '#a78bfa',
-                  fontSize: '15px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  marginBottom: '20px',
-                }}
-              >
-                + Add Input
-              </button>
-            ) : (
+            {/* Toggle button */}
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              style={{
+                width: '100%',
+                background: showAddForm ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                color: showAddForm ? '#a5b4fc' : '#818cf8',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span style={{
+                fontSize: '16px',
+                fontWeight: '300',
+                transition: 'transform 0.2s ease',
+                transform: showAddForm ? 'rotate(45deg)' : 'none',
+              }}>+</span>
+              Add input
+            </button>
+
+            {/* Expandable form */}
+            {showAddForm && (
               <div style={{
-                background: 'rgba(15, 17, 21, 0.8)',
-                borderRadius: '12px',
+                marginTop: '12px',
+                background: 'rgba(15, 17, 21, 0.6)',
+                borderRadius: '8px',
                 padding: '16px',
-                marginBottom: '20px',
-                border: '1px solid rgba(139, 92, 246, 0.2)',
+                animation: 'slideDown 0.2s ease-out',
               }}>
-                <input
-                  type="text"
-                  value={newInput.name}
-                  onChange={(e) => setNewInput({ ...newInput, name: e.target.value })}
-                  placeholder="Input name (e.g., Dairy, Alcohol)"
-                  autoFocus
-                  style={{
-                    width: '100%',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    border: '2px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '8px',
-                    padding: '12px 14px',
-                    color: '#f8fafc',
-                    fontSize: '16px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    marginBottom: '10px',
-                  }}
-                />
-                <input
-                  type="text"
-                  value={newInput.description}
-                  onChange={(e) => setNewInput({ ...newInput, description: e.target.value })}
-                  placeholder="Description (optional)"
-                  style={{
-                    width: '100%',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    border: '2px solid rgba(99, 102, 241, 0.3)',
-                    borderRadius: '8px',
-                    padding: '12px 14px',
-                    color: '#f8fafc',
-                    fontSize: '16px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    marginBottom: '10px',
-                  }}
-                />
-
-                {/* Category selector */}
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                  {INPUT_CATEGORIES.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setNewInput({ ...newInput, category: cat.id })}
-                      style={{
-                        flex: 1,
-                        padding: '8px',
-                        background: newInput.category === cat.id
-                          ? `${cat.color}25`
-                          : 'rgba(15, 23, 42, 0.8)',
-                        border: newInput.category === cat.id
-                          ? `2px solid ${cat.color}80`
-                          : '2px solid rgba(99, 102, 241, 0.15)',
-                        borderRadius: '8px',
-                        color: newInput.category === cat.id ? cat.color : '#94a3b8',
-                        fontSize: '13px',
-                        fontWeight: newInput.category === cat.id ? '600' : '400',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => {
-                      setNewInput({ name: '', description: '', category: 'food' });
-                      setShowAddForm(false);
-                    }}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input
+                    type="text"
+                    value={newInput.name}
+                    onChange={(e) => setNewInput({ ...newInput, name: e.target.value })}
+                    placeholder="Input name (e.g., Dairy, Alcohol)"
+                    autoFocus
                     style={{
-                      flex: 1,
-                      padding: '10px',
-                      background: 'rgba(100, 116, 139, 0.2)',
-                      border: 'none',
-                      borderRadius: '8px',
-                      color: '#94a3b8',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      cursor: 'pointer',
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 14px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
                     }}
-                  >
-                    Cancel
-                  </button>
+                  />
+                  <input
+                    type="text"
+                    value={newInput.description}
+                    onChange={(e) => setNewInput({ ...newInput, description: e.target.value })}
+                    placeholder="Description (optional)"
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 14px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+
+                  {/* Category selector */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {INPUT_CATEGORIES.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setNewInput({ ...newInput, category: cat.id })}
+                        style={{
+                          flex: 1,
+                          padding: '8px',
+                          background: newInput.category === cat.id
+                            ? `${cat.color}25`
+                            : 'rgba(15, 23, 42, 0.8)',
+                          border: newInput.category === cat.id
+                            ? `2px solid ${cat.color}80`
+                            : '2px solid rgba(99, 102, 241, 0.15)',
+                          borderRadius: '8px',
+                          color: newInput.category === cat.id ? cat.color : '#94a3b8',
+                          fontSize: '13px',
+                          fontWeight: newInput.category === cat.id ? '600' : '400',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
                   <button
                     onClick={addInputItem}
                     disabled={!newInput.name.trim()}
                     style={{
-                      flex: 1,
-                      padding: '10px',
-                      background: newInput.name.trim() ? '#8b5cf6' : 'rgba(139, 92, 246, 0.3)',
+                      marginTop: '10px',
+                      width: '100%',
+                      background: !newInput.name.trim()
+                        ? 'rgba(99, 102, 241, 0.3)'
+                        : '#6366f1',
                       border: 'none',
-                      borderRadius: '8px',
+                      borderRadius: '5px',
+                      padding: '12px',
                       color: '#fff',
                       fontSize: '14px',
-                      fontWeight: '500',
-                      cursor: newInput.name.trim() ? 'pointer' : 'not-allowed',
+                      fontWeight: '600',
+                      cursor: !newInput.name.trim() ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    Add
+                    Add Input
                   </button>
                 </div>
               </div>
             )}
+          </div>
+        </div>
 
-            {/* Active Items List */}
+        {/* Scrollable Content */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            padding: '12px 16px',
+            paddingBottom: '120px',
+          }}
+        >
+          <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+
+            {/* Active Items */}
             {activeItems.length > 0 && (() => {
               const dragCurrentIndex = dragReorderId ? activeItems.findIndex(i => i.id === dragReorderId) : -1;
               const itemHeight = 52;
@@ -446,6 +418,7 @@ export default function Inputs({
 
               return (
               <div
+                style={{ marginBottom: '20px' }}
                 onTouchMove={handleDragMove}
                 onTouchEnd={handleDragEnd}
                 onTouchCancel={handleDragEnd}
@@ -453,6 +426,14 @@ export default function Inputs({
                 onMouseUp={handleDragEnd}
                 onMouseLeave={handleDragEnd}
               >
+                <label style={{
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  marginBottom: '12px',
+                  display: 'block',
+                }}>Active ({activeItems.length})</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {activeItems.map((item, index) => {
                     const catInfo = getCategoryInfo(item.category);
@@ -470,18 +451,17 @@ export default function Inputs({
                       <div
                         key={item.id}
                         style={{
+                          background: isDragging ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
+                          borderRadius: '3px',
+                          padding: '10px 12px 10px 0',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '12px',
-                          padding: '12px 0',
-                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                          background: isDragging ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
-                          borderRadius: isDragging ? '3px' : '0',
+                          gap: '10px',
                           transform: isDragging ? `translateY(${dragReorderY}px)` : `translateY(${offsetY}px)`,
-                          transition: isDragging ? 'none' : 'transform 0.15s ease',
-                          boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
                           zIndex: isDragging ? 10 : 1,
                           position: 'relative',
+                          transition: isDragging ? 'none' : 'transform 0.15s ease',
+                          boxShadow: isDragging ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
                         }}
                       >
                         {/* Drag handle (hamburger) */}
@@ -493,6 +473,7 @@ export default function Inputs({
                             cursor: dragReorderId ? 'grabbing' : 'grab',
                             touchAction: 'none',
                             userSelect: 'none',
+                            color: '#64748b',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '3px',
@@ -504,30 +485,27 @@ export default function Inputs({
                           <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
                         </div>
 
-                        {/* Category dot */}
-                        <div style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: catInfo.color,
-                          flexShrink: 0,
-                        }} />
-
-                        {/* Name - tap to edit */}
-                        <button
+                        <div
                           onClick={() => setEditingInputId(item.id)}
                           style={{
-                            flex: 1,
-                            background: 'none',
-                            border: 'none',
-                            color: '#e2e8f0',
-                            fontSize: '15px',
                             cursor: 'pointer',
-                            textAlign: 'left',
-                            padding: 0,
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
                           }}
                         >
-                          {item.name}
+                          {/* Category dot */}
+                          <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: catInfo.color,
+                            flexShrink: 0,
+                          }} />
+                          <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                            {item.name}
+                          </span>
                           {item.verdict && (
                             <span style={{
                               display: 'inline-block',
@@ -535,28 +513,23 @@ export default function Inputs({
                               height: '6px',
                               borderRadius: '50%',
                               background: VERDICT_COLORS[item.verdict],
-                              marginLeft: '6px',
-                              verticalAlign: 'middle',
                             }} />
                           )}
-                        </button>
-
-                        {/* Hide button */}
+                        </div>
                         <button
                           onClick={() => toggleInputActive(item.id)}
                           style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#4b5563',
-                            cursor: 'pointer',
-                            padding: '4px',
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: '3px',
+                            padding: '6px 12px',
+                            color: '#f87171',
                             fontSize: '12px',
+                            cursor: 'pointer',
+                            flexShrink: 0,
                           }}
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                            <line x1="1" y1="1" x2="23" y2="23"/>
-                          </svg>
+                          Hide
                         </button>
                       </div>
                     );
@@ -577,22 +550,21 @@ export default function Inputs({
               </div>
             )}
 
-            {/* Hidden Items */}
+            {/* Inactive Items - Collapsible */}
             {inactiveItems.length > 0 && (
-              <div style={{ marginTop: '24px' }}>
+              <div>
                 <button
                   onClick={() => setShowHiddenItems(!showHiddenItems)}
                   style={{
                     width: '100%',
-                    padding: '10px 0',
                     background: 'transparent',
                     border: 'none',
-                    color: '#64748b',
-                    fontSize: '13px',
+                    padding: '0',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '8px',
+                    marginBottom: showHiddenItems ? '12px' : '0',
                   }}
                 >
                   <svg
@@ -600,65 +572,95 @@ export default function Inputs({
                     height="12"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="currentColor"
+                    stroke="#94a3b8"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     style={{
+                      transition: 'transform 0.2s ease',
                       transform: showHiddenItems ? 'rotate(90deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.15s ease',
                     }}
                   >
-                    <polyline points="9 18 15 12 9 6"/>
+                    <polyline points="9 18 15 12 9 6"></polyline>
                   </svg>
-                  Hidden ({inactiveItems.length})
+                  <label style={{
+                    color: '#94a3b8',
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    cursor: 'pointer',
+                  }}>Hidden ({inactiveItems.length})</label>
                 </button>
-
-                {showHiddenItems && inactiveItems.map(item => {
-                  const catInfo = getCategoryInfo(item.category);
-                  return (
-                    <div
-                      key={item.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '10px 0 10px 28px',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
-                      }}
-                    >
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: catInfo.color,
-                        opacity: 0.4,
-                        flexShrink: 0,
-                      }} />
-                      <span style={{ flex: 1, color: '#64748b', fontSize: '14px' }}>
-                        {item.name}
-                      </span>
-                      <button
-                        onClick={() => toggleInputActive(item.id)}
+                {showHiddenItems && (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    animation: 'slideDown 0.2s ease-out',
+                  }}>
+                    {inactiveItems.map((item) => (
+                      <div
+                        key={item.id}
                         style={{
-                          background: 'rgba(139, 92, 246, 0.15)',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '6px 10px',
-                          color: '#a78bfa',
-                          fontSize: '12px',
-                          cursor: 'pointer',
+                          background: 'rgba(15, 17, 21, 0.3)',
+                          borderRadius: '3px',
+                          padding: '12px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
                         }}
                       >
-                        Restore
-                      </button>
-                    </div>
-                  );
-                })}
+                        <span style={{ color: '#64748b', fontSize: '15px', flex: 1 }}>
+                          {item.name}
+                        </span>
+                        <button
+                          onClick={() => toggleInputActive(item.id)}
+                          style={{
+                            background: 'rgba(34, 197, 94, 0.15)',
+                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                            borderRadius: '3px',
+                            padding: '6px 12px',
+                            color: '#4ade80',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
+
+        {/* Floating Done Button */}
+        <button
+          onClick={() => {
+            setShowManageInputs(false);
+          }}
+          style={{
+            position: 'absolute',
+            bottom: '30px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#8b5cf6',
+            border: 'none',
+            borderRadius: '25px',
+            color: '#fff',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            padding: '14px 40px',
+            boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
+            zIndex: 10,
+          }}
+        >
+          Done
+        </button>
       </div>
     );
   }
@@ -785,19 +787,26 @@ export default function Inputs({
       })}
 
       {/* Manage inputs link - only on today */}
-      {isToday && (
+      {isToday && !showManageInputs && (
         <button
           onClick={() => setShowManageInputs(true)}
           style={{
-            padding: '10px 20px',
+            width: '100%',
+            padding: '16px 20px',
             background: 'transparent',
             border: 'none',
-            color: '#8b5cf6',
-            fontSize: '13px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+            color: '#6b7280',
+            fontSize: '14px',
+            fontWeight: '400',
             cursor: 'pointer',
-            textAlign: 'left',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
           }}
         >
+          <span style={{ fontSize: '14px' }}>+</span>
           Manage inputs
         </button>
       )}
