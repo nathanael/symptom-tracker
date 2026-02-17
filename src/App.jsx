@@ -603,6 +603,7 @@ function App() {
           setRapidEntryMode={setRapidEntryMode}
           quickLog={quickLog}
           setEntries={setEntries}
+          getMostRecentEntry={getMostRecentEntry}
           setCopyToastMessage={setCopyToastMessage}
         />
       )}

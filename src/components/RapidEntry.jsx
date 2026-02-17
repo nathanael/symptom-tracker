@@ -17,6 +17,7 @@ export default function RapidEntry({
   setRapidEntryMode,
   quickLog,
   setEntries,
+  getMostRecentEntry,
   setCopyToastMessage,
 }) {
   const getCurrentTimePeriod = () => {
@@ -422,6 +423,9 @@ export default function RapidEntry({
           maxWidth: '400px',
         }}>
           {[0, 1, 2, 3, 4, 5].map(severity => {
+            const recentEntry = getMostRecentEntry(currentSymptom.id, logTime);
+            const isRecentSeverity = recentEntry?.severity === severity;
+
             // Check if this severity is the currently selected value for this symptom
             const currentEntryKey = `${dateKey}-${currentSymptom.id}-${timeKey}`;
             const currentEntry = entries[currentEntryKey];
@@ -478,7 +482,9 @@ export default function RapidEntry({
                   padding: '24px',
                   background: isCurrentValue
                     ? `${severityColors[severity]}40`
-                    : `${severityColors[severity]}20`,
+                    : isRecentSeverity
+                      ? `${severityColors[severity]}30`
+                      : `${severityColors[severity]}20`,
                   border: isCurrentValue
                     ? `3px solid ${severityColors[severity]}`
                     : '2px solid transparent',
