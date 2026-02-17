@@ -97,9 +97,5 @@ export const isAuthSupported = () => {
     storageAvailable = false;
   }
 
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                       window.navigator.standalone === true ||
-                       document.referrer.includes('android-app://');
-
-  return validProtocol && storageAvailable && !isStandalone;
+  return validProtocol && storageAvailable;
 };

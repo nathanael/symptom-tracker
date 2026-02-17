@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { initFirebase, getFirebaseAuth, getFirebaseDb, getGoogleProvider, isAuthSupported } from '../utils/firebase';
-import { isStandalone } from '../utils/helpers';
+
 
 export function useFirebase() {
   const [user, setUser] = useState(null);
@@ -135,8 +135,6 @@ export function useFirebase() {
     if (!isAuthSupported()) {
       if (window.location.protocol === 'file:') {
         setSyncError('Cannot sign in from local file. Deploy to a web server.');
-      } else if (isStandalone()) {
-        setSyncError('Google Sign-In not supported in home screen mode. Use Safari browser instead.');
       } else {
         setSyncError('Sign-in not supported in this environment.');
       }
@@ -164,7 +162,7 @@ export function useFirebase() {
       if (error.code === 'auth/popup-closed-by-user') {
         setSyncError('Sign-in cancelled');
       } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
-        setSyncError('Sign-in not supported. Use Safari browser (not home screen app) or deploy to HTTPS.');
+        setSyncError('Google Sign-In unavailable in this mode. Try email sign-in instead.');
       } else if (error.code !== 'auth/cancelled-popup-request') {
         setSyncError(error.message);
       }
