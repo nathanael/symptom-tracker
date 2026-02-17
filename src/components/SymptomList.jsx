@@ -1029,166 +1029,6 @@ export default function SymptomList({
             flexDirection: 'column',
           }}
         >
-          {/* Collapsible Add Section */}
-          <div style={{
-            flexShrink: 0,
-            background: '#08090A',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            padding: '16px 20px',
-          }}>
-            <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-              {/* Toggle button */}
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                style={{
-                  width: '100%',
-                  background: showAddForm ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  color: showAddForm ? '#a5b4fc' : '#818cf8',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <span style={{
-                  fontSize: '16px',
-                  fontWeight: '300',
-                  transition: 'transform 0.2s ease',
-                  transform: showAddForm ? 'rotate(45deg)' : 'none',
-                }}>+</span>
-                Add symptom
-              </button>
-
-              {/* Expandable form */}
-              {showAddForm && (
-                <div style={{
-                  marginTop: '12px',
-                  background: 'rgba(15, 17, 21, 0.6)',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  animation: 'slideDown 0.2s ease-out',
-                }}>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      value={newSymptomName}
-                      onChange={(e) => setNewSymptomName(e.target.value)}
-                      onFocus={() => setShowSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newSymptomName.trim()) addSymptom();
-                      }}
-                      placeholder="Symptom name"
-                      autoFocus
-                      style={{
-                        width: '100%',
-                        background: 'rgba(15, 23, 42, 0.8)',
-                        border: '2px solid rgba(99, 102, 241, 0.3)',
-                        borderRadius: '5px',
-                        padding: '12px 14px',
-                        color: '#f8fafc',
-                        fontSize: '15px',
-                        boxSizing: 'border-box',
-                        outline: 'none',
-                      }}
-                    />
-                    {/* Autocomplete dropdown for hidden symptoms */}
-                    {showSuggestions && suggestions.length > 0 && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        background: 'rgba(15, 17, 21, 0.98)',
-                        border: '1px solid rgba(99, 102, 241, 0.3)',
-                        borderRadius: '5px',
-                        marginTop: '4px',
-                        maxHeight: '150px',
-                        overflowY: 'auto',
-                        zIndex: 10,
-                      }}>
-                        {suggestions.map((symptom) => (
-                          <button
-                            key={symptom.id}
-                            onClick={() => {
-                              reactivateSymptom(symptom.id);
-                              setNewSymptomName('');
-                              setShowSuggestions(false);
-                              setShowAddForm(false);
-                            }}
-                            style={{
-                              width: '100%',
-                              padding: '12px 14px',
-                              background: 'transparent',
-                              border: 'none',
-                              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                              color: '#e5e7eb',
-                              fontSize: '14px',
-                              textAlign: 'left',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                            }}
-                          >
-                            <span>{symptom.name}</span>
-                            <span style={{ color: '#6b7280', fontSize: '12px' }}>Restore</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <input
-                    value={newSymptomDescription}
-                    onChange={(e) => setNewSymptomDescription(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newSymptomName.trim()) addSymptom();
-                    }}
-                    placeholder="Description (optional)"
-                    style={{
-                      width: '100%',
-                      background: 'rgba(15, 23, 42, 0.5)',
-                      border: '1px solid rgba(99, 102, 241, 0.2)',
-                      borderRadius: '5px',
-                      padding: '10px 14px',
-                      marginTop: '8px',
-                      color: '#9ca3af',
-                      fontSize: '14px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <button
-                    onClick={() => {
-                      addSymptom();
-                      setShowAddForm(false);
-                    }}
-                    disabled={!newSymptomName.trim()}
-                    style={{
-                      marginTop: '10px',
-                      width: '100%',
-                      background: newSymptomName.trim() ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
-                      border: 'none',
-                      borderRadius: '5px',
-                      padding: '12px',
-                      color: '#fff',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: newSymptomName.trim() ? 'pointer' : 'not-allowed',
-                    }}
-                  >
-                    Add Symptom
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Scrollable Content */}
           <div
             style={{
@@ -1314,6 +1154,147 @@ export default function SymptomList({
               </div>
               );
             })()}
+
+            {/* Add Symptom Button/Form */}
+            {!showAddForm ? (
+              <button
+                onClick={() => setShowAddForm(true)}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: 'rgba(139, 92, 246, 0.06)',
+                  border: '2px dashed rgba(139, 92, 246, 0.3)',
+                  borderRadius: '12px',
+                  color: '#a78bfa',
+                  fontSize: '15px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  marginBottom: '20px',
+                }}
+              >
+                + Add Symptom
+              </button>
+            ) : (
+              <div style={{
+                background: 'rgba(15, 17, 21, 0.6)',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '20px',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                animation: 'slideDown 0.2s ease-out',
+              }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    value={newSymptomName}
+                    onChange={(e) => setNewSymptomName(e.target.value)}
+                    onFocus={() => setShowSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newSymptomName.trim()) addSymptom();
+                    }}
+                    placeholder="Symptom name"
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 14px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  />
+                  {/* Autocomplete dropdown for hidden symptoms */}
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: 'rgba(15, 17, 21, 0.98)',
+                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      marginTop: '4px',
+                      maxHeight: '150px',
+                      overflowY: 'auto',
+                      zIndex: 10,
+                    }}>
+                      {suggestions.map((symptom) => (
+                        <button
+                          key={symptom.id}
+                          onClick={() => {
+                            reactivateSymptom(symptom.id);
+                            setNewSymptomName('');
+                            setShowSuggestions(false);
+                            setShowAddForm(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '12px 14px',
+                            background: 'transparent',
+                            border: 'none',
+                            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                            color: '#e5e7eb',
+                            fontSize: '14px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <span>{symptom.name}</span>
+                          <span style={{ color: '#6b7280', fontSize: '12px' }}>Restore</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <input
+                  value={newSymptomDescription}
+                  onChange={(e) => setNewSymptomDescription(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newSymptomName.trim()) addSymptom();
+                  }}
+                  placeholder="Description (optional)"
+                  style={{
+                    width: '100%',
+                    background: 'rgba(15, 23, 42, 0.5)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    borderRadius: '5px',
+                    padding: '10px 14px',
+                    marginTop: '8px',
+                    color: '#9ca3af',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    addSymptom();
+                    setShowAddForm(false);
+                  }}
+                  disabled={!newSymptomName.trim()}
+                  style={{
+                    marginTop: '10px',
+                    width: '100%',
+                    background: newSymptomName.trim() ? '#6366f1' : 'rgba(99, 102, 241, 0.3)',
+                    border: 'none',
+                    borderRadius: '5px',
+                    padding: '12px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: newSymptomName.trim() ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Add Symptom
+                </button>
+              </div>
+            )}
 
             {/* Inactive symptoms - Collapsible */}
             {inactiveSymptoms.length > 0 && (

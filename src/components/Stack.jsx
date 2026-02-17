@@ -345,28 +345,6 @@ export default function Stack({
             const { taken, total } = getStackProgress();
             return (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {taken > 0 && (
-                  <button
-                    onClick={() => {
-                      const newEntries = { ...stackEntries };
-                      Object.keys(newEntries).forEach(key => {
-                        if (key.startsWith(dateKey)) delete newEntries[key];
-                      });
-                      setStackEntries(newEntries);
-                      setLastAction('All cleared');
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#9ca3af',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      padding: '4px 8px',
-                    }}
-                  >
-                    Unselect
-                  </button>
-                )}
                 <div
                   onClick={() => {
                     if (taken === total) {
@@ -663,217 +641,6 @@ export default function Stack({
             animation: 'modalIn 0.2s ease-out',
           }}
         >
-          {/* Collapsible Add Section */}
-          <div style={{
-            flexShrink: 0,
-            background: '#08090A',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            padding: '16px 20px',
-          }}>
-            <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-              {/* Toggle button */}
-              <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                style={{
-                  width: '100%',
-                  background: showAddForm ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '8px',
-                  padding: '12px 16px',
-                  color: showAddForm ? '#a5b4fc' : '#818cf8',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <span style={{
-                  fontSize: '16px',
-                  fontWeight: '300',
-                  transition: 'transform 0.2s ease',
-                  transform: showAddForm ? 'rotate(45deg)' : 'none',
-                }}>+</span>
-                Add supplement
-              </button>
-
-              {/* Expandable form */}
-              {showAddForm && (
-                <div style={{
-                  marginTop: '12px',
-                  background: 'rgba(15, 17, 21, 0.6)',
-                  borderRadius: '8px',
-                  padding: '16px',
-                  animation: 'slideDown 0.2s ease-out',
-                }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ position: 'relative' }}>
-                      <input
-                        type="text"
-                        placeholder="Supplement name"
-                        value={newStackItem.name}
-                        onChange={(e) => setNewStackItem({...newStackItem, name: e.target.value})}
-                        onFocus={() => setShowSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                        autoFocus
-                        style={{
-                          width: '100%',
-                          background: 'rgba(15, 23, 42, 0.8)',
-                          border: '2px solid rgba(99, 102, 241, 0.3)',
-                          borderRadius: '5px',
-                          padding: '12px 14px',
-                          color: '#f8fafc',
-                          fontSize: '15px',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                      {/* Autocomplete dropdown for hidden supplements */}
-                      {showSuggestions && suggestions.length > 0 && (
-                        <div style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          background: 'rgba(15, 17, 21, 0.98)',
-                          border: '1px solid rgba(99, 102, 241, 0.3)',
-                          borderRadius: '5px',
-                          marginTop: '4px',
-                          maxHeight: '150px',
-                          overflowY: 'auto',
-                          zIndex: 10,
-                        }}>
-                          {suggestions.map((item) => (
-                            <button
-                              key={item.id}
-                              onClick={() => {
-                                toggleStackItemActive(item.id);
-                                setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
-                                setShowSuggestions(false);
-                                setShowAddForm(false);
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '12px 14px',
-                                background: 'transparent',
-                                border: 'none',
-                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                                color: '#e5e7eb',
-                                fontSize: '14px',
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                              }}
-                            >
-                              <span>{item.name}</span>
-                              <span style={{ color: '#6b7280', fontSize: '12px' }}>Restore</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Description (optional)"
-                      value={newStackItem.description}
-                      onChange={(e) => setNewStackItem({...newStackItem, description: e.target.value})}
-                      style={{
-                        width: '100%',
-                        background: 'rgba(15, 23, 42, 0.8)',
-                        border: '2px solid rgba(99, 102, 241, 0.3)',
-                        borderRadius: '5px',
-                        padding: '12px 14px',
-                        color: '#f8fafc',
-                        fontSize: '15px',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="Dose"
-                        value={newStackItem.defaultDose}
-                        onChange={(e) => setNewStackItem({...newStackItem, defaultDose: e.target.value})}
-                        style={{
-                          width: '80px',
-                          background: 'rgba(15, 23, 42, 0.8)',
-                          border: '2px solid rgba(99, 102, 241, 0.3)',
-                          borderRadius: '5px',
-                          padding: '12px 14px',
-                          color: '#f8fafc',
-                          fontSize: '15px',
-                          textAlign: 'center',
-                          outline: 'none',
-                        }}
-                      />
-                      <select
-                        value={newStackItem.unit}
-                        onChange={(e) => setNewStackItem({...newStackItem, unit: e.target.value})}
-                        style={{
-                          width: '80px',
-                          background: 'rgba(15, 23, 42, 0.8)',
-                          border: '2px solid rgba(99, 102, 241, 0.3)',
-                          borderRadius: '5px',
-                          padding: '12px 10px',
-                          color: '#f8fafc',
-                          fontSize: '15px',
-                        }}
-                      >
-                        <option value="mg">mg</option>
-                        <option value="mcg">mcg</option>
-                        <option value="g">g</option>
-                        <option value="IU">IU</option>
-                        <option value="ml">ml</option>
-                        <option value="drops">drops</option>
-                        <option value="caps">caps</option>
-                      </select>
-                    </div>
-                    <div style={{ marginTop: '4px' }}>
-                      <label style={{
-                        color: '#64748b',
-                        fontSize: '11px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        marginBottom: '8px',
-                        display: 'block',
-                      }}>Schedule</label>
-                      <SchedulePicker
-                        schedule={newStackItem.schedule}
-                        onChange={(schedule) => setNewStackItem({...newStackItem, schedule})}
-                      />
-                    </div>
-                    <button
-                      onClick={addStackItem}
-                      disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
-                      style={{
-                        marginTop: '10px',
-                        width: '100%',
-                        background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
-                          ? 'rgba(99, 102, 241, 0.3)'
-                          : '#6366f1',
-                        border: 'none',
-                        borderRadius: '5px',
-                        padding: '12px',
-                        color: '#fff',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      Add Supplement
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Scrollable Content */}
           <div
             style={{
@@ -1005,6 +772,198 @@ export default function Stack({
               </div>
               );
             })()}
+
+            {/* Add Supplement Button/Form */}
+            {!showAddForm ? (
+              <button
+                onClick={() => setShowAddForm(true)}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: 'rgba(139, 92, 246, 0.06)',
+                  border: '2px dashed rgba(139, 92, 246, 0.3)',
+                  borderRadius: '12px',
+                  color: '#a78bfa',
+                  fontSize: '15px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  marginBottom: '20px',
+                }}
+              >
+                + Add Supplement
+              </button>
+            ) : (
+              <div style={{
+                background: 'rgba(15, 17, 21, 0.6)',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '20px',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                animation: 'slideDown 0.2s ease-out',
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder="Supplement name"
+                      value={newStackItem.name}
+                      onChange={(e) => setNewStackItem({...newStackItem, name: e.target.value})}
+                      onFocus={() => setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                      autoFocus
+                      style={{
+                        width: '100%',
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '2px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '5px',
+                        padding: '12px 14px',
+                        color: '#f8fafc',
+                        fontSize: '15px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    {/* Autocomplete dropdown for hidden supplements */}
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: 'rgba(15, 17, 21, 0.98)',
+                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '5px',
+                        marginTop: '4px',
+                        maxHeight: '150px',
+                        overflowY: 'auto',
+                        zIndex: 10,
+                      }}>
+                        {suggestions.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              toggleStackItemActive(item.id);
+                              setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
+                              setShowSuggestions(false);
+                              setShowAddForm(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              background: 'transparent',
+                              border: 'none',
+                              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                              color: '#e5e7eb',
+                              fontSize: '14px',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <span>{item.name}</span>
+                            <span style={{ color: '#6b7280', fontSize: '12px' }}>Restore</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Description (optional)"
+                    value={newStackItem.description}
+                    onChange={(e) => setNewStackItem({...newStackItem, description: e.target.value})}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 14px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Dose"
+                      value={newStackItem.defaultDose}
+                      onChange={(e) => setNewStackItem({...newStackItem, defaultDose: e.target.value})}
+                      style={{
+                        width: '80px',
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '2px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '5px',
+                        padding: '12px 14px',
+                        color: '#f8fafc',
+                        fontSize: '15px',
+                        textAlign: 'center',
+                        outline: 'none',
+                      }}
+                    />
+                    <select
+                      value={newStackItem.unit}
+                      onChange={(e) => setNewStackItem({...newStackItem, unit: e.target.value})}
+                      style={{
+                        width: '80px',
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '2px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '5px',
+                        padding: '12px 10px',
+                        color: '#f8fafc',
+                        fontSize: '15px',
+                      }}
+                    >
+                      <option value="mg">mg</option>
+                      <option value="mcg">mcg</option>
+                      <option value="g">g</option>
+                      <option value="IU">IU</option>
+                      <option value="ml">ml</option>
+                      <option value="drops">drops</option>
+                      <option value="caps">caps</option>
+                    </select>
+                  </div>
+                  <div style={{ marginTop: '4px' }}>
+                    <label style={{
+                      color: '#64748b',
+                      fontSize: '11px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '8px',
+                      display: 'block',
+                    }}>Schedule</label>
+                    <SchedulePicker
+                      schedule={newStackItem.schedule}
+                      onChange={(schedule) => setNewStackItem({...newStackItem, schedule})}
+                    />
+                  </div>
+                  <button
+                    onClick={addStackItem}
+                    disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
+                    style={{
+                      marginTop: '10px',
+                      width: '100%',
+                      background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
+                        ? 'rgba(99, 102, 241, 0.3)'
+                        : '#6366f1',
+                      border: 'none',
+                      borderRadius: '5px',
+                      padding: '12px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Add Supplement
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Inactive Items - Collapsible */}
             {inactiveItems.length > 0 && (

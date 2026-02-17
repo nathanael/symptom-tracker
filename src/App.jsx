@@ -689,41 +689,6 @@ function App() {
             />
           ) : (
             <>
-              {/* Protocol toggle */}
-              <div style={{
-                display: 'flex',
-                padding: '8px 20px',
-                gap: '4px',
-                position: 'sticky',
-                top: 0,
-                background: '#08090A',
-                zIndex: 10,
-              }}>
-                {['stack', 'inputs'].map(view => {
-                  const isActive = protocolView === view;
-                  return (
-                    <button
-                      key={view}
-                      onClick={() => setProtocolView(view)}
-                      style={{
-                        flex: 1,
-                        padding: '8px',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        background: isActive ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
-                        color: isActive ? '#a78bfa' : '#64748b',
-                        border: isActive
-                          ? '1px solid rgba(139, 92, 246, 0.3)'
-                          : '1px solid rgba(255, 255, 255, 0.08)',
-                      }}
-                    >
-                      {view === 'stack' ? 'Stack' : 'Inputs'}
-                    </button>
-                  );
-                })}
-              </div>
               {protocolView === 'stack' ? (
                 <Stack
                   stackItems={stackItems}
@@ -746,6 +711,39 @@ function App() {
                   showManageInputs={showManageInputs}
                   setShowManageInputs={setShowManageInputs}
                 />
+              )}
+              {/* Protocol toggle - at bottom for thumb reach */}
+              {!showManageStack && !showManageInputs && (
+                <div style={{
+                  display: 'flex',
+                  padding: '12px 20px',
+                  gap: '4px',
+                }}>
+                  {['stack', 'inputs'].map(view => {
+                    const isActive = protocolView === view;
+                    return (
+                      <button
+                        key={view}
+                        onClick={() => setProtocolView(view)}
+                        style={{
+                          flex: 1,
+                          padding: '8px',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          background: isActive ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
+                          color: isActive ? '#a78bfa' : '#64748b',
+                          border: isActive
+                            ? '1px solid rgba(139, 92, 246, 0.3)'
+                            : '1px solid rgba(255, 255, 255, 0.08)',
+                        }}
+                      >
+                        {view === 'stack' ? 'Stack' : 'Inputs'}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </>
           )}

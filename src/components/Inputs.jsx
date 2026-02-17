@@ -262,141 +262,6 @@ export default function Inputs({
         flexDirection: 'column',
         animation: 'modalIn 0.2s ease-out',
       }}>
-        {/* Collapsible Add Section */}
-        <div style={{
-          flexShrink: 0,
-          background: '#08090A',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          padding: '16px 20px',
-        }}>
-          <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-            {/* Toggle button */}
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              style={{
-                width: '100%',
-                background: showAddForm ? 'rgba(99, 102, 241, 0.2)' : 'rgba(99, 102, 241, 0.1)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                color: showAddForm ? '#a5b4fc' : '#818cf8',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <span style={{
-                fontSize: '16px',
-                fontWeight: '300',
-                transition: 'transform 0.2s ease',
-                transform: showAddForm ? 'rotate(45deg)' : 'none',
-              }}>+</span>
-              Add input
-            </button>
-
-            {/* Expandable form */}
-            {showAddForm && (
-              <div style={{
-                marginTop: '12px',
-                background: 'rgba(15, 17, 21, 0.6)',
-                borderRadius: '8px',
-                padding: '16px',
-                animation: 'slideDown 0.2s ease-out',
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <input
-                    type="text"
-                    value={newInput.name}
-                    onChange={(e) => setNewInput({ ...newInput, name: e.target.value })}
-                    placeholder="Input name (e.g., Dairy, Alcohol)"
-                    autoFocus
-                    style={{
-                      width: '100%',
-                      background: 'rgba(15, 23, 42, 0.8)',
-                      border: '2px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '5px',
-                      padding: '12px 14px',
-                      color: '#f8fafc',
-                      fontSize: '15px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <input
-                    type="text"
-                    value={newInput.description}
-                    onChange={(e) => setNewInput({ ...newInput, description: e.target.value })}
-                    placeholder="Description (optional)"
-                    style={{
-                      width: '100%',
-                      background: 'rgba(15, 23, 42, 0.8)',
-                      border: '2px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: '5px',
-                      padding: '12px 14px',
-                      color: '#f8fafc',
-                      fontSize: '15px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-
-                  {/* Category selector */}
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    {INPUT_CATEGORIES.map(cat => (
-                      <button
-                        key={cat.id}
-                        onClick={() => setNewInput({ ...newInput, category: cat.id })}
-                        style={{
-                          flex: 1,
-                          padding: '8px',
-                          background: newInput.category === cat.id
-                            ? `${cat.color}25`
-                            : 'rgba(15, 23, 42, 0.8)',
-                          border: newInput.category === cat.id
-                            ? `2px solid ${cat.color}80`
-                            : '2px solid rgba(99, 102, 241, 0.15)',
-                          borderRadius: '8px',
-                          color: newInput.category === cat.id ? cat.color : '#94a3b8',
-                          fontSize: '13px',
-                          fontWeight: newInput.category === cat.id ? '600' : '400',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {cat.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={addInputItem}
-                    disabled={!newInput.name.trim()}
-                    style={{
-                      marginTop: '10px',
-                      width: '100%',
-                      background: !newInput.name.trim()
-                        ? 'rgba(99, 102, 241, 0.3)'
-                        : '#6366f1',
-                      border: 'none',
-                      borderRadius: '5px',
-                      padding: '12px',
-                      color: '#fff',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: !newInput.name.trim() ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    Add Input
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Scrollable Content */}
         <div
           style={{
@@ -538,6 +403,122 @@ export default function Inputs({
               </div>
               );
             })()}
+
+            {/* Add Input Button/Form */}
+            {!showAddForm ? (
+              <button
+                onClick={() => setShowAddForm(true)}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: 'rgba(139, 92, 246, 0.06)',
+                  border: '2px dashed rgba(139, 92, 246, 0.3)',
+                  borderRadius: '12px',
+                  color: '#a78bfa',
+                  fontSize: '15px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  marginBottom: '20px',
+                }}
+              >
+                + Add Input
+              </button>
+            ) : (
+              <div style={{
+                background: 'rgba(15, 17, 21, 0.6)',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '20px',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                animation: 'slideDown 0.2s ease-out',
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input
+                    type="text"
+                    value={newInput.name}
+                    onChange={(e) => setNewInput({ ...newInput, name: e.target.value })}
+                    placeholder="Input name (e.g., Dairy, Alcohol)"
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 14px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={newInput.description}
+                    onChange={(e) => setNewInput({ ...newInput, description: e.target.value })}
+                    placeholder="Description (optional)"
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 14px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+
+                  {/* Category selector */}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {INPUT_CATEGORIES.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setNewInput({ ...newInput, category: cat.id })}
+                        style={{
+                          flex: 1,
+                          padding: '8px',
+                          background: newInput.category === cat.id
+                            ? `${cat.color}25`
+                            : 'rgba(15, 23, 42, 0.8)',
+                          border: newInput.category === cat.id
+                            ? `2px solid ${cat.color}80`
+                            : '2px solid rgba(99, 102, 241, 0.15)',
+                          borderRadius: '8px',
+                          color: newInput.category === cat.id ? cat.color : '#94a3b8',
+                          fontSize: '13px',
+                          fontWeight: newInput.category === cat.id ? '600' : '400',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={addInputItem}
+                    disabled={!newInput.name.trim()}
+                    style={{
+                      marginTop: '10px',
+                      width: '100%',
+                      background: !newInput.name.trim()
+                        ? 'rgba(99, 102, 241, 0.3)'
+                        : '#6366f1',
+                      border: 'none',
+                      borderRadius: '5px',
+                      padding: '12px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: !newInput.name.trim() ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Add Input
+                  </button>
+                </div>
+              </div>
+            )}
 
             {activeItems.length === 0 && !showAddForm && (
               <div style={{

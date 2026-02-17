@@ -73,7 +73,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '3.13.0',
+      version: '3.13.1',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
