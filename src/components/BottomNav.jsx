@@ -107,7 +107,7 @@ export default function BottomNav({
             color: appMode === 'stack' && !isViewOpen ? '#8b5cf6' : '#64748b',
             fontWeight: appMode === 'stack' && !isViewOpen ? '600' : '400',
           }}>
-            Stack
+            Protocol
           </span>
         </button>
 

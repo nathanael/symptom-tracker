@@ -241,7 +241,7 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
   let output = [];
 
   // AI-friendly intro framing
-  output.push(`I've been tracking my health symptoms. Please analyze this data and help me understand patterns.\n`);
+  output.push(`I've been tracking my health symptoms. Here is the data.\n`);
 
   // Header
   output.push(`## Symptom Tracking (last ${days} days)`);
