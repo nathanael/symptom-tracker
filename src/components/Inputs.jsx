@@ -71,26 +71,17 @@ export default function Inputs({
     });
   };
 
-  const decrementInput = (inputId, e) => {
+  const clearInput = (inputId, e) => {
     e.stopPropagation();
     haptic('light');
     const entryKey = `${dateKey}-${inputId}`;
     const item = inputItems.find(i => i.id === inputId);
 
     setInputEntries(prev => {
-      const existing = prev[entryKey];
-      if (!existing) return prev;
-      const currentCount = existing.count || 1;
-      if (currentCount > 1) {
-        const newCount = currentCount - 1;
-        setLastAction(`${item?.name} x${newCount}`);
-        return { ...prev, [entryKey]: { ...existing, count: newCount } };
-      } else {
-        const newEntries = { ...prev };
-        delete newEntries[entryKey];
-        setLastAction(`Removed ${item?.name}`);
-        return newEntries;
-      }
+      const newEntries = { ...prev };
+      delete newEntries[entryKey];
+      setLastAction(`Removed ${item?.name}`);
+      return newEntries;
     });
   };
 
@@ -751,10 +742,10 @@ export default function Inputs({
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
-              padding: '12px 20px',
-              background: isLogged ? 'rgba(139, 92, 246, 0.08)' : 'transparent',
+              padding: '14px 20px',
+              background: 'transparent',
               border: 'none',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
               cursor: isToday ? 'pointer' : 'default',
               width: '100%',
               textAlign: 'left',
@@ -773,9 +764,9 @@ export default function Inputs({
             {/* Name */}
             <span style={{
               flex: 1,
-              color: isLogged ? '#e2e8f0' : '#64748b',
-              fontSize: '15px',
-              fontWeight: isLogged ? '500' : '400',
+              color: isLogged ? '#e5e7eb' : '#9ca3af',
+              fontSize: '17px',
+              fontWeight: '400',
             }}>
               {item.name}
             </span>
@@ -793,12 +784,12 @@ export default function Inputs({
 
             {/* Count badge / empty circle */}
             <div
-              onClick={isLogged && isToday ? (e) => decrementInput(item.id, e) : undefined}
+              onClick={isLogged && isToday ? (e) => clearInput(item.id, e) : undefined}
               style={{
-                width: '22px',
-                height: '22px',
-                borderRadius: '6px',
-                border: isLogged ? 'none' : '2px solid rgba(100, 116, 139, 0.3)',
+                width: '32px',
+                height: '32px',
+                borderRadius: isLogged ? '6px' : '50%',
+                border: isLogged ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
                 background: isLogged ? '#8b5cf6' : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
@@ -815,8 +806,8 @@ export default function Inputs({
               {isLogged && count > 1 && (
                 <span style={{
                   color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: '700',
+                  fontSize: '14px',
+                  fontWeight: '600',
                   lineHeight: 1,
                 }}>
                   {count}
