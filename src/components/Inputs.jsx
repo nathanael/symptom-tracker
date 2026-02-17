@@ -627,9 +627,42 @@ export default function Inputs({
   }
 
   // Daily view
-  if (displayItems.length === 0) return null;
-
   const progress = getInputProgress();
+
+  // Empty state: show add prompt on today
+  if (displayItems.length === 0) {
+    if (!isToday) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '16px 20px 8px',
+        }}>
+          <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: '600', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+            Inputs
+          </span>
+        </div>
+        <button
+          onClick={() => setShowManageInputs(true)}
+          style={{
+            margin: '4px 20px 12px',
+            padding: '14px',
+            background: 'rgba(139, 92, 246, 0.06)',
+            border: '1px dashed rgba(139, 92, 246, 0.25)',
+            borderRadius: '12px',
+            color: '#a78bfa',
+            fontSize: '14px',
+            cursor: 'pointer',
+            textAlign: 'center',
+          }}
+        >
+          + Track foods, substances, or activities
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
