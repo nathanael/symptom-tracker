@@ -993,6 +993,31 @@ export default function SymptomList({
       })}
 
 
+      {/* Add Symptom Button - at bottom of list */}
+      {!showAddSymptom && (
+        <button
+          onClick={() => setShowAddSymptom(true)}
+          style={{
+            width: '100%',
+            padding: '16px 20px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+            color: '#6b7280',
+            fontSize: '14px',
+            fontWeight: '400',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>+</span>
+          Manage symptoms
+        </button>
+      )}
+
       {/* Manage Symptoms Modal */}
       {showAddSymptom && (
         <div
@@ -1013,7 +1038,7 @@ export default function SymptomList({
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
               padding: '12px 16px',
-              paddingBottom: '120px',
+              paddingBottom: '180px',
             }}
           >
             <div style={{ maxWidth: '500px', margin: '0 auto' }}>
@@ -1131,26 +1156,8 @@ export default function SymptomList({
               );
             })()}
 
-            {/* Add Symptom Button/Form */}
-            {!showAddForm ? (
-              <button
-                onClick={() => setShowAddForm(true)}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  background: 'rgba(139, 92, 246, 0.06)',
-                  border: '2px dashed rgba(139, 92, 246, 0.3)',
-                  borderRadius: '12px',
-                  color: '#a78bfa',
-                  fontSize: '15px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  marginBottom: '20px',
-                }}
-              >
-                + Add Symptom
-              </button>
-            ) : (
+            {/* Add Symptom Form (inline, when expanded) */}
+            {showAddForm && (
               <div style={{
                 background: 'rgba(15, 17, 21, 0.6)',
                 borderRadius: '12px',
@@ -1363,28 +1370,54 @@ export default function SymptomList({
             </div>
           </div>
 
-          {/* Floating Done Button */}
-          <button
-            onClick={() => setShowAddSymptom(false)}
-            style={{
-              position: 'absolute',
-              bottom: '30px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: '#8b5cf6',
-              border: 'none',
-              borderRadius: '25px',
-              color: '#fff',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              padding: '14px 40px',
-              boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
-              zIndex: 100,
-            }}
-          >
-            Done
-          </button>
+          {/* Fixed Bottom Bar */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: '16px 16px 30px',
+            background: 'linear-gradient(transparent, #08090A 25%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
+            zIndex: 10,
+          }}>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              style={{
+                width: '100%',
+                maxWidth: '500px',
+                padding: '14px',
+                background: showAddForm ? 'rgba(139, 92, 246, 0.15)' : 'rgba(139, 92, 246, 0.06)',
+                border: '2px dashed rgba(139, 92, 246, 0.3)',
+                borderRadius: '12px',
+                color: '#a78bfa',
+                fontSize: '15px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+            >
+              + Add Symptom
+            </button>
+            <button
+              onClick={() => setShowAddSymptom(false)}
+              style={{
+                background: '#8b5cf6',
+                border: 'none',
+                borderRadius: '25px',
+                color: '#fff',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: '14px 40px',
+                boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
+              }}
+            >
+              Done
+            </button>
+          </div>
         </div>
       )}
 
