@@ -67,7 +67,7 @@ export default function BottomNav({
                     : '1px solid rgba(255, 255, 255, 0.08)',
                 }}
               >
-                {view === 'stack' ? 'Symptoms' : 'Other Inputs'}
+                {view === 'stack' ? 'Supplements' : 'Other Inputs'}
               </button>
             );
           })}
