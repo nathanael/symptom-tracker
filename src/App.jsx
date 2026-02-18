@@ -57,6 +57,7 @@ function App() {
   const [appMode, setAppMode] = useState('symptoms');
   // Protocol sub-view: 'stack' or 'inputs'
   const [protocolView, setProtocolView] = useState('stack');
+  const scrollContainerRef = useRef(null);
 
   // Core data state
   const [symptoms, setSymptoms] = useLocalStorage(STORAGE_KEY_SYMPTOMS, []);
@@ -111,6 +112,13 @@ function App() {
 
   // Refs
   const justLoggedRef = useRef(false);
+
+  // Reset scroll when switching views
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [appMode, protocolView]);
 
   // Derived values
   const timePeriods = trackingModes[trackingMode].periods;
@@ -647,7 +655,7 @@ function App() {
       )}
 
       {/* Scrollable Content Area */}
-      <div style={{
+      <div ref={scrollContainerRef} style={{
         flex: 1,
         overflowY: 'auto',
         overflowX: 'hidden',

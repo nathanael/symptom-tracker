@@ -356,6 +356,7 @@ export default function RapidEntry({
                 flex: 1,
                 height: '4px',
                 borderRadius: '2px',
+                transition: 'background 0.3s ease',
                 background: isCurrent
                   ? '#8b5cf6'
                   : hasEntry
@@ -381,7 +382,7 @@ export default function RapidEntry({
           {isCurrentMarked ? (
             <span style={{ color: '#10b981' }}>✓ Already logged</span>
           ) : (
-            `${unmarkedSymptoms.findIndex(s => s.id === currentSymptom?.id) + 1} of ${unmarkedSymptoms.length} remaining`
+            `${activeSymptomsList.length - unmarkedSymptoms.length + (isCurrentMarked ? 0 : 1)} of ${activeSymptomsList.length}`
           )}
         </div>
 
