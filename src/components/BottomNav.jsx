@@ -38,8 +38,8 @@ export default function BottomNav({
       zIndex: 200,
       paddingBottom: '20px',
     }}>
-      {/* Pinned Action Bar */}
-      {!isViewOpen && (
+      {/* Pinned Protocol Tabs */}
+      {!isViewOpen && appMode === 'stack' && (
         <div style={{
           maxWidth: '500px',
           margin: '0 auto',
@@ -47,76 +47,30 @@ export default function BottomNav({
           display: 'flex',
           gap: '8px',
         }}>
-          {appMode === 'symptoms' ? (
-            <button
-              onClick={onEditSymptoms}
-              style={{
-                flex: 1,
-                padding: '10px',
-                background: 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '8px',
-                color: '#6b7280',
-                fontSize: '14px',
-                fontWeight: '400',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-              }}
-            >
-              <span style={{ fontSize: '14px' }}>+</span>
-              Manage symptoms
-            </button>
-          ) : (
-            <>
-              {['stack', 'inputs'].map(view => {
-                const isActive = protocolView === view;
-                return (
-                  <button
-                    key={view}
-                    onClick={() => setProtocolView(view)}
-                    style={{
-                      flex: 1,
-                      padding: '8px',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      background: isActive ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
-                      color: isActive ? '#a78bfa' : '#64748b',
-                      border: isActive
-                        ? '1px solid rgba(139, 92, 246, 0.3)'
-                        : '1px solid rgba(255, 255, 255, 0.08)',
-                    }}
-                  >
-                    {view === 'stack' ? 'Stack' : 'Inputs'}
-                  </button>
-                );
-              })}
+          {['stack', 'inputs'].map(view => {
+            const isActive = protocolView === view;
+            return (
               <button
-                onClick={protocolView === 'stack' ? onEditStack : onEditInputs}
+                key={view}
+                onClick={() => setProtocolView(view)}
                 style={{
-                  padding: '8px 14px',
-                  background: 'transparent',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  flex: 1,
+                  padding: '8px',
                   borderRadius: '8px',
-                  color: '#6b7280',
                   fontSize: '14px',
-                  fontWeight: '400',
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  flexShrink: 0,
+                  background: isActive ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
+                  color: isActive ? '#a78bfa' : '#64748b',
+                  border: isActive
+                    ? '1px solid rgba(139, 92, 246, 0.3)'
+                    : '1px solid rgba(255, 255, 255, 0.08)',
                 }}
               >
-                <span style={{ fontSize: '14px' }}>+</span>
-                Manage
+                {view === 'stack' ? 'Stack' : 'Inputs'}
               </button>
-            </>
-          )}
+            );
+          })}
         </div>
       )}
       <div style={{
