@@ -726,15 +726,26 @@ export default function Inputs({
               opacity: isLogged ? 1 : 0.4,
             }} />
 
-            {/* Name */}
-            <span style={{
-              flex: 1,
-              color: isLogged ? '#e5e7eb' : '#9ca3af',
-              fontSize: '17px',
-              fontWeight: '400',
-            }}>
-              {item.name}
-            </span>
+            {/* Name + description */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{
+                color: isLogged ? '#e5e7eb' : '#9ca3af',
+                fontSize: '17px',
+                fontWeight: '400',
+                display: 'block',
+              }}>
+                {item.name}
+              </span>
+              {item.description && (
+                <span style={{
+                  color: '#6b7280',
+                  fontSize: '13px',
+                  fontWeight: '400',
+                  display: 'block',
+                  marginTop: '2px',
+                }}>{item.description}</span>
+              )}
+            </div>
 
             {/* Verdict dot */}
             {item.verdict && (

@@ -256,7 +256,8 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
   const activeSymptoms = symptoms.filter(s => s.active);
 
   activeSymptoms.forEach(symptom => {
-    output.push(`\n### ${symptom.name}`);
+    const desc = symptom.description ? ` — ${symptom.description}` : '';
+    output.push(`\n### ${symptom.name}${desc}`);
     output.push('| ' + headers.join(' | ') + ' |');
     output.push('| ' + headers.map(() => '---').join(' | ') + ' |');
 
@@ -280,6 +281,16 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
       output.push('| ' + row.join(' | ') + ' |');
     }
   });
+
+  // Supplement list with descriptions
+  const activeSupplements = stackItems.filter(s => s.active);
+  if (activeSupplements.length > 0) {
+    output.push('\n### Supplements');
+    activeSupplements.forEach(item => {
+      const desc = item.description ? ` — ${item.description}` : '';
+      output.push(`- ${item.name} (${item.defaultDose}${item.unit})${desc}`);
+    });
+  }
 
   // Stack summary - include ALL items with entries, regardless of active state
   output.push('\n### Supplements Taken');
@@ -310,7 +321,8 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
     if (activeInputs.length > 0) {
       activeInputs.forEach(item => {
         const verdict = item.verdict ? ` [${item.verdict}]` : '';
-        output.push(`- ${item.name} (${item.category})${verdict}`);
+        const desc = item.description ? ` — ${item.description}` : '';
+        output.push(`- ${item.name} (${item.category})${verdict}${desc}`);
       });
     }
 
