@@ -13,12 +13,12 @@
   .success { color: #4ade80; }
   .warn { color: #fbbf24; }
   .error { color: #f87171; }
-  #log { margin-top: 16px; }
+  #log { margin-top: 16px; font-size: 13px; line-height: 1.6; }
 </style>
 </head>
 <body>
 <h1>Restore Tracking Data</h1>
-<p>This will restore symptom entries, supplement entries, and daily notes for <strong>Feb 14 &amp; Feb 15, 2026</strong>, plus supplement entries for <strong>Feb 20</strong>.</p>
+<p>Restores symptom entries, supplement entries, input log, and daily notes for <strong>Feb 12&ndash;17, 2026</strong>, plus supplement entries for <strong>Feb 20</strong>.</p>
 <p class="warn">Only entries that don't already exist will be added (won't overwrite).</p>
 
 <button onclick="runRestore(false)">Preview (dry run)</button>
@@ -45,11 +45,17 @@ function runRestore(forReal) {
   const stackItems = JSON.parse(localStorage.getItem('symptomTracker_stackItems') || '[]');
   const stackEntries = JSON.parse(localStorage.getItem('symptomTracker_stackEntries') || '{}');
   const dailyNotes = JSON.parse(localStorage.getItem('symptomTracker_notes') || '{}');
+  const inputItems = JSON.parse(localStorage.getItem('symptomTracker_inputItems') || '[]');
+  const inputEntries = JSON.parse(localStorage.getItem('symptomTracker_inputEntries') || '{}');
 
-  // Build symptom name -> id lookup (case-insensitive, match start)
+  // Build symptom name -> id lookup (case-insensitive)
+  // Handle dash variants: em-dash, en-dash, hyphen
   const symptomLookup = {};
   symptoms.forEach(s => {
     symptomLookup[s.name.toLowerCase()] = s.id;
+    // Also index with normalized dashes
+    const normalized = s.name.toLowerCase().replace(/[\u2014\u2013]/g, '-');
+    symptomLookup[normalized] = s.id;
   });
 
   // Build stack item name -> id lookup
@@ -58,13 +64,73 @@ function runRestore(forReal) {
     stackLookup[s.name.toLowerCase()] = s.id;
   });
 
-  log('Found ' + symptoms.length + ' symptoms, ' + stackItems.length + ' supplements in localStorage');
+  // Build input item name -> id lookup
+  const inputLookup = {};
+  inputItems.forEach(i => {
+    inputLookup[i.name.toLowerCase()] = i.id;
+  });
+
+  // Helper to find symptom ID with dash-variant fallback
+  function findSymptomId(name) {
+    const lower = name.toLowerCase();
+    if (symptomLookup[lower]) return symptomLookup[lower];
+    // Try with normalized dashes
+    const normalized = lower.replace(/[\u2014\u2013]/g, '-');
+    if (symptomLookup[normalized]) return symptomLookup[normalized];
+    // Try replacing hyphen with em-dash
+    const emDash = lower.replace(/ - /g, ' \u2014 ').replace(/ - /g, ' \u2014 ');
+    if (symptomLookup[emDash]) return symptomLookup[emDash];
+    return null;
+  }
+
+  log('Found ' + symptoms.length + ' symptoms, ' + stackItems.length + ' supplements, ' + inputItems.length + ' inputs in localStorage');
   log('');
 
   // === SYMPTOM ENTRIES TO RESTORE ===
+  // Format: [symptomName, dateKey, period, severity]
+  // severity -1 = N/A
+  const NA = -1;
   const symptomData = [
-    // [symptomName, dateKey, period, severity]
-    // Feb 14
+    // ===== Feb 12 AM =====
+    ['Flushing', '2026-02-12', 'morning', 2],
+    ['Penile retraction', '2026-02-12', 'morning', 2],
+    ['Urinary urgency', '2026-02-12', 'morning', 2],
+    ['Daytime fatigue', '2026-02-12', 'morning', 0],
+    ['Irritability', '2026-02-12', 'morning', 2],
+    ['Air hunger', '2026-02-12', 'morning', 1],
+    ['Anxiety \u2014 Mental', '2026-02-12', 'morning', 0],
+    ['Low sexual drive', '2026-02-12', 'morning', 3],
+    ['Neuropathy', '2026-02-12', 'morning', 0],
+    ['Headache', '2026-02-12', 'morning', 1],
+    ['Dysphagia', '2026-02-12', 'morning', 2],
+    ['Fascial tightness', '2026-02-12', 'morning', 1],
+    ['Psoriasis', '2026-02-12', 'morning', 0],
+    ['Skinny stool', '2026-02-12', 'morning', 3],
+    ['Diarrhea / Loose stool', '2026-02-12', 'morning', 3],
+    ['Brain fog', '2026-02-12', 'morning', 1],
+    ['Sugar / alcohol cravings', '2026-02-12', 'morning', 0],
+    ['Heartburn / bile reflux', '2026-02-12', 'morning', 0],
+    ['Oral thrush', '2026-02-12', 'morning', 1],
+    ['Farting, burping', '2026-02-12', 'morning', 1],
+    ['Cracking joints', '2026-02-12', 'morning', 1],
+    ['Acne', '2026-02-12', 'morning', 1],
+    ['Apathy', '2026-02-12', 'morning', 1],
+    ['Itching', '2026-02-12', 'morning', 0],
+    ['Depression', '2026-02-12', 'morning', 2],
+    ['Poor sleep quality', '2026-02-12', 'morning', 2],
+
+    // ===== Feb 13 =====
+    ['Air hunger', '2026-02-13', 'morning', 1],
+    ['Anxiety \u2014 Mental', '2026-02-13', 'morning', 1],
+    ['Diarrhea / Loose stool', '2026-02-13', 'morning', 1],
+    ['Air hunger', '2026-02-13', 'evening', 0],
+    ['Anxiety \u2014 Mental', '2026-02-13', 'evening', 0],
+    ['Neuropathy', '2026-02-13', 'evening', 1],
+    ['Heartburn / bile reflux', '2026-02-13', 'evening', 2],
+    ['Poor sleep quality', '2026-02-13', 'evening', 3],
+
+    // ===== Feb 14 =====
+    ['Air hunger', '2026-02-14', 'morning', 1],
     ['Flushing', '2026-02-14', 'evening', 3],
     ['Penile retraction', '2026-02-14', 'evening', 2],
     ['Pee dribble', '2026-02-14', 'evening', 1],
@@ -72,9 +138,8 @@ function runRestore(forReal) {
     ['Daytime fatigue', '2026-02-14', 'evening', 0],
     ['Irritability', '2026-02-14', 'evening', 1],
     ['Social withdrawal', '2026-02-14', 'evening', 1],
-    ['Air hunger', '2026-02-14', 'morning', 1],
     ['Air hunger', '2026-02-14', 'evening', 1],
-    ['Anxiety', '2026-02-14', 'evening', 1],
+    ['Anxiety \u2014 Mental', '2026-02-14', 'evening', 1],
     ['Low sexual drive', '2026-02-14', 'evening', 3],
     ['Neuropathy', '2026-02-14', 'evening', 1],
     ['Headache', '2026-02-14', 'evening', 2],
@@ -93,7 +158,8 @@ function runRestore(forReal) {
     ['Itching', '2026-02-14', 'evening', 1],
     ['Depression', '2026-02-14', 'evening', 2],
     ['Poor sleep quality', '2026-02-14', 'evening', 2],
-    // Feb 15 AM
+
+    // ===== Feb 15 AM =====
     ['Flushing', '2026-02-15', 'morning', 3],
     ['Penile retraction', '2026-02-15', 'morning', 2],
     ['Pee dribble', '2026-02-15', 'morning', 1],
@@ -102,7 +168,7 @@ function runRestore(forReal) {
     ['Irritability', '2026-02-15', 'morning', 1],
     ['Social withdrawal', '2026-02-15', 'morning', 1],
     ['Air hunger', '2026-02-15', 'morning', 1],
-    ['Anxiety', '2026-02-15', 'morning', 0],
+    ['Anxiety \u2014 Mental', '2026-02-15', 'morning', 0],
     ['Low sexual drive', '2026-02-15', 'morning', 2],
     ['Neuropathy', '2026-02-15', 'morning', 1],
     ['Headache', '2026-02-15', 'morning', 3],
@@ -122,7 +188,8 @@ function runRestore(forReal) {
     ['Itching', '2026-02-15', 'morning', 0],
     ['Depression', '2026-02-15', 'morning', 1],
     ['Poor sleep quality', '2026-02-15', 'morning', 3],
-    // Feb 15 PM
+
+    // ===== Feb 15 PM =====
     ['Flushing', '2026-02-15', 'evening', 3],
     ['Penile retraction', '2026-02-15', 'evening', 2],
     ['Pee dribble', '2026-02-15', 'evening', 1],
@@ -131,7 +198,7 @@ function runRestore(forReal) {
     ['Irritability', '2026-02-15', 'evening', 1],
     ['Social withdrawal', '2026-02-15', 'evening', 1],
     ['Air hunger', '2026-02-15', 'evening', 0],
-    ['Anxiety', '2026-02-15', 'evening', 0],
+    ['Anxiety \u2014 Mental', '2026-02-15', 'evening', 0],
     ['Low sexual drive', '2026-02-15', 'evening', 2],
     ['Neuropathy', '2026-02-15', 'evening', 0],
     ['Headache', '2026-02-15', 'evening', 1],
@@ -149,6 +216,134 @@ function runRestore(forReal) {
     ['Itching', '2026-02-15', 'evening', 2],
     ['Depression', '2026-02-15', 'evening', 0],
     ['Poor sleep quality', '2026-02-15', 'evening', 0],
+
+    // ===== Feb 16 AM =====
+    ['Flushing', '2026-02-16', 'morning', 3],
+    ['Penile retraction', '2026-02-16', 'morning', 1],
+    ['Pee dribble', '2026-02-16', 'morning', 1],
+    ['Urinary urgency', '2026-02-16', 'morning', 1],
+    ['Daytime fatigue', '2026-02-16', 'morning', 0],
+    ['Irritability', '2026-02-16', 'morning', 1],
+    ['Social withdrawal', '2026-02-16', 'morning', 0],
+    ['Air hunger', '2026-02-16', 'morning', 1],
+    ['Anxiety \u2014 Mental', '2026-02-16', 'morning', 0],
+    ['Anxiety', '2026-02-16', 'morning', 0],
+    ['Low sexual drive', '2026-02-16', 'morning', 3],
+    ['Neuropathy', '2026-02-16', 'morning', 0],
+    ['Headache', '2026-02-16', 'morning', 1],
+    ['Dysphagia', '2026-02-16', 'morning', 1],
+    ['Fascial tightness', '2026-02-16', 'morning', 0],
+    ['Psoriasis', '2026-02-16', 'morning', 2],
+    ['Skinny stool', '2026-02-16', 'morning', 2],
+    ['Diarrhea / Loose stool', '2026-02-16', 'morning', 0],
+    ['Brain fog', '2026-02-16', 'morning', 0],
+    ['Sugar / alcohol cravings', '2026-02-16', 'morning', 0],
+    ['Heartburn / bile reflux', '2026-02-16', 'morning', 0],
+    ['Oral thrush', '2026-02-16', 'morning', 0],
+    ['Farting, burping', '2026-02-16', 'morning', 0],
+    ['Cracking joints', '2026-02-16', 'morning', 1],
+    ['Acne', '2026-02-16', 'morning', 0],
+    ['Apathy', '2026-02-16', 'morning', 0],
+    ['Itching', '2026-02-16', 'morning', 1],
+    ['Depression', '2026-02-16', 'morning', 0],
+    ['Poor sleep quality', '2026-02-16', 'morning', 1],
+
+    // ===== Feb 16 PM =====
+    ['Flushing', '2026-02-16', 'evening', 3],
+    ['Penile retraction', '2026-02-16', 'evening', 1],
+    ['Pee dribble', '2026-02-16', 'evening', 1],
+    ['Urinary urgency', '2026-02-16', 'evening', 1],
+    ['Daytime fatigue', '2026-02-16', 'evening', 0],
+    ['Irritability', '2026-02-16', 'evening', 1],
+    ['Social withdrawal', '2026-02-16', 'evening', 1],
+    ['Air hunger', '2026-02-16', 'evening', 0],
+    ['Anxiety \u2014 Mental', '2026-02-16', 'evening', 0],
+    ['Anxiety', '2026-02-16', 'evening', 1],
+    ['Low sexual drive', '2026-02-16', 'evening', 3],
+    ['Neuropathy', '2026-02-16', 'evening', 1],
+    ['Headache', '2026-02-16', 'evening', 1],
+    ['Dysphagia', '2026-02-16', 'evening', 1],
+    ['Fascial tightness', '2026-02-16', 'evening', 1],
+    ['Psoriasis', '2026-02-16', 'evening', 3],
+    ['Skinny stool', '2026-02-16', 'evening', 0],
+    ['Diarrhea / Loose stool', '2026-02-16', 'evening', 0],
+    ['Brain fog', '2026-02-16', 'evening', 1],
+    ['Sugar / alcohol cravings', '2026-02-16', 'evening', 2],
+    ['Heartburn / bile reflux', '2026-02-16', 'evening', 2],
+    ['Oral thrush', '2026-02-16', 'evening', 0],
+    ['Farting, burping', '2026-02-16', 'evening', 1],
+    ['Cracking joints', '2026-02-16', 'evening', 1],
+    ['Acne', '2026-02-16', 'evening', 0],
+    ['Apathy', '2026-02-16', 'evening', 1],
+    ['Itching', '2026-02-16', 'evening', 0],
+    ['Depression', '2026-02-16', 'evening', 1],
+    ['Poor sleep quality', '2026-02-16', 'evening', 0],
+
+    // ===== Feb 17 AM =====
+    ['Flushing', '2026-02-17', 'morning', 3],
+    ['Penile retraction', '2026-02-17', 'morning', 1],
+    ['Pee dribble', '2026-02-17', 'morning', 1],
+    ['Urinary urgency', '2026-02-17', 'morning', 2],
+    ['Daytime fatigue', '2026-02-17', 'morning', 0],
+    ['Irritability', '2026-02-17', 'morning', 1],
+    ['Social withdrawal', '2026-02-17', 'morning', 1],
+    ['Air hunger', '2026-02-17', 'morning', 1],
+    ['Anxiety \u2014 Mental', '2026-02-17', 'morning', 0],
+    ['Anxiety', '2026-02-17', 'morning', 1],
+    ['Low sexual drive', '2026-02-17', 'morning', 3],
+    ['Neuropathy', '2026-02-17', 'morning', 1],
+    ['Headache', '2026-02-17', 'morning', 2],
+    ['Dysphagia', '2026-02-17', 'morning', 0],
+    ['Fascial tightness', '2026-02-17', 'morning', 1],
+    ['Psoriasis', '2026-02-17', 'morning', 2],
+    ['Skinny stool', '2026-02-17', 'morning', 1],
+    ['Diarrhea / Loose stool', '2026-02-17', 'morning', 3],
+    ['Brain fog', '2026-02-17', 'morning', 0],
+    ['Sugar / alcohol cravings', '2026-02-17', 'morning', 0],
+    ['Heartburn / bile reflux', '2026-02-17', 'morning', 0],
+    ['Oral thrush', '2026-02-17', 'morning', 1],
+    ['Farting, burping', '2026-02-17', 'morning', 1],
+    ['Cracking joints', '2026-02-17', 'morning', 1],
+    ['Acne', '2026-02-17', 'morning', 0],
+    ['Apathy', '2026-02-17', 'morning', 0],
+    ['Itching', '2026-02-17', 'morning', 1],
+    ['Depression', '2026-02-17', 'morning', 0],
+    ['Poor sleep quality', '2026-02-17', 'morning', 1],
+    ['Exercise intolerance', '2026-02-17', 'morning', NA],
+    ['Cognitive fusion', '2026-02-17', 'morning', 1],
+
+    // ===== Feb 17 PM =====
+    ['Flushing', '2026-02-17', 'evening', 3],
+    ['Penile retraction', '2026-02-17', 'evening', 1],
+    ['Pee dribble', '2026-02-17', 'evening', NA],
+    ['Urinary urgency', '2026-02-17', 'evening', 1],
+    ['Daytime fatigue', '2026-02-17', 'evening', 0],
+    ['Irritability', '2026-02-17', 'evening', 0],
+    ['Social withdrawal', '2026-02-17', 'evening', 2],
+    ['Air hunger', '2026-02-17', 'evening', 1],
+    ['Anxiety \u2014 Mental', '2026-02-17', 'evening', 0],
+    ['Anxiety', '2026-02-17', 'evening', 1],
+    ['Low sexual drive', '2026-02-17', 'evening', 3],
+    ['Neuropathy', '2026-02-17', 'evening', 1],
+    ['Headache', '2026-02-17', 'evening', 1],
+    ['Dysphagia', '2026-02-17', 'evening', 1],
+    ['Fascial tightness', '2026-02-17', 'evening', 1],
+    ['Psoriasis', '2026-02-17', 'evening', 2],
+    ['Skinny stool', '2026-02-17', 'evening', NA],
+    ['Diarrhea / Loose stool', '2026-02-17', 'evening', NA],
+    ['Brain fog', '2026-02-17', 'evening', 1],
+    ['Sugar / alcohol cravings', '2026-02-17', 'evening', 1],
+    ['Heartburn / bile reflux', '2026-02-17', 'evening', 0],
+    ['Oral thrush', '2026-02-17', 'evening', NA],
+    ['Farting, burping', '2026-02-17', 'evening', 0],
+    ['Cracking joints', '2026-02-17', 'evening', 1],
+    ['Acne', '2026-02-17', 'evening', 0],
+    ['Apathy', '2026-02-17', 'evening', 1],
+    ['Itching', '2026-02-17', 'evening', 0],
+    ['Depression', '2026-02-17', 'evening', 1],
+    ['Poor sleep quality', '2026-02-17', 'evening', NA],
+    ['Exercise intolerance', '2026-02-17', 'evening', NA],
+    ['Cognitive fusion', '2026-02-17', 'evening', 1],
   ];
 
   let restoredSymptoms = 0;
@@ -156,7 +351,7 @@ function runRestore(forReal) {
   let missingSymptoms = [];
 
   symptomData.forEach(([name, dateKey, period, severity]) => {
-    const id = symptomLookup[name.toLowerCase()];
+    const id = findSymptomId(name);
     if (!id) {
       if (!missingSymptoms.includes(name)) missingSymptoms.push(name);
       return;
@@ -166,7 +361,8 @@ function runRestore(forReal) {
       skippedSymptoms++;
       return;
     }
-    log(`+ Symptom: ${name} ${dateKey} ${period === 'morning' ? 'AM' : 'PM'} = ${severity}`);
+    const sevLabel = severity === NA ? 'N/A' : severity;
+    log(`+ Symptom: ${name} ${dateKey} ${period === 'morning' ? 'AM' : 'PM'} = ${sevLabel}`);
     if (forReal) {
       entries[key] = { time: period, severity, date: dateKey, symptomId: id };
     }
@@ -182,16 +378,41 @@ function runRestore(forReal) {
   // === SUPPLEMENT ENTRIES TO RESTORE ===
   const supplementData = [
     // [name, dateKey, dose]
+    // Feb 12
+    ['Ketotifen', '2026-02-12', 1],
+    ['Magnesium', '2026-02-12', 300],
+
+    // Feb 13
+    ['Ketotifen', '2026-02-13', 1],
+    ['Magnesium', '2026-02-13', 300],
+    ['B2', '2026-02-13', 100],
+
+    // Feb 14
+    ['B2', '2026-02-14', 300],
     ['Ketotifen', '2026-02-14', 1],
     ['Magnesium', '2026-02-14', 300],
     ['Creatine', '2026-02-14', 0.75],
-    ['B2', '2026-02-14', 300],
 
-    ['Creatine', '2026-02-15', 0.75],
-    ['Ketotifen', '2026-02-15', 0.5],
+    // Feb 15
     ['B2', '2026-02-15', 100],
+    ['Ketotifen', '2026-02-15', 0.5],
+    ['Creatine', '2026-02-15', 0.75],
     ['Magnesium', '2026-02-15', 200],
 
+    // Feb 16
+    ['B1 HCL Injectable', '2026-02-16', 95],
+    ['Ketotifen', '2026-02-16', 0.5],
+    ['B2', '2026-02-16', 200],
+    ['Magnesium', '2026-02-16', 300],
+    ['Creatine', '2026-02-16', 1],
+
+    // Feb 17
+    ['B2', '2026-02-17', 200],
+    ['Ketotifen', '2026-02-17', 0.5],
+    ['Creatine', '2026-02-17', 0.75],
+    ['Magnesium', '2026-02-17', 100],
+
+    // Feb 20 (from separate export)
     ['Glycine', '2026-02-20', 3],
     ['Creatine', '2026-02-20', 1.5],
     ['Magnesium', '2026-02-20', 300],
@@ -227,10 +448,47 @@ function runRestore(forReal) {
     log('Could not match supplements: ' + missingSupplements.join(', '), 'error');
   }
 
+  // === INPUT ENTRIES TO RESTORE ===
+  const inputData = [
+    // [name, dateKey, count]
+    ['Ginger tea', '2026-02-17', 2],
+  ];
+
+  let restoredInputs = 0;
+  let skippedInputs = 0;
+  let missingInputs = [];
+
+  inputData.forEach(([name, dateKey, count]) => {
+    const id = inputLookup[name.toLowerCase()];
+    if (!id) {
+      if (!missingInputs.includes(name)) missingInputs.push(name);
+      return;
+    }
+    const key = `${dateKey}-${id}`;
+    if (inputEntries[key]) {
+      skippedInputs++;
+      return;
+    }
+    log(`+ Input: ${name} ${dateKey} x${count}`);
+    if (forReal) {
+      inputEntries[key] = { date: dateKey, inputId: id, logged: true, count };
+    }
+    restoredInputs++;
+  });
+
+  log('');
+  log(`Input entries: ${restoredInputs} to restore, ${skippedInputs} already exist`, restoredInputs > 0 ? 'success' : '');
+  if (missingInputs.length > 0) {
+    log('Could not match inputs: ' + missingInputs.join(', '), 'error');
+  }
+
   // === DAILY NOTES TO RESTORE ===
   const notesData = {
+    '2026-02-13': "Today I felt like the air hunger was 95% gone in the afternoon and evening. Although, when I say this, I don\u2019t mean I\u2019ve pushed my body. This is only judged at rest. Most days I give a 1/5 should really be a 5/20. This afternoon I would have given a 1/20. I could sense it, but it wasn\u2019t noticeable and caused no anxiety. I have also been taking Panadol all day and yesterday as I\u2019ve had a bad cold. The worst of it was today, but it started yesterday during the day.",
     '2026-02-14': "Still absolute liquid on the second stool. I wonder if I should only take magnesium with meals and only take B2 and creatine with meals as well",
-    '2026-02-15': "Had poor sleep last night probably due to the 300mg b2. It was probably too much for my system without the b1 without a transition from low dose. I had a lot of trouble falling asleep but then slept later. Sleep score of only 63 on garmin.\n\nDuration 6h 54m\nStress 25\nDeep 13m\nLight 5h 53m\nREM 48m\n\n\nI wonder too if this caused the overnight development of a headache. \n\nThe type of neuropathy I've had in the last couple of days is the same type I've had primarily since December which is a dull pain in the first knuckles of my right hand with just a little in the left. \n\nFinally feeling like my cold is dissipating. I think I'll be back to normal tomorrow.",
+    '2026-02-15': "Had poor sleep last night probably due to the 300mg b2. It was probably too much for my system without the b1 without a transition from low dose. I had a lot of trouble falling asleep but then slept later. Sleep score of only 63 on garmin.\n\nDuration 6h 54m\nStress 25\nDeep 13m\nLight 5h 53m\nREM 48m\n\nI wonder too if this caused the overnight development of a headache. \n\nThe type of neuropathy I\u2019ve had in the last couple of days is the same type I\u2019ve had primarily since December which is a dull pain in the first knuckles of my right hand with just a little in the left. \n\nFinally feeling like my cold is dissipating. I think I\u2019ll be back to normal tomorrow.",
+    '2026-02-16': "I'd say air hunger is non-zero. Not 1.",
+    '2026-02-17': "Heavy on the carbohydrates this evening. I think this could be a key. I now have that sharp electrical Type nerve pain that I haven\u2019t had in quite a while and I wonder if it has to do with sugar levels. I had this a lot in 2020. But it\u2019s been quite a while since I\u2019ve had it now. The nerve pain I\u2019ve been experiencing more recently, has been a dull knuckle Localized nerve pain. The sharp and acute but short pain happens a lot in my fingers, but also even in my eyeballs. Almost like electrical shocks. Extremely different than the other type of Nerve pain. Very difficult to fall asleep tonight. Maybe due to the low magnesium?",
   };
 
   let restoredNotes = 0;
@@ -256,6 +514,7 @@ function runRestore(forReal) {
   if (forReal) {
     localStorage.setItem('symptomTracker_entries', JSON.stringify(entries));
     localStorage.setItem('symptomTracker_stackEntries', JSON.stringify(stackEntries));
+    localStorage.setItem('symptomTracker_inputEntries', JSON.stringify(inputEntries));
     localStorage.setItem('symptomTracker_notes', JSON.stringify(dailyNotes));
     // Update timestamp so this gets synced to cloud
     localStorage.setItem('symptomTracker_localUpdatedAt', Date.now().toString());
@@ -265,7 +524,7 @@ function runRestore(forReal) {
     log('Reload the app to see restored data. It will auto-sync to cloud.', 'success');
   } else {
     log('');
-    log('=== DRY RUN COMPLETE — nothing was changed ===', 'warn');
+    log('=== DRY RUN COMPLETE \u2014 nothing was changed ===', 'warn');
     log('Click "Restore Data" to actually save.', 'warn');
   }
 }
