@@ -623,7 +623,7 @@ function App() {
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         background: trackingMode === 'ampm'
-          ? ((quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening' ? '#080A0F' : '#0A0908')
+          ? ((quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening' ? '#080A0F' : '#12140F')
           : '#08090A',
         transition: 'background-color 0.6s ease',
         minHeight: '100%',
@@ -651,7 +651,10 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: '#08090A',
+        background: trackingMode === 'ampm'
+          ? ((quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening' ? '#080A0F' : '#12140F')
+          : '#08090A',
+        transition: 'background-color 0.6s ease',
         boxShadow: window.innerWidth > 500 ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
       }}
     >
@@ -777,60 +780,9 @@ function App() {
           transform: 'translateX(-50%)',
           display: 'flex',
           alignItems: 'center',
-          gap: '2px',
-          background: 'rgba(15, 17, 21, 0.95)',
-          borderRadius: '24px',
-          padding: '4px',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          gap: '8px',
           zIndex: 200,
         }}>
-          <DayNightToggle
-            isNight={(quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening'}
-            onToggle={() => {
-              const current = quickLogTime || getCurrentTimePeriod(trackingMode);
-              const next = current === 'morning' ? 'evening' : 'morning';
-              setQuickLogTime(next);
-              setFlashColumn(next);
-              setTimeout(() => setFlashColumn(null), 400);
-              setCopyToastMessage(next === 'morning' ? '..AM..' : '..PM..');
-              setTimeout(() => setCopyToastMessage(''), 2000);
-            }}
-          />
-          {/* Divider */}
-          <div style={{
-            width: '1px',
-            height: '20px',
-            background: 'rgba(255, 255, 255, 0.1)',
-            margin: '0 4px',
-          }} />
-          {/* Edit Note Button */}
-          <button
-            onClick={() => setShowNoteModal(true)}
-            style={{
-              padding: '10px 14px',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '20px',
-              color: '#9ca3af',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9"/>
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-          </button>
-          {/* Divider */}
-          <div style={{
-            width: '1px',
-            height: '20px',
-            background: 'rgba(255, 255, 255, 0.1)',
-            margin: '0 4px',
-          }} />
           {/* Rapid Entry Button */}
           <button
             onClick={() => {
@@ -838,7 +790,6 @@ function App() {
               if (!quickLogTime) {
                 setQuickLogTime(effectiveTime);
               }
-              // Compute first incomplete symptom index
               const dateKey = getDateKey(selectedDate);
               const timeKey = trackingMode === 'ampm' ? effectiveTime : 'daily';
               const allActive = symptoms.filter(s => s.active).sort((a, b) => {
@@ -858,19 +809,58 @@ function App() {
               }
             }}
             style={{
-              padding: '10px 14px',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '20px',
+              width: '44px',
+              height: '44px',
+              background: 'rgba(15, 17, 21, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%',
               color: '#fbbf24',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+              flexShrink: 0,
             }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          </button>
+          {/* Day/Night Toggle */}
+          <DayNightToggle
+            isNight={(quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening'}
+            onToggle={() => {
+              const current = quickLogTime || getCurrentTimePeriod(trackingMode);
+              const next = current === 'morning' ? 'evening' : 'morning';
+              setQuickLogTime(next);
+              setFlashColumn(next);
+              setTimeout(() => setFlashColumn(null), 400);
+              setCopyToastMessage(next === 'morning' ? '..AM..' : '..PM..');
+              setTimeout(() => setCopyToastMessage(''), 2000);
+            }}
+          />
+          {/* Note Button */}
+          <button
+            onClick={() => setShowNoteModal(true)}
+            style={{
+              width: '44px',
+              height: '44px',
+              background: 'rgba(15, 17, 21, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+              flexShrink: 0,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
             </svg>
           </button>
         </div>

@@ -7,22 +7,19 @@ export default function DayNightToggle({ isNight, onToggle }) {
     <div
       onClick={onToggle}
       style={{
-        padding: '4px 6px',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
         WebkitTapHighlightColor: 'transparent',
+        flex: 1,
       }}
     >
       <svg
         viewBox="0 0 100 40"
-        width={100}
-        height={40}
+        width="100%"
         style={{
           display: 'block',
           overflow: 'visible',
-          borderRadius: '999px',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
         }}
       >
         <defs>
