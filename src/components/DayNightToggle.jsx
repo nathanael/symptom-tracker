@@ -1,19 +1,13 @@
-import { useRef } from 'react';
-
 export default function DayNightToggle({ isNight, onToggle }) {
-  const ref = useRef(null);
-
-  const trackColor = isNight ? '#1E3A8A' : '#73C0FC';
-  const knobX = isNight ? 76 : 24;
-  const transition = '0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
-  const fadeSlow = '0.5s ease';
+  // Timing constants matching the original prototype
+  const trackTransition = '0.6s cubic-bezier(0.4, 0.0, 0.2, 1)';
+  const bounceTransition = '0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
 
   return (
     <div
       onClick={onToggle}
-      ref={ref}
       style={{
-        padding: '6px 4px',
+        padding: '4px 6px',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -22,138 +16,129 @@ export default function DayNightToggle({ isNight, onToggle }) {
     >
       <svg
         viewBox="0 0 100 40"
-        width={76}
-        height={32}
-        style={{ display: 'block', overflow: 'visible' }}
+        width={100}
+        height={40}
+        style={{
+          display: 'block',
+          overflow: 'visible',
+          borderRadius: '999px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
+        }}
       >
         <defs>
-          {/* Drop shadow for sun */}
-          <filter id="sun-shadow" x="-40%" y="-40%" width="180%" height="180%">
-            <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#F59E0B" floodOpacity="0.5" />
+          {/* Day shadow filter */}
+          <filter id="dn-shadow-day" x="-50%" y="-50%" width="200%" height="200%" colorInterpolationFilters="sRGB">
+            <feDropShadow dx="0" dy="2" stdDeviation="1.5" floodColor="#000000" floodOpacity="0.2" />
           </filter>
-          {/* Glow for moon */}
-          <filter id="moon-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feFlood floodColor="#93C5FD" floodOpacity="0.6" result="color" />
-            <feComposite in="color" in2="blur" operator="in" result="glow" />
-            <feMerge>
-              <feMergeNode in="glow" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
+
+          {/* Night glow filter */}
+          <filter id="dn-glow-night" x="-50%" y="-50%" width="200%" height="200%" colorInterpolationFilters="sRGB">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#FEFCD7" floodOpacity="0.9" />
           </filter>
-          {/* Crescent mask */}
-          <mask id="crescent-mask">
-            <rect x="0" y="0" width="100" height="100" fill="white" />
+
+          {/* Crescent moon mask - shared by sun and moon */}
+          <mask id="dn-moon-mask" maskUnits="userSpaceOnUse" x="-50" y="-50" width="100" height="100">
+            <rect x="-50" y="-50" width="100" height="100" fill="white" />
             <circle
-              cx={isNight ? 8 : 0}
-              cy={isNight ? -3 : 0}
-              r="9"
-              fill="black"
-              style={{ transition: `cx ${fadeSlow}, cy ${fadeSlow}` }}
+              cx="0" cy="0" r="13" fill="black"
+              style={{
+                transform: isNight ? 'translate(-6px, -6px)' : 'translate(25px, -25px)',
+                transition: `transform ${bounceTransition}`,
+              }}
             />
           </mask>
         </defs>
 
         {/* Track */}
         <rect
-          x="2"
-          y="2"
-          width="96"
-          height="36"
-          rx="18"
-          ry="18"
-          fill={trackColor}
-          style={{ transition: `fill ${fadeSlow}` }}
+          x="0" y="0" width="100" height="40" rx="20" ry="20"
+          fill={isNight ? '#1E3A8A' : '#73C0FC'}
+          style={{ transition: `fill ${trackTransition}` }}
         />
 
-        {/* Stars (night decoration - left half) */}
+        {/* Night Stars (sparkle paths) */}
         <g style={{
           opacity: isNight ? 1 : 0,
-          transition: `opacity ${fadeSlow}`,
+          transform: isNight ? 'translateY(0)' : 'translateY(-10px)',
+          transition: 'opacity 0.4s ease, transform 0.6s ease',
         }}>
-          <circle cx="18" cy="12" r="1" fill="#FDE68A" />
-          <circle cx="30" cy="8" r="0.8" fill="#FDE68A" />
-          <circle cx="12" cy="24" r="0.6" fill="#FDE68A" />
-          <circle cx="38" cy="14" r="0.7" fill="#FDE68A" />
-          <circle cx="25" cy="28" r="0.9" fill="#FDE68A" />
-          <circle cx="42" cy="26" r="0.5" fill="#FDE68A" />
-          {/* Twinkle star */}
-          <g style={{
-            opacity: isNight ? 1 : 0,
-            transition: `opacity 0.8s ease 0.3s`,
-          }}>
-            <path d="M15 18 L15.5 16 L16 18 L17.5 18.5 L16 19 L15.5 21 L15 19 L13.5 18.5 Z" fill="#FDE68A" opacity="0.8" />
-            <path d="M35 22 L35.3 20.8 L35.6 22 L36.8 22.3 L35.6 22.6 L35.3 23.8 L35 22.6 L33.8 22.3 Z" fill="#FDE68A" opacity="0.6" />
-          </g>
+          <path d="M 20 8 Q 20 12 16 12 Q 20 12 20 16 Q 20 12 24 12 Q 20 12 20 8 Z" fill="#ffffff" />
+          <path d="M 35 19 Q 35 22 32 22 Q 35 22 35 25 Q 35 22 38 22 Q 35 22 35 19 Z" fill="#ffffff" opacity="0.8" />
+          <path d="M 48 12 Q 48 14 46 14 Q 48 14 48 16 Q 48 14 50 14 Q 48 14 48 12 Z" fill="#ffffff" opacity="0.6" />
         </g>
 
-        {/* Clouds (day decoration - right half) */}
+        {/* Day Clouds */}
         <g style={{
           opacity: isNight ? 0 : 1,
-          transition: `opacity ${fadeSlow}`,
+          transform: isNight ? 'translateY(10px)' : 'translateY(0)',
+          transition: 'opacity 0.4s ease, transform 0.6s ease',
         }}>
-          {/* Cloud 1 */}
-          <g>
-            <circle cx="62" cy="14" r="4" fill="white" opacity="0.5" />
-            <circle cx="67" cy="13" r="5" fill="white" opacity="0.5" />
-            <circle cx="72" cy="14" r="3.5" fill="white" opacity="0.5" />
-            <rect x="62" y="14" width="10" height="4" rx="2" fill="white" opacity="0.5" />
+          {/* Large cloud */}
+          <g fill="#ffffff" opacity="0.9">
+            <circle cx="70" cy="20" r="6" />
+            <circle cx="78" cy="22" r="4" />
+            <circle cx="64" cy="22" r="4" />
+            <rect x="64" y="20" width="14" height="6" rx="3" />
           </g>
-          {/* Cloud 2 */}
-          <g>
-            <circle cx="72" cy="28" r="3" fill="white" opacity="0.35" />
-            <circle cx="76" cy="27" r="4" fill="white" opacity="0.35" />
-            <circle cx="80" cy="28" r="3" fill="white" opacity="0.35" />
-            <rect x="72" y="28" width="8" height="3" rx="1.5" fill="white" opacity="0.35" />
+          {/* Small cloud */}
+          <g fill="#ffffff" opacity="0.6">
+            <circle cx="50" cy="14" r="4" />
+            <circle cx="55" cy="15" r="3" />
+            <circle cx="45" cy="15" r="3" />
+            <rect x="45" y="14" width="10" height="4" rx="2" />
           </g>
         </g>
 
-        {/* Knob group */}
+        {/* Sliding Knob */}
         <g style={{
-          transform: `translateX(${knobX}px)`,
-          transition: `transform ${transition}`,
+          transform: isNight ? 'translate(80px, 20px)' : 'translate(20px, 20px)',
+          transition: `transform ${bounceTransition}`,
         }}>
-          {/* Sun */}
+          {/* Sun Rays */}
           <g
-            filter={isNight ? undefined : 'url(#sun-shadow)'}
+            stroke="#FFD43B" strokeWidth="2" strokeLinecap="round"
             style={{
               opacity: isNight ? 0 : 1,
-              transform: isNight ? 'rotate(60deg)' : 'rotate(0deg)',
-              transformOrigin: '0px 20px',
-              transition: `opacity 0.4s ease, transform 0.5s ease`,
+              transform: isNight ? 'rotate(90deg) scale(0.5)' : 'rotate(0deg) scale(1)',
+              transition: `opacity 0.4s ease, transform ${bounceTransition}`,
             }}
           >
-            <circle cx="0" cy="20" r="10" fill="#FBBF24" />
-            {/* Rays */}
-            {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
-              <line
-                key={angle}
-                x1={0 + Math.cos(angle * Math.PI / 180) * 12}
-                y1={20 + Math.sin(angle * Math.PI / 180) * 12}
-                x2={0 + Math.cos(angle * Math.PI / 180) * 15}
-                y2={20 + Math.sin(angle * Math.PI / 180) * 15}
-                stroke="#FBBF24"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            ))}
+            <line x1="0" y1="-12.5" x2="0" y2="-15.5" />
+            <line x1="0" y1="12.5" x2="0" y2="15.5" />
+            <line x1="12.5" y1="0" x2="15.5" y2="0" />
+            <line x1="-12.5" y1="0" x2="-15.5" y2="0" />
+            <line x1="8.8" y1="-8.8" x2="11" y2="-11" />
+            <line x1="-8.8" y1="8.8" x2="-11" y2="11" />
+            <line x1="8.8" y1="8.8" x2="11" y2="11" />
+            <line x1="-8.8" y1="-8.8" x2="-11" y2="-11" />
           </g>
 
-          {/* Moon */}
+          {/* Day Knob (Sun) */}
           <g
-            filter={isNight ? 'url(#moon-glow)' : undefined}
+            filter="url(#dn-shadow-day)"
             style={{
-              opacity: isNight ? 1 : 0,
-              transition: `opacity 0.4s ease`,
+              opacity: isNight ? 0 : 1,
+              visibility: isNight ? 'hidden' : 'visible',
+              transition: isNight
+                ? 'opacity 0.4s ease, visibility 0s linear 0.4s'
+                : 'opacity 0.4s ease, visibility 0s linear',
             }}
           >
-            <circle
-              cx="0"
-              cy="20"
-              r="11"
-              fill="#E0E7FF"
-              mask="url(#crescent-mask)"
-            />
+            <circle cx="0" cy="0" r="10" fill="#FFD43B" mask="url(#dn-moon-mask)" />
+          </g>
+
+          {/* Night Knob (Moon) */}
+          <g
+            filter="url(#dn-glow-night)"
+            style={{
+              opacity: isNight ? 1 : 0,
+              visibility: isNight ? 'visible' : 'hidden',
+              transition: isNight
+                ? 'opacity 0.6s ease, visibility 0s linear'
+                : 'opacity 0.6s ease, visibility 0s linear 0.6s',
+            }}
+          >
+            <circle cx="0" cy="0" r="13" fill="#FEFCD7" mask="url(#dn-moon-mask)" />
           </g>
         </g>
       </svg>
