@@ -16,10 +16,11 @@ export default function DayNightToggle({ isNight, onToggle }) {
     >
       <svg
         viewBox="0 0 100 40"
-        width="100%"
+        height={44}
         style={{
           display: 'block',
           overflow: 'visible',
+          width: 'auto',
         }}
       >
         <defs>

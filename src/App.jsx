@@ -618,16 +618,15 @@ function App() {
   }, [entries, selectedDate]);
 
   // Main render
+  const isDaytime = trackingMode === 'ampm' && (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'morning';
   return (
     <div
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        background: trackingMode === 'ampm'
-          ? ((quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening' ? '#080A0F' : '#12140F')
-          : '#08090A',
+        background: isDaytime ? '#E6E8E2' : (trackingMode === 'ampm' ? '#080A0F' : '#08090A'),
         transition: 'background-color 0.6s ease',
         minHeight: '100%',
-        color: '#f8fafc',
+        color: isDaytime ? '#1a1a2e' : '#f8fafc',
         userSelect: 'none',
         WebkitUserSelect: 'none',
         WebkitTouchCallout: 'none',
@@ -651,9 +650,7 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: trackingMode === 'ampm'
-          ? ((quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening' ? '#080A0F' : '#12140F')
-          : '#08090A',
+        background: isDaytime ? '#E6E8E2' : (trackingMode === 'ampm' ? '#080A0F' : '#08090A'),
         transition: 'background-color 0.6s ease',
         boxShadow: window.innerWidth > 500 ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
       }}
@@ -811,16 +808,17 @@ function App() {
             style={{
               width: '44px',
               height: '44px',
-              background: 'rgba(15, 17, 21, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: isDaytime ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 17, 21, 0.95)',
+              border: isDaytime ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '50%',
-              color: '#fbbf24',
+              color: isDaytime ? '#b45309' : '#fbbf24',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+              boxShadow: isDaytime ? '0 2px 8px rgba(0, 0, 0, 0.1)' : '0 4px 20px rgba(0, 0, 0, 0.4)',
               flexShrink: 0,
+              transition: 'background 0.6s ease, border 0.6s ease, color 0.6s ease, box-shadow 0.6s ease',
             }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
@@ -846,16 +844,17 @@ function App() {
             style={{
               width: '44px',
               height: '44px',
-              background: 'rgba(15, 17, 21, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: isDaytime ? 'rgba(255, 255, 255, 0.9)' : 'rgba(15, 17, 21, 0.95)',
+              border: isDaytime ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(255, 255, 255, 0.1)',
               borderRadius: '50%',
-              color: '#9ca3af',
+              color: isDaytime ? '#4b5563' : '#9ca3af',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+              boxShadow: isDaytime ? '0 2px 8px rgba(0, 0, 0, 0.1)' : '0 4px 20px rgba(0, 0, 0, 0.4)',
               flexShrink: 0,
+              transition: 'background 0.6s ease, border 0.6s ease, color 0.6s ease, box-shadow 0.6s ease',
             }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
