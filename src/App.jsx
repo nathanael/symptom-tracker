@@ -51,6 +51,7 @@ import Settings from './components/Settings';
 import Export from './components/Export';
 import RapidEntry from './components/RapidEntry';
 import NoteModal from './components/NoteModal';
+import DayNightToggle from './components/DayNightToggle';
 
 function App() {
   // App mode: 'symptoms' or 'stack'
@@ -621,7 +622,10 @@ function App() {
     <div
       style={{
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        background: '#08090A',
+        background: trackingMode === 'ampm'
+          ? ((quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening' ? '#080A0F' : '#0A0908')
+          : '#08090A',
+        transition: 'background-color 0.6s ease',
         minHeight: '100%',
         color: '#f8fafc',
         userSelect: 'none',
@@ -781,58 +785,18 @@ function App() {
           border: '1px solid rgba(255, 255, 255, 0.1)',
           zIndex: 200,
         }}>
-          {/* AM Button */}
-          <button
-            onClick={() => {
-              setQuickLogTime('morning');
-              setFlashColumn('morning');
+          <DayNightToggle
+            isNight={(quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening'}
+            onToggle={() => {
+              const current = quickLogTime || getCurrentTimePeriod(trackingMode);
+              const next = current === 'morning' ? 'evening' : 'morning';
+              setQuickLogTime(next);
+              setFlashColumn(next);
               setTimeout(() => setFlashColumn(null), 400);
-              setCopyToastMessage('New entries will be recorded as AM');
+              setCopyToastMessage(next === 'morning' ? '..AM..' : '..PM..');
               setTimeout(() => setCopyToastMessage(''), 2000);
             }}
-            style={{
-              padding: '10px 16px',
-              background: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'morning'
-                ? 'rgba(139, 92, 246, 0.3)'
-                : 'transparent',
-              border: 'none',
-              borderRadius: '20px',
-              color: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'morning'
-                ? '#c4b5fd'
-                : '#6b7280',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            AM
-          </button>
-          {/* PM Button */}
-          <button
-            onClick={() => {
-              setQuickLogTime('evening');
-              setFlashColumn('evening');
-              setTimeout(() => setFlashColumn(null), 400);
-              setCopyToastMessage('New entries will be recorded as PM');
-              setTimeout(() => setCopyToastMessage(''), 2000);
-            }}
-            style={{
-              padding: '10px 16px',
-              background: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening'
-                ? 'rgba(139, 92, 246, 0.3)'
-                : 'transparent',
-              border: 'none',
-              borderRadius: '20px',
-              color: (quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening'
-                ? '#c4b5fd'
-                : '#6b7280',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            PM
-          </button>
+          />
           {/* Divider */}
           <div style={{
             width: '1px',
