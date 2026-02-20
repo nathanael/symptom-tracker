@@ -265,59 +265,88 @@ function App() {
 
         if (!isInitial && incomingData === lastSyncDataRef.current) return;
 
-        // On initial load, merge (local takes priority). On subsequent updates, accept cloud data.
+        // On initial load, compare timestamps to decide merge strategy.
+        // On subsequent updates, accept cloud data.
         if (isInitial) {
-          if (data.symptoms?.length > 0) {
-            setSymptoms(prev => {
-              const cloudMap = new Map(data.symptoms.map(s => [s.id, s]));
-              // Local symptoms override cloud by id
-              prev.forEach(s => cloudMap.set(s.id, s));
-              return Array.from(cloudMap.values());
-            });
-          }
-          if (data.entries) {
-            setEntries(prev => {
-              const merged = { ...data.entries };
-              Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
-              return merged;
-            });
-          }
-          if (data.dailyNotes) {
-            setDailyNotes(prev => {
-              const merged = { ...data.dailyNotes };
-              Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
-              return merged;
-            });
-          }
-          if (data.stackItems?.length > 0) {
-            setStackItems(prev => {
-              const cloudMap = new Map(data.stackItems.map(s => [s.id, s]));
-              prev.forEach(s => cloudMap.set(s.id, s));
-              return Array.from(cloudMap.values());
-            });
-          }
-          if (data.stackEntries) {
-            setStackEntries(prev => {
-              const merged = { ...data.stackEntries };
-              Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
-              return merged;
-            });
-          }
-          if (data.trackingMode) setTrackingMode(data.trackingMode);
-          if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
-          if (data.inputItems?.length > 0) {
-            setInputItems(prev => {
-              const cloudMap = new Map(data.inputItems.map(s => [s.id, s]));
-              prev.forEach(s => cloudMap.set(s.id, s));
-              return Array.from(cloudMap.values());
-            });
-          }
-          if (data.inputEntries) {
-            setInputEntries(prev => {
-              const merged = { ...data.inputEntries };
-              Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
-              return merged;
-            });
+          const localUpdatedAt = parseInt(localStorage.getItem(STORAGE_KEY_LOCAL_UPDATED_AT) || '0');
+          const cloudUpdatedAt = data.updatedAt?.toDate?.()?.getTime() || 0;
+          const localIsNewer = localUpdatedAt > cloudUpdatedAt;
+
+          if (localIsNewer) {
+            // Local data is more recent (e.g., offline changes) — merge with local priority
+            if (data.symptoms?.length > 0) {
+              setSymptoms(prev => {
+                const cloudMap = new Map(data.symptoms.map(s => [s.id, s]));
+                prev.forEach(s => cloudMap.set(s.id, s));
+                return Array.from(cloudMap.values());
+              });
+            }
+            if (data.entries) {
+              setEntries(prev => {
+                const merged = { ...data.entries };
+                Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
+                return merged;
+              });
+            }
+            if (data.dailyNotes) {
+              setDailyNotes(prev => {
+                const merged = { ...data.dailyNotes };
+                Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
+                return merged;
+              });
+            }
+            if (data.stackItems?.length > 0) {
+              setStackItems(prev => {
+                const cloudMap = new Map(data.stackItems.map(s => [s.id, s]));
+                prev.forEach(s => cloudMap.set(s.id, s));
+                return Array.from(cloudMap.values());
+              });
+            }
+            if (data.stackEntries) {
+              setStackEntries(prev => {
+                const merged = { ...data.stackEntries };
+                Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
+                return merged;
+              });
+            }
+            if (data.trackingMode) setTrackingMode(data.trackingMode);
+            if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
+            if (data.inputItems?.length > 0) {
+              setInputItems(prev => {
+                const cloudMap = new Map(data.inputItems.map(s => [s.id, s]));
+                prev.forEach(s => cloudMap.set(s.id, s));
+                return Array.from(cloudMap.values());
+              });
+            }
+            if (data.inputEntries) {
+              setInputEntries(prev => {
+                const merged = { ...data.inputEntries };
+                Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
+                return merged;
+              });
+            }
+          } else {
+            // Cloud data is more recent — accept cloud data to prevent stale
+            // local data from overwriting newer cloud data. For entries, do a
+            // union merge (cloud priority) as a safety net to preserve any
+            // local entries that might not be in cloud.
+            if (data.symptoms?.length > 0) setSymptoms(data.symptoms);
+            if (data.entries) {
+              setEntries(prev => ({ ...prev, ...data.entries }));
+            }
+            if (data.dailyNotes) {
+              setDailyNotes(prev => ({ ...prev, ...data.dailyNotes }));
+            }
+            if (data.stackItems?.length > 0) setStackItems(data.stackItems);
+            if (data.stackEntries) {
+              setStackEntries(prev => ({ ...prev, ...data.stackEntries }));
+            }
+            if (data.trackingMode) setTrackingMode(data.trackingMode);
+            if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
+            if (data.inputItems?.length > 0) setInputItems(data.inputItems);
+            if (data.inputEntries) {
+              setInputEntries(prev => ({ ...prev, ...data.inputEntries }));
+            }
           }
         } else {
           // Real-time update from another device — accept cloud data

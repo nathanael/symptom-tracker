@@ -240,7 +240,7 @@ export default function Stack({
     if (!i.active || stackEntries[`${dateKey}-${i.id}`]) return false;
     // Don't offer to log items that didn't exist on this date
     if (i.schedule?.startDate) {
-      const start = new Date(i.schedule.startDate);
+      const start = new Date(i.schedule.startDate + 'T00:00:00');
       start.setHours(0, 0, 0, 0);
       const target = new Date(selectedDate);
       target.setHours(0, 0, 0, 0);

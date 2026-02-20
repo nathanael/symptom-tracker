@@ -3,8 +3,9 @@ import { trackingModes, severityColors, NA_SEVERITY } from './constants';
 // Schedule Helpers
 export const isScheduledForDate = (schedule, date) => {
   // Check startDate for all schedule types first
+  // Use 'T00:00:00' suffix to parse as local time, not UTC
   if (schedule?.startDate) {
-    const start = new Date(schedule.startDate);
+    const start = new Date(schedule.startDate + 'T00:00:00');
     start.setHours(0, 0, 0, 0);
     const target = new Date(date);
     target.setHours(0, 0, 0, 0);
@@ -18,11 +19,11 @@ export const isScheduledForDate = (schedule, date) => {
   }
 
   if (schedule.type === 'interval') {
-    const start = new Date(schedule.startDate);
+    const start = new Date(schedule.startDate + 'T00:00:00');
     start.setHours(0, 0, 0, 0);
     const targetDate = new Date(date);
     targetDate.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((targetDate - start) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.round((targetDate - start) / (1000 * 60 * 60 * 24));
     return diffDays >= 0 && diffDays % schedule.interval === 0;
   }
 
