@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Restore Data</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background: #08090A; color: #e5e7eb; font-family: system-ui; padding: 20px; max-width: 600px; margin: 0 auto; }
+  h1 { color: #a78bfa; }
+  pre { background: #1a1a2e; padding: 12px; border-radius: 8px; overflow: auto; font-size: 12px; max-height: 300px; }
+  button { background: #8b5cf6; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin: 8px 4px; }
+  button:hover { background: #7c3aed; }
+  button.danger { background: #dc2626; }
+  .success { color: #4ade80; }
+  .warn { color: #fbbf24; }
+  .error { color: #f87171; }
+  #log { margin-top: 16px; }
+</style>
+</head>
+<body>
+<h1>Restore Tracking Data</h1>
+<p>This will restore symptom entries, supplement entries, and daily notes for <strong>Feb 14 &amp; Feb 15, 2026</strong>, plus supplement entries for <strong>Feb 20</strong>.</p>
+<p class="warn">Only entries that don't already exist will be added (won't overwrite).</p>
+
+<button onclick="runRestore(false)">Preview (dry run)</button>
+<button onclick="runRestore(true)">Restore Data</button>
+
+<div id="log"></div>
+
+<script>
+function log(msg, cls) {
+  const el = document.getElementById('log');
+  const p = document.createElement('div');
+  p.className = cls || '';
+  p.textContent = msg;
+  el.appendChild(p);
+}
+
+function runRestore(forReal) {
+  document.getElementById('log').innerHTML = '';
+  log(forReal ? '=== RESTORING DATA ===' : '=== DRY RUN (preview) ===', 'warn');
+
+  // Load current data
+  const symptoms = JSON.parse(localStorage.getItem('symptomTracker_symptoms') || '[]');
+  const entries = JSON.parse(localStorage.getItem('symptomTracker_entries') || '{}');
+  const stackItems = JSON.parse(localStorage.getItem('symptomTracker_stackItems') || '[]');
+  const stackEntries = JSON.parse(localStorage.getItem('symptomTracker_stackEntries') || '{}');
+  const dailyNotes = JSON.parse(localStorage.getItem('symptomTracker_notes') || '{}');
+
+  // Build symptom name -> id lookup (case-insensitive, match start)
+  const symptomLookup = {};
+  symptoms.forEach(s => {
+    symptomLookup[s.name.toLowerCase()] = s.id;
+  });
+
+  // Build stack item name -> id lookup
+  const stackLookup = {};
+  stackItems.forEach(s => {
+    stackLookup[s.name.toLowerCase()] = s.id;
+  });
+
+  log('Found ' + symptoms.length + ' symptoms, ' + stackItems.length + ' supplements in localStorage');
+  log('');
+
+  // === SYMPTOM ENTRIES TO RESTORE ===
+  const symptomData = [
+    // [symptomName, dateKey, period, severity]
+    // Feb 14
+    ['Flushing', '2026-02-14', 'evening', 3],
+    ['Penile retraction', '2026-02-14', 'evening', 2],
+    ['Pee dribble', '2026-02-14', 'evening', 1],
+    ['Urinary urgency', '2026-02-14', 'evening', 1],
+    ['Daytime fatigue', '2026-02-14', 'evening', 0],
+    ['Irritability', '2026-02-14', 'evening', 1],
+    ['Social withdrawal', '2026-02-14', 'evening', 1],
+    ['Air hunger', '2026-02-14', 'morning', 1],
+    ['Air hunger', '2026-02-14', 'evening', 1],
+    ['Anxiety', '2026-02-14', 'evening', 1],
+    ['Low sexual drive', '2026-02-14', 'evening', 3],
+    ['Neuropathy', '2026-02-14', 'evening', 1],
+    ['Headache', '2026-02-14', 'evening', 2],
+    ['Dysphagia', '2026-02-14', 'evening', 1],
+    ['Fascial tightness', '2026-02-14', 'evening', 2],
+    ['Psoriasis', '2026-02-14', 'evening', 2],
+    ['Skinny stool', '2026-02-14', 'evening', 2],
+    ['Diarrhea / Loose stool', '2026-02-14', 'evening', 1],
+    ['Brain fog', '2026-02-14', 'evening', 1],
+    ['Sugar / alcohol cravings', '2026-02-14', 'evening', 1],
+    ['Heartburn / bile reflux', '2026-02-14', 'evening', 1],
+    ['Oral thrush', '2026-02-14', 'evening', 1],
+    ['Farting, burping', '2026-02-14', 'evening', 1],
+    ['Acne', '2026-02-14', 'evening', 0],
+    ['Apathy', '2026-02-14', 'evening', 1],
+    ['Itching', '2026-02-14', 'evening', 1],
+    ['Depression', '2026-02-14', 'evening', 2],
+    ['Poor sleep quality', '2026-02-14', 'evening', 2],
+    // Feb 15 AM
+    ['Flushing', '2026-02-15', 'morning', 3],
+    ['Penile retraction', '2026-02-15', 'morning', 2],
+    ['Pee dribble', '2026-02-15', 'morning', 1],
+    ['Urinary urgency', '2026-02-15', 'morning', 2],
+    ['Daytime fatigue', '2026-02-15', 'morning', 0],
+    ['Irritability', '2026-02-15', 'morning', 1],
+    ['Social withdrawal', '2026-02-15', 'morning', 1],
+    ['Air hunger', '2026-02-15', 'morning', 1],
+    ['Anxiety', '2026-02-15', 'morning', 0],
+    ['Low sexual drive', '2026-02-15', 'morning', 2],
+    ['Neuropathy', '2026-02-15', 'morning', 1],
+    ['Headache', '2026-02-15', 'morning', 3],
+    ['Dysphagia', '2026-02-15', 'morning', 0],
+    ['Fascial tightness', '2026-02-15', 'morning', 1],
+    ['Psoriasis', '2026-02-15', 'morning', 2],
+    ['Skinny stool', '2026-02-15', 'morning', 3],
+    ['Diarrhea / Loose stool', '2026-02-15', 'morning', 4],
+    ['Brain fog', '2026-02-15', 'morning', 1],
+    ['Sugar / alcohol cravings', '2026-02-15', 'morning', 1],
+    ['Heartburn / bile reflux', '2026-02-15', 'morning', 0],
+    ['Oral thrush', '2026-02-15', 'morning', 1],
+    ['Farting, burping', '2026-02-15', 'morning', 1],
+    ['Cracking joints', '2026-02-15', 'morning', 1],
+    ['Acne', '2026-02-15', 'morning', 0],
+    ['Apathy', '2026-02-15', 'morning', 1],
+    ['Itching', '2026-02-15', 'morning', 0],
+    ['Depression', '2026-02-15', 'morning', 1],
+    ['Poor sleep quality', '2026-02-15', 'morning', 3],
+    // Feb 15 PM
+    ['Flushing', '2026-02-15', 'evening', 3],
+    ['Penile retraction', '2026-02-15', 'evening', 2],
+    ['Pee dribble', '2026-02-15', 'evening', 1],
+    ['Urinary urgency', '2026-02-15', 'evening', 1],
+    ['Daytime fatigue', '2026-02-15', 'evening', 0],
+    ['Irritability', '2026-02-15', 'evening', 1],
+    ['Social withdrawal', '2026-02-15', 'evening', 1],
+    ['Air hunger', '2026-02-15', 'evening', 0],
+    ['Anxiety', '2026-02-15', 'evening', 0],
+    ['Low sexual drive', '2026-02-15', 'evening', 2],
+    ['Neuropathy', '2026-02-15', 'evening', 0],
+    ['Headache', '2026-02-15', 'evening', 1],
+    ['Dysphagia', '2026-02-15', 'evening', 1],
+    ['Fascial tightness', '2026-02-15', 'evening', 1],
+    ['Psoriasis', '2026-02-15', 'evening', 0],
+    ['Brain fog', '2026-02-15', 'evening', 1],
+    ['Sugar / alcohol cravings', '2026-02-15', 'evening', 1],
+    ['Heartburn / bile reflux', '2026-02-15', 'evening', 2],
+    ['Oral thrush', '2026-02-15', 'evening', 1],
+    ['Farting, burping', '2026-02-15', 'evening', 1],
+    ['Cracking joints', '2026-02-15', 'evening', 1],
+    ['Acne', '2026-02-15', 'evening', 0],
+    ['Apathy', '2026-02-15', 'evening', 1],
+    ['Itching', '2026-02-15', 'evening', 2],
+    ['Depression', '2026-02-15', 'evening', 0],
+    ['Poor sleep quality', '2026-02-15', 'evening', 0],
+  ];
+
+  let restoredSymptoms = 0;
+  let skippedSymptoms = 0;
+  let missingSymptoms = [];
+
+  symptomData.forEach(([name, dateKey, period, severity]) => {
+    const id = symptomLookup[name.toLowerCase()];
+    if (!id) {
+      if (!missingSymptoms.includes(name)) missingSymptoms.push(name);
+      return;
+    }
+    const key = `${dateKey}-${id}-${period}`;
+    if (entries[key]) {
+      skippedSymptoms++;
+      return;
+    }
+    log(`+ Symptom: ${name} ${dateKey} ${period === 'morning' ? 'AM' : 'PM'} = ${severity}`);
+    if (forReal) {
+      entries[key] = { time: period, severity, date: dateKey, symptomId: id };
+    }
+    restoredSymptoms++;
+  });
+
+  log('');
+  log(`Symptom entries: ${restoredSymptoms} to restore, ${skippedSymptoms} already exist`, restoredSymptoms > 0 ? 'success' : '');
+  if (missingSymptoms.length > 0) {
+    log('Could not match symptoms: ' + missingSymptoms.join(', '), 'error');
+  }
+
+  // === SUPPLEMENT ENTRIES TO RESTORE ===
+  const supplementData = [
+    // [name, dateKey, dose]
+    ['Ketotifen', '2026-02-14', 1],
+    ['Magnesium', '2026-02-14', 300],
+    ['Creatine', '2026-02-14', 0.75],
+    ['B2', '2026-02-14', 300],
+
+    ['Creatine', '2026-02-15', 0.75],
+    ['Ketotifen', '2026-02-15', 0.5],
+    ['B2', '2026-02-15', 100],
+    ['Magnesium', '2026-02-15', 200],
+
+    ['Glycine', '2026-02-20', 3],
+    ['Creatine', '2026-02-20', 1.5],
+    ['Magnesium', '2026-02-20', 300],
+    ['Ketotifen', '2026-02-20', 0.5],
+    ['B2', '2026-02-20', 100],
+  ];
+
+  let restoredSupplements = 0;
+  let skippedSupplements = 0;
+  let missingSupplements = [];
+
+  supplementData.forEach(([name, dateKey, dose]) => {
+    const id = stackLookup[name.toLowerCase()];
+    if (!id) {
+      if (!missingSupplements.includes(name)) missingSupplements.push(name);
+      return;
+    }
+    const key = `${dateKey}-${id}`;
+    if (stackEntries[key]) {
+      skippedSupplements++;
+      return;
+    }
+    log(`+ Supplement: ${name} ${dateKey} dose=${dose}`);
+    if (forReal) {
+      stackEntries[key] = { date: dateKey, itemId: id, dose, taken: true };
+    }
+    restoredSupplements++;
+  });
+
+  log('');
+  log(`Supplement entries: ${restoredSupplements} to restore, ${skippedSupplements} already exist`, restoredSupplements > 0 ? 'success' : '');
+  if (missingSupplements.length > 0) {
+    log('Could not match supplements: ' + missingSupplements.join(', '), 'error');
+  }
+
+  // === DAILY NOTES TO RESTORE ===
+  const notesData = {
+    '2026-02-14': "Still absolute liquid on the second stool. I wonder if I should only take magnesium with meals and only take B2 and creatine with meals as well",
+    '2026-02-15': "Had poor sleep last night probably due to the 300mg b2. It was probably too much for my system without the b1 without a transition from low dose. I had a lot of trouble falling asleep but then slept later. Sleep score of only 63 on garmin.\n\nDuration 6h 54m\nStress 25\nDeep 13m\nLight 5h 53m\nREM 48m\n\n\nI wonder too if this caused the overnight development of a headache. \n\nThe type of neuropathy I've had in the last couple of days is the same type I've had primarily since December which is a dull pain in the first knuckles of my right hand with just a little in the left. \n\nFinally feeling like my cold is dissipating. I think I'll be back to normal tomorrow.",
+  };
+
+  let restoredNotes = 0;
+  let skippedNotes = 0;
+
+  Object.entries(notesData).forEach(([dateKey, note]) => {
+    if (dailyNotes[dateKey]) {
+      log(`Skipping note for ${dateKey} (already exists)`);
+      skippedNotes++;
+      return;
+    }
+    log(`+ Note: ${dateKey} (${note.substring(0, 60)}...)`);
+    if (forReal) {
+      dailyNotes[dateKey] = note;
+    }
+    restoredNotes++;
+  });
+
+  log('');
+  log(`Daily notes: ${restoredNotes} to restore, ${skippedNotes} already exist`, restoredNotes > 0 ? 'success' : '');
+
+  // === SAVE ===
+  if (forReal) {
+    localStorage.setItem('symptomTracker_entries', JSON.stringify(entries));
+    localStorage.setItem('symptomTracker_stackEntries', JSON.stringify(stackEntries));
+    localStorage.setItem('symptomTracker_notes', JSON.stringify(dailyNotes));
+    // Update timestamp so this gets synced to cloud
+    localStorage.setItem('symptomTracker_localUpdatedAt', Date.now().toString());
+
+    log('');
+    log('=== DATA SAVED TO LOCALSTORAGE ===', 'success');
+    log('Reload the app to see restored data. It will auto-sync to cloud.', 'success');
+  } else {
+    log('');
+    log('=== DRY RUN COMPLETE — nothing was changed ===', 'warn');
+    log('Click "Restore Data" to actually save.', 'warn');
+  }
+}
+</script>
+</body>
+</html>
