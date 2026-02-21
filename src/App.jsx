@@ -338,28 +338,52 @@ function App() {
             if (data.dailyNotes) {
               setDailyNotes(prev => ({ ...prev, ...data.dailyNotes }));
             }
-            if (data.stackItems?.length > 0) setStackItems(data.stackItems);
+            if (data.stackItems?.length > 0) {
+              setStackItems(prev => {
+                const localMap = new Map(prev.map(s => [s.id, s]));
+                data.stackItems.forEach(s => localMap.set(s.id, s));
+                return Array.from(localMap.values());
+              });
+            }
             if (data.stackEntries) {
               setStackEntries(prev => ({ ...prev, ...data.stackEntries }));
             }
             if (data.trackingMode) setTrackingMode(data.trackingMode);
             if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
-            if (data.inputItems?.length > 0) setInputItems(data.inputItems);
+            if (data.inputItems?.length > 0) {
+              setInputItems(prev => {
+                const localMap = new Map(prev.map(s => [s.id, s]));
+                data.inputItems.forEach(s => localMap.set(s.id, s));
+                return Array.from(localMap.values());
+              });
+            }
             if (data.inputEntries) {
               setInputEntries(prev => ({ ...prev, ...data.inputEntries }));
             }
           }
         } else {
-          // Real-time update from another device — accept cloud data
+          // Real-time update from another device — merge to preserve local items
           if (data.symptoms?.length > 0) setSymptoms(data.symptoms);
-          if (data.entries) setEntries(data.entries);
-          if (data.dailyNotes) setDailyNotes(data.dailyNotes);
-          if (data.stackItems?.length > 0) setStackItems(data.stackItems);
-          if (data.stackEntries) setStackEntries(data.stackEntries);
+          if (data.entries) setEntries(prev => ({ ...prev, ...data.entries }));
+          if (data.dailyNotes) setDailyNotes(prev => ({ ...prev, ...data.dailyNotes }));
+          if (data.stackItems?.length > 0) {
+            setStackItems(prev => {
+              const localMap = new Map(prev.map(s => [s.id, s]));
+              data.stackItems.forEach(s => localMap.set(s.id, s));
+              return Array.from(localMap.values());
+            });
+          }
+          if (data.stackEntries) setStackEntries(prev => ({ ...prev, ...data.stackEntries }));
           if (data.trackingMode) setTrackingMode(data.trackingMode);
           if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
-          if (data.inputItems?.length > 0) setInputItems(data.inputItems);
-          if (data.inputEntries) setInputEntries(data.inputEntries);
+          if (data.inputItems?.length > 0) {
+            setInputItems(prev => {
+              const localMap = new Map(prev.map(s => [s.id, s]));
+              data.inputItems.forEach(s => localMap.set(s.id, s));
+              return Array.from(localMap.values());
+            });
+          }
+          if (data.inputEntries) setInputEntries(prev => ({ ...prev, ...data.inputEntries }));
         }
 
         lastSyncDataRef.current = incomingData;
