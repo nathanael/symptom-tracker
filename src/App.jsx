@@ -936,9 +936,11 @@ function App() {
         <SymptomGraph
           primarySymptomId={showSymptomGraph}
           symptoms={symptoms}
+          activeSymptoms={activeSymptoms}
           entries={entries}
           trackingMode={trackingMode}
           onClose={() => setShowSymptomGraph(null)}
+          onChangeSymptom={setShowSymptomGraph}
         />
       )}
 

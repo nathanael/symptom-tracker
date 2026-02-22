@@ -104,9 +104,11 @@ function buildPath(points) {
 export default function SymptomGraph({
   primarySymptomId,
   symptoms,
+  activeSymptoms,
   entries,
   trackingMode,
   onClose,
+  onChangeSymptom,
 }) {
   const [timeframe, setTimeframe] = useState(28);
   const [compareIds, setCompareIds] = useState([]);
@@ -277,15 +279,74 @@ export default function SymptomGraph({
           Back
         </button>
 
-        {/* Title */}
-        <h2 style={{
-          color: '#f8fafc',
-          fontSize: '22px',
-          fontWeight: '600',
-          margin: '0 0 20px 0',
-        }}>
-          {primarySymptom?.name || 'Symptom'}
-        </h2>
+        {/* Title with prev/next navigation */}
+        {(() => {
+          const list = activeSymptoms || [];
+          const currentIdx = list.findIndex(s => s.id === primarySymptomId);
+          const hasPrev = currentIdx > 0;
+          const hasNext = currentIdx >= 0 && currentIdx < list.length - 1;
+          const go = (idx) => {
+            if (onChangeSymptom && list[idx]) {
+              setCompareIds([]);
+              setShowPicker(false);
+              setTouchX(null);
+              onChangeSymptom(list[idx].id);
+              haptic('light');
+            }
+          };
+          return (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              margin: '0 0 20px 0',
+            }}>
+              <button
+                onClick={() => hasPrev && go(currentIdx - 1)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: hasPrev ? '#9ca3af' : 'rgba(255,255,255,0.1)',
+                  cursor: hasPrev ? 'pointer' : 'default',
+                  padding: '8px 4px',
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <h2 style={{
+                color: '#f8fafc',
+                fontSize: '22px',
+                fontWeight: '600',
+                margin: 0,
+                flex: 1,
+                textAlign: 'center',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {primarySymptom?.name || 'Symptom'}
+              </h2>
+              <button
+                onClick={() => hasNext && go(currentIdx + 1)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: hasNext ? '#9ca3af' : 'rgba(255,255,255,0.1)',
+                  cursor: hasNext ? 'pointer' : 'default',
+                  padding: '8px 4px',
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 6 15 12 9 18" />
+                </svg>
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Timeframe selector */}
         <div style={{
