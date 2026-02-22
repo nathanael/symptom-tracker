@@ -550,6 +550,9 @@ export default function SymptomList({
           <div
             key={symptom.id}
             data-symptom-row
+            onTouchStart={(e) => handleTouchStart(e, symptom.id)}
+            onTouchMove={(e) => handleMove(e.touches[0].clientX, e.touches[0].clientY)}
+            onTouchEnd={handleEnd}
             onClick={(e) => {
               if (quickLogSymptom !== null) {
                 setQuickLogSymptom(null);
