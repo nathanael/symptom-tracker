@@ -2,10 +2,10 @@ import { useState, useMemo, useRef, useCallback } from 'react';
 import { haptic } from '../utils/helpers';
 
 const TIMEFRAMES = [
-  { label: '1W', days: 7 },
   { label: '2W', days: 14 },
   { label: '4W', days: 28 },
-  { label: '3M', days: 90 },
+  { label: '2M', days: 60 },
+  { label: '4M', days: 120 },
   { label: '6M', days: 180 },
 ];
 
@@ -15,7 +15,7 @@ const COLORS = {
   compare2: '#06b6d4',
 };
 
-const SMOOTH_WINDOWS = { 7: 2, 14: 3, 28: 5, 90: 7, 180: 10 };
+const SMOOTH_WINDOWS = { 14: 3, 28: 5, 60: 7, 120: 9, 180: 10 };
 
 function getDailyValue(entries, dateKey, symptomId, trackingMode) {
   if (trackingMode === 'ampm') {
