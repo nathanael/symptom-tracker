@@ -527,6 +527,16 @@ export default function SymptomGraph({
           )}
         </div>
 
+        <p style={{
+          color: '#4b5563',
+          fontSize: '11px',
+          margin: '6px 0 16px',
+          textAlign: 'center',
+          lineHeight: '1.4',
+        }}>
+          Gaps of 1–3 days are interpolated. Line is smoothed.
+        </p>
+
         {/* Legend (when comparing) */}
         {compareIds.length > 0 && (
           <div style={{
