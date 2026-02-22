@@ -527,16 +527,6 @@ export default function SymptomGraph({
           )}
         </div>
 
-        <p style={{
-          color: '#4b5563',
-          fontSize: '11px',
-          margin: '6px 0 16px',
-          textAlign: 'center',
-          lineHeight: '1.4',
-        }}>
-          Gaps of 1–3 days are interpolated. Line is smoothed.
-        </p>
-
         {/* Legend (when comparing) */}
         {compareIds.length > 0 && (
           <div style={{
@@ -580,7 +570,7 @@ export default function SymptomGraph({
             marginBottom: '12px',
           }}
         >
-          {showPicker ? 'Hide comparison' : `Compare${compareIds.length > 0 ? ` (${compareIds.length})` : ''}`}
+          {showPicker ? 'Hide comparison' : `Compare symptoms${compareIds.length > 0 ? ` (${compareIds.length})` : ''}`}
         </button>
 
         {/* Comparison picker */}
@@ -675,6 +665,16 @@ export default function SymptomGraph({
             </div>
           </div>
         </div>
+
+        <p style={{
+          color: '#4b5563',
+          fontSize: '11px',
+          margin: '8px 0 0',
+          textAlign: 'center',
+          lineHeight: '1.4',
+        }}>
+          Gaps of 1–3 days are interpolated. Line is smoothed.
+        </p>
       </div>
     </div>
   );
