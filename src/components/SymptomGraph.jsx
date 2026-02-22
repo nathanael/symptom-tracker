@@ -338,19 +338,36 @@ export default function SymptomGraph({
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
-              <h2 style={{
-                color: '#f8fafc',
-                fontSize: '22px',
-                fontWeight: '600',
-                margin: 0,
+              <div style={{
                 flex: 1,
                 textAlign: 'center',
                 overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
+                minWidth: 0,
               }}>
-                {primarySymptom?.name || 'Symptom'}
-              </h2>
+                <div style={{
+                  color: '#f8fafc',
+                  fontSize: '22px',
+                  fontWeight: '600',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {primarySymptom?.name || 'Symptom'}
+                </div>
+                {primarySymptom?.description && (
+                  <div style={{
+                    color: '#6b7280',
+                    fontSize: '13px',
+                    fontWeight: '400',
+                    marginTop: '2px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {primarySymptom.description}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => hasNext && go(currentIdx + 1)}
                 style={{
