@@ -52,6 +52,7 @@ import Export from './components/Export';
 import RapidEntry from './components/RapidEntry';
 import NoteModal from './components/NoteModal';
 import DayNightToggle from './components/DayNightToggle';
+import SymptomGraph from './components/SymptomGraph';
 
 function App() {
   // App mode: 'symptoms' or 'stack'
@@ -84,6 +85,7 @@ function App() {
   const [showExport, setShowExport] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showSymptomGraph, setShowSymptomGraph] = useState(null);
 
   // UI state
   const [lastAction, setLastAction] = useState('');
@@ -748,6 +750,7 @@ function App() {
               getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
               trendWindow={trendWindow}
               flashColumn={flashColumn}
+              onOpenGraph={setShowSymptomGraph}
             />
           ) : (
             <>
@@ -924,6 +927,18 @@ function App() {
           symptoms={symptoms}
           insightsWindow={insightsWindow}
           setInsightsWindow={setInsightsWindow}
+          onOpenGraph={setShowSymptomGraph}
+        />
+      )}
+
+      {/* Symptom Graph */}
+      {showSymptomGraph && (
+        <SymptomGraph
+          primarySymptomId={showSymptomGraph}
+          symptoms={symptoms}
+          entries={entries}
+          trackingMode={trackingMode}
+          onClose={() => setShowSymptomGraph(null)}
         />
       )}
 

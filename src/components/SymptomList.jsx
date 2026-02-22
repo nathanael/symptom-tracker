@@ -31,6 +31,7 @@ export default function SymptomList({
   getCurrentTimePeriod,
   trendWindow,
   flashColumn,
+  onOpenGraph,
 }) {
   // Drag state for hold-to-edit
   const [activeSymptom, setActiveSymptom] = useState(null);
@@ -62,6 +63,7 @@ export default function SymptomList({
   const holdTimerRef = useRef(null);
   const pendingSymptomRef = useRef(null);
   const isDraggingRef = useRef(false);
+  const movedDuringHoldRef = useRef(false);
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -116,10 +118,19 @@ export default function SymptomList({
     startPosRef.current = { x: touch.clientX, y: touch.clientY };
     setFingerPosition({ x: touch.clientX, y: touch.clientY });
     pendingSymptomRef.current = symptomId;
+    movedDuringHoldRef.current = false;
 
     holdTimerRef.current = setTimeout(() => {
       if (pendingSymptomRef.current === symptomId) {
-        enterEditMode(symptomId, touch.clientX, touch.clientY);
+        if (!movedDuringHoldRef.current && onOpenGraph) {
+          // Hold without drag → open graph
+          haptic('medium');
+          onOpenGraph(symptomId);
+          pendingSymptomRef.current = null;
+        } else {
+          // Hold with drag → severity edit mode
+          enterEditMode(symptomId, touch.clientX, touch.clientY);
+        }
       }
     }, HOLD_DELAY);
   };
@@ -130,6 +141,12 @@ export default function SymptomList({
       const deltaX = Math.abs(clientX - startPosRef.current.x);
       const deltaY = Math.abs(clientY - startPosRef.current.y);
 
+      // Track if finger moved enough to be a drag
+      if (deltaX > 5 || deltaY > 5) {
+        movedDuringHoldRef.current = true;
+      }
+
+      // Cancel hold entirely if finger moves too far (scrolling)
       if (deltaX > 10 || deltaY > 10) {
         if (holdTimerRef.current) {
           clearTimeout(holdTimerRef.current);

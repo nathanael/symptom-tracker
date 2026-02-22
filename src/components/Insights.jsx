@@ -43,6 +43,7 @@ export default function Insights({
   symptoms,
   insightsWindow,
   setInsightsWindow,
+  onOpenGraph,
 }) {
   const [expandedId, setExpandedId] = useState(null);
 
@@ -285,11 +286,25 @@ export default function Insights({
 
                           {/* Sparkline */}
                           {insight.chartData && insight.chartData.length >= 2 && (
-                            <div style={{ marginBottom: '4px' }}>
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onOpenGraph) onOpenGraph(insight.symptomId);
+                              }}
+                              style={{ marginBottom: '4px', cursor: 'pointer' }}
+                            >
                               <Sparkline
                                 data={insight.chartData}
                                 color={lineColor}
                               />
+                              <div style={{
+                                color: dimColor,
+                                fontSize: '11px',
+                                textAlign: 'center',
+                                marginTop: '4px',
+                              }}>
+                                Tap for full history
+                              </div>
                             </div>
                           )}
                         </div>
