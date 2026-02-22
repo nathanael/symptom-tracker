@@ -981,7 +981,7 @@ export default function SymptomList({
                       );
                     })}
                   </div>
-                  {/* N/A + Chart button row */}
+                  {/* N/A + History button row */}
                   <div style={{ padding: '0 16px 12px', display: 'flex', gap: '6px' }}>
                     {onOpenGraph && (
                       <button
@@ -992,20 +992,25 @@ export default function SymptomList({
                           onOpenGraph(symptom.id);
                         }}
                         style={{
-                          padding: '10px 12px',
-                          background: 'rgba(139, 92, 246, 0.08)',
+                          flex: 1,
+                          padding: '10px 0',
+                          background: 'rgba(139, 92, 246, 0.06)',
                           border: '1px solid rgba(139, 92, 246, 0.2)',
                           borderRadius: '3px',
                           color: '#8b5cf6',
+                          fontSize: '13px',
+                          fontWeight: '600',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          gap: '6px',
                         }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                         </svg>
+                        History
                       </button>
                     )}
                     <button
@@ -1025,8 +1030,16 @@ export default function SymptomList({
                         fontSize: '13px',
                         fontWeight: '600',
                         cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
                       }}
                     >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                      </svg>
                       N/A
                     </button>
                   </div>
