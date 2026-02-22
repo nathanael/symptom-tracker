@@ -981,8 +981,33 @@ export default function SymptomList({
                       );
                     })}
                   </div>
-                  {/* N/A button */}
-                  <div style={{ padding: '0 16px 12px' }}>
+                  {/* N/A + Chart button row */}
+                  <div style={{ padding: '0 16px 12px', display: 'flex', gap: '6px' }}>
+                    {onOpenGraph && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuickLogSymptom(null);
+                          setPopupPosition(null);
+                          onOpenGraph(symptom.id);
+                        }}
+                        style={{
+                          padding: '10px 12px',
+                          background: 'rgba(139, 92, 246, 0.08)',
+                          border: '1px solid rgba(139, 92, 246, 0.2)',
+                          borderRadius: '3px',
+                          color: '#8b5cf6',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                        </svg>
+                      </button>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -991,7 +1016,7 @@ export default function SymptomList({
                         setPopupPosition(null);
                       }}
                       style={{
-                        width: '100%',
+                        flex: 1,
                         padding: '10px 0',
                         background: 'rgba(100, 116, 139, 0.1)',
                         border: '1px solid rgba(100, 116, 139, 0.2)',
