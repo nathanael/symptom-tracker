@@ -715,7 +715,7 @@ function App() {
         flex: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
-        paddingBottom: '140px',
+        paddingBottom: '155px',
         WebkitOverflowScrolling: 'touch',
       }}>
         <div style={{
