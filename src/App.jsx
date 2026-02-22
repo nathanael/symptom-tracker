@@ -793,7 +793,7 @@ function App() {
       )}
 
       {/* Floating AM/PM + Rapid Entry Pill - only on symptoms page in AM/PM mode */}
-      {appMode === 'symptoms' && trackingMode === 'ampm' && !showAddSymptom && !showManageStack && !showManageInputs && !showInsights && !showSettings && !rapidEntryMode && (
+      {appMode === 'symptoms' && trackingMode === 'ampm' && !showAddSymptom && !showManageStack && !showManageInputs && !showInsights && !showSettings && !showSymptomGraph && !rapidEntryMode && (
         <div style={{
           position: 'fixed',
           bottom: 'calc(105px + env(safe-area-inset-bottom))',
