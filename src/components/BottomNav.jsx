@@ -214,7 +214,7 @@ export default function BottomNav({
             color: showQuickActions ? '#8b5cf6' : '#64748b',
             fontWeight: showQuickActions ? '600' : '400',
           }}>
-            Actions
+            More
           </span>
         </button>
       </div>
