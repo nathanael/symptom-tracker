@@ -56,6 +56,27 @@ function generateDateRange(days) {
   return dates;
 }
 
+// Fill small gaps (≤3 days) with linear interpolation
+function interpolateSmallGaps(values, maxGap = 3) {
+  const result = [...values];
+  let i = 0;
+  while (i < result.length) {
+    if (result[i] !== null) { i++; continue; }
+    // Found a null — find the gap extent
+    const gapStart = i;
+    while (i < result.length && result[i] === null) i++;
+    const gapLen = i - gapStart;
+    const leftVal = gapStart > 0 ? result[gapStart - 1] : null;
+    const rightVal = i < result.length ? result[i] : null;
+    if (gapLen <= maxGap && leftVal !== null && rightVal !== null) {
+      for (let j = 0; j < gapLen; j++) {
+        result[gapStart + j] = leftVal + (rightVal - leftVal) * ((j + 1) / (gapLen + 1));
+      }
+    }
+  }
+  return result;
+}
+
 function smooth(values, windowSize) {
   return values.map((val, i) => {
     if (val === null) return null;
@@ -129,8 +150,9 @@ export default function SymptomGraph({
   // Build data series for a symptom
   const buildSeries = useCallback((symptomId) => {
     const raw = dates.map(d => getDailyValue(entries, d, symptomId, trackingMode));
+    const filled = interpolateSmallGaps(raw);
     const windowSize = SMOOTH_WINDOWS[timeframe] || 5;
-    return smooth(raw, windowSize);
+    return smooth(filled, windowSize);
   }, [dates, entries, trackingMode, timeframe]);
 
   const primaryData = useMemo(() => buildSeries(primarySymptomId), [buildSeries, primarySymptomId]);
