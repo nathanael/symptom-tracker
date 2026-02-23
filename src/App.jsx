@@ -358,7 +358,13 @@ function App() {
             // local data from overwriting newer cloud data. For entries, do a
             // union merge (cloud priority) as a safety net to preserve any
             // local entries that might not be in cloud.
-            if (data.symptoms?.length > 0) setSymptoms(data.symptoms);
+            if (data.symptoms?.length > 0) {
+              setSymptoms(prev => {
+                const localMap = new Map(prev.map(s => [s.id, s]));
+                data.symptoms.forEach(s => localMap.set(s.id, s));
+                return Array.from(localMap.values());
+              });
+            }
             if (data.entries) {
               setEntries(prev => ({ ...prev, ...data.entries }));
             }
@@ -406,7 +412,13 @@ function App() {
           }
         } else {
           // Real-time update from another device — merge to preserve local items
-          if (data.symptoms?.length > 0) setSymptoms(data.symptoms);
+          if (data.symptoms?.length > 0) {
+            setSymptoms(prev => {
+              const localMap = new Map(prev.map(s => [s.id, s]));
+              data.symptoms.forEach(s => localMap.set(s.id, s));
+              return Array.from(localMap.values());
+            });
+          }
           if (data.entries) setEntries(prev => ({ ...prev, ...data.entries }));
           if (data.dailyNotes) setDailyNotes(prev => ({ ...prev, ...data.dailyNotes }));
           if (data.stackItems?.length > 0) {
