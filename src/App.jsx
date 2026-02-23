@@ -208,6 +208,8 @@ function App() {
   const isLoadingDataRef = useRef(true);
   // Counter to force auto-sync re-check after initial cloud merge completes
   const [syncTrigger, setSyncTrigger] = useState(0);
+  // Track recently edited stack item IDs to protect from cloud sync overwrites
+  const recentStackEditsRef = useRef(new Map());
 
   // Re-lock loading flag when user signs in, BEFORE effects run
   // This prevents auto-sync from pushing empty local data to cloud
@@ -366,12 +368,28 @@ function App() {
             if (data.stackItems?.length > 0) {
               setStackItems(prev => {
                 const localMap = new Map(prev.map(s => [s.id, s]));
-                data.stackItems.forEach(s => localMap.set(s.id, s));
+                data.stackItems.forEach(s => {
+                  // Don't overwrite recently edited items with cloud data
+                  const editTime = recentStackEditsRef.current.get(s.id);
+                  if (editTime && Date.now() - editTime < 5000) return;
+                  localMap.set(s.id, s);
+                });
                 return Array.from(localMap.values());
               });
             }
             if (data.stackEntries) {
-              setStackEntries(prev => ({ ...prev, ...data.stackEntries }));
+              setStackEntries(prev => {
+                const merged = { ...prev, ...data.stackEntries };
+                // Restore local entries for recently edited items
+                recentStackEditsRef.current.forEach((editTime, itemId) => {
+                  if (Date.now() - editTime < 5000) {
+                    Object.keys(prev).forEach(key => {
+                      if (key.includes(itemId)) merged[key] = prev[key];
+                    });
+                  }
+                });
+                return merged;
+              });
             }
             if (data.trackingMode) setTrackingMode(data.trackingMode);
             if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
@@ -394,11 +412,27 @@ function App() {
           if (data.stackItems?.length > 0) {
             setStackItems(prev => {
               const localMap = new Map(prev.map(s => [s.id, s]));
-              data.stackItems.forEach(s => localMap.set(s.id, s));
+              data.stackItems.forEach(s => {
+                const editTime = recentStackEditsRef.current.get(s.id);
+                if (editTime && Date.now() - editTime < 5000) return;
+                localMap.set(s.id, s);
+              });
               return Array.from(localMap.values());
             });
           }
-          if (data.stackEntries) setStackEntries(prev => ({ ...prev, ...data.stackEntries }));
+          if (data.stackEntries) {
+            setStackEntries(prev => {
+              const merged = { ...prev, ...data.stackEntries };
+              recentStackEditsRef.current.forEach((editTime, itemId) => {
+                if (Date.now() - editTime < 5000) {
+                  Object.keys(prev).forEach(key => {
+                    if (key.includes(itemId)) merged[key] = prev[key];
+                  });
+                }
+              });
+              return merged;
+            });
+          }
           if (data.trackingMode) setTrackingMode(data.trackingMode);
           if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
           if (data.inputItems?.length > 0) {
@@ -787,6 +821,7 @@ function App() {
                   setLastAction={setLastAction}
                   showManageStack={showManageStack}
                   setShowManageStack={setShowManageStack}
+                  recentStackEditsRef={recentStackEditsRef}
                 />
               ) : (
                 <Inputs

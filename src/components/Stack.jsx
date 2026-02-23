@@ -12,6 +12,7 @@ export default function Stack({
   setLastAction,
   showManageStack,
   setShowManageStack,
+  recentStackEditsRef,
 }) {
   const [editingStackItem, setEditingStackItem] = useState(null);
   const [newStackItem, setNewStackItem] = useState({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
@@ -184,6 +185,12 @@ export default function Stack({
   const handleSupplementSave = (updatedData) => {
     if (updatedData.name.trim() && editingSupplementId) {
       const newDefaultDose = parseFloat(updatedData.defaultDose);
+
+      // Protect this item from cloud sync overwrites for 5 seconds
+      if (recentStackEditsRef?.current) {
+        recentStackEditsRef.current.set(editingSupplementId, Date.now());
+        setTimeout(() => recentStackEditsRef.current.delete(editingSupplementId), 5000);
+      }
 
       // Use functional updater to avoid stale closure issues with stackItems
       setStackItems(prev => prev.map(item => {
