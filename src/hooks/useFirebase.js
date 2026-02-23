@@ -284,7 +284,7 @@ export function useFirebase() {
         if (docSnap.exists) {
           const data = docSnap.data();
           setLastSynced(data.updatedAt?.toDate() || new Date());
-          onData(data);
+          onData(data, docSnap.metadata);
         }
       },
       (error) => {

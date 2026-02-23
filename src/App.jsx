@@ -254,7 +254,7 @@ function App() {
   useEffect(() => {
     if (firebase.user && firebase.firebaseReady) {
       isInitialCloudLoad.current = true;
-      const unsubscribe = firebase.listenToCloud((data) => {
+      const unsubscribe = firebase.listenToCloud((data, metadata) => {
         const isInitial = isInitialCloudLoad.current;
         isInitialCloudLoad.current = false;
 
@@ -267,6 +267,14 @@ function App() {
         });
 
         if (!isInitial && incomingData === lastSyncDataRef.current) return;
+
+        // Skip snapshots with pending local writes (our own echoes).
+        // Firestore fires onSnapshot immediately for local writes before server
+        // confirmation. When multiple writes are queued, intermediate confirmations
+        // can arrive with stale data (e.g., server confirming a hide/unhide write
+        // AFTER we've already pushed a dose change). Only processing confirmed
+        // snapshots (hasPendingWrites=false) prevents stale data from overwriting.
+        if (!isInitial && metadata?.hasPendingWrites) return;
 
         // On initial load, compare timestamps to decide merge strategy.
         // On subsequent updates, accept cloud data.
