@@ -208,18 +208,20 @@ export default function Stack({
         };
       }));
 
-      // Also update today's entry if it exists, so display updates immediately
-      const entryKey = `${dateKey}-${editingSupplementId}`;
+      // Update all entries that still have the old dose to the new dose
       if (newDefaultDose) {
+        const oldItem = stackItems.find(i => i.id === editingSupplementId);
+        const oldDose = oldItem?.defaultDose;
         setStackEntries(prev => {
-          if (!prev[entryKey]) return prev;
-          return {
-            ...prev,
-            [entryKey]: {
-              ...prev[entryKey],
-              dose: newDefaultDose
+          const updated = { ...prev };
+          let changed = false;
+          Object.keys(updated).forEach(key => {
+            if (key.endsWith(`-${editingSupplementId}`) && updated[key].dose === oldDose) {
+              updated[key] = { ...updated[key], dose: newDefaultDose };
+              changed = true;
             }
-          };
+          });
+          return changed ? updated : prev;
         });
       }
     }

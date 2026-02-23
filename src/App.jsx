@@ -301,7 +301,15 @@ function App() {
             if (data.stackItems?.length > 0) {
               setStackItems(prev => {
                 const cloudMap = new Map(data.stackItems.map(s => [s.id, s]));
-                prev.forEach(s => cloudMap.set(s.id, s));
+                prev.forEach(s => {
+                  const cloud = cloudMap.get(s.id);
+                  // If cloud explicitly disabled this item, respect that
+                  if (cloud && !cloud.active) {
+                    cloudMap.set(s.id, { ...s, active: false });
+                  } else {
+                    cloudMap.set(s.id, s);
+                  }
+                });
                 return Array.from(cloudMap.values());
               });
             }
@@ -317,7 +325,14 @@ function App() {
             if (data.inputItems?.length > 0) {
               setInputItems(prev => {
                 const cloudMap = new Map(data.inputItems.map(s => [s.id, s]));
-                prev.forEach(s => cloudMap.set(s.id, s));
+                prev.forEach(s => {
+                  const cloud = cloudMap.get(s.id);
+                  if (cloud && !cloud.active) {
+                    cloudMap.set(s.id, { ...s, active: false });
+                  } else {
+                    cloudMap.set(s.id, s);
+                  }
+                });
                 return Array.from(cloudMap.values());
               });
             }
