@@ -17,6 +17,7 @@ export default function Inputs({
   const [newInput, setNewInput] = useState({ name: '', description: '', category: 'food' });
   const [showAddForm, setShowAddForm] = useState(false);
   const [showHiddenItems, setShowHiddenItems] = useState(false);
+  const [showLogPicker, setShowLogPicker] = useState(false);
 
   const manageScrollRef = useRef(null);
 
@@ -169,6 +170,9 @@ export default function Inputs({
 
   const activeItems = inputItems.filter(i => i.active).sort((a, b) => (a.order || 0) - (b.order || 0));
   const inactiveItems = inputItems.filter(i => !i.active);
+
+  // Inputs available to log retroactively (active items without entries for this date)
+  const availableToLog = activeItems.filter(i => !inputEntries[`${dateKey}-${i.id}`]);
 
   // Determine which items to display
   const displayItems = (() => {
@@ -667,7 +671,139 @@ export default function Inputs({
 
   // Empty state: show add prompt on today
   if (displayItems.length === 0) {
-    if (!isToday) return null;
+    if (!isToday) {
+      // Past date with no entries — show "Log input" button if items are available
+      if (availableToLog.length === 0) return null;
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+          <button
+            onClick={() => setShowLogPicker(true)}
+            style={{
+              width: '100%',
+              padding: '16px 20px',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+              color: '#6b7280',
+              fontSize: '14px',
+              fontWeight: '400',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            <span style={{ fontSize: '14px' }}>+</span>
+            Log input
+          </button>
+
+          {/* Log Picker Modal */}
+          {showLogPicker && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.7)',
+                zIndex: 1000,
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'center',
+                paddingBottom: '76px',
+              }}
+              onClick={() => setShowLogPicker(false)}
+            >
+              <div
+                style={{
+                  background: '#1a1b1e',
+                  borderRadius: '16px',
+                  width: 'calc(100% - 32px)',
+                  maxWidth: '500px',
+                  maxHeight: '50vh',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  animation: 'modalIn 0.2s ease-out',
+                  marginBottom: '8px',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{
+                  padding: '20px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}>
+                  <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+                    Log input
+                  </h3>
+                  <button
+                    onClick={() => setShowLogPicker(false)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#6b7280',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      padding: '8px 12px',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div style={{
+                  overflowY: 'auto',
+                  WebkitOverflowScrolling: 'touch',
+                  flex: 1,
+                }}>
+                  {availableToLog.map((item) => {
+                    const catInfo = getCategoryInfo(item.category);
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          incrementInput(item.id);
+                          setShowLogPicker(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '16px 20px',
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                          color: '#e5e7eb',
+                          fontSize: '15px',
+                          fontWeight: '400',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: catInfo.color,
+                          flexShrink: 0,
+                        }} />
+                        <span>{item.name}</span>
+                        {item.description && (
+                          <span style={{ color: '#6b7280', fontSize: '13px' }}>
+                            {item.description}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
         <button
@@ -702,7 +838,7 @@ export default function Inputs({
         return (
           <button
             key={item.id}
-            onClick={() => isToday && incrementInput(item.id)}
+            onClick={() => incrementInput(item.id)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -711,7 +847,7 @@ export default function Inputs({
               background: 'transparent',
               border: 'none',
               borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-              cursor: isToday ? 'pointer' : 'default',
+              cursor: 'pointer',
               width: '100%',
               textAlign: 'left',
             }}
@@ -760,7 +896,7 @@ export default function Inputs({
 
             {/* Count badge / empty circle */}
             <div
-              onClick={isLogged && isToday ? (e) => clearInput(item.id, e) : undefined}
+              onClick={isLogged ? (e) => clearInput(item.id, e) : undefined}
               style={{
                 width: '32px',
                 height: '32px',
@@ -793,6 +929,135 @@ export default function Inputs({
           </button>
         );
       })}
+
+      {/* Log input button - past dates only */}
+      {!isToday && availableToLog.length > 0 && (
+        <button
+          onClick={() => setShowLogPicker(true)}
+          style={{
+            width: '100%',
+            padding: '16px 20px',
+            background: 'transparent',
+            border: 'none',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+            color: '#6b7280',
+            fontSize: '14px',
+            fontWeight: '400',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>+</span>
+          Log input
+        </button>
+      )}
+
+      {/* Log Picker Modal (for past dates) */}
+      {showLogPicker && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            paddingBottom: '76px',
+          }}
+          onClick={() => setShowLogPicker(false)}
+        >
+          <div
+            style={{
+              background: '#1a1b1e',
+              borderRadius: '16px',
+              width: 'calc(100% - 32px)',
+              maxWidth: '500px',
+              maxHeight: '50vh',
+              display: 'flex',
+              flexDirection: 'column',
+              animation: 'modalIn 0.2s ease-out',
+              marginBottom: '8px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              padding: '20px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+                Log input
+              </h3>
+              <button
+                onClick={() => setShowLogPicker(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#6b7280',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  padding: '8px 12px',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+            <div style={{
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              flex: 1,
+            }}>
+              {availableToLog.map((item) => {
+                const catInfo = getCategoryInfo(item.category);
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      incrementInput(item.id);
+                      setShowLogPicker(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '16px 20px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                      color: '#e5e7eb',
+                      fontSize: '15px',
+                      fontWeight: '400',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: catInfo.color,
+                      flexShrink: 0,
+                    }} />
+                    <span>{item.name}</span>
+                    {item.description && (
+                      <span style={{ color: '#6b7280', fontSize: '13px' }}>
+                        {item.description}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Manage inputs link - only on today */}
       {isToday && !showManageInputs && (
