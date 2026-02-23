@@ -185,7 +185,8 @@ export default function Stack({
     if (updatedData.name.trim() && editingSupplementId) {
       const newDefaultDose = parseFloat(updatedData.defaultDose);
 
-      setStackItems(stackItems.map(item => {
+      // Use functional updater to avoid stale closure issues with stackItems
+      setStackItems(prev => prev.map(item => {
         if (item.id !== editingSupplementId) return item;
 
         const newValues = {
@@ -210,12 +211,13 @@ export default function Stack({
 
       // Update today's entry to the new dose (only if it still has the old default)
       if (newDefaultDose) {
-        const oldItem = stackItems.find(i => i.id === editingSupplementId);
-        const oldDose = oldItem?.defaultDose;
         const entryKey = `${dateKey}-${editingSupplementId}`;
         setStackEntries(prev => {
           if (!prev[entryKey]) return prev;
-          if (prev[entryKey].dose !== oldDose) return prev; // manually customized, don't touch
+          // Skip if user manually customized the dose to something other than the original default
+          const oldItem = stackItems.find(i => i.id === editingSupplementId);
+          const oldDose = oldItem?.defaultDose;
+          if (oldDose !== undefined && prev[entryKey].dose !== oldDose) return prev;
           return {
             ...prev,
             [entryKey]: { ...prev[entryKey], dose: newDefaultDose }

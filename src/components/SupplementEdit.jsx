@@ -13,9 +13,13 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
   });
   const [revertedIndex, setRevertedIndex] = useState(null);
 
-  // Initialize form data from item
+  // Initialize form data from item - only when editing a different supplement
+  // Using item?.id prevents cloud sync from resetting user's in-progress edits
+  // (cloud sync creates new object references for the same item)
+  const initializedIdRef = useRef(null);
   useEffect(() => {
-    if (item) {
+    if (item && item.id !== initializedIdRef.current) {
+      initializedIdRef.current = item.id;
       setFormData({
         name: item.name || '',
         description: item.description || '',
