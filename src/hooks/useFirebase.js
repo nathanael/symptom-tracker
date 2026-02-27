@@ -68,6 +68,35 @@ export function useFirebase() {
     const firebaseDb = getFirebaseDb();
     if (!user || !firebaseDb) return;
 
+    // Safety check: never overwrite cloud data with less data.
+    // Read current cloud document and abort if local data has fewer entries.
+    try {
+      const docSnap = await firebaseDb.collection('users').doc(user.uid).get({ source: 'server' });
+      if (docSnap.exists) {
+        const cloud = docSnap.data();
+        const localEntryCount = Object.keys(data.entries || {}).length;
+        const cloudEntryCount = Object.keys(cloud.entries || {}).length;
+        const localSymptomCount = (data.symptoms || []).length;
+        const cloudSymptomCount = (cloud.symptoms || []).length;
+        const localStackEntryCount = Object.keys(data.stackEntries || {}).length;
+        const cloudStackEntryCount = Object.keys(cloud.stackEntries || {}).length;
+
+        if (
+          (cloudEntryCount > 0 && localEntryCount < cloudEntryCount * 0.5) ||
+          (cloudSymptomCount > 0 && localSymptomCount < cloudSymptomCount * 0.5) ||
+          (cloudStackEntryCount > 0 && localStackEntryCount < cloudStackEntryCount * 0.5)
+        ) {
+          console.warn('Cloud sync aborted: local data has significantly fewer items than cloud. entries:', localEntryCount, 'vs', cloudEntryCount, 'symptoms:', localSymptomCount, 'vs', cloudSymptomCount, 'stackEntries:', localStackEntryCount, 'vs', cloudStackEntryCount);
+          return;
+        }
+      }
+    } catch (prefetchErr) {
+      // If we can't read cloud (offline etc), skip the safety check and proceed
+      if (prefetchErr.code !== 'unavailable' && !prefetchErr.message?.includes('offline')) {
+        console.warn('Cloud prefetch check failed:', prefetchErr);
+      }
+    }
+
     setSyncing(true);
     setSyncError(null);
 
