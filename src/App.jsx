@@ -246,19 +246,85 @@ function App() {
 
   // Track local update timestamp for sync conflict resolution
   // Only update when user makes changes, not during initial load or cloud sync
+  const isSyncingFromCloudRef = useRef(false);
   useEffect(() => {
-    if (isLoadingDataRef.current) return;
+    if (isLoadingDataRef.current || isSyncingFromCloudRef.current) return;
     localStorage.setItem(STORAGE_KEY_LOCAL_UPDATED_AT, Date.now().toString());
   }, [symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode, inputItems, inputEntries]);
 
+  // Apply cloud data with union merge (preserves local items not in cloud, cloud wins for conflicts)
+  const applyCloudData = (data, isRealTime) => {
+    isSyncingFromCloudRef.current = true;
+    // Reset after React processes the state updates
+    setTimeout(() => { isSyncingFromCloudRef.current = false; }, 0);
+    if (data.symptoms?.length > 0) {
+      setSymptoms(prev => {
+        const localMap = new Map(prev.map(s => [s.id, s]));
+        data.symptoms.forEach(s => localMap.set(s.id, s));
+        return Array.from(localMap.values());
+      });
+    }
+    if (data.entries) {
+      setEntries(prev => ({ ...prev, ...data.entries }));
+    }
+    if (data.dailyNotes) {
+      setDailyNotes(prev => ({ ...prev, ...data.dailyNotes }));
+    }
+    if (data.stackItems?.length > 0) {
+      setStackItems(prev => {
+        const localMap = new Map(prev.map(s => [s.id, s]));
+        data.stackItems.forEach(s => {
+          // Don't overwrite recently edited items with cloud data
+          if (isRealTime) {
+            const editTime = recentStackEditsRef.current.get(s.id);
+            if (editTime && Date.now() - editTime < 5000) return;
+          }
+          localMap.set(s.id, s);
+        });
+        return Array.from(localMap.values());
+      });
+    }
+    if (data.stackEntries) {
+      setStackEntries(prev => {
+        const merged = { ...prev, ...data.stackEntries };
+        // Restore local entries for recently edited items
+        if (isRealTime) {
+          recentStackEditsRef.current.forEach((editTime, itemId) => {
+            if (Date.now() - editTime < 5000) {
+              Object.keys(prev).forEach(key => {
+                if (key.includes(itemId)) merged[key] = prev[key];
+              });
+            }
+          });
+        }
+        return merged;
+      });
+    }
+    if (data.trackingMode) setTrackingMode(data.trackingMode);
+    if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
+    if (data.inputItems?.length > 0) {
+      setInputItems(prev => {
+        const localMap = new Map(prev.map(s => [s.id, s]));
+        data.inputItems.forEach(s => localMap.set(s.id, s));
+        return Array.from(localMap.values());
+      });
+    }
+    if (data.inputEntries) {
+      setInputEntries(prev => ({ ...prev, ...data.inputEntries }));
+    }
+  };
+
   // Listen to cloud changes in real-time
   const isInitialCloudLoad = useRef(true);
+  // Track whether we received a server-confirmed snapshot (not just cache)
+  const hasServerDataRef = useRef(false);
   useEffect(() => {
     if (firebase.user && firebase.firebaseReady) {
       isInitialCloudLoad.current = true;
+      hasServerDataRef.current = false;
       const unsubscribe = firebase.listenToCloud((data, metadata) => {
         const isInitial = isInitialCloudLoad.current;
-        isInitialCloudLoad.current = false;
+        const isFromCache = metadata?.fromCache === true;
 
         // Update lastSyncDataRef so auto-sync doesn't immediately push back
         const incomingData = JSON.stringify({
@@ -278,187 +344,37 @@ function App() {
         // snapshots (hasPendingWrites=false) prevents stale data from overwriting.
         if (!isInitial && metadata?.hasPendingWrites) return;
 
-        // On initial load, compare timestamps to decide merge strategy.
-        // On subsequent updates, accept cloud data.
-        if (isInitial) {
-          const localUpdatedAt = parseInt(localStorage.getItem(STORAGE_KEY_LOCAL_UPDATED_AT) || '0');
-          const cloudUpdatedAt = data.updatedAt?.toDate?.()?.getTime() || 0;
-          const localIsNewer = localUpdatedAt > cloudUpdatedAt;
+        // For initial load: if this is a cached snapshot (Firestore offline cache),
+        // apply it for display but DON'T mark initial load as complete and DON'T
+        // unlock isLoadingDataRef. Wait for the server-confirmed snapshot to avoid
+        // pushing stale cached data that overwrites newer cloud data from other devices.
+        if (isInitial && isFromCache && !hasServerDataRef.current) {
+          // Apply cached data for fast display using cloud-priority merge
+          applyCloudData(data, false);
+          lastSyncDataRef.current = incomingData;
+          // Don't unlock isLoadingDataRef — wait for server data
+          return;
+        }
 
-          if (localIsNewer) {
-            // Local data is more recent (e.g., offline changes) — merge with local priority
-            if (data.symptoms?.length > 0) {
-              setSymptoms(prev => {
-                const cloudMap = new Map(data.symptoms.map(s => [s.id, s]));
-                prev.forEach(s => cloudMap.set(s.id, s));
-                return Array.from(cloudMap.values());
-              });
-            }
-            if (data.entries) {
-              setEntries(prev => {
-                const merged = { ...data.entries };
-                Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
-                return merged;
-              });
-            }
-            if (data.dailyNotes) {
-              setDailyNotes(prev => {
-                const merged = { ...data.dailyNotes };
-                Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
-                return merged;
-              });
-            }
-            if (data.stackItems?.length > 0) {
-              setStackItems(prev => {
-                const cloudMap = new Map(data.stackItems.map(s => [s.id, s]));
-                prev.forEach(s => {
-                  const cloud = cloudMap.get(s.id);
-                  // If cloud explicitly disabled this item, respect that
-                  if (cloud && !cloud.active) {
-                    cloudMap.set(s.id, { ...s, active: false });
-                  } else {
-                    cloudMap.set(s.id, s);
-                  }
-                });
-                return Array.from(cloudMap.values());
-              });
-            }
-            if (data.stackEntries) {
-              setStackEntries(prev => {
-                const merged = { ...data.stackEntries };
-                Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
-                return merged;
-              });
-            }
-            if (data.trackingMode) setTrackingMode(data.trackingMode);
-            if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
-            if (data.inputItems?.length > 0) {
-              setInputItems(prev => {
-                const cloudMap = new Map(data.inputItems.map(s => [s.id, s]));
-                prev.forEach(s => {
-                  const cloud = cloudMap.get(s.id);
-                  if (cloud && !cloud.active) {
-                    cloudMap.set(s.id, { ...s, active: false });
-                  } else {
-                    cloudMap.set(s.id, s);
-                  }
-                });
-                return Array.from(cloudMap.values());
-              });
-            }
-            if (data.inputEntries) {
-              setInputEntries(prev => {
-                const merged = { ...data.inputEntries };
-                Object.keys(prev).forEach(key => { merged[key] = prev[key]; });
-                return merged;
-              });
-            }
-          } else {
-            // Cloud data is more recent — accept cloud data to prevent stale
-            // local data from overwriting newer cloud data. For entries, do a
-            // union merge (cloud priority) as a safety net to preserve any
-            // local entries that might not be in cloud.
-            if (data.symptoms?.length > 0) {
-              setSymptoms(prev => {
-                const localMap = new Map(prev.map(s => [s.id, s]));
-                data.symptoms.forEach(s => localMap.set(s.id, s));
-                return Array.from(localMap.values());
-              });
-            }
-            if (data.entries) {
-              setEntries(prev => ({ ...prev, ...data.entries }));
-            }
-            if (data.dailyNotes) {
-              setDailyNotes(prev => ({ ...prev, ...data.dailyNotes }));
-            }
-            if (data.stackItems?.length > 0) {
-              setStackItems(prev => {
-                const localMap = new Map(prev.map(s => [s.id, s]));
-                data.stackItems.forEach(s => {
-                  // Don't overwrite recently edited items with cloud data
-                  const editTime = recentStackEditsRef.current.get(s.id);
-                  if (editTime && Date.now() - editTime < 5000) return;
-                  localMap.set(s.id, s);
-                });
-                return Array.from(localMap.values());
-              });
-            }
-            if (data.stackEntries) {
-              setStackEntries(prev => {
-                const merged = { ...prev, ...data.stackEntries };
-                // Restore local entries for recently edited items
-                recentStackEditsRef.current.forEach((editTime, itemId) => {
-                  if (Date.now() - editTime < 5000) {
-                    Object.keys(prev).forEach(key => {
-                      if (key.includes(itemId)) merged[key] = prev[key];
-                    });
-                  }
-                });
-                return merged;
-              });
-            }
-            if (data.trackingMode) setTrackingMode(data.trackingMode);
-            if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
-            if (data.inputItems?.length > 0) {
-              setInputItems(prev => {
-                const localMap = new Map(prev.map(s => [s.id, s]));
-                data.inputItems.forEach(s => localMap.set(s.id, s));
-                return Array.from(localMap.values());
-              });
-            }
-            if (data.inputEntries) {
-              setInputEntries(prev => ({ ...prev, ...data.inputEntries }));
-            }
-          }
+        // Mark that we've processed the real initial load
+        if (isInitial) {
+          isInitialCloudLoad.current = false;
+          hasServerDataRef.current = true;
+        }
+
+        // On initial load (server-confirmed), use union merge to preserve both sides.
+        // On subsequent updates, accept cloud data with merge.
+        if (isInitial) {
+          // Server-confirmed initial load — always use cloud-priority union merge.
+          // This preserves any local-only items while accepting cloud as source of truth.
+          applyCloudData(data, false);
         } else {
           // Real-time update from another device — merge to preserve local items
-          if (data.symptoms?.length > 0) {
-            setSymptoms(prev => {
-              const localMap = new Map(prev.map(s => [s.id, s]));
-              data.symptoms.forEach(s => localMap.set(s.id, s));
-              return Array.from(localMap.values());
-            });
-          }
-          if (data.entries) setEntries(prev => ({ ...prev, ...data.entries }));
-          if (data.dailyNotes) setDailyNotes(prev => ({ ...prev, ...data.dailyNotes }));
-          if (data.stackItems?.length > 0) {
-            setStackItems(prev => {
-              const localMap = new Map(prev.map(s => [s.id, s]));
-              data.stackItems.forEach(s => {
-                const editTime = recentStackEditsRef.current.get(s.id);
-                if (editTime && Date.now() - editTime < 5000) return;
-                localMap.set(s.id, s);
-              });
-              return Array.from(localMap.values());
-            });
-          }
-          if (data.stackEntries) {
-            setStackEntries(prev => {
-              const merged = { ...prev, ...data.stackEntries };
-              recentStackEditsRef.current.forEach((editTime, itemId) => {
-                if (Date.now() - editTime < 5000) {
-                  Object.keys(prev).forEach(key => {
-                    if (key.includes(itemId)) merged[key] = prev[key];
-                  });
-                }
-              });
-              return merged;
-            });
-          }
-          if (data.trackingMode) setTrackingMode(data.trackingMode);
-          if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
-          if (data.inputItems?.length > 0) {
-            setInputItems(prev => {
-              const localMap = new Map(prev.map(s => [s.id, s]));
-              data.inputItems.forEach(s => localMap.set(s.id, s));
-              return Array.from(localMap.values());
-            });
-          }
-          if (data.inputEntries) setInputEntries(prev => ({ ...prev, ...data.inputEntries }));
+          applyCloudData(data, true);
         }
 
         lastSyncDataRef.current = incomingData;
-        // Enable timestamp updates after cloud sync completes
+        // Enable timestamp updates after cloud sync completes (only for server data)
         if (isLoadingDataRef.current) {
           setTimeout(() => {
             isLoadingDataRef.current = false;
