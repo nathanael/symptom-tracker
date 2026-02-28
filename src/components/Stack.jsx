@@ -21,6 +21,7 @@ export default function Stack({
   const [showAddForm, setShowAddForm] = useState(false);
   const [showHiddenItems, setShowHiddenItems] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const manageScrollRef = useRef(null);
 
   // Prevent row click from toggling right after dose blur save
@@ -159,7 +160,7 @@ export default function Stack({
     // Add history entry for creation
     newItem.history = [createHistoryEntry(newItem)];
 
-    setStackItems([...stackItems, newItem]);
+    setStackItems(prev => [...prev, newItem]);
 
     setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
     setShowAddForm(false);
@@ -167,7 +168,7 @@ export default function Stack({
   };
 
   const toggleStackItemActive = (itemId) => {
-    setStackItems(stackItems.map(item => {
+    setStackItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
 
       const newActive = !item.active;
@@ -180,6 +181,26 @@ export default function Stack({
         history: historyEntry ? [...history, historyEntry] : history
       };
     }));
+  };
+
+  const getEntryCountForItem = (itemId) => {
+    return Object.keys(stackEntries).filter(key => key.endsWith(`-${itemId}`)).length;
+  };
+
+  const deleteStackItem = (itemId) => {
+    const item = stackItems.find(i => i.id === itemId);
+    setStackItems(prev => prev.filter(i => i.id !== itemId));
+    setStackEntries(prev => {
+      const filtered = {};
+      for (const [key, value] of Object.entries(prev)) {
+        if (!key.endsWith(`-${itemId}`)) {
+          filtered[key] = value;
+        }
+      }
+      return filtered;
+    });
+    setConfirmingDeleteId(null);
+    if (item) setLastAction(`Deleted ${item.name}`);
   };
 
   const handleSupplementSave = (updatedData) => {
@@ -312,7 +333,7 @@ export default function Stack({
       const [moved] = newList.splice(currentIndex, 1);
       newList.splice(newIndex, 0, moved);
 
-      setStackItems(stackItems.map(i => {
+      setStackItems(prev => prev.map(i => {
         const newOrderIndex = newList.findIndex(item => item.id === i.id);
         if (newOrderIndex !== -1) {
           return { ...i, order: newOrderIndex };
@@ -1004,38 +1025,106 @@ export default function Stack({
                     gap: '8px',
                     animation: 'slideDown 0.2s ease-out',
                   }}>
-                    {inactiveItems.map((item) => (
-                      <div
-                        key={item.id}
-                        style={{
-                          background: 'rgba(15, 17, 21, 0.3)',
-                          borderRadius: '3px',
-                          padding: '12px 16px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                        }}
-                      >
-                        <span style={{ color: '#64748b', fontSize: '15px', flex: 1 }}>
-                          {item.name}
-                        </span>
-                        <button
-                          onClick={() => toggleStackItemActive(item.id)}
+                    {inactiveItems.map((item) => {
+                      const isConfirming = confirmingDeleteId === item.id;
+                      const entryCount = isConfirming ? getEntryCountForItem(item.id) : 0;
+                      return (
+                      <div key={item.id}>
+                        <div
                           style={{
-                            background: 'rgba(34, 197, 94, 0.15)',
-                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                            background: 'rgba(15, 17, 21, 0.3)',
                             borderRadius: '3px',
-                            padding: '6px 12px',
-                            color: '#4ade80',
-                            fontSize: '12px',
-                            cursor: 'pointer',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
                           }}
                         >
-                          Restore
-                        </button>
+                          <span style={{ color: '#64748b', fontSize: '15px', flex: 1 }}>
+                            {item.name}
+                          </span>
+                          <button
+                            onClick={() => toggleStackItemActive(item.id)}
+                            style={{
+                              background: 'rgba(34, 197, 94, 0.15)',
+                              border: '1px solid rgba(34, 197, 94, 0.3)',
+                              borderRadius: '3px',
+                              padding: '6px 12px',
+                              color: '#4ade80',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          >
+                            Restore
+                          </button>
+                          <button
+                            onClick={() => setConfirmingDeleteId(isConfirming ? null : item.id)}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              borderRadius: '3px',
+                              padding: '6px 10px',
+                              color: '#f87171',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                        {isConfirming && (
+                          <div style={{
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            borderRadius: '3px',
+                            padding: '12px 16px',
+                            marginTop: '4px',
+                            animation: 'slideDown 0.15s ease-out',
+                          }}>
+                            <div style={{ color: '#fca5a5', fontSize: '13px', marginBottom: '10px' }}>
+                              {entryCount > 0
+                                ? `Permanently delete "${item.name}" and ${entryCount} historical record${entryCount === 1 ? '' : 's'}?`
+                                : `Permanently delete "${item.name}"?`}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => deleteStackItem(item.id)}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.3)',
+                                  border: '1px solid rgba(239, 68, 68, 0.5)',
+                                  borderRadius: '3px',
+                                  padding: '8px 16px',
+                                  color: '#fca5a5',
+                                  fontSize: '13px',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Delete forever
+                              </button>
+                              <button
+                                onClick={() => setConfirmingDeleteId(null)}
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.05)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  borderRadius: '3px',
+                                  padding: '8px 16px',
+                                  color: '#9ca3af',
+                                  fontSize: '13px',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
