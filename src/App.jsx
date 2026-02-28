@@ -439,21 +439,22 @@ function App() {
       return;
     }
 
-    const newEntries = { ...stackEntries };
-    yesterdayEntries.forEach(([key, entry]) => {
-      const itemId = key.substring(yesterdayKey.length + 1);
-      const item = stackItems.find(i => i.id === itemId);
-      if (item && item.active && isScheduledForDate(item.schedule, new Date())) {
-        newEntries[`${todayKey}-${itemId}`] = {
-          date: todayKey,
-          itemId,
-          dose: entry.dose,
-          taken: true,
-        };
-      }
+    setStackEntries(prev => {
+      const newEntries = { ...prev };
+      yesterdayEntries.forEach(([key, entry]) => {
+        const itemId = key.substring(yesterdayKey.length + 1);
+        const item = stackItems.find(i => i.id === itemId);
+        if (item && item.active && isScheduledForDate(item.schedule, new Date())) {
+          newEntries[`${todayKey}-${itemId}`] = {
+            date: todayKey,
+            itemId,
+            dose: entry.dose,
+            taken: true,
+          };
+        }
+      });
+      return newEntries;
     });
-
-    setStackEntries(newEntries);
     lastPrefillDateRef.current = todayKey;
     localStorage.setItem('lastStackPrefillDate', todayKey);
   }, [stackEntries, stackItems]);
@@ -1038,29 +1039,33 @@ function App() {
             const activeItems = stackItems.filter(i =>
               i.active && isScheduledForDate(i.schedule, selectedDate)
             );
-            const newEntries = { ...stackEntries };
-            activeItems.forEach(item => {
-              const entryKey = `${dateKey}-${item.id}`;
-              newEntries[entryKey] = {
-                date: dateKey,
-                itemId: item.id,
-                dose: item.defaultDose,
-                taken: true
-              };
+            setStackEntries(prev => {
+              const newEntries = { ...prev };
+              activeItems.forEach(item => {
+                const entryKey = `${dateKey}-${item.id}`;
+                newEntries[entryKey] = {
+                  date: dateKey,
+                  itemId: item.id,
+                  dose: item.defaultDose,
+                  taken: true
+                };
+              });
+              return newEntries;
             });
-            setStackEntries(newEntries);
             haptic('success');
             setLastAction('All selected');
           }}
           onClear={() => {
             const dateKey = getDateKey(selectedDate);
-            const newEntries = { ...stackEntries };
-            Object.keys(newEntries).forEach(key => {
-              if (key.startsWith(dateKey)) {
-                delete newEntries[key];
-              }
+            setStackEntries(prev => {
+              const newEntries = { ...prev };
+              Object.keys(newEntries).forEach(key => {
+                if (key.startsWith(dateKey)) {
+                  delete newEntries[key];
+                }
+              });
+              return newEntries;
             });
-            setStackEntries(newEntries);
             setLastAction('All cleared');
           }}
           onMatchYesterday={() => {
@@ -1069,31 +1074,33 @@ function App() {
             yesterday.setDate(yesterday.getDate() - 1);
             const yesterdayKey = getDateKey(yesterday);
 
-            const yesterdayEntries = Object.entries(stackEntries).filter(([key]) => key.startsWith(yesterdayKey));
-            if (yesterdayEntries.length === 0) {
-              setLastAction('No entries from yesterday');
-              return;
-            }
-
-            const newEntries = { ...stackEntries };
-            let copiedCount = 0;
-            yesterdayEntries.forEach(([key, entry]) => {
-              const itemId = key.substring(yesterdayKey.length + 1);
-              const item = stackItems.find(i => i.id === itemId);
-              if (item && item.active && isScheduledForDate(item.schedule, selectedDate)) {
-                newEntries[`${dateKey}-${itemId}`] = {
-                  date: dateKey,
-                  itemId: itemId,
-                  dose: entry.dose,
-                  taken: true
-                };
-                copiedCount++;
+            setStackEntries(prev => {
+              const yesterdayEntries = Object.entries(prev).filter(([key]) => key.startsWith(yesterdayKey));
+              if (yesterdayEntries.length === 0) {
+                setLastAction('No entries from yesterday');
+                return prev;
               }
-            });
 
-            setStackEntries(newEntries);
+              const newEntries = { ...prev };
+              let copiedCount = 0;
+              yesterdayEntries.forEach(([key, entry]) => {
+                const itemId = key.substring(yesterdayKey.length + 1);
+                const item = stackItems.find(i => i.id === itemId);
+                if (item && item.active && isScheduledForDate(item.schedule, selectedDate)) {
+                  newEntries[`${dateKey}-${itemId}`] = {
+                    date: dateKey,
+                    itemId: itemId,
+                    dose: entry.dose,
+                    taken: true
+                  };
+                  copiedCount++;
+                }
+              });
+
+              setLastAction(`Matched ${copiedCount} from yesterday`);
+              return newEntries;
+            });
             haptic('success');
-            setLastAction(`Matched ${copiedCount} from yesterday`);
           }}
           onEditStack={() => setShowManageStack(true)}
           onEditInputs={() => setShowManageInputs(true)}

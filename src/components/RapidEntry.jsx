@@ -237,12 +237,14 @@ export default function RapidEntry({
             <button
               onClick={() => {
                 // Clear entries for this period and start over
-                const newEntries = { ...entries };
-                activeSymptomsList.forEach(symptom => {
-                  const entryKey = `${dateKey}-${symptom.id}-${timeKey}`;
-                  delete newEntries[entryKey];
+                setEntries(prev => {
+                  const newEntries = { ...prev };
+                  activeSymptomsList.forEach(symptom => {
+                    const entryKey = `${dateKey}-${symptom.id}-${timeKey}`;
+                    delete newEntries[entryKey];
+                  });
+                  return newEntries;
                 });
-                setEntries(newEntries);
                 setRapidEntryConfirm(false);
                 setRapidEntryIndex(0);
               }}

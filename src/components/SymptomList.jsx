@@ -258,7 +258,7 @@ export default function SymptomList({
     const existing = symptoms.find(s => s.name.toLowerCase() === name.toLowerCase());
     if (existing) {
       if (!existing.active) {
-        setSymptoms(symptoms.map(s => {
+        setSymptoms(prev => prev.map(s => {
           if (s.id !== existing.id) return s;
           const newValues = { ...s, active: true, description: newSymptomDescription.trim() || s.description };
           const historyEntry = recordSymptomHistoryChange(s, newValues);
@@ -284,7 +284,7 @@ export default function SymptomList({
         order: minOrder - 1,
       };
       newSymptom.history = [createSymptomHistoryEntry(newSymptom)];
-      setSymptoms([...symptoms, newSymptom]);
+      setSymptoms(prev => [...prev, newSymptom]);
       setLastAction('Symptom added');
     }
 
@@ -293,7 +293,7 @@ export default function SymptomList({
   };
 
   const removeSymptom = (symptomId) => {
-    setSymptoms(symptoms.map(s => {
+    setSymptoms(prev => prev.map(s => {
       if (s.id !== symptomId) return s;
       const newValues = { ...s, active: false };
       const historyEntry = recordSymptomHistoryChange(s, newValues);
@@ -307,7 +307,7 @@ export default function SymptomList({
   };
 
   const reactivateSymptom = (symptomId) => {
-    setSymptoms(symptoms.map(s => {
+    setSymptoms(prev => prev.map(s => {
       if (s.id !== symptomId) return s;
       const newValues = { ...s, active: true };
       const historyEntry = recordSymptomHistoryChange(s, newValues);
@@ -322,7 +322,7 @@ export default function SymptomList({
 
   const handleSymptomSave = (updatedData) => {
     if (updatedData.name.trim() && editingSymptomFullId) {
-      setSymptoms(symptoms.map(s => {
+      setSymptoms(prev => prev.map(s => {
         if (s.id !== editingSymptomFullId) return s;
 
         const newValues = {
@@ -398,7 +398,7 @@ export default function SymptomList({
       newList.splice(newIndex, 0, moved);
 
       // Update order values
-      setSymptoms(symptoms.map(s => {
+      setSymptoms(prev => prev.map(s => {
         const newOrderIndex = newList.findIndex(item => item.id === s.id);
         if (newOrderIndex !== -1) {
           return { ...s, order: newOrderIndex };
