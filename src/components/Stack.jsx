@@ -380,27 +380,31 @@ export default function Stack({
                   onClick={() => {
                     if (taken === total) {
                       // Uncheck all
-                      const newEntries = { ...stackEntries };
-                      Object.keys(newEntries).forEach(key => {
-                        if (key.startsWith(dateKey)) delete newEntries[key];
+                      setStackEntries(prev => {
+                        const newEntries = { ...prev };
+                        Object.keys(newEntries).forEach(key => {
+                          if (key.startsWith(dateKey)) delete newEntries[key];
+                        });
+                        return newEntries;
                       });
-                      setStackEntries(newEntries);
                       setLastAction('All cleared');
                     } else {
                       // Check all
-                      const newEntries = { ...stackEntries };
-                      displayItems.forEach(item => {
-                        const entryKey = `${dateKey}-${item.id}`;
-                        if (!newEntries[entryKey]) {
-                          newEntries[entryKey] = {
-                            date: dateKey,
-                            itemId: item.id,
-                            dose: item.defaultDose,
-                            taken: true,
-                          };
-                        }
+                      setStackEntries(prev => {
+                        const newEntries = { ...prev };
+                        displayItems.forEach(item => {
+                          const entryKey = `${dateKey}-${item.id}`;
+                          if (!newEntries[entryKey]) {
+                            newEntries[entryKey] = {
+                              date: dateKey,
+                              itemId: item.id,
+                              dose: item.defaultDose,
+                              taken: true,
+                            };
+                          }
+                        });
+                        return newEntries;
                       });
-                      setStackEntries(newEntries);
                       haptic('success');
                       setLastAction('All selected');
                     }
