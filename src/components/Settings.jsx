@@ -73,7 +73,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '3.19.2',
+      version: '3.19.4',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -108,17 +108,49 @@ export default function Settings({
       try {
         const backup = JSON.parse(e.target.result);
 
-        if (backup.symptoms) setSymptoms(backup.symptoms);
-        if (backup.entries) setEntries(backup.entries);
-        if (backup.dailyNotes) setDailyNotes(backup.dailyNotes);
-        if (backup.stackItems) setStackItems(backup.stackItems);
-        if (backup.stackEntries) setStackEntries(backup.stackEntries);
-        if (backup.inputItems) setInputItems(backup.inputItems);
-        if (backup.inputEntries) setInputEntries(backup.inputEntries);
+        // Merge restore: backup fills in missing data without overwriting existing
+        let added = 0;
+        if (backup.symptoms) setSymptoms(prev => {
+          const map = new Map(prev.map(s => [s.id, s]));
+          backup.symptoms.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); added++; } });
+          return Array.from(map.values());
+        });
+        if (backup.entries) setEntries(prev => {
+          const merged = { ...prev };
+          Object.entries(backup.entries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; added++; } });
+          return merged;
+        });
+        if (backup.dailyNotes) setDailyNotes(prev => {
+          const merged = { ...prev };
+          Object.entries(backup.dailyNotes).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; added++; } });
+          return merged;
+        });
+        if (backup.stackItems) setStackItems(prev => {
+          const map = new Map(prev.map(s => [s.id, s]));
+          backup.stackItems.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); added++; } });
+          return Array.from(map.values());
+        });
+        if (backup.stackEntries) setStackEntries(prev => {
+          const merged = { ...prev };
+          Object.entries(backup.stackEntries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; added++; } });
+          return merged;
+        });
+        if (backup.inputItems) setInputItems(prev => {
+          const map = new Map(prev.map(s => [s.id, s]));
+          backup.inputItems.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); added++; } });
+          return Array.from(map.values());
+        });
+        if (backup.inputEntries) setInputEntries(prev => {
+          const merged = { ...prev };
+          Object.entries(backup.inputEntries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; added++; } });
+          return merged;
+        });
         if (backup.trackingMode) setTrackingMode(backup.trackingMode);
         if (backup.pinnedSymptoms) setPinnedSymptoms(new Set(backup.pinnedSymptoms));
 
-        setLastAction(`Restored backup from ${backup.exportedAt ? new Date(backup.exportedAt).toLocaleDateString() : 'file'}`);
+        setLastAction(added > 0
+          ? `Merged ${added} missing entries from backup`
+          : 'Backup loaded but no missing entries found — all data already present');
       } catch (err) {
         setLastAction('Error: Invalid backup file');
       }
@@ -660,7 +692,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v3.19.2
+              v3.19.4
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

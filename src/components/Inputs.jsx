@@ -116,14 +116,14 @@ export default function Inputs({
       }],
     };
 
-    setInputItems([...inputItems, newItem]);
+    setInputItems(prev => [...prev, newItem]);
     setNewInput({ name: '', description: '', category: 'food' });
     setShowAddForm(false);
     setLastAction(`Added ${newInput.name}`);
   };
 
   const toggleInputActive = (itemId) => {
-    setInputItems(inputItems.map(item => {
+    setInputItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
       const newActive = !item.active;
       const history = item.history || [];
@@ -138,7 +138,7 @@ export default function Inputs({
 
   const handleInputSave = (updatedData) => {
     if (updatedData.name.trim() && editingInputId) {
-      setInputItems(inputItems.map(item => {
+      setInputItems(prev => prev.map(item => {
         if (item.id !== editingInputId) return item;
 
         const changes = {};
@@ -230,7 +230,7 @@ export default function Inputs({
       const [moved] = newList.splice(currentIndex, 1);
       newList.splice(newIndex, 0, moved);
 
-      setInputItems(inputItems.map(i => {
+      setInputItems(prev => prev.map(i => {
         const newOrderIndex = newList.findIndex(item => item.id === i.id);
         if (newOrderIndex !== -1) {
           return { ...i, order: newOrderIndex };

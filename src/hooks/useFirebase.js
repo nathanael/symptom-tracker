@@ -74,27 +74,26 @@ export function useFirebase() {
       const docSnap = await firebaseDb.collection('users').doc(user.uid).get({ source: 'server' });
       if (docSnap.exists) {
         const cloud = docSnap.data();
-        const localEntryCount = Object.keys(data.entries || {}).length;
-        const cloudEntryCount = Object.keys(cloud.entries || {}).length;
-        const localSymptomCount = (data.symptoms || []).length;
-        const cloudSymptomCount = (cloud.symptoms || []).length;
-        const localStackEntryCount = Object.keys(data.stackEntries || {}).length;
-        const cloudStackEntryCount = Object.keys(cloud.stackEntries || {}).length;
+        const checks = [
+          { name: 'entries', local: Object.keys(data.entries || {}).length, cloud: Object.keys(cloud.entries || {}).length },
+          { name: 'symptoms', local: (data.symptoms || []).length, cloud: (cloud.symptoms || []).length },
+          { name: 'stackEntries', local: Object.keys(data.stackEntries || {}).length, cloud: Object.keys(cloud.stackEntries || {}).length },
+          { name: 'stackItems', local: (data.stackItems || []).length, cloud: (cloud.stackItems || []).length },
+          { name: 'inputItems', local: (data.inputItems || []).length, cloud: (cloud.inputItems || []).length },
+          { name: 'inputEntries', local: Object.keys(data.inputEntries || {}).length, cloud: Object.keys(cloud.inputEntries || {}).length },
+          { name: 'dailyNotes', local: Object.keys(data.dailyNotes || {}).length, cloud: Object.keys(cloud.dailyNotes || {}).length },
+        ];
 
-        if (
-          (cloudEntryCount > 0 && localEntryCount < cloudEntryCount * 0.5) ||
-          (cloudSymptomCount > 0 && localSymptomCount < cloudSymptomCount * 0.5) ||
-          (cloudStackEntryCount > 0 && localStackEntryCount < cloudStackEntryCount * 0.5)
-        ) {
-          console.warn('Cloud sync aborted: local data has significantly fewer items than cloud. entries:', localEntryCount, 'vs', cloudEntryCount, 'symptoms:', localSymptomCount, 'vs', cloudSymptomCount, 'stackEntries:', localStackEntryCount, 'vs', cloudStackEntryCount);
+        const failed = checks.filter(c => c.cloud > 0 && c.local < c.cloud * 0.5);
+        if (failed.length > 0) {
+          console.warn('Cloud sync aborted: local data has significantly fewer items than cloud.', failed.map(c => `${c.name}: ${c.local} vs ${c.cloud}`).join(', '));
           return;
         }
       }
     } catch (prefetchErr) {
-      // If we can't read cloud (offline etc), skip the safety check and proceed
-      if (prefetchErr.code !== 'unavailable' && !prefetchErr.message?.includes('offline')) {
-        console.warn('Cloud prefetch check failed:', prefetchErr);
-      }
+      // If we can't read cloud (offline etc), ABORT the sync rather than risk overwriting
+      console.warn('Cloud prefetch check failed, aborting sync to protect data:', prefetchErr);
+      return;
     }
 
     setSyncing(true);
@@ -105,7 +104,7 @@ export function useFirebase() {
         ...data,
         updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
         version: '3.4',
-      });
+      }, { merge: true });
       setLastSynced(new Date());
     } catch (error) {
       console.error('Error saving to cloud:', error);

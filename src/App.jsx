@@ -403,15 +403,16 @@ function App() {
     }
   }, [firebase.user, firebase.firebaseReady, firebase.authLoading]);
 
-  // Fallback: ensure timestamp updates are enabled after 10s even if Firebase never loads
+  // Fallback: enable timestamp updates after 10s ONLY if user is not signed in.
+  // If user IS signed in but cloud hasn't loaded, keep locked to prevent empty data push.
   useEffect(() => {
     const fallbackTimer = setTimeout(() => {
-      if (isLoadingDataRef.current) {
+      if (isLoadingDataRef.current && !firebase.user) {
         isLoadingDataRef.current = false;
       }
     }, 10000);
     return () => clearTimeout(fallbackTimer);
-  }, []);
+  }, [firebase.user]);
 
   // Auto-prefill today's stack from yesterday's checked entries
   const lastPrefillDateRef = useRef(localStorage.getItem('lastStackPrefillDate'));
