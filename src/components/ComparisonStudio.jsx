@@ -83,10 +83,18 @@ export default function ComparisonStudio({
   const [selectedSymptoms, setSelectedSymptoms] = useState(initialSelections.symptoms);
   const [showSupplementPicker, setShowSupplementPicker] = useState(false);
   const [showSymptomPicker, setShowSymptomPicker] = useState(false);
+  const [suppSearch, setSuppSearch] = useState('');
+  const [symSearch, setSymSearch] = useState('');
+  const suppSearchRef = useRef(null);
+  const symSearchRef = useRef(null);
   const [timeframe, setTimeframe] = useState(60);
   const [startOffset, setStartOffset] = useState(0); // days back from today for the end of the window
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
+
+  // Auto-focus search inputs when pickers open
+  useEffect(() => { if (showSupplementPicker) { setSuppSearch(''); setTimeout(() => suppSearchRef.current?.focus(), 50); } }, [showSupplementPicker]);
+  useEffect(() => { if (showSymptomPicker) { setSymSearch(''); setTimeout(() => symSearchRef.current?.focus(), 50); } }, [showSymptomPicker]);
 
   // Persist selections to localStorage
   useEffect(() => {
@@ -122,7 +130,10 @@ export default function ComparisonStudio({
     for (let i = timeframe - 1; i >= 0; i--) {
       const d = new Date(end);
       d.setDate(d.getDate() - i);
-      result.push(d.toISOString().split('T')[0]);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      result.push(`${y}-${m}-${day}`);
     }
     return result;
   }, [timeframe, startOffset]);
@@ -143,18 +154,20 @@ export default function ComparisonStudio({
 
   const windowSize = SMOOTH_WINDOWS[timeframe] || 5;
 
-  // Supplement: raw dose series (no smoothing/interpolation — supplements are fixed doses)
+  // Supplement: dose series — 0 on untaken days so the line is continuous
   const suppDoseRaw = useMemo(() => {
     if (!selectedSupplement) return null;
     const raw = getSupplementDoseSeries(stackEntries, stackItems, selectedSupplement, dates);
     // Cap outlier doses: use 95th percentile × 3 to ignore bogus spikes
     const valid = raw.filter(v => v !== null && v > 0).sort((a, b) => a - b);
+    let capped = raw;
     if (valid.length > 2) {
       const p95 = valid[Math.floor(valid.length * 0.95)];
       const cap = p95 * 3;
-      return raw.map(v => (v !== null && v > cap) ? cap : v);
+      capped = raw.map(v => (v !== null && v > cap) ? cap : v);
     }
-    return raw;
+    // Fill nulls with 0 so the line drops to 0 on untaken days
+    return capped.map(v => v === null ? 0 : v);
   }, [selectedSupplement, stackEntries, stackItems, dates]);
 
   // Dose Y-axis range
@@ -269,7 +282,9 @@ export default function ComparisonStudio({
     };
     const items = [];
     if (suppDoseRaw) {
-      items.push({ name: suppItem?.name, color: SUPP_COLOR, val: avg(suppDoseRaw), unit: suppUnit });
+      const takenOnly = suppDoseRaw.filter(v => v > 0);
+      const suppAvg = takenOnly.length > 0 ? takenOnly.reduce((a, b) => a + b, 0) / takenOnly.length : null;
+      items.push({ name: suppItem?.name, color: SUPP_COLOR, val: suppAvg, unit: suppUnit });
     }
     selectedSymptoms.forEach((symId, idx) => {
       const sd = symptomData[idx];
@@ -393,13 +408,36 @@ export default function ComparisonStudio({
           </button>
         </div>
         <div style={{ overflowY: 'auto', padding: '12px 16px' }}>
+          <input
+            ref={suppSearchRef}
+            value={suppSearch}
+            onChange={(e) => setSuppSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { e.stopPropagation(); if (suppSearch) setSuppSearch(''); else setShowSupplementPicker(false); }
+              if (e.key === 'Enter') {
+                const filtered = allSupplements.filter(s => s.name.toLowerCase().includes(suppSearch.toLowerCase()));
+                if (filtered.length === 1) { selectSupplement(filtered[0].id); setShowSupplementPicker(false); }
+              }
+            }}
+            placeholder="Search supplements..."
+            style={{
+              width: '100%', padding: '8px 12px', marginBottom: '10px',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '8px',
           }}>
-            {allSupplements.map(supp => {
+            {(() => {
+              const filtered = allSupplements.filter(s => !suppSearch || s.name.toLowerCase().includes(suppSearch.toLowerCase()));
+              const autoSelected = filtered.length === 1;
+              return filtered.map(supp => {
               const isSelected = selectedSupplement === supp.id;
+              const highlighted = isSelected || autoSelected;
               return (
                 <button
                   key={supp.id}
@@ -408,29 +446,30 @@ export default function ComparisonStudio({
                     display: 'flex', alignItems: 'center', gap: '8px',
                     padding: '10px 12px', minWidth: 0,
                     borderRadius: '8px',
-                    background: isSelected ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
-                    border: isSelected ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                    background: highlighted ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                    border: highlighted ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.06)',
                     cursor: 'pointer',
                     textAlign: 'left',
                   }}
                 >
                   <span style={{
                     width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                    background: isSelected ? SUPP_COLOR : '#4b5563',
+                    background: highlighted ? SUPP_COLOR : '#4b5563',
                   }} />
                   <span style={{
-                    flex: 1, color: isSelected ? '#e5e7eb' : '#9ca3af',
-                    fontSize: '13px', fontWeight: isSelected ? '500' : '400',
+                    flex: 1, color: highlighted ? '#e5e7eb' : '#9ca3af',
+                    fontSize: '13px', fontWeight: highlighted ? '500' : '400',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
                     {supp.name}
                   </span>
-                  {isSelected && (
+                  {highlighted && (
                     <span style={{ color: SUPP_COLOR, fontSize: '14px', flexShrink: 0 }}>✓</span>
                   )}
                 </button>
               );
-            })}
+            });
+            })()}
           </div>
         </div>
       </div>
@@ -486,6 +525,25 @@ export default function ComparisonStudio({
 
         {/* Body */}
         <div style={{ overflowY: 'auto', padding: '12px 16px' }}>
+          <input
+            ref={symSearchRef}
+            value={symSearch}
+            onChange={(e) => setSymSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { e.stopPropagation(); if (symSearch) setSymSearch(''); else setShowSymptomPicker(false); }
+              if (e.key === 'Enter') {
+                const filtered = activeSymptoms.filter(s => s.name.toLowerCase().includes(symSearch.toLowerCase()));
+                if (filtered.length === 1) { toggleSymptom(filtered[0].id); setShowSymptomPicker(false); }
+              }
+            }}
+            placeholder="Search symptoms..."
+            style={{
+              width: '100%', padding: '8px 12px', marginBottom: '10px',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
           {selectedSymptoms.length >= 3 && (
             <div style={{
               padding: '0 0 10px', color: '#6b7280', fontSize: '12px', textAlign: 'center',
@@ -498,10 +556,17 @@ export default function ComparisonStudio({
             gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '8px',
           }}>
-          {activeSymptoms.map(sym => {
+          {(() => {
+            const filtered = activeSymptoms.filter(s => !symSearch || s.name.toLowerCase().includes(symSearch.toLowerCase()));
+            const autoSelected = filtered.length === 1;
+            const autoColor = '#8b5cf6';
+            return filtered.map(sym => {
             const isSelected = selectedSymptoms.includes(sym.id);
             const styleIdx = selectedSymptoms.indexOf(sym.id);
             const atMax = selectedSymptoms.length >= 3 && !isSelected;
+            const highlighted = isSelected || autoSelected;
+            const dotColor = isSelected ? SYMPTOM_STYLES[styleIdx].color : autoSelected ? autoColor : '#4b5563';
+            const borderColor = isSelected ? SYMPTOM_STYLES[styleIdx].chipBorder : autoSelected ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.06)';
             return (
               <button
                 key={sym.id}
@@ -510,8 +575,8 @@ export default function ComparisonStudio({
                   display: 'flex', alignItems: 'center', gap: '8px',
                   padding: '10px 12px', minWidth: 0,
                   borderRadius: '8px',
-                  background: isSelected ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
-                  border: isSelected ? `1px solid ${SYMPTOM_STYLES[styleIdx].chipBorder}` : '1px solid rgba(255,255,255,0.06)',
+                  background: highlighted ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${borderColor}`,
                   cursor: atMax ? 'default' : 'pointer',
                   opacity: atMax ? 0.35 : 1,
                   textAlign: 'left',
@@ -519,21 +584,22 @@ export default function ComparisonStudio({
               >
                 <span style={{
                   width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                  background: isSelected ? SYMPTOM_STYLES[styleIdx].color : '#4b5563',
+                  background: dotColor,
                 }} />
                 <span style={{
-                  flex: 1, color: isSelected ? '#e5e7eb' : '#9ca3af',
-                  fontSize: '13px', fontWeight: isSelected ? '500' : '400',
+                  flex: 1, color: highlighted ? '#e5e7eb' : '#9ca3af',
+                  fontSize: '13px', fontWeight: highlighted ? '500' : '400',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {sym.name}
                 </span>
-                {isSelected && (
-                  <span style={{ color: SYMPTOM_STYLES[styleIdx].color, fontSize: '14px', flexShrink: 0 }}>✓</span>
+                {highlighted && (
+                  <span style={{ color: isSelected ? SYMPTOM_STYLES[styleIdx].color : autoColor, fontSize: '14px', flexShrink: 0 }}>✓</span>
                 )}
               </button>
             );
-          })}
+            });
+          })()}
           </div>
         </div>
       </div>
@@ -661,7 +727,7 @@ export default function ComparisonStudio({
 
               {/* Legend panel — left side */}
               <div style={{
-                width: isDesktop ? '170px' : '130px', flexShrink: 0,
+                width: isDesktop ? '255px' : '195px', flexShrink: 0,
                 paddingRight: '14px',
                 display: 'flex', flexDirection: 'column',
                 borderRight: '1px solid rgba(255,255,255,0.04)',
@@ -673,7 +739,7 @@ export default function ComparisonStudio({
                   border: '1px solid rgba(255,255,255,0.08)',
                   background: 'rgba(255,255,255,0.04)',
                   padding: '2px',
-                  marginBottom: '8px',
+                  marginBottom: '20px',
                 }}>
                   {TIMEFRAMES.map(tf => (
                     <button key={tf.days}
@@ -693,19 +759,26 @@ export default function ComparisonStudio({
                 </div>
 
                 {/* Date window slider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+                <style>{`
+                  .cs-slider { -webkit-appearance: none; appearance: none; width: 120px; height: 6px; border-radius: 3px; background: #f59e0b; outline: none; direction: rtl; }
+                  .cs-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #f59e0b; cursor: pointer; border: 2px solid #1a1a2e; }
+                  .cs-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #f59e0b; cursor: pointer; border: 2px solid #1a1a2e; }
+                  .cs-slider::-moz-range-track { background: #f59e0b; height: 6px; border-radius: 3px; }
+                `}</style>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '22px' }}>
                   <span style={{ color: '#4b5563', fontSize: '8px', whiteSpace: 'nowrap' }}>{dateWindowLabel}</span>
-                  <input type="range" min="0" max={maxOffset} step="1" value={startOffset}
-                    onChange={(e) => setStartOffset(parseInt(e.target.value))}
-                    style={{ flex: 1, minWidth: 0, accentColor: '#f59e0b', height: '14px', margin: '0', direction: 'rtl' }}
-                  />
+                  <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                    <input type="range" className="cs-slider" min="0" max={maxOffset} step="1" value={startOffset}
+                      onChange={(e) => setStartOffset(parseInt(e.target.value))}
+                    />
+                  </div>
                 </div>
 
                 {/* Date / Average header */}
                 <div style={{
                   color: crosshairData ? '#e5e7eb' : '#4b5563',
                   fontSize: '10px', fontWeight: '500',
-                  marginBottom: '10px',
+                  marginBottom: '14px',
                   letterSpacing: '0.03em',
                 }}>
                   {legendItems.dateLabel}
@@ -713,7 +786,7 @@ export default function ComparisonStudio({
 
                 {/* Series items */}
                 {legendItems.items.map((item, i) => (
-                  <div key={i} style={{ marginBottom: '10px' }}>
+                  <div key={i} style={{ marginBottom: '14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
                       <span style={{

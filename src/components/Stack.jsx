@@ -539,30 +539,9 @@ export default function Stack({
               )}
             </div>
 
-            {/* Desktop: 7-day adherence + chart icon */}
-            {isDesktop && (() => {
-              const today = new Date();
-              let taken = 0, scheduled = 0;
-              for (let d = 0; d < 7; d++) {
-                const dt = new Date(today);
-                dt.setDate(dt.getDate() - d);
-                const dk = getDateKey(dt);
-                if (isScheduledForDate(item.schedule, dt)) {
-                  scheduled++;
-                  if (stackEntries[`${dk}-${item.id}`]?.taken) taken++;
-                }
-              }
-              return (
+            {/* Desktop: chart icon */}
+            {isDesktop && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                  {scheduled > 0 && (
-                    <span style={{
-                      color: taken === scheduled ? '#34d399' : taken > 0 ? '#fbbf24' : '#6b7280',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                    }}>
-                      {taken}/{scheduled}
-                    </span>
-                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -586,8 +565,7 @@ export default function Stack({
                     </svg>
                   </button>
                 </div>
-              );
-            })()}
+            )}
 
             {/* Right side: dose + checkbox */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>

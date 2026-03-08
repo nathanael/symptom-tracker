@@ -60,13 +60,15 @@ export default function SupplementGraph({
 
   // Build dose series: actual dose taken per day
   const buildDoseSeries = useCallback((itemId) => {
+    const item = stackItems.find(i => i.id === itemId);
+    const fallbackDose = item?.defaultDose || 0;
     return dates.map(dateStr => {
       const entryKey = `${dateStr}-${itemId}`;
       const entry = stackEntries[entryKey];
       if (!entry?.taken) return null;
-      return entry.dose || 0;
+      return Number(entry.dose) || fallbackDose;
     });
-  }, [dates, stackEntries]);
+  }, [dates, stackEntries, stackItems]);
 
   // Build symptom overlay series
   const buildSymptomSeries = useCallback((symptomId) => {
