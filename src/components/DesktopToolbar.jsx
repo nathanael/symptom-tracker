@@ -58,13 +58,14 @@ export default function DesktopToolbar({
         display: 'flex',
         alignItems: 'center',
       }}>
-        {/* Left: Date navigation — fixed width */}
+        {/* Left: Date navigation — fixed width, hidden on insights */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
           flexShrink: 0,
           width: '280px',
+          visibility: activeTab === 'insights' ? 'hidden' : 'visible',
         }}>
           <button
             onClick={() => changeDate(-1)}
