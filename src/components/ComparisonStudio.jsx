@@ -573,17 +573,17 @@ export default function ComparisonStudio({
             {selectedSupplement && (() => {
               const supp = allSupplements.find(s => s.id === selectedSupplement);
               return (
-                <span style={{
+                <span onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }} style={{
                   display: 'inline-flex', alignItems: 'center', gap: '5px',
                   padding: '3px 8px', borderRadius: '6px',
                   background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.35)',
                   color: SUPP_COLOR, fontSize: '13px', fontWeight: '500', lineHeight: '1.3',
+                  cursor: 'pointer',
                 }}>
                   {supp?.name}
-                  <button onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }} style={{
-                    background: 'none', border: 'none', color: SUPP_COLOR,
-                    cursor: 'pointer', padding: 0, fontSize: '14px', lineHeight: 1, opacity: 0.7,
-                  }}>×</button>
+                  <span style={{
+                    color: SUPP_COLOR, fontSize: '14px', lineHeight: 1, opacity: 0.7,
+                  }}>×</span>
                 </span>
               );
             })()}
@@ -614,17 +614,17 @@ export default function ComparisonStudio({
               const sym = activeSymptoms.find(s => s.id === symId);
               const st = SYMPTOM_STYLES[idx];
               return (
-                <span key={symId} style={{
+                <span key={symId} onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }} style={{
                   display: 'inline-flex', alignItems: 'center', gap: '5px',
                   padding: '3px 8px', borderRadius: '6px',
                   background: st.chipBg, border: `1px solid ${st.chipBorder}`,
                   color: st.color, fontSize: '13px', fontWeight: '500', lineHeight: '1.3',
+                  cursor: 'pointer',
                 }}>
                   {sym?.name}
-                  <button onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }} style={{
-                    background: 'none', border: 'none', color: st.color,
-                    cursor: 'pointer', padding: 0, fontSize: '14px', lineHeight: 1, opacity: 0.7,
-                  }}>×</button>
+                  <span style={{
+                    color: st.color, fontSize: '14px', lineHeight: 1, opacity: 0.7,
+                  }}>×</span>
                 </span>
               );
             })}
