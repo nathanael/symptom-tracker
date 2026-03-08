@@ -766,7 +766,7 @@ export default function ComparisonStudio({
                   .cs-slider::-moz-range-track { background: #f59e0b; height: 6px; border-radius: 3px; }
                 `}</style>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '22px' }}>
-                  <span style={{ color: '#4b5563', fontSize: '8px', whiteSpace: 'nowrap' }}>{dateWindowLabel}</span>
+                  <span style={{ color: '#9ca3af', fontSize: '8px', whiteSpace: 'nowrap' }}>{dateWindowLabel}</span>
                   <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
                     <input type="range" className="cs-slider" min="0" max={maxOffset} step="1" value={startOffset}
                       onChange={(e) => setStartOffset(parseInt(e.target.value))}
@@ -776,7 +776,7 @@ export default function ComparisonStudio({
 
                 {/* Date / Average header */}
                 <div style={{
-                  color: crosshairData ? '#e5e7eb' : '#4b5563',
+                  color: crosshairData ? '#e5e7eb' : '#9ca3af',
                   fontSize: '10px', fontWeight: '500',
                   marginBottom: '14px',
                   letterSpacing: '0.03em',
