@@ -19,6 +19,7 @@ export default function RapidEntry({
   setEntries,
   getMostRecentEntry,
   setCopyToastMessage,
+  isDesktop,
 }) {
   const getCurrentTimePeriod = () => {
     if (trackingMode !== 'ampm') return 'daily';
@@ -121,7 +122,16 @@ export default function RapidEntry({
   // If all complete, show confirmation screen
   if (rapidEntryConfirm) {
     return (
-      <div style={{
+      <div style={isDesktop ? {
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.6)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px',
+      } : {
         position: 'fixed',
         top: 0,
         left: 0,
@@ -133,6 +143,20 @@ export default function RapidEntry({
         flexDirection: 'column',
         padding: '20px',
         paddingTop: 'calc(20px + env(safe-area-inset-top))',
+      }}>
+      <div style={isDesktop ? {
+        maxWidth: '600px',
+        width: '100%',
+        maxHeight: '80vh',
+        overflowY: 'auto',
+        background: '#08090A',
+        borderRadius: '12px',
+        border: '1px solid rgba(255,255,255,0.1)',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'column',
+      } : {
+        display: 'contents',
       }}>
         {/* Header */}
         <div style={{
@@ -264,6 +288,7 @@ export default function RapidEntry({
           </div>
         </div>
       </div>
+      </div>
     );
   }
 
@@ -295,7 +320,16 @@ export default function RapidEntry({
   }
 
   return (
-    <div style={{
+    <div style={isDesktop ? {
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0, 0, 0, 0.6)',
+      zIndex: 1000,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '40px',
+    } : {
       position: 'fixed',
       top: 0,
       left: 0,
@@ -307,6 +341,20 @@ export default function RapidEntry({
       flexDirection: 'column',
       padding: '20px',
       paddingTop: 'calc(20px + env(safe-area-inset-top))',
+    }}>
+    <div style={isDesktop ? {
+      maxWidth: '600px',
+      width: '100%',
+      maxHeight: '80vh',
+      overflowY: 'auto',
+      background: '#08090A',
+      borderRadius: '12px',
+      border: '1px solid rgba(255,255,255,0.1)',
+      padding: '24px',
+      display: 'flex',
+      flexDirection: 'column',
+    } : {
+      display: 'contents',
     }}>
       {/* Header */}
       <div style={{
@@ -321,6 +369,21 @@ export default function RapidEntry({
           </svg>
           Rapid Entry
         </div>
+        {trackingMode === 'ampm' && (
+          <div style={{
+            position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+            padding: '3px 14px',
+            borderRadius: '12px',
+            background: 'rgba(139, 92, 246, 0.15)',
+            border: '1px solid rgba(139, 92, 246, 0.25)',
+            color: '#c4b5fd',
+            fontSize: '13px',
+            fontWeight: '700',
+            letterSpacing: '0.05em',
+          }}>
+            {logTime === 'morning' ? 'AM' : 'PM'}
+          </div>
+        )}
         <button
           onClick={handleClose}
           style={{
@@ -379,17 +442,9 @@ export default function RapidEntry({
         alignItems: 'center',
         gap: '12px',
       }}>
-        {/* Counter */}
-        <div style={{ color: '#64748b', fontSize: '14px' }}>
-          {isCurrentMarked ? (
-            <span style={{ color: '#10b981' }}>✓ Already logged</span>
-          ) : (
-            `${activeSymptomsList.length - unmarkedSymptoms.length + (isCurrentMarked ? 0 : 1)} of ${activeSymptomsList.length}`
-          )}
-        </div>
 
         {/* Symptom name + description */}
-        <div style={{ textAlign: 'center' }}>
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
           <div style={{
             color: '#f8fafc',
             fontSize: '28px',
@@ -397,15 +452,14 @@ export default function RapidEntry({
           }}>
             {currentSymptom.name}
           </div>
-          {currentSymptom.description && (
-            <div style={{
-              color: '#6b7280',
-              fontSize: '15px',
-              marginTop: '8px',
-            }}>
-              {currentSymptom.description}
-            </div>
-          )}
+          <div style={{
+            color: '#6b7280',
+            fontSize: '15px',
+            marginTop: '8px',
+            minHeight: '20px',
+          }}>
+            {currentSymptom.description || '\u00A0'}
+          </div>
         </div>
       </div>
 
@@ -509,19 +563,6 @@ export default function RapidEntry({
                     color: severityColors[severity],
                   }}>✓</span>
                 )}
-                {!isMobile() && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '4px',
-                    left: '6px',
-                    fontSize: '11px',
-                    color: '#64748b',
-                    fontWeight: '600',
-                    background: 'rgba(0,0,0,0.3)',
-                    padding: '2px 5px',
-                    borderRadius: '3px',
-                  }}>{severity}</span>
-                )}
               </button>
             );
           })}
@@ -579,15 +620,6 @@ export default function RapidEntry({
           }}
         >
           N/A
-          {!isMobile() && (
-            <span style={{
-              background: 'rgba(100, 116, 139, 0.3)',
-              padding: '2px 6px',
-              borderRadius: '3px',
-              marginLeft: '8px',
-              fontSize: '12px',
-            }}>n</span>
-          )}
         </button>
 
         {/* Navigation buttons */}
@@ -607,15 +639,6 @@ export default function RapidEntry({
               cursor: 'pointer',
             }}
           >
-            {!isMobile() && (
-              <span style={{
-                background: 'rgba(100, 116, 139, 0.3)',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                marginRight: '8px',
-                fontSize: '12px',
-              }}>←</span>
-            )}
             Back
           </button>
 
@@ -640,86 +663,12 @@ export default function RapidEntry({
               cursor: 'pointer',
             }}
           >
-            {findNextUnmarkedIndex(rapidEntryIndex) !== -1 ? 'Skip' : 'Done'}
-            {!isMobile() && (
-              <span style={{
-                background: 'rgba(100, 116, 139, 0.3)',
-                padding: '2px 6px',
-                borderRadius: '3px',
-                marginLeft: '8px',
-                fontSize: '12px',
-              }}>→</span>
-            )}
+            {findNextUnmarkedIndex(rapidEntryIndex) !== -1 ? 'Next' : 'Done'}
           </button>
         </div>
       </div>
 
-      {/* Keyboard shortcuts bar - typeform style (desktop only) */}
-      {!isMobile() && (
-      <div style={{
-        position: 'absolute',
-        bottom: '20px',
-        left: '20px',
-        right: '20px',
-        display: 'flex',
-        justifyContent: 'center',
-        gap: '16px',
-        color: '#64748b',
-        fontSize: '12px',
-        flexWrap: 'wrap',
-      }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{
-              background: 'rgba(100, 116, 139, 0.2)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontFamily: 'monospace',
-              fontSize: '12px',
-            }}>0-5</span>
-            <span>severity</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{
-              background: 'rgba(100, 116, 139, 0.2)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontFamily: 'monospace',
-              fontSize: '12px',
-            }}>n</span>
-            <span>N/A</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{
-              background: 'rgba(100, 116, 139, 0.2)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontFamily: 'monospace',
-              fontSize: '12px',
-            }}>←</span>
-            <span>back</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{
-              background: 'rgba(100, 116, 139, 0.2)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontFamily: 'monospace',
-              fontSize: '12px',
-            }}>→</span>
-            <span>skip</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{
-              background: 'rgba(100, 116, 139, 0.2)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              fontFamily: 'monospace',
-              fontSize: '12px',
-            }}>esc</span>
-            <span>close</span>
-          </div>
-        </div>
-      )}
+    </div>
     </div>
   );
 }

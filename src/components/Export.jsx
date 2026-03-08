@@ -11,6 +11,7 @@ export default function Export({
   inputEntries,
   setCopyToastMessage,
   onClose,
+  isDesktop,
 }) {
   const copyAIData = (days) => {
     const data = generateAIDataExport(days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, null, inputItems, inputEntries);
@@ -29,7 +30,16 @@ export default function Export({
   return (
     <div
       onClick={onClose}
-      style={{
+      style={isDesktop ? {
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.6)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px',
+      } : {
         position: 'fixed',
         inset: 0,
         background: 'rgba(0, 0, 0, 0.92)',
@@ -41,7 +51,19 @@ export default function Export({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '600px', margin: '0 auto' }}
+        style={isDesktop ? {
+          maxWidth: '600px',
+          width: '100%',
+          maxHeight: '80vh',
+          overflowY: 'auto',
+          background: '#08090A',
+          borderRadius: '12px',
+          border: '1px solid rgba(255,255,255,0.1)',
+          padding: '24px',
+        } : {
+          maxWidth: '600px',
+          margin: '0 auto',
+        }}
       >
         {/* Header */}
         <div style={{

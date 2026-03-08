@@ -12,6 +12,8 @@ export default function Inputs({
   setLastAction,
   showManageInputs,
   setShowManageInputs,
+  isDesktop,
+  searchFilter,
 }) {
   const [editingInputId, setEditingInputId] = useState(null);
   const [newInput, setNewInput] = useState({ name: '', description: '', category: 'food' });
@@ -187,7 +189,11 @@ export default function Inputs({
     );
     return inputItems.filter(i => itemIdsWithEntries.has(i.id))
       .sort((a, b) => (a.order || 0) - (b.order || 0));
-  })();
+  })().filter(item => {
+    if (!searchFilter) return true;
+    const s = searchFilter.toLowerCase();
+    return item.name.toLowerCase().includes(s) || (item.description || '').toLowerCase().includes(s);
+  });
 
   const getInputProgress = () => {
     const loggedCount = displayItems.filter(item =>
@@ -828,6 +834,27 @@ export default function Inputs({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+      {/* Desktop panel header */}
+      {isDesktop && (
+        <div style={{
+          padding: '12px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <span style={{
+            fontSize: '13px',
+            fontWeight: '600',
+            color: '#8b5cf6',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+          }}>
+            Other Inputs
+          </span>
+        </div>
+      )}
+
       {/* Input items */}
       {displayItems.map(item => {
         const catInfo = getCategoryInfo(item.category);

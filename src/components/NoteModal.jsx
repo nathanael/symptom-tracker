@@ -6,6 +6,7 @@ export default function NoteModal({
   dailyNotes,
   setDailyNotes,
   onClose,
+  isDesktop,
 }) {
   const textareaRef = useRef(null);
   const dateKey = getDateKey(selectedDate);

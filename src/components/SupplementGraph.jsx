@@ -1,52 +1,114 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
-import { haptic } from '../utils/helpers';
+import { haptic, isScheduledForDate, getDateKey, getSupplementAdherence, getSupplementStreak } from '../utils/helpers';
 import {
   TIMEFRAMES, COLORS, SMOOTH_WINDOWS,
   generateDateRange, interpolateSmallGaps, smooth,
   formatXLabel, getXLabelInterval, buildPath, getDailyValue,
 } from '../utils/chartHelpers';
 
-export default function SymptomGraph({
-  primarySymptomId,
+export default function SupplementGraph({
+  primaryItemId,
+  stackItems,
+  stackEntries,
   symptoms,
-  activeSymptoms,
   entries,
   trackingMode,
   onClose,
-  onChangeSymptom,
+  onChangeItem,
   isDesktop,
 }) {
   const [timeframe, setTimeframe] = useState(28);
+  const [viewMode, setViewMode] = useState('adherence'); // 'adherence' or 'dose'
   const [compareIds, setCompareIds] = useState([]);
+  const [overlaySymptomId, setOverlaySymptomId] = useState(null);
   const [touchX, setTouchX] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [showSymptomPicker, setShowSymptomPicker] = useState(false);
   const svgRef = useRef(null);
 
-  const primarySymptom = symptoms.find(s => s.id === primarySymptomId);
+  const primaryItem = stackItems.find(i => i.id === primaryItemId);
+  const activeItems = stackItems.filter(i => i.active).sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Chart dimensions
   const W = 340, H = 200;
-  const padLeft = 28, padRight = 10, padTop = 18, padBottom = 28;
+  const padLeft = 32, padRight = overlaySymptomId ? 28 : 10, padTop = 18, padBottom = 28;
   const chartW = W - padLeft - padRight;
   const chartH = H - padTop - padBottom;
 
   const dates = useMemo(() => generateDateRange(timeframe), [timeframe]);
 
-  // Build data series for a symptom
-  const buildSeries = useCallback((symptomId) => {
+  // Build adherence series: rolling 7-day adherence % for a supplement
+  const buildAdherenceSeries = useCallback((itemId) => {
+    const item = stackItems.find(i => i.id === itemId);
+    if (!item) return dates.map(() => null);
+
+    return dates.map((dateStr, idx) => {
+      // Look back 7 days (or fewer if at start)
+      const windowStart = Math.max(0, idx - 6);
+      let taken = 0, scheduled = 0;
+      for (let j = windowStart; j <= idx; j++) {
+        const d = new Date(dates[j] + 'T12:00:00');
+        if (!isScheduledForDate(item.schedule, d)) continue;
+        scheduled++;
+        const entryKey = `${dates[j]}-${itemId}`;
+        if (stackEntries[entryKey]?.taken) taken++;
+      }
+      if (scheduled === 0) return null;
+      return (taken / scheduled) * 100;
+    });
+  }, [dates, stackItems, stackEntries]);
+
+  // Build dose series: actual dose taken per day
+  const buildDoseSeries = useCallback((itemId) => {
+    return dates.map(dateStr => {
+      const entryKey = `${dateStr}-${itemId}`;
+      const entry = stackEntries[entryKey];
+      if (!entry?.taken) return null;
+      return entry.dose || 0;
+    });
+  }, [dates, stackEntries]);
+
+  // Build symptom overlay series
+  const buildSymptomSeries = useCallback((symptomId) => {
     const raw = dates.map(d => getDailyValue(entries, d, symptomId, trackingMode));
     const filled = interpolateSmallGaps(raw);
     const windowSize = SMOOTH_WINDOWS[timeframe] || 5;
     return smooth(filled, windowSize);
   }, [dates, entries, trackingMode, timeframe]);
 
-  const primaryData = useMemo(() => buildSeries(primarySymptomId), [buildSeries, primarySymptomId]);
+  const buildSeries = viewMode === 'adherence' ? buildAdherenceSeries : buildDoseSeries;
+
+  const primaryData = useMemo(() => buildSeries(primaryItemId), [buildSeries, primaryItemId]);
   const compareDatas = useMemo(() => compareIds.map(id => buildSeries(id)), [buildSeries, compareIds]);
+  const symptomData = useMemo(
+    () => overlaySymptomId ? buildSymptomSeries(overlaySymptomId) : null,
+    [overlaySymptomId, buildSymptomSeries]
+  );
+
+  // Y-axis range
+  const yMax = useMemo(() => {
+    if (viewMode === 'adherence') return 100;
+    // For dose view, find max dose across all series
+    let max = 0;
+    [primaryData, ...compareDatas].forEach(data => {
+      data.forEach(v => { if (v !== null && v > max) max = v; });
+    });
+    return max > 0 ? Math.ceil(max * 1.1) : 100;
+  }, [viewMode, primaryData, compareDatas]);
 
   // Convert data to SVG points
   const toPoints = useCallback((data) => {
     return data.map((val, i) => ({
-      x: padLeft + (i / (dates.length - 1)) * chartW,
+      x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
+      y: val === null ? null : padTop + chartH - (val / yMax) * chartH,
+      val,
+    }));
+  }, [dates.length, chartW, chartH, yMax]);
+
+  // Symptom overlay uses right Y-axis (0-5)
+  const toSymptomPoints = useCallback((data) => {
+    return data.map((val, i) => ({
+      x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
       y: val === null ? null : padTop + chartH - (val / 5) * chartH,
       val,
     }));
@@ -54,6 +116,10 @@ export default function SymptomGraph({
 
   const primaryPoints = useMemo(() => toPoints(primaryData), [toPoints, primaryData]);
   const comparePoints = useMemo(() => compareDatas.map(d => toPoints(d)), [toPoints, compareDatas]);
+  const symptomPoints = useMemo(
+    () => symptomData ? toSymptomPoints(symptomData) : null,
+    [symptomData, toSymptomPoints]
+  );
 
   // X-axis labels
   const interval = getXLabelInterval(timeframe);
@@ -61,14 +127,25 @@ export default function SymptomGraph({
     const labels = [];
     for (let i = 0; i < dates.length; i += interval) {
       labels.push({
-        x: padLeft + (i / (dates.length - 1)) * chartW,
+        x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
         label: formatXLabel(dates[i], timeframe),
       });
     }
     return labels;
   }, [dates, interval, chartW, timeframe]);
 
-  // Touch crosshair logic
+  // Y-axis labels
+  const yLabels = useMemo(() => {
+    if (viewMode === 'adherence') {
+      return [0, 25, 50, 75, 100];
+    }
+    const step = yMax > 200 ? 100 : yMax > 50 ? 25 : yMax > 10 ? 5 : 1;
+    const labels = [];
+    for (let v = 0; v <= yMax; v += step) labels.push(v);
+    return labels;
+  }, [viewMode, yMax]);
+
+  // Touch crosshair
   const getSnappedIndex = useCallback((clientX) => {
     if (!svgRef.current) return null;
     const rect = svgRef.current.getBoundingClientRect();
@@ -79,72 +156,91 @@ export default function SymptomGraph({
     return Math.max(0, Math.min(dates.length - 1, idx));
   }, [chartW, dates.length]);
 
-  const handleTouchStart = (e) => {
-    e.preventDefault();
-    const idx = getSnappedIndex(e.touches[0].clientX);
-    setTouchX(idx);
-  };
-  const handleTouchMove = (e) => {
-    e.preventDefault();
-    const idx = getSnappedIndex(e.touches[0].clientX);
-    setTouchX(idx);
-  };
+  const handleTouchStart = (e) => { e.preventDefault(); setTouchX(getSnappedIndex(e.touches[0].clientX)); };
+  const handleTouchMove = (e) => { e.preventDefault(); setTouchX(getSnappedIndex(e.touches[0].clientX)); };
   const handleTouchEnd = () => setTouchX(null);
-  const handleMouseMove = (e) => {
-    const idx = getSnappedIndex(e.clientX);
-    setTouchX(idx);
-  };
+  const handleMouseMove = (e) => setTouchX(getSnappedIndex(e.clientX));
   const handleMouseLeave = () => setTouchX(null);
 
-  // Crosshair tooltip data
+  // Crosshair tooltip
   const crosshairData = useMemo(() => {
     if (touchX === null) return null;
     const date = dates[touchX];
     const d = new Date(date + 'T12:00:00');
     const dateLabel = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const unit = viewMode === 'adherence' ? '%' : (primaryItem?.unit || '');
     const items = [
-      { name: primarySymptom?.name, color: COLORS.primary, val: primaryData[touchX] },
+      { name: primaryItem?.name, color: COLORS.primary, val: primaryData[touchX], unit },
     ];
     compareIds.forEach((id, i) => {
-      const sym = symptoms.find(s => s.id === id);
+      const item = stackItems.find(s => s.id === id);
+      const cUnit = viewMode === 'adherence' ? '%' : (item?.unit || '');
       items.push({
-        name: sym?.name,
+        name: item?.name,
         color: i === 0 ? COLORS.compare1 : COLORS.compare2,
         val: compareDatas[i]?.[touchX],
+        unit: cUnit,
       });
     });
-    return { dateLabel, items, x: padLeft + (touchX / (dates.length - 1)) * chartW };
-  }, [touchX, dates, primarySymptom, primaryData, compareIds, compareDatas, symptoms, chartW]);
+    if (symptomData && overlaySymptomId) {
+      const sym = symptoms.find(s => s.id === overlaySymptomId);
+      items.push({
+        name: sym?.name,
+        color: 'rgba(251, 113, 133, 0.8)',
+        val: symptomData[touchX],
+        unit: '/5',
+      });
+    }
+    return { dateLabel, items, x: padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW };
+  }, [touchX, dates, primaryItem, primaryData, compareIds, compareDatas, stackItems, viewMode, symptomData, overlaySymptomId, symptoms, chartW]);
 
   // Summary stats
   const stats = useMemo(() => {
-    let sum = 0, count = 0, best = null, worst = null;
-    primaryData.forEach((val, i) => {
-      if (val === null) return;
-      // Use raw (unsmoothed) for stats
-      const raw = getDailyValue(entries, dates[i], primarySymptomId, trackingMode);
-      if (raw === null) return;
-      sum += raw;
-      count++;
-      if (best === null || raw < best.val) best = { val: raw, date: dates[i] };
-      if (worst === null || raw > worst.val) worst = { val: raw, date: dates[i] };
+    const adherence = getSupplementAdherence(primaryItemId, stackEntries, stackItems, timeframe);
+    const streak = getSupplementStreak(primaryItemId, stackEntries, stackItems);
+
+    // Longest streak (look through all dates in timeframe)
+    let longestStreak = 0;
+    let currentStreak = 0;
+    const item = stackItems.find(i => i.id === primaryItemId);
+    if (item) {
+      for (const dateStr of dates) {
+        const d = new Date(dateStr + 'T12:00:00');
+        if (!isScheduledForDate(item.schedule, d)) continue;
+        const entryKey = `${dateStr}-${primaryItemId}`;
+        if (stackEntries[entryKey]?.taken) {
+          currentStreak++;
+          if (currentStreak > longestStreak) longestStreak = currentStreak;
+        } else {
+          currentStreak = 0;
+        }
+      }
+    }
+
+    // Average dose (if dose varies)
+    let doseSum = 0, doseCount = 0;
+    dates.forEach(dateStr => {
+      const entryKey = `${dateStr}-${primaryItemId}`;
+      const entry = stackEntries[entryKey];
+      if (entry?.taken) {
+        doseSum += entry.dose || 0;
+        doseCount++;
+      }
     });
-    const formatDate = (d) => {
-      if (!d) return '';
-      const dt = new Date(d + 'T12:00:00');
-      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    };
+
     return {
-      avg: count > 0 ? (sum / count).toFixed(1) : '--',
-      best: best ? `${best.val.toFixed(1)} (${formatDate(best.date)})` : '--',
-      worst: worst ? `${worst.val.toFixed(1)} (${formatDate(worst.date)})` : '--',
-      coverage: `${count} / ${dates.length}`,
+      adherenceRate: adherence.rate,
+      taken: adherence.taken,
+      scheduled: adherence.scheduled,
+      currentStreak: streak,
+      longestStreak,
+      avgDose: doseCount > 0 ? (doseSum / doseCount).toFixed(1) : '--',
+      doseUnit: item?.unit || '',
     };
-  }, [primaryData, entries, dates, primarySymptomId, trackingMode]);
+  }, [primaryItemId, stackEntries, stackItems, timeframe, dates]);
 
   const showDots = timeframe <= 28;
 
-  // Comparison toggle
   const toggleCompare = (id) => {
     setCompareIds(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id);
@@ -213,18 +309,20 @@ export default function SymptomGraph({
           Back
         </button>
 
-        {/* Title with prev/next navigation */}
+        {/* Title with prev/next */}
         {(() => {
-          const list = activeSymptoms || [];
-          const currentIdx = list.findIndex(s => s.id === primarySymptomId);
+          const list = activeItems;
+          const currentIdx = list.findIndex(i => i.id === primaryItemId);
           const hasPrev = currentIdx > 0;
           const hasNext = currentIdx >= 0 && currentIdx < list.length - 1;
           const go = (idx) => {
-            if (onChangeSymptom && list[idx]) {
+            if (onChangeItem && list[idx]) {
               setCompareIds([]);
               setShowPicker(false);
+              setShowSymptomPicker(false);
               setTouchX(null);
-              onChangeSymptom(list[idx].id);
+              setOverlaySymptomId(null);
+              onChangeItem(list[idx].id);
               haptic('light');
             }
           };
@@ -264,9 +362,9 @@ export default function SymptomGraph({
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                 }}>
-                  {primarySymptom?.name || 'Symptom'}
+                  {primaryItem?.name || 'Supplement'}
                 </div>
-                {primarySymptom?.description && (
+                {primaryItem?.description && (
                   <div style={{
                     color: '#6b7280',
                     fontSize: '13px',
@@ -276,7 +374,7 @@ export default function SymptomGraph({
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                   }}>
-                    {primarySymptom.description}
+                    {primaryItem.description}
                   </div>
                 )}
               </div>
@@ -298,6 +396,38 @@ export default function SymptomGraph({
             </div>
           );
         })()}
+
+        {/* View mode toggle */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '4px',
+          padding: '4px',
+          marginBottom: '16px',
+          borderRadius: '12px',
+          background: 'rgba(23, 23, 23, 0.5)',
+          border: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          {[{ id: 'adherence', label: 'Adherence' }, { id: 'dose', label: 'Dose' }].map(mode => (
+            <button
+              key={mode.id}
+              onClick={() => { setViewMode(mode.id); haptic('light'); }}
+              style={{
+                padding: '10px',
+                borderRadius: '8px',
+                border: 'none',
+                background: viewMode === mode.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                boxShadow: viewMode === mode.id ? '0 1px 2px rgba(0,0,0,0.05), inset 0 0 0 1px rgba(255,255,255,0.05)' : 'none',
+                color: viewMode === mode.id ? '#fff' : '#a3a3a3',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
 
         {/* Timeframe selector */}
         <div style={{
@@ -352,20 +482,31 @@ export default function SymptomGraph({
             style={{ display: 'block' }}
           >
             {/* Grid lines */}
-            {[0, 1, 2, 3, 4, 5].map(sev => {
-              const y = padTop + chartH - (sev / 5) * chartH;
+            {yLabels.map(val => {
+              const y = padTop + chartH - (val / yMax) * chartH;
               return (
-                <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y}
+                <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y}
                   stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
               );
             })}
 
-            {/* Y-axis labels */}
-            {[0, 1, 2, 3, 4, 5].map(sev => {
+            {/* Y-axis labels (left) */}
+            {yLabels.map(val => {
+              const y = padTop + chartH - (val / yMax) * chartH;
+              return (
+                <text key={val} x={padLeft - 6} y={y + 4} textAnchor="end"
+                  fill="#6b7280" fontSize="9" fontFamily="system-ui">
+                  {viewMode === 'adherence' ? `${val}%` : val}
+                </text>
+              );
+            })}
+
+            {/* Right Y-axis for symptom overlay (0-5) */}
+            {overlaySymptomId && [0, 1, 2, 3, 4, 5].map(sev => {
               const y = padTop + chartH - (sev / 5) * chartH;
               return (
-                <text key={sev} x={padLeft - 6} y={y + 4} textAnchor="end"
-                  fill="#6b7280" fontSize="10" fontFamily="system-ui">
+                <text key={`r-${sev}`} x={W - padRight + 6} y={y + 4} textAnchor="start"
+                  fill="rgba(251, 113, 133, 0.5)" fontSize="9" fontFamily="system-ui">
                   {sev}
                 </text>
               );
@@ -378,6 +519,16 @@ export default function SymptomGraph({
                 {lbl.label}
               </text>
             ))}
+
+            {/* Symptom overlay line */}
+            {symptomPoints && (
+              <path d={buildPath(symptomPoints)}
+                fill="none"
+                stroke="rgba(251, 113, 133, 0.4)"
+                strokeWidth="1.5"
+                strokeDasharray="6 3"
+              />
+            )}
 
             {/* Comparison lines */}
             {comparePoints.map((pts, i) => (
@@ -397,7 +548,7 @@ export default function SymptomGraph({
               strokeLinejoin="round"
             />
 
-            {/* Data dots for short timeframes */}
+            {/* Data dots */}
             {showDots && primaryPoints.map((pt, i) => (
               pt.y !== null && (
                 <circle key={`pd-${i}`} cx={pt.x} cy={pt.y} r="2.5"
@@ -420,7 +571,7 @@ export default function SymptomGraph({
             )}
           </svg>
 
-          {/* Crosshair tooltip (rendered outside SVG for better text rendering) */}
+          {/* Crosshair tooltip */}
           {crosshairData && (
             <div style={{
               padding: '8px 12px',
@@ -448,7 +599,7 @@ export default function SymptomGraph({
                     {item.name}
                   </span>
                   <span style={{ fontWeight: '600' }}>
-                    {item.val !== null && item.val !== undefined ? item.val.toFixed(1) : '--'}
+                    {item.val !== null && item.val !== undefined ? `${item.val.toFixed(1)}${item.unit}` : '--'}
                   </span>
                 </div>
               ))}
@@ -456,8 +607,8 @@ export default function SymptomGraph({
           )}
         </div>
 
-        {/* Legend (when comparing) */}
-        {compareIds.length > 0 && (
+        {/* Legend (when comparing or overlay) */}
+        {(compareIds.length > 0 || overlaySymptomId) && (
           <div style={{
             display: 'flex',
             flexWrap: 'wrap',
@@ -466,26 +617,39 @@ export default function SymptomGraph({
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#e5e7eb' }}>
               <span style={{ width: '12px', height: '3px', background: COLORS.primary, borderRadius: '2px', display: 'inline-block' }} />
-              {primarySymptom?.name}
+              {primaryItem?.name}
             </div>
             {compareIds.map((id, i) => {
-              const sym = symptoms.find(s => s.id === id);
+              const item = stackItems.find(s => s.id === id);
               return (
                 <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#e5e7eb' }}>
                   <span style={{
                     width: '12px', height: '3px', borderRadius: '2px', display: 'inline-block',
                     background: i === 0 ? COLORS.compare1 : COLORS.compare2,
                   }} />
-                  {sym?.name}
+                  {item?.name}
                 </div>
               );
             })}
+            {overlaySymptomId && (() => {
+              const sym = symptoms.find(s => s.id === overlaySymptomId);
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#e5e7eb' }}>
+                  <span style={{
+                    width: '12px', height: '3px', borderRadius: '2px', display: 'inline-block',
+                    background: 'rgba(251, 113, 133, 0.8)',
+                    borderTop: '1px dashed rgba(251, 113, 133, 0.8)',
+                  }} />
+                  {sym?.name} (severity)
+                </div>
+              );
+            })()}
           </div>
         )}
 
-        {/* Compare button */}
+        {/* Compare supplements button */}
         <button
-          onClick={() => { setShowPicker(!showPicker); haptic('light'); }}
+          onClick={() => { setShowPicker(!showPicker); setShowSymptomPicker(false); haptic('light'); }}
           style={{
             width: '100%',
             padding: '12px',
@@ -499,7 +663,7 @@ export default function SymptomGraph({
             marginBottom: '12px',
           }}
         >
-          {showPicker ? 'Hide comparison' : `Compare symptoms${compareIds.length > 0 ? ` (${compareIds.length})` : ''}`}
+          {showPicker ? 'Hide comparison' : `Compare supplements${compareIds.length > 0 ? ` (${compareIds.length})` : ''}`}
         </button>
 
         {/* Comparison picker */}
@@ -508,20 +672,20 @@ export default function SymptomGraph({
             background: 'rgba(15, 17, 21, 0.6)',
             borderRadius: '12px',
             border: '1px solid rgba(255,255,255,0.06)',
-            maxHeight: '240px',
+            maxHeight: '200px',
             overflowY: 'auto',
-            marginBottom: '20px',
+            marginBottom: '12px',
           }}>
-            {symptoms
-              .filter(s => s.active && s.id !== primarySymptomId)
+            {stackItems
+              .filter(i => i.active && i.id !== primaryItemId)
               .sort((a, b) => a.name.localeCompare(b.name))
-              .map(sym => {
-                const isSelected = compareIds.includes(sym.id);
-                const colorIdx = compareIds.indexOf(sym.id);
+              .map(item => {
+                const isSelected = compareIds.includes(item.id);
+                const colorIdx = compareIds.indexOf(item.id);
                 return (
                   <button
-                    key={sym.id}
-                    onClick={() => toggleCompare(sym.id)}
+                    key={item.id}
+                    onClick={() => toggleCompare(item.id)}
                     disabled={!isSelected && compareIds.length >= 2}
                     style={{
                       width: '100%',
@@ -546,6 +710,79 @@ export default function SymptomGraph({
                       background: isSelected
                         ? (colorIdx === 0 ? COLORS.compare1 : COLORS.compare2)
                         : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, fontSize: '11px', color: '#000',
+                    }}>
+                      {isSelected && '\u2713'}
+                    </span>
+                    {item.name}
+                  </button>
+                );
+              })}
+          </div>
+        )}
+
+        {/* Overlay symptom button */}
+        <button
+          onClick={() => { setShowSymptomPicker(!showSymptomPicker); setShowPicker(false); haptic('light'); }}
+          style={{
+            width: '100%',
+            padding: '12px',
+            background: showSymptomPicker ? 'rgba(251, 113, 133, 0.1)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${showSymptomPicker ? 'rgba(251, 113, 133, 0.3)' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius: '10px',
+            color: showSymptomPicker ? '#fb7185' : '#9ca3af',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            marginBottom: '12px',
+          }}
+        >
+          {showSymptomPicker ? 'Hide symptom overlay' : `Overlay symptom${overlaySymptomId ? ' (1)' : ''}`}
+        </button>
+
+        {/* Symptom overlay picker */}
+        {showSymptomPicker && (
+          <div style={{
+            background: 'rgba(15, 17, 21, 0.6)',
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.06)',
+            maxHeight: '200px',
+            overflowY: 'auto',
+            marginBottom: '20px',
+          }}>
+            {symptoms
+              .filter(s => s.active)
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(sym => {
+                const isSelected = overlaySymptomId === sym.id;
+                return (
+                  <button
+                    key={sym.id}
+                    onClick={() => {
+                      setOverlaySymptomId(prev => prev === sym.id ? null : sym.id);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      background: isSelected ? 'rgba(251, 113, 133, 0.08)' : 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      color: '#e5e7eb',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{
+                      width: '18px', height: '18px', borderRadius: '4px',
+                      border: isSelected
+                        ? '2px solid rgba(251, 113, 133, 0.8)'
+                        : '2px solid rgba(255,255,255,0.15)',
+                      background: isSelected ? 'rgba(251, 113, 133, 0.8)' : 'transparent',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       flexShrink: 0, fontSize: '11px', color: '#000',
                     }}>
@@ -577,20 +814,24 @@ export default function SymptomGraph({
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <div style={{ color: '#9ca3af', fontSize: '12px' }}>Average</div>
-              <div style={{ color: '#e5e7eb', fontSize: '18px', fontWeight: '600' }}>{stats.avg}</div>
+              <div style={{ color: '#9ca3af', fontSize: '12px' }}>Adherence</div>
+              <div style={{ color: '#e5e7eb', fontSize: '18px', fontWeight: '600' }}>{stats.adherenceRate}%</div>
+              <div style={{ color: '#6b7280', fontSize: '11px' }}>{stats.taken}/{stats.scheduled} days</div>
             </div>
             <div>
-              <div style={{ color: '#9ca3af', fontSize: '12px' }}>Coverage</div>
-              <div style={{ color: '#e5e7eb', fontSize: '18px', fontWeight: '600' }}>{stats.coverage}</div>
+              <div style={{ color: '#9ca3af', fontSize: '12px' }}>Avg Dose</div>
+              <div style={{ color: '#e5e7eb', fontSize: '18px', fontWeight: '600' }}>{stats.avgDose}</div>
+              <div style={{ color: '#6b7280', fontSize: '11px' }}>{stats.doseUnit}</div>
             </div>
             <div>
-              <div style={{ color: '#34d399', fontSize: '12px' }}>Best day</div>
-              <div style={{ color: '#e5e7eb', fontSize: '14px' }}>{stats.best}</div>
+              <div style={{ color: '#34d399', fontSize: '12px' }}>Current streak</div>
+              <div style={{ color: '#e5e7eb', fontSize: '14px' }}>
+                {stats.currentStreak.days} day{stats.currentStreak.days !== 1 ? 's' : ''} {stats.currentStreak.type}
+              </div>
             </div>
             <div>
-              <div style={{ color: '#fb7185', fontSize: '12px' }}>Worst day</div>
-              <div style={{ color: '#e5e7eb', fontSize: '14px' }}>{stats.worst}</div>
+              <div style={{ color: '#f59e0b', fontSize: '12px' }}>Longest streak</div>
+              <div style={{ color: '#e5e7eb', fontSize: '14px' }}>{stats.longestStreak} days</div>
             </div>
           </div>
         </div>
@@ -602,7 +843,9 @@ export default function SymptomGraph({
           textAlign: 'center',
           lineHeight: '1.4',
         }}>
-          Gaps of 1–3 days are interpolated. Line is smoothed.
+          {viewMode === 'adherence'
+            ? 'Shows rolling 7-day adherence rate. Schedule-aware.'
+            : 'Shows actual dose taken per day.'}
         </p>
       </div>
     </div>

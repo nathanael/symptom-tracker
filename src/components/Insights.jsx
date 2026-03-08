@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { getInsights, haptic } from '../utils/helpers';
+import { getInsights, getSupplementAdherence, haptic } from '../utils/helpers';
+import ComparisonStudio from './ComparisonStudio';
 
 // Simple SVG sparkline component with moving average smoothing
 const Sparkline = ({ data, color, width = 280, height = 60 }) => {
@@ -41,11 +42,17 @@ const Sparkline = ({ data, color, width = 280, height = 60 }) => {
 export default function Insights({
   entries,
   symptoms,
+  stackItems,
+  stackEntries,
   insightsWindow,
   setInsightsWindow,
   onOpenGraph,
+  onOpenSupplementGraph,
+  isDesktop,
+  trackingMode,
 }) {
   const [expandedId, setExpandedId] = useState(null);
+  const [insightsSubtab, setInsightsSubtab] = useState('studio');
 
   const data = useMemo(() =>
     getInsights(insightsWindow, entries, symptoms),
@@ -59,7 +66,9 @@ export default function Insights({
 
   return (
     <div
-      style={{
+      style={isDesktop ? {
+        // Desktop: inline, no fixed positioning
+      } : {
         position: 'fixed',
         top: 0,
         left: 0,
@@ -72,7 +81,53 @@ export default function Insights({
         paddingTop: 'calc(20px + env(safe-area-inset-top))',
       }}
     >
-      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+      <div style={{ maxWidth: isDesktop ? '100%' : '700px', margin: '0 auto' }}>
+        {/* Subtab toggle */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '4px',
+          padding: '4px',
+          marginBottom: '24px',
+          borderRadius: '12px',
+          background: 'rgba(23, 23, 23, 0.5)',
+          border: '1px solid rgba(255,255,255,0.1)',
+        }}>
+          {[
+            { id: 'studio', label: 'Comparison Studio' },
+            { id: 'quick', label: 'Quick Insights' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setInsightsSubtab(tab.id); haptic('light'); }}
+              style={{
+                padding: '10px',
+                borderRadius: '8px',
+                border: 'none',
+                background: insightsSubtab === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                boxShadow: insightsSubtab === tab.id ? '0 1px 2px rgba(0,0,0,0.05), inset 0 0 0 1px rgba(255,255,255,0.05)' : 'none',
+                color: insightsSubtab === tab.id ? '#fff' : '#a3a3a3',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {insightsSubtab === 'studio' ? (
+          <ComparisonStudio
+            entries={entries}
+            symptoms={symptoms}
+            stackItems={stackItems}
+            stackEntries={stackEntries}
+            trackingMode={trackingMode}
+            isDesktop={isDesktop}
+          />
+        ) : (
+        <>
         {/* Window Selector */}
         <div style={{
           display: 'grid',
@@ -145,7 +200,14 @@ export default function Insights({
             </p>
           </div>
         ) : (
-          <>
+          <div style={isDesktop ? {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '32px',
+            alignItems: 'start',
+          } : {}}>
+            {/* Left column (or full width on mobile): Symptom insights */}
+            <div>
             {/* Insights tiles */}
             {data.insights.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
@@ -352,7 +414,127 @@ export default function Insights({
               Based on {data.entriesCount} entries over {data.daysOfData} days.<br />
               For informational purposes only.
             </p>
-          </>
+            </div>
+
+            {/* Right column (or continuation on mobile): Supplement adherence */}
+            <div>
+        {/* Supplement Adherence Section */}
+        {stackItems && stackEntries && (() => {
+          const activeSupplements = (stackItems || []).filter(i => i.active);
+          if (activeSupplements.length === 0) return null;
+
+          const supplementStats = activeSupplements.map(item => {
+            const current = getSupplementAdherence(item.id, stackEntries, stackItems, 7);
+            const previous = getSupplementAdherence(item.id, stackEntries, stackItems, insightsWindow);
+            const prevWeek = getSupplementAdherence(item.id, stackEntries, stackItems, 14);
+            const trend = current.rate - (prevWeek.rate > 0 ? prevWeek.rate : previous.rate);
+            return {
+              id: item.id,
+              name: item.name,
+              currentRate: current.rate,
+              overallRate: previous.rate,
+              trend,
+              taken: previous.taken,
+              scheduled: previous.scheduled,
+            };
+          }).filter(s => s.scheduled > 0)
+            .sort((a, b) => Math.abs(b.trend) - Math.abs(a.trend));
+
+          if (supplementStats.length === 0) return null;
+
+          return (
+            <div style={{ marginTop: '32px' }}>
+              <div style={{
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                color: '#6b7280',
+                marginBottom: '16px',
+              }}>
+                Supplement Adherence
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {supplementStats.map(stat => {
+                  const isImproving = stat.trend > 5;
+                  const isDeclining = stat.trend < -5;
+                  const trendColor = isImproving ? '#34d399' : isDeclining ? '#fb7185' : '#9ca3af';
+                  const bgColor = isImproving
+                    ? 'rgba(16, 185, 129, 0.05)'
+                    : isDeclining
+                      ? 'rgba(244, 63, 94, 0.05)'
+                      : 'rgba(255, 255, 255, 0.02)';
+                  const borderColor = isImproving
+                    ? 'rgba(16, 185, 129, 0.15)'
+                    : isDeclining
+                      ? 'rgba(244, 63, 94, 0.15)'
+                      : 'rgba(255, 255, 255, 0.06)';
+
+                  return (
+                    <div
+                      key={stat.id}
+                      onClick={() => {
+                        haptic('light');
+                        if (onOpenSupplementGraph) onOpenSupplementGraph(stat.id);
+                      }}
+                      style={{
+                        background: bgColor,
+                        border: `1px solid ${borderColor}`,
+                        borderRadius: '12px',
+                        padding: '14px 16px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          color: '#e5e7eb',
+                          fontSize: '15px',
+                          fontWeight: '500',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {stat.name}
+                        </div>
+                        <div style={{ color: '#6b7280', fontSize: '12px', marginTop: '2px' }}>
+                          {stat.taken}/{stat.scheduled} days taken
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '12px' }}>
+                        <div style={{
+                          fontSize: '18px',
+                          fontWeight: '700',
+                          color: stat.overallRate >= 80 ? '#34d399' : stat.overallRate >= 50 ? '#fbbf24' : '#fb7185',
+                        }}>
+                          {stat.overallRate}%
+                        </div>
+                        {Math.abs(stat.trend) > 5 && (
+                          <div style={{ color: trendColor, fontSize: '12px', fontWeight: '500' }}>
+                            {stat.trend > 0 ? '+' : ''}{Math.round(stat.trend)}%
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{
+                color: '#4b5563',
+                fontSize: '11px',
+                textAlign: 'center',
+                marginTop: '12px',
+              }}>
+                Tap a supplement for full history
+              </div>
+            </div>
+          );
+        })()}
+            </div>
+          </div>
+        )}
+        </>
         )}
       </div>
     </div>

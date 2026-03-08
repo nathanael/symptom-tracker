@@ -1,0 +1,827 @@
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { haptic } from '../utils/helpers';
+import {
+  TIMEFRAMES, SMOOTH_WINDOWS,
+  interpolateSmallGaps, smooth,
+  formatXLabel, getXLabelInterval, buildPath,
+} from '../utils/chartHelpers';
+import {
+  getSymptomDailySeries,
+  getSupplementDoseSeries,
+} from '../utils/correlationHelpers';
+
+const SYMPTOM_STYLES = [
+  { color: '#fb7185', chipBg: 'rgba(251,113,133,0.12)', chipBorder: 'rgba(251,113,133,0.35)' },
+  { color: '#38bdf8', chipBg: 'rgba(56,189,248,0.12)', chipBorder: 'rgba(56,189,248,0.35)' },
+  { color: '#f59e0b', chipBg: 'rgba(245,158,11,0.12)', chipBorder: 'rgba(245,158,11,0.35)' },
+];
+
+const SUPP_COLOR = '#8b5cf6';
+
+export default function ComparisonStudio({
+  entries,
+  symptoms,
+  stackItems,
+  stackEntries,
+  trackingMode,
+  isDesktop,
+}) {
+  const STORAGE_KEY = 'comparisonStudioSelections';
+
+  const allSupplements = useMemo(
+    () => (stackItems || []).sort((a, b) => a.name.localeCompare(b.name)),
+    [stackItems]
+  );
+  const activeSymptoms = useMemo(
+    () => (symptoms || []).filter(s => s.active).sort((a, b) => a.name.localeCompare(b.name)),
+    [symptoms]
+  );
+
+  // Compute smart defaults: supplement with most history, one random active symptom
+  const smartDefaults = useMemo(() => {
+    // Find supplement with most entries in stackEntries
+    let bestSupp = '';
+    let bestCount = 0;
+    for (const item of (stackItems || [])) {
+      let count = 0;
+      const keys = Object.keys(stackEntries || {});
+      for (const key of keys) {
+        if (key.endsWith(`-${item.id}`) && stackEntries[key]?.taken) count++;
+      }
+      if (count > bestCount) { bestCount = count; bestSupp = item.id; }
+    }
+    // Pick first active symptom as fallback "random" pick
+    const defaultSymptom = activeSymptoms.length > 0 ? activeSymptoms[0].id : '';
+    return { supplement: bestSupp, symptom: defaultSymptom };
+  }, [stackItems, stackEntries, activeSymptoms]);
+
+  // Load saved or compute initial selections
+  const initialSelections = useMemo(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (saved) {
+        // Validate saved supplement still exists
+        const suppValid = saved.supplement && (stackItems || []).some(i => i.id === saved.supplement);
+        // Validate saved symptoms still exist as active
+        const validSymptoms = (saved.symptoms || []).filter(
+          id => (symptoms || []).some(s => s.id === id && s.active)
+        );
+        return {
+          supplement: suppValid ? saved.supplement : '',
+          symptoms: validSymptoms.length > 0 ? validSymptoms : (smartDefaults.symptom ? [smartDefaults.symptom] : []),
+        };
+      }
+    } catch {}
+    return {
+      supplement: '',
+      symptoms: smartDefaults.symptom ? [smartDefaults.symptom] : [],
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount only
+
+  const [selectedSupplement, setSelectedSupplement] = useState(initialSelections.supplement);
+  const [selectedSymptoms, setSelectedSymptoms] = useState(initialSelections.symptoms);
+  const [showSupplementPicker, setShowSupplementPicker] = useState(false);
+  const [showSymptomPicker, setShowSymptomPicker] = useState(false);
+  const [timeframe, setTimeframe] = useState(60);
+  const [startOffset, setStartOffset] = useState(0); // days back from today for the end of the window
+  const [touchX, setTouchX] = useState(null);
+  const svgRef = useRef(null);
+
+  // Persist selections to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        supplement: selectedSupplement,
+        symptoms: selectedSymptoms,
+      }));
+    } catch {}
+  }, [selectedSupplement, selectedSymptoms]);
+
+  // Symptom selection
+  const toggleSymptom = (symId) => {
+    setSelectedSymptoms(prev => {
+      if (prev.includes(symId)) return prev.filter(id => id !== symId);
+      if (prev.length >= 3) return prev;
+      return [...prev, symId];
+    });
+    haptic('light');
+  };
+  const removeSymptom = (symId) => {
+    setSelectedSymptoms(prev => prev.filter(id => id !== symId));
+    haptic('light');
+  };
+
+  // Reset startOffset when timeframe changes
+  useEffect(() => { setStartOffset(0); }, [timeframe]);
+
+  const dates = useMemo(() => {
+    const result = [];
+    const end = new Date();
+    end.setDate(end.getDate() - startOffset);
+    for (let i = timeframe - 1; i >= 0; i--) {
+      const d = new Date(end);
+      d.setDate(d.getDate() - i);
+      result.push(d.toISOString().split('T')[0]);
+    }
+    return result;
+  }, [timeframe, startOffset]);
+
+  const suppItem = useMemo(
+    () => stackItems.find(i => i.id === selectedSupplement),
+    [stackItems, selectedSupplement]
+  );
+  const suppUnit = suppItem?.unit || 'mg';
+
+  // SVG — narrower chart, 40% taller, legend goes to the right
+  const W = 500, H = 280;
+  const padLeft = 36, padRight = 20, padTop = 14, padBottom = 22;
+  const chartW = W - padLeft - padRight;
+  const chartH = H - padTop - padBottom;
+
+  // ── Data pipeline ──
+
+  const windowSize = SMOOTH_WINDOWS[timeframe] || 5;
+
+  // Supplement: raw dose series (no smoothing/interpolation — supplements are fixed doses)
+  const suppDoseRaw = useMemo(() => {
+    if (!selectedSupplement) return null;
+    const raw = getSupplementDoseSeries(stackEntries, stackItems, selectedSupplement, dates);
+    // Cap outlier doses: use 95th percentile × 3 to ignore bogus spikes
+    const valid = raw.filter(v => v !== null && v > 0).sort((a, b) => a - b);
+    if (valid.length > 2) {
+      const p95 = valid[Math.floor(valid.length * 0.95)];
+      const cap = p95 * 3;
+      return raw.map(v => (v !== null && v > cap) ? cap : v);
+    }
+    return raw;
+  }, [selectedSupplement, stackEntries, stackItems, dates]);
+
+  // Dose Y-axis range
+  const suppYMax = useMemo(() => {
+    if (!suppDoseRaw) return 100;
+    let max = 0;
+    suppDoseRaw.forEach(v => { if (v !== null && v > max) max = v; });
+    const ceiling = max > 0 ? Math.ceil(max * 1.1) : (suppItem?.defaultDose || 100);
+    return Math.max(ceiling, suppItem?.defaultDose || 100);
+  }, [suppDoseRaw, suppItem]);
+
+  // Nice-number Y-axis labels: always ~4-6 labels regardless of range
+  const suppYLabels = useMemo(() => {
+    const range = suppYMax;
+    const roughStep = range / 5;
+    const mag = Math.pow(10, Math.floor(Math.log10(roughStep || 1)));
+    const residual = roughStep / mag;
+    const niceStep = residual <= 1.5 ? mag : residual <= 3 ? 2 * mag : residual <= 7 ? 5 * mag : 10 * mag;
+    const labels = [];
+    for (let v = 0; v <= suppYMax; v += niceStep) labels.push(Math.round(v));
+    return labels;
+  }, [suppYMax]);
+
+  const symptomData = useMemo(() =>
+    selectedSymptoms.map(symId => {
+      const filled = interpolateSmallGaps(getSymptomDailySeries(entries, symId, dates, trackingMode));
+      return { raw: filled, smoothed: smooth(filled, windowSize) };
+    }),
+    [selectedSymptoms, entries, dates, trackingMode, windowSize]
+  );
+
+  // ── Chart points ──
+
+  const suppPoints = useMemo(() => {
+    if (!suppDoseRaw) return null;
+    return suppDoseRaw.map((val, i) => ({
+      x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
+      y: val === null ? null : padTop + chartH - (val / suppYMax) * chartH,
+      val,
+    }));
+  }, [suppDoseRaw, dates.length, chartW, chartH, suppYMax]);
+
+  const symptomPointSets = useMemo(() =>
+    symptomData.map(sd =>
+      sd.smoothed.map((val, i) => ({
+        x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
+        y: val === null ? null : padTop + chartH - (val / 5) * chartH,
+        val,
+      }))
+    ),
+    [symptomData, dates.length, chartW, chartH]
+  );
+
+  const interval = getXLabelInterval(timeframe);
+  const xLabels = useMemo(() => {
+    const labels = [];
+    for (let i = 0; i < dates.length; i += interval) {
+      labels.push({
+        x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
+        label: formatXLabel(dates[i], timeframe),
+      });
+    }
+    return labels;
+  }, [dates, interval, chartW, timeframe]);
+
+  // Touch/mouse
+  const getSnappedIndex = useCallback((clientX) => {
+    if (!svgRef.current) return null;
+    const rect = svgRef.current.getBoundingClientRect();
+    const idx = Math.round(((clientX - rect.left) / rect.width * W - padLeft) / chartW * (dates.length - 1));
+    return Math.max(0, Math.min(dates.length - 1, idx));
+  }, [chartW, dates.length]);
+
+  const handleTouchStart = (e) => { e.preventDefault(); setTouchX(getSnappedIndex(e.touches[0].clientX)); };
+  const handleTouchMove = (e) => { e.preventDefault(); setTouchX(getSnappedIndex(e.touches[0].clientX)); };
+  const handleTouchEnd = () => setTouchX(null);
+  const handleMouseMove = (e) => setTouchX(getSnappedIndex(e.clientX));
+  const handleMouseLeave = () => setTouchX(null);
+
+  const crosshairData = useMemo(() => {
+    if (touchX === null) return null;
+    const d = new Date(dates[touchX] + 'T12:00:00');
+    const dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const items = [];
+    if (suppPoints) {
+      items.push({
+        name: suppItem?.name,
+        color: SUPP_COLOR,
+        val: suppPoints[touchX]?.val,
+        unit: suppUnit,
+      });
+    }
+    selectedSymptoms.forEach((symId, idx) => {
+      if (symptomPointSets[idx]) {
+        items.push({
+          name: symptoms.find(s => s.id === symId)?.name,
+          color: SYMPTOM_STYLES[idx].color,
+          val: symptomPointSets[idx][touchX]?.val,
+          unit: '/5',
+        });
+      }
+    });
+    return { dateLabel, items, x: padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW };
+  }, [touchX, dates, suppPoints, symptomPointSets, suppItem, suppUnit, symptoms, selectedSymptoms, chartW]);
+
+  // Legend: show crosshair values when hovering, averages otherwise
+  const legendItems = useMemo(() => {
+    if (crosshairData) return crosshairData;
+    const avg = (arr) => {
+      const valid = arr.filter(v => v !== null);
+      return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
+    };
+    const items = [];
+    if (suppDoseRaw) {
+      items.push({ name: suppItem?.name, color: SUPP_COLOR, val: avg(suppDoseRaw), unit: suppUnit });
+    }
+    selectedSymptoms.forEach((symId, idx) => {
+      const sd = symptomData[idx];
+      if (sd) {
+        items.push({
+          name: symptoms.find(s => s.id === symId)?.name,
+          color: SYMPTOM_STYLES[idx].color,
+          val: avg(sd.smoothed),
+          unit: '/5',
+        });
+      }
+    });
+    return { dateLabel: 'Average', items, x: null };
+  }, [crosshairData, suppDoseRaw, symptomData, suppItem, suppUnit, symptoms, selectedSymptoms]);
+
+  // Max offset: based on earliest data point across selected symptoms/supplement
+  const maxOffset = useMemo(() => {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    let earliest = null;
+
+    // Check selected symptoms
+    for (const symId of selectedSymptoms) {
+      for (const key of Object.keys(entries || {})) {
+        if (key.includes(`-${symId}-`)) {
+          const e = entries[key];
+          if (e?.date && (!earliest || e.date < earliest)) earliest = e.date;
+        }
+      }
+    }
+
+    // Check selected supplement
+    if (selectedSupplement) {
+      for (const key of Object.keys(stackEntries || {})) {
+        if (key.endsWith(`-${selectedSupplement}`)) {
+          const e = stackEntries[key];
+          if (e?.taken) {
+            const dateStr = key.slice(0, 10);
+            if (!earliest || dateStr < earliest) earliest = dateStr;
+          }
+        }
+      }
+    }
+
+    if (!earliest) return 0;
+    const earliestDate = new Date(earliest + 'T12:00:00');
+    const totalDays = Math.round((today - earliestDate) / (1000 * 60 * 60 * 24));
+    return Math.max(0, totalDays - timeframe);
+  }, [selectedSymptoms, selectedSupplement, entries, stackEntries, timeframe]);
+
+  // Clamp startOffset when maxOffset shrinks
+  useEffect(() => { setStartOffset(prev => Math.min(prev, maxOffset)); }, [maxOffset]);
+
+  // Date window label for the slider
+  const dateWindowLabel = useMemo(() => {
+    if (dates.length === 0) return '';
+    const fmt = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${fmt(dates[0])} — ${fmt(dates[dates.length - 1])}`;
+  }, [dates]);
+
+  const hasAnySeries = selectedSupplement || selectedSymptoms.length > 0;
+  const showDots = timeframe <= 28;
+
+  // Shared input box style for all three selectors
+  const inputBoxStyle = {
+    borderRadius: '10px',
+    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.04)',
+    height: '38px',
+    boxSizing: 'border-box',
+  };
+
+  // ── Supplement picker panel ──
+  const selectSupplement = (suppId) => {
+    setSelectedSupplement(prev => prev === suppId ? '' : suppId);
+    haptic('light');
+  };
+
+  const supplementPickerPanel = showSupplementPicker ? (
+    <div
+      onClick={() => setShowSupplementPicker(false)}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,0.92)',
+        zIndex: 1000,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '20px',
+        paddingTop: 'calc(60px + env(safe-area-inset-top))',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: '820px',
+          background: 'rgba(15,17,21,0.95)',
+          borderRadius: '12px',
+          border: '1px solid rgba(139,92,246,0.3)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          overflow: 'hidden',
+          maxHeight: 'calc(100vh - 120px)',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '16px 20px',
+          borderBottom: '1px solid rgba(100,116,139,0.2)',
+          flexShrink: 0,
+        }}>
+          <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+            Select Supplement
+          </h3>
+          <button
+            onClick={() => setShowSupplementPicker(false)}
+            style={{
+              background: 'none', border: 'none', color: '#8b5cf6',
+              fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '4px 8px',
+            }}
+          >
+            Done
+          </button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '12px 16px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '8px',
+          }}>
+            {allSupplements.map(supp => {
+              const isSelected = selectedSupplement === supp.id;
+              return (
+                <button
+                  key={supp.id}
+                  onClick={() => { selectSupplement(supp.id); setShowSupplementPicker(false); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '10px 12px', minWidth: 0,
+                    borderRadius: '8px',
+                    background: isSelected ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                    border: isSelected ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{
+                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                    background: isSelected ? SUPP_COLOR : '#4b5563',
+                  }} />
+                  <span style={{
+                    flex: 1, color: isSelected ? '#e5e7eb' : '#9ca3af',
+                    fontSize: '13px', fontWeight: isSelected ? '500' : '400',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {supp.name}
+                  </span>
+                  {isSelected && (
+                    <span style={{ color: SUPP_COLOR, fontSize: '14px', flexShrink: 0 }}>✓</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  // ── Symptom picker panel ──
+  const symptomPickerPanel = showSymptomPicker ? (
+    <div
+      onClick={() => setShowSymptomPicker(false)}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,0.92)',
+        zIndex: 1000,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        padding: '20px',
+        paddingTop: 'calc(60px + env(safe-area-inset-top))',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: '820px',
+          background: 'rgba(15,17,21,0.95)',
+          borderRadius: '12px',
+          border: '1px solid rgba(99,102,241,0.3)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          overflow: 'hidden',
+          maxHeight: 'calc(100vh - 120px)',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '16px 20px',
+          borderBottom: '1px solid rgba(100,116,139,0.2)',
+          flexShrink: 0,
+        }}>
+          <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+            Select Symptoms
+          </h3>
+          <button
+            onClick={() => setShowSymptomPicker(false)}
+            style={{
+              background: 'none', border: 'none', color: '#8b5cf6',
+              fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '4px 8px',
+            }}
+          >
+            Done
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ overflowY: 'auto', padding: '12px 16px' }}>
+          {selectedSymptoms.length >= 3 && (
+            <div style={{
+              padding: '0 0 10px', color: '#6b7280', fontSize: '12px', textAlign: 'center',
+            }}>
+              Max 3 symptoms selected
+            </div>
+          )}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '8px',
+          }}>
+          {activeSymptoms.map(sym => {
+            const isSelected = selectedSymptoms.includes(sym.id);
+            const styleIdx = selectedSymptoms.indexOf(sym.id);
+            const atMax = selectedSymptoms.length >= 3 && !isSelected;
+            return (
+              <button
+                key={sym.id}
+                onClick={() => toggleSymptom(sym.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 12px', minWidth: 0,
+                  borderRadius: '8px',
+                  background: isSelected ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                  border: isSelected ? `1px solid ${SYMPTOM_STYLES[styleIdx].chipBorder}` : '1px solid rgba(255,255,255,0.06)',
+                  cursor: atMax ? 'default' : 'pointer',
+                  opacity: atMax ? 0.35 : 1,
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{
+                  width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                  background: isSelected ? SYMPTOM_STYLES[styleIdx].color : '#4b5563',
+                }} />
+                <span style={{
+                  flex: 1, color: isSelected ? '#e5e7eb' : '#9ca3af',
+                  fontSize: '13px', fontWeight: isSelected ? '500' : '400',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {sym.name}
+                </span>
+                {isSelected && (
+                  <span style={{ color: SYMPTOM_STYLES[styleIdx].color, fontSize: '14px', flexShrink: 0 }}>✓</span>
+                )}
+              </button>
+            );
+          })}
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  // ── Render ──
+
+  return (
+    <div>
+      {supplementPickerPanel}
+      {symptomPickerPanel}
+
+      {/* ── Selectors ── */}
+      <div style={{
+        display: 'flex', flexDirection: isDesktop ? 'row' : 'column',
+        gap: isDesktop ? '12px' : '14px',
+        marginBottom: isDesktop ? '20px' : '16px',
+        ...(isDesktop ? { alignItems: 'flex-end' } : {}),
+      }}>
+        {/* Supplement selector */}
+        <div style={isDesktop ? { width: '180px', flexShrink: 0 } : {}}>
+          <div style={{ marginBottom: '6px' }}>
+            <span style={{ color: '#9ca3af', fontSize: '13px' }}>Supplement</span>
+          </div>
+          <div
+            onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
+            style={{
+              ...inputBoxStyle,
+              display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center',
+              padding: '0 10px',
+              height: selectedSupplement ? undefined : '38px',
+              minHeight: '38px',
+              cursor: 'pointer',
+            }}
+          >
+            {selectedSupplement && (() => {
+              const supp = allSupplements.find(s => s.id === selectedSupplement);
+              return (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  padding: '3px 8px', borderRadius: '6px',
+                  background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.35)',
+                  color: SUPP_COLOR, fontSize: '13px', fontWeight: '500', lineHeight: '1.3',
+                }}>
+                  {supp?.name}
+                  <button onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }} style={{
+                    background: 'none', border: 'none', color: SUPP_COLOR,
+                    cursor: 'pointer', padding: 0, fontSize: '14px', lineHeight: 1, opacity: 0.7,
+                  }}>×</button>
+                </span>
+              );
+            })()}
+            {!selectedSupplement && (
+              <span style={{ color: '#6b7280', fontSize: '13px', pointerEvents: 'none' }}>Select supplement...</span>
+            )}
+          </div>
+        </div>
+
+        {/* Symptom selector */}
+        <div style={isDesktop ? { flex: 1, minWidth: 0 } : {}}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <span style={{ color: '#9ca3af', fontSize: '13px' }}>Symptoms</span>
+            <span style={{ color: '#4b5563', fontSize: '12px' }}>{selectedSymptoms.length}/3</span>
+          </div>
+          <div
+            onClick={() => { setShowSymptomPicker(true); haptic('light'); }}
+            style={{
+              ...inputBoxStyle,
+              display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center',
+              padding: '0 10px',
+              height: selectedSymptoms.length > 0 ? undefined : '38px',
+              minHeight: '38px',
+              cursor: 'pointer',
+            }}
+          >
+            {selectedSymptoms.map((symId, idx) => {
+              const sym = activeSymptoms.find(s => s.id === symId);
+              const st = SYMPTOM_STYLES[idx];
+              return (
+                <span key={symId} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  padding: '3px 8px', borderRadius: '6px',
+                  background: st.chipBg, border: `1px solid ${st.chipBorder}`,
+                  color: st.color, fontSize: '13px', fontWeight: '500', lineHeight: '1.3',
+                }}>
+                  {sym?.name}
+                  <button onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }} style={{
+                    background: 'none', border: 'none', color: st.color,
+                    cursor: 'pointer', padding: 0, fontSize: '14px', lineHeight: 1, opacity: 0.7,
+                  }}>×</button>
+                </span>
+              );
+            })}
+            {selectedSymptoms.length === 0 && (
+              <span style={{ color: '#6b7280', fontSize: '13px', pointerEvents: 'none' }}>Select symptoms...</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {!hasAnySeries ? (
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '12px',
+          padding: '48px 20px', textAlign: 'center',
+        }}>
+          <div style={{ color: '#6b7280', fontSize: '13px', lineHeight: '1.6' }}>
+            Select at least one supplement or symptom<br />to visualize trends over time
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* ── Chart card ── */}
+          <div style={{
+            background: 'rgba(15,17,21,0.6)',
+            borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.06)',
+            padding: '14px 14px 10px',
+            marginBottom: '16px',
+          }}>
+            {/* Legend (left) + Chart (right) */}
+            <div style={{ display: 'flex', gap: '0' }}>
+
+              {/* Legend panel — left side */}
+              <div style={{
+                width: isDesktop ? '170px' : '130px', flexShrink: 0,
+                paddingRight: '14px',
+                display: 'flex', flexDirection: 'column',
+                borderRight: '1px solid rgba(255,255,255,0.04)',
+              }}>
+                {/* Timeframe pills */}
+                <div style={{
+                  display: 'flex', gap: '0',
+                  borderRadius: '7px',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'rgba(255,255,255,0.04)',
+                  padding: '2px',
+                  marginBottom: '8px',
+                }}>
+                  {TIMEFRAMES.map(tf => (
+                    <button key={tf.days}
+                      onClick={() => { setTimeframe(tf.days); haptic('light'); }}
+                      style={{
+                        padding: '3px 0',
+                        flex: 1,
+                        borderRadius: '5px', border: 'none',
+                        background: timeframe === tf.days ? 'rgba(255,255,255,0.12)' : 'transparent',
+                        color: timeframe === tf.days ? '#fff' : '#6b7280',
+                        fontSize: '10px', fontWeight: '500', cursor: 'pointer',
+                      }}
+                    >
+                      {tf.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Date window slider */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+                  <span style={{ color: '#4b5563', fontSize: '8px', whiteSpace: 'nowrap' }}>{dateWindowLabel}</span>
+                  <input type="range" min="0" max={maxOffset} step="1" value={startOffset}
+                    onChange={(e) => setStartOffset(parseInt(e.target.value))}
+                    style={{ flex: 1, minWidth: 0, accentColor: '#f59e0b', height: '14px', margin: '0', direction: 'rtl' }}
+                  />
+                </div>
+
+                {/* Date / Average header */}
+                <div style={{
+                  color: crosshairData ? '#e5e7eb' : '#4b5563',
+                  fontSize: '10px', fontWeight: '500',
+                  marginBottom: '10px',
+                  letterSpacing: '0.03em',
+                }}>
+                  {legendItems.dateLabel}
+                </div>
+
+                {/* Series items */}
+                {legendItems.items.map((item, i) => (
+                  <div key={i} style={{ marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                      <span style={{
+                        color: '#9ca3af', fontSize: '11px',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {item.name}
+                      </span>
+                    </div>
+                    <div style={{
+                      color: '#e5e7eb', fontSize: '16px', fontWeight: '600',
+                      fontVariantNumeric: 'tabular-nums', paddingLeft: '12px',
+                    }}>
+                      {item.val !== null && item.val !== undefined && isFinite(item.val)
+                        ? item.unit === '/5'
+                          ? `${item.val.toFixed(1)}${item.unit}`
+                          : `${Number.isInteger(item.val) ? item.val : item.val.toFixed(1)} ${item.unit}`
+                        : '--'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* SVG chart — right side */}
+              <div style={{ flex: 1, minWidth: 0, touchAction: 'none', paddingLeft: '6px' }}>
+                <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
+                  onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+                  onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
+                  style={{ display: 'block' }}
+                >
+                  {/* Grid lines */}
+                  {selectedSupplement ? (
+                    suppYLabels.map(val => {
+                      const y = padTop + chartH - (val / suppYMax) * chartH;
+                      return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
+                    })
+                  ) : (
+                    [0, 1, 2, 3, 4, 5].map(sev => {
+                      const y = padTop + chartH - (sev / 5) * chartH;
+                      return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
+                    })
+                  )}
+
+                  {/* Left Y-axis */}
+                  {selectedSupplement ? (
+                    suppYLabels.map(val => {
+                      const y = padTop + chartH - (val / suppYMax) * chartH;
+                      return (
+                        <text key={`l-${val}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
+                          fill="#6b7280" fontSize="7" fontFamily="system-ui">{val}</text>
+                      );
+                    })
+                  ) : (
+                    [0, 1, 2, 3, 4, 5].map(sev => {
+                      const y = padTop + chartH - (sev / 5) * chartH;
+                      return (
+                        <text key={`l-${sev}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
+                          fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
+                      );
+                    })
+                  )}
+
+                  {/* Right Y-axis: severity (only when dual-axis mode) */}
+                  {selectedSupplement && selectedSymptoms.length > 0 && [0, 2.5, 5].map(sev => {
+                    const y = padTop + chartH - (sev / 5) * chartH;
+                    return (
+                      <text key={`r-${sev}`} x={W - padRight + 5} y={y + 2.5} textAnchor="start"
+                        fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
+                    );
+                  })}
+
+                  {/* X-axis */}
+                  {xLabels.map((lbl, i) => (
+                    <text key={i} x={lbl.x} y={H - 5} textAnchor="middle"
+                      fill="#6b7280" fontSize="7" fontFamily="system-ui">{lbl.label}</text>
+                  ))}
+
+                  {/* Supplement line */}
+                  {suppPoints && (
+                    <g>
+                      <path d={buildPath(suppPoints)} fill="none" stroke={SUPP_COLOR} strokeWidth="1.2" strokeLinejoin="round" />
+                      {showDots && suppPoints.map((pt, i) => (
+                        pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r="1.8" fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth="0.8" />
+                      ))}
+                    </g>
+                  )}
+
+                  {/* Symptom lines */}
+                  {symptomPointSets.map((pts, idx) => (
+                    <g key={`sym-${idx}`}>
+                      <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="1" strokeLinejoin="round" />
+                      {showDots && pts.map((pt, i) => (
+                        pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r="1.2" fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="0.7" />
+                      ))}
+                    </g>
+                  ))}
+
+                  {/* Crosshair */}
+                  {crosshairData && (
+                    <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
+                  )}
+                </svg>
+              </div>
+            </div>
+          </div>
+
+        </>
+      )}
+    </div>
+  );
+}

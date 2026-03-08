@@ -27,6 +27,7 @@ export default function BottomNav({
 }) {
   const isViewOpen = showInsights || showSettings || showExport;
 
+  // Mobile: standard bottom navigation
   return (
     <div style={{
       position: 'fixed',
@@ -186,7 +187,7 @@ export default function BottomNav({
         {/* Actions Tab - hidden when Settings is open */}
         <button
           onClick={() => {
-            if (showSettings) return; // Don't open menu when Settings is open
+            if (showSettings) return;
             setShowQuickActions(!showQuickActions);
           }}
           disabled={showSettings}
@@ -203,7 +204,6 @@ export default function BottomNav({
             opacity: showSettings ? 0.3 : 1,
           }}
         >
-          {/* Ellipsis (three dots) icon */}
           <svg width="24" height="24" viewBox="0 0 24 24" fill={showQuickActions ? '#8b5cf6' : '#64748b'}>
             <circle cx="12" cy="12" r="2"/>
             <circle cx="5" cy="12" r="2"/>

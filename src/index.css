@@ -136,8 +136,8 @@ button, .no-select {
   user-select: none;
 }
 
-/* Landscape orientation blocker for mobile */
-@media screen and (max-height: 500px) and (orientation: landscape) {
+/* Landscape orientation blocker for mobile only (not desktop) */
+@media screen and (max-width: 1023px) and (max-height: 500px) and (orientation: landscape) {
   #root {
     display: none !important;
   }
@@ -159,5 +159,21 @@ button, .no-select {
     text-align: center;
     padding: 20px;
     z-index: 99999;
+  }
+}
+
+/* Desktop scrollbar refinements */
+@media screen and (min-width: 1024px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.2);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.4);
   }
 }

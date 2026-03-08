@@ -39,6 +39,7 @@ export default function Settings({
   setCopyToastMessage,
   setShowExport,
   setShowSettings,
+  isDesktop,
 }) {
   const [confirmClearData, setConfirmClearData] = useState(false);
   const [confirmFullReset, setConfirmFullReset] = useState(false);
@@ -73,7 +74,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '3.19.4',
+      version: '3.22.0',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -177,7 +178,16 @@ export default function Settings({
 
   return (
     <div
-      style={{
+      style={isDesktop ? {
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.6)',
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px',
+      } : {
         position: 'fixed',
         top: 0,
         left: 0,
@@ -189,8 +199,24 @@ export default function Settings({
         padding: '16px 16px 120px 16px',
         paddingTop: 'calc(16px + env(safe-area-inset-top))',
       }}
+      onClick={isDesktop ? () => setShowSettings(false) : undefined}
     >
-      <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+      <div
+        style={isDesktop ? {
+          maxWidth: '600px',
+          width: '100%',
+          maxHeight: '80vh',
+          overflowY: 'auto',
+          background: '#08090A',
+          borderRadius: '12px',
+          border: '1px solid rgba(255,255,255,0.1)',
+          padding: '24px',
+        } : {
+          maxWidth: '700px',
+          margin: '0 auto',
+        }}
+        onClick={isDesktop ? (e) => e.stopPropagation() : undefined}
+      >
         {/* Cloud Sync Section */}
         <div style={{ marginBottom: '8px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           CLOUD SYNC
@@ -692,7 +718,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v3.19.4
+              v3.22.0
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

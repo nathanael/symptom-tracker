@@ -32,6 +32,14 @@ export default function SymptomList({
   trendWindow,
   flashColumn,
   onOpenGraph,
+  isDesktop,
+  // Desktop inline action handlers
+  onRapidEntry,
+  onEditNote,
+  onCopyData,
+  copyDays,
+  setCopyDays,
+  onEditSymptoms,
 }) {
   // Drag state for hold-to-edit
   const [activeSymptom, setActiveSymptom] = useState(null);
@@ -56,6 +64,9 @@ export default function SymptomList({
 
   // Popup position state
   const [popupPosition, setPopupPosition] = useState(null);
+
+  // Desktop copy days dropdown
+  const [showCopyDropdown, setShowCopyDropdown] = useState(false);
 
   // Refs
   const containerRef = useRef(null);
@@ -421,8 +432,241 @@ export default function SymptomList({
         gap: '0',
       }}
     >
-      {/* Search Input - only show when searchVisible (pull to search) */}
-      {searchVisible && (
+      {/* Desktop: Search + inline actions bar */}
+      {isDesktop && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          marginBottom: '16px',
+        }}>
+          {/* Search — ~25% width */}
+          <div style={{ position: 'relative', width: '25%', minWidth: '180px', flexShrink: 0 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="text"
+              value={symptomSearch}
+              onChange={(e) => setSymptomSearch(e.target.value)}
+              placeholder="Search..."
+              style={{
+                width: '100%',
+                padding: '8px 32px 8px 34px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '8px',
+                color: '#f8fafc',
+                fontSize: '13px',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            {symptomSearch && (
+              <button
+                onClick={() => setSymptomSearch('')}
+                style={{
+                  position: 'absolute',
+                  right: '6px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#6b7280',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+
+          {/* Actions — fill remaining space, right-aligned */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+            {/* AM/PM pill toggle + Rapid Entry attached */}
+            {(() => {
+              const current = trackingMode === 'ampm' ? (quickLogTime || getCurrentTimePeriod()) : null;
+              const hasAmPm = trackingMode === 'ampm';
+              return (
+                <div style={{
+                  position: 'relative', flexShrink: 0,
+                }}>
+                  {/* Rapid Entry — the full-width background layer */}
+                  <button
+                    onClick={onRapidEntry}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: hasAmPm ? '6px 12px 6px 100px' : '6px 12px',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      borderRadius: '20px',
+                      color: '#9ca3af', fontSize: '12px', fontWeight: '500',
+                      cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease',
+                      height: '32px',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#e5e7eb'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = '#9ca3af'; }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#facc15" stroke="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Rapid Entry
+                  </button>
+                  {/* AM/PM pill — positioned on top, covering the left portion */}
+                  {hasAmPm && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center',
+                      position: 'absolute', left: 0, top: 0, bottom: 0,
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      borderRadius: '20px',
+                      overflow: 'hidden',
+                      background: 'rgba(17, 18, 22, 0.98)',
+                    }}>
+                      <button
+                        onClick={() => setQuickLogTime('morning')}
+                        style={{
+                          padding: '0 14px', border: 'none', height: '100%',
+                          background: current === 'morning' ? 'rgba(139, 92, 246, 0.25)' : 'transparent',
+                          color: current === 'morning' ? '#c4b5fd' : '#6b7280',
+                          fontSize: '12px', fontWeight: '700', letterSpacing: '0.03em',
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => { if (current !== 'morning') { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#9ca3af'; } }}
+                        onMouseLeave={(e) => { if (current !== 'morning') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#6b7280'; } }}
+                      >
+                        AM
+                      </button>
+                      <div style={{ width: '1px', alignSelf: 'stretch', margin: '6px 0', background: 'rgba(139, 92, 246, 0.2)' }} />
+                      <button
+                        onClick={() => setQuickLogTime('evening')}
+                        style={{
+                          padding: '0 14px', border: 'none', height: '100%',
+                          background: current === 'evening' ? 'rgba(139, 92, 246, 0.25)' : 'transparent',
+                          color: current === 'evening' ? '#c4b5fd' : '#6b7280',
+                          fontSize: '12px', fontWeight: '700', letterSpacing: '0.03em',
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => { if (current !== 'evening') { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#9ca3af'; } }}
+                        onMouseLeave={(e) => { if (current !== 'evening') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#6b7280'; } }}
+                      >
+                        PM
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Edit Note */}
+            <button
+              onClick={onEditNote}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '6px 10px', background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px',
+                color: '#9ca3af', fontSize: '12px', fontWeight: '500',
+                cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#e5e7eb'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#9ca3af'; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Edit Today's Notes
+            </button>
+
+            {/* Edit Symptoms */}
+            <button
+              onClick={onEditSymptoms}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '6px 10px', background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px',
+                color: '#9ca3af', fontSize: '12px', fontWeight: '500',
+                cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#e5e7eb'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#9ca3af'; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              Edit Symptoms
+            </button>
+
+            {/* Copy — with adjustable days dropdown */}
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <button
+                  onClick={onCopyData}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    padding: '6px 6px 6px 10px', background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px 0 0 6px',
+                    borderRight: 'none',
+                    color: '#9ca3af', fontSize: '12px', fontWeight: '500',
+                    cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#e5e7eb'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9ca3af'; }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  Copy tracking data for {copyDays} days
+                </button>
+                <button
+                  onClick={() => setShowCopyDropdown(prev => !prev)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '6px 6px', background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.06)', borderRadius: '0 6px 6px 0',
+                    color: '#9ca3af', cursor: 'pointer', transition: 'all 0.15s ease',
+                    minWidth: '24px',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#e5e7eb'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9ca3af'; }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+              </div>
+              {showCopyDropdown && (
+                <>
+                  <div onClick={() => setShowCopyDropdown(false)} style={{ position: 'fixed', inset: 0, zIndex: 600 }} />
+                  <div style={{
+                    position: 'absolute', top: '100%', right: 0, marginTop: '4px',
+                    background: 'rgba(15,17,21,0.98)', borderRadius: '8px',
+                    border: '1px solid rgba(99,102,241,0.3)', boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                    zIndex: 601, overflow: 'hidden', minWidth: '100px',
+                  }}>
+                    {[7, 14, 30, 60, 90].map(d => (
+                      <button
+                        key={d}
+                        onClick={() => {
+                          setCopyDays(d);
+                          setShowCopyDropdown(false);
+                        }}
+                        style={{
+                          display: 'block', width: '100%', padding: '8px 14px',
+                          background: d === copyDays ? 'rgba(99,102,241,0.15)' : 'transparent',
+                          border: 'none', color: d === copyDays ? '#a5b4fc' : '#e5e7eb',
+                          fontSize: '13px', fontWeight: d === copyDays ? '600' : '400',
+                          cursor: 'pointer', textAlign: 'left',
+                          borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        }}
+                        onMouseEnter={(e) => { if (d !== copyDays) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                        onMouseLeave={(e) => { if (d !== copyDays) e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        {d} days
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile: Search Input - pull-to-search */}
+      {!isDesktop && searchVisible && (
         <div style={{
           position: 'relative',
           marginBottom: '8px',
@@ -478,8 +722,8 @@ export default function SymptomList({
         </div>
       )}
 
-      {/* AM/PM Column Headers - only show in ampm mode */}
-      {trackingMode === 'ampm' && activeSymptoms.length > 0 && (() => {
+      {/* AM/PM Column Headers - only show in ampm mode, mobile only */}
+      {!isDesktop && trackingMode === 'ampm' && activeSymptoms.length > 0 && (() => {
         const currentHour = new Date().getHours();
         const defaultPeriod = currentHour < 12 ? 'morning' : 'evening';
         const activePeriod = quickLogTime || defaultPeriod;
@@ -512,7 +756,319 @@ export default function SymptomList({
         );
       })()}
 
-      {/* Symptom rows - flat design */}
+      {/* Desktop: Card grid layout */}
+      {isDesktop ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '12px',
+        }}>
+          {activeSymptoms.map((symptom) => {
+            const symptomEntries = getSymptomEntries(symptom.id);
+            const isPinned = pinnedSymptoms.has(symptom.id);
+            const trend = getSymptomTrend(symptom.id, entries, trendWindow);
+
+            const amEntry = trackingMode === 'ampm' ? symptomEntries.find(e => e.time === 'morning') : null;
+            const pmEntry = trackingMode === 'ampm' ? symptomEntries.find(e => e.time === 'evening') : null;
+            const maxEntry = trackingMode !== 'ampm' && symptomEntries.length > 0
+              ? symptomEntries.reduce((max, e) => e.severity > max.severity ? e : max, symptomEntries[0])
+              : null;
+
+            const currentHour = new Date().getHours();
+            const defaultPeriod = currentHour < 12 ? 'morning' : 'evening';
+            const activePeriod = quickLogTime || defaultPeriod;
+
+            const hasAnyEntry = trackingMode === 'ampm' ? (amEntry || pmEntry) : maxEntry;
+
+            // Sparkline data
+            const days = 7;
+            const today = new Date();
+            const vals = [];
+            for (let d = days - 1; d >= 0; d--) {
+              const dt = new Date(today);
+              dt.setDate(dt.getDate() - d);
+              const dk = getDateKey(dt);
+              const am = entries[`${dk}-${symptom.id}-morning`];
+              const pm = entries[`${dk}-${symptom.id}-evening`];
+              const daily = entries[`${dk}-${symptom.id}-daily`];
+              const sevs = [];
+              if (am && am.severity !== NA_SEVERITY) sevs.push(am.severity);
+              if (pm && pm.severity !== NA_SEVERITY) sevs.push(pm.severity);
+              if (sevs.length === 0 && daily && daily.severity !== NA_SEVERITY) sevs.push(daily.severity);
+              vals.push(sevs.length > 0 ? sevs.reduce((a, b) => a + b, 0) / sevs.length : null);
+            }
+            const hasSparkData = vals.some(v => v !== null);
+            const sparkW = 200, sparkH = 30;
+            const nonNullPts = [];
+            vals.forEach((v, i) => {
+              if (v !== null) nonNullPts.push({ x: (i / (vals.length - 1)) * sparkW, y: sparkH - (v / 5) * sparkH });
+            });
+            const pathD = nonNullPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join('');
+
+            return (
+              <div
+                key={symptom.id}
+                data-symptom-row
+                onClick={(e) => {
+                  if (quickLogSymptom !== null) {
+                    setQuickLogSymptom(null);
+                    setPopupPosition(null);
+                  } else {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setPopupPosition({ top: rect.top, left: rect.left, width: rect.width });
+                    setQuickLogSymptom(symptom.id);
+                    if (!quickLogTime) setQuickLogTime(getCurrentTimePeriod());
+                  }
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: '10px',
+                  padding: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.02)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                }}
+              >
+                {/* Card header: name + badges */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {isPinned && <span style={{ color: '#fbbf24', fontSize: '10px' }}>⊙</span>}
+                      <span style={{
+                        width: '16px',
+                        fontSize: '14px',
+                        opacity: 0.7,
+                        color: trend === 'improving' ? '#4ade80' : '#fbbf24',
+                        flexShrink: 0,
+                      }}>
+                        {trend === 'improving' ? '↓' : trend === 'worsening' ? '↑' : ''}
+                      </span>
+                      <span style={{
+                        color: hasAnyEntry ? '#e5e7eb' : '#9ca3af',
+                        fontSize: '15px',
+                        fontWeight: '500',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}>
+                        {symptom.name}
+                      </span>
+                    </div>
+                    {symptom.description && (
+                      <div style={{ color: '#6b7280', fontSize: '12px', marginTop: '3px', marginLeft: '22px' }}>
+                        {symptom.description}
+                      </div>
+                    )}
+                  </div>
+                  {/* AM/PM badges — clickable to toggle period */}
+                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    {trackingMode === 'ampm' ? (
+                      <>
+                        {/* AM badge */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQuickLogTime('morning');
+                            const tile = e.currentTarget.closest('[data-symptom-row]');
+                            if (tile) {
+                              const rect = tile.getBoundingClientRect();
+                              setPopupPosition({ top: rect.top, left: rect.left, width: rect.width });
+                            }
+                            setQuickLogSymptom(symptom.id);
+                          }}
+                          style={{
+                            minWidth: '32px', height: '32px',
+                            borderRadius: amEntry ? '6px' : '16px',
+                            border: activePeriod === 'morning'
+                              ? '1px solid rgba(99, 102, 241, 0.5)'
+                              : '1px solid rgba(255,255,255,0.08)',
+                            background: activePeriod === 'morning'
+                              ? 'rgba(99, 102, 241, 0.12)'
+                              : 'rgba(255,255,255,0.02)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '0 6px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {amEntry ? (
+                            <span style={{
+                              color: amEntry.severity === NA_SEVERITY ? '#64748b' : '#e5e7eb',
+                              fontSize: amEntry.severity === NA_SEVERITY ? '10px' : '14px',
+                              fontWeight: '600',
+                            }}>
+                              {amEntry.severity === NA_SEVERITY ? 'N/A' : amEntry.severity}
+                            </span>
+                          ) : (
+                            <span style={{
+                              color: activePeriod === 'morning' ? '#a5b4fc' : '#4b5563',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              letterSpacing: '0.5px',
+                            }}>
+                              AM
+                            </span>
+                          )}
+                        </div>
+                        {/* PM badge */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQuickLogTime('evening');
+                            const tile = e.currentTarget.closest('[data-symptom-row]');
+                            if (tile) {
+                              const rect = tile.getBoundingClientRect();
+                              setPopupPosition({ top: rect.top, left: rect.left, width: rect.width });
+                            }
+                            setQuickLogSymptom(symptom.id);
+                          }}
+                          style={{
+                            minWidth: '32px', height: '32px',
+                            borderRadius: pmEntry ? '6px' : '16px',
+                            border: activePeriod === 'evening'
+                              ? '1px solid rgba(99, 102, 241, 0.5)'
+                              : '1px solid rgba(255,255,255,0.08)',
+                            background: activePeriod === 'evening'
+                              ? 'rgba(99, 102, 241, 0.12)'
+                              : 'rgba(255,255,255,0.02)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '0 6px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {pmEntry ? (
+                            <span style={{
+                              color: pmEntry.severity === NA_SEVERITY ? '#64748b' : '#e5e7eb',
+                              fontSize: pmEntry.severity === NA_SEVERITY ? '10px' : '14px',
+                              fontWeight: '600',
+                            }}>
+                              {pmEntry.severity === NA_SEVERITY ? 'N/A' : pmEntry.severity}
+                            </span>
+                          ) : (
+                            <span style={{
+                              color: activePeriod === 'evening' ? '#a5b4fc' : '#4b5563',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              letterSpacing: '0.5px',
+                            }}>
+                              PM
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : maxEntry ? (
+                      <div style={{
+                        width: '32px', height: '32px', borderRadius: '6px',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.05)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <span style={{ color: maxEntry.severity === NA_SEVERITY ? '#64748b' : '#e5e7eb', fontSize: maxEntry.severity === NA_SEVERITY ? '10px' : '14px', fontWeight: '600' }}>
+                          {maxEntry.severity === NA_SEVERITY ? 'N/A' : maxEntry.severity}
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{
+                        width: '32px', height: '32px', borderRadius: '50%',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sparkline — full tile width */}
+                {hasSparkData && (
+                  <div
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenGraph) onOpenGraph(symptom.id);
+                    }}
+                  >
+                    <svg width="100%" height={sparkH} viewBox={`0 0 ${sparkW} ${sparkH}`} preserveAspectRatio="none" style={{ display: 'block' }}>
+                      <path d={pathD} fill="none" stroke="rgba(139, 92, 246, 0.5)" strokeWidth="1.5" />
+                    </svg>
+                  </div>
+                )}
+
+                {/* Quick log popup for this card */}
+                {quickLogSymptom === symptom.id && popupPosition && (() => {
+                  const popupHeight = 120;
+                  const bottomSafeZone = 200;
+                  const windowHeight = window.innerHeight;
+                  const wouldOverlap = popupPosition.top + popupHeight > windowHeight - bottomSafeZone;
+                  const adjustedTop = wouldOverlap ? Math.max(100, popupPosition.top - popupHeight - 10) : popupPosition.top;
+
+                  return (
+                    <>
+                      <div
+                        onClick={(e) => { e.stopPropagation(); setQuickLogSymptom(null); setPopupPosition(null); }}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 500 }}
+                      />
+                      <div onClick={(e) => e.stopPropagation()} style={{
+                        position: 'fixed', top: adjustedTop, left: popupPosition.left, width: popupPosition.width,
+                        background: 'rgba(15,17,21,0.98)', borderRadius: '8px', border: '1px solid rgba(99,102,241,0.3)',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.4)', zIndex: 501, overflow: 'hidden',
+                      }}>
+                        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#e5e7eb', fontSize: '14px', fontWeight: '500', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{symptom.name}</span>
+                          {trackingMode === 'ampm' && <span style={{ fontSize: '11px', color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px', background: 'rgba(99,102,241,0.15)', padding: '2px 8px', borderRadius: '4px' }}>{(quickLogTime || getCurrentTimePeriod()) === 'morning' ? 'AM' : 'PM'}</span>}
+                        </div>
+                        <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', gap: '6px' }}>
+                          {[0,1,2,3,4,5].map(severity => {
+                            const logTime = quickLogTime || getCurrentTimePeriod();
+                            const recentEntry = getMostRecentEntry(symptom.id, logTime);
+                            const isRecentSeverity = recentEntry?.severity === severity;
+                            const subtleColors = ['#6b7280','#9ca3af','#b0b7c0','#c9cdd3','#dfe2e6','#f1f3f5'];
+                            return (
+                              <button key={severity} onClick={(e) => { e.stopPropagation(); quickLog(symptom.id, severity, logTime); setPopupPosition(null); }}
+                                style={{ flex: 1, padding: '14px 0', background: `rgba(255,255,255,${0.03+severity*0.01})`, border: isRecentSeverity ? '1px solid rgba(255,255,255,0.25)' : '1px solid transparent', borderRadius: '3px', color: subtleColors[severity], fontSize: '18px', fontWeight: '700', cursor: 'pointer' }}>
+                                {severity}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div style={{ padding: '0 16px 12px', display: 'flex', gap: '6px' }}>
+                          {onOpenGraph && (
+                            <button onClick={(e) => { e.stopPropagation(); setQuickLogSymptom(null); setPopupPosition(null); onOpenGraph(symptom.id); }}
+                              style={{ flex: 1, padding: '10px 0', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '3px', color: '#8b5cf6', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                              History
+                            </button>
+                          )}
+                          <button onClick={(e) => { e.stopPropagation(); quickLog(symptom.id, NA_SEVERITY, quickLogTime || getCurrentTimePeriod()); setPopupPosition(null); }}
+                            style={{ flex: 1, padding: '10px 0', background: 'rgba(100,116,139,0.1)', border: '1px solid rgba(100,116,139,0.2)', borderRadius: '3px', color: '#64748b', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                            N/A
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+      <>
+
+      {/* Symptom rows - flat design (mobile) */}
       {activeSymptoms.map((symptom, index) => {
         const symptomEntries = getSymptomEntries(symptom.id);
         const isQuickLog = quickLogSymptom === symptom.id;
@@ -620,6 +1176,54 @@ export default function SymptomList({
                   )}
                 </div>
               </div>
+
+              {/* Desktop: mini sparkline + recent avg */}
+              {isDesktop && (() => {
+                const days = 7;
+                const today = new Date();
+                const vals = [];
+                for (let d = days - 1; d >= 0; d--) {
+                  const dt = new Date(today);
+                  dt.setDate(dt.getDate() - d);
+                  const dk = getDateKey(dt);
+                  // Get daily value
+                  const am = entries[`${dk}-${symptom.id}-morning`];
+                  const pm = entries[`${dk}-${symptom.id}-evening`];
+                  const daily = entries[`${dk}-${symptom.id}-daily`];
+                  const sevs = [];
+                  if (am && am.severity !== NA_SEVERITY) sevs.push(am.severity);
+                  if (pm && pm.severity !== NA_SEVERITY) sevs.push(pm.severity);
+                  if (sevs.length === 0 && daily && daily.severity !== NA_SEVERITY) sevs.push(daily.severity);
+                  vals.push(sevs.length > 0 ? sevs.reduce((a, b) => a + b, 0) / sevs.length : null);
+                }
+                const hasData = vals.some(v => v !== null);
+                if (!hasData) return null;
+                const validVals = vals.filter(v => v !== null);
+                const avg = validVals.length > 0 ? (validVals.reduce((a, b) => a + b, 0) / validVals.length).toFixed(1) : '--';
+                // Mini sparkline as inline SVG
+                const w = 50, h = 20;
+                const nonNullPts = [];
+                vals.forEach((v, i) => {
+                  if (v !== null) nonNullPts.push({ x: (i / (vals.length - 1)) * w, y: h - (v / 5) * h });
+                });
+                const pathD = nonNullPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join('');
+                return (
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginRight: '4px', cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenGraph) onOpenGraph(symptom.id);
+                    }}
+                  >
+                    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
+                      <path d={pathD} fill="none" stroke="rgba(139, 92, 246, 0.5)" strokeWidth="1.5" />
+                    </svg>
+                    <span style={{ color: '#6b7280', fontSize: '12px', fontWeight: '500', minWidth: '24px', textAlign: 'right' }}>
+                      {avg}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* Right side: AM/PM badges - minus circle for unentered */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -1050,10 +1654,12 @@ export default function SymptomList({
           </div>
         );
       })}
+      </>
+      )}
 
 
-      {/* Add Symptom Button - at bottom of list */}
-      {!showAddSymptom && (
+      {/* Add Symptom Button - at bottom of list (mobile only, desktop uses toolbar) */}
+      {!showAddSymptom && !isDesktop && (
         <button
           onClick={() => setShowAddSymptom(true)}
           style={{
@@ -1080,7 +1686,16 @@ export default function SymptomList({
       {/* Manage Symptoms Modal */}
       {showAddSymptom && (
         <div
-          style={{
+          style={isDesktop ? {
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '40px',
+          } : {
             position: 'fixed',
             inset: 0,
             background: '#08090A',
@@ -1088,7 +1703,24 @@ export default function SymptomList({
             display: 'flex',
             flexDirection: 'column',
           }}
+          onClick={isDesktop ? () => setShowAddSymptom(false) : undefined}
         >
+          <div
+            onClick={isDesktop ? (e) => e.stopPropagation() : undefined}
+            style={isDesktop ? {
+              width: '100%',
+              maxWidth: '900px',
+              maxHeight: '80vh',
+              background: '#08090A',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            } : {
+              display: 'contents',
+            }}
+          >
           {/* Scrollable Content */}
           <div
             ref={manageScrollRef}
@@ -1097,11 +1729,11 @@ export default function SymptomList({
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
-              padding: '12px 16px',
+              padding: isDesktop ? '24px 32px' : '12px 16px',
               paddingBottom: '180px',
             }}
           >
-            <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+            <div style={{ maxWidth: isDesktop ? '100%' : '500px', margin: '0 auto' }}>
 
             {/* Add Symptom Form (at top, when expanded) */}
             {showAddForm && (
@@ -1484,6 +2116,7 @@ export default function SymptomList({
             >
               Done
             </button>
+          </div>
           </div>
         </div>
       )}

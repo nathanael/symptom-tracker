@@ -13,6 +13,9 @@ export default function Stack({
   showManageStack,
   setShowManageStack,
   recentStackEditsRef,
+  onOpenSupplementGraph,
+  isDesktop,
+  searchFilter,
 }) {
   const [editingStackItem, setEditingStackItem] = useState(null);
   const [newStackItem, setNewStackItem] = useState({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
@@ -26,6 +29,10 @@ export default function Stack({
 
   // Prevent row click from toggling right after dose blur save
   const justSavedDose = useRef(false);
+
+  // Long-press state for opening graph
+  const longPressTimerRef = useRef(null);
+  const longPressTriggeredRef = useRef(false);
 
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
@@ -301,7 +308,11 @@ export default function Stack({
       if (!historical) return i;
       return { ...i, name: historical.name, description: historical.description, unit: historical.unit, defaultDose: historical.defaultDose, schedule: historical.schedule };
     });
-  })().sort((a, b) => (a.order || 0) - (b.order || 0));
+  })().sort((a, b) => (a.order || 0) - (b.order || 0)).filter(item => {
+    if (!searchFilter) return true;
+    const s = searchFilter.toLowerCase();
+    return item.name.toLowerCase().includes(s) || (item.description || '').toLowerCase().includes(s);
+  });
 
   // Drag reorder handlers
   const handleDragStart = (e, itemId) => {
@@ -349,6 +360,27 @@ export default function Stack({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+      {/* Desktop panel header */}
+      {isDesktop && (
+        <div style={{
+          padding: '12px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <span style={{
+            fontSize: '13px',
+            fontWeight: '600',
+            color: '#8b5cf6',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+          }}>
+            Supplements
+          </span>
+        </div>
+      )}
+
       {/* Progress indicator */}
       {displayItems.length > 0 && (
         <div style={{
@@ -460,8 +492,25 @@ export default function Stack({
               justifyContent: 'space-between',
               gap: '16px',
               cursor: 'pointer',
+              transition: isDesktop ? 'background 0.15s ease' : 'none',
             }}
-            onClick={() => !isEditing && !justSavedDose.current && toggleStackItem(item.id)}
+            onMouseEnter={isDesktop ? (e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; } : undefined}
+            onMouseLeave={isDesktop ? (e) => { e.currentTarget.style.background = 'transparent'; } : undefined}
+            onClick={() => !isEditing && !justSavedDose.current && !longPressTriggeredRef.current && toggleStackItem(item.id)}
+            onTouchStart={() => {
+              longPressTriggeredRef.current = false;
+              longPressTimerRef.current = setTimeout(() => {
+                longPressTriggeredRef.current = true;
+                haptic('medium');
+                if (onOpenSupplementGraph) onOpenSupplementGraph(item.id);
+              }, 500);
+            }}
+            onTouchEnd={() => {
+              clearTimeout(longPressTimerRef.current);
+            }}
+            onTouchMove={() => {
+              clearTimeout(longPressTimerRef.current);
+            }}
           >
             {/* Left side: name + description */}
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -489,6 +538,56 @@ export default function Stack({
                 }}>{item.description}</span>
               )}
             </div>
+
+            {/* Desktop: 7-day adherence + chart icon */}
+            {isDesktop && (() => {
+              const today = new Date();
+              let taken = 0, scheduled = 0;
+              for (let d = 0; d < 7; d++) {
+                const dt = new Date(today);
+                dt.setDate(dt.getDate() - d);
+                const dk = getDateKey(dt);
+                if (isScheduledForDate(item.schedule, dt)) {
+                  scheduled++;
+                  if (stackEntries[`${dk}-${item.id}`]?.taken) taken++;
+                }
+              }
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                  {scheduled > 0 && (
+                    <span style={{
+                      color: taken === scheduled ? '#34d399' : taken > 0 ? '#fbbf24' : '#6b7280',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                    }}>
+                      {taken}/{scheduled}
+                    </span>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenSupplementGraph) onOpenSupplementGraph(item.id);
+                    }}
+                    style={{
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '6px',
+                      padding: '4px 6px',
+                      cursor: 'pointer',
+                      color: '#9ca3af',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="20" x2="18" y2="10"/>
+                      <line x1="12" y1="20" x2="12" y2="4"/>
+                      <line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Right side: dose + checkbox */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>

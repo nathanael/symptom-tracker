@@ -759,3 +759,71 @@ export const exportCSV = (days, entries, symptoms, trackingMode) => {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
+
+// Supplement Adherence Helpers
+
+/**
+ * Get supplement adherence data for a given item over N days.
+ * Schedule-aware: only counts days where the supplement was scheduled.
+ */
+export const getSupplementAdherence = (itemId, stackEntries, stackItems, days) => {
+  const item = stackItems.find(i => i.id === itemId);
+  if (!item) return { rate: 0, taken: 0, scheduled: 0 };
+
+  const today = new Date();
+  let taken = 0;
+  let scheduled = 0;
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateKey = getDateKey(d);
+
+    if (!isScheduledForDate(item.schedule, d)) continue;
+    scheduled++;
+
+    const entryKey = `${dateKey}-${itemId}`;
+    if (stackEntries[entryKey]?.taken) taken++;
+  }
+
+  return {
+    rate: scheduled > 0 ? Math.round((taken / scheduled) * 100) : 0,
+    taken,
+    scheduled,
+  };
+};
+
+/**
+ * Get current streak for a supplement (consecutive taken or missed days).
+ * Looks backwards from today, only counting scheduled days.
+ */
+export const getSupplementStreak = (itemId, stackEntries, stackItems) => {
+  const item = stackItems.find(i => i.id === itemId);
+  if (!item) return { type: 'taken', days: 0 };
+
+  const today = new Date();
+  let streakType = null;
+  let streakDays = 0;
+
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateKey = getDateKey(d);
+
+    if (!isScheduledForDate(item.schedule, d)) continue;
+
+    const entryKey = `${dateKey}-${itemId}`;
+    const wasTaken = !!stackEntries[entryKey]?.taken;
+
+    if (streakType === null) {
+      streakType = wasTaken ? 'taken' : 'missed';
+      streakDays = 1;
+    } else if ((wasTaken && streakType === 'taken') || (!wasTaken && streakType === 'missed')) {
+      streakDays++;
+    } else {
+      break;
+    }
+  }
+
+  return { type: streakType || 'taken', days: streakDays };
+};

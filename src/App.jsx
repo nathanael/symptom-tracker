@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useLocalStorage, useLocalStorageSet } from './hooks/useLocalStorage';
 import { useFirebase } from './hooks/useFirebase';
+import { useDesktopMode } from './hooks/useMediaQuery';
 import {
   STORAGE_KEY_SYMPTOMS,
   STORAGE_KEY_ENTRIES,
@@ -42,6 +43,7 @@ import {
 // Components
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
+import DesktopToolbar from './components/DesktopToolbar';
 import SymptomList from './components/SymptomList';
 import Stack from './components/Stack';
 import Inputs from './components/Inputs';
@@ -53,6 +55,7 @@ import RapidEntry from './components/RapidEntry';
 import NoteModal from './components/NoteModal';
 import DayNightToggle from './components/DayNightToggle';
 import SymptomGraph from './components/SymptomGraph';
+import SupplementGraph from './components/SupplementGraph';
 
 function App() {
   // App mode: 'symptoms' or 'stack'
@@ -86,11 +89,13 @@ function App() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showSymptomGraph, setShowSymptomGraph] = useState(null);
+  const [showSupplementGraph, setShowSupplementGraph] = useState(null);
 
   // UI state
   const [lastAction, setLastAction] = useState('');
   const [copyToastMessage, setCopyToastMessage] = useState('');
   const [symptomSearch, setSymptomSearch] = useState('');
+  const [protocolSearch, setProtocolSearch] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
   const [quickLogSymptom, setQuickLogSymptom] = useState(null);
   const [quickLogTime, setQuickLogTime] = useState(null);
@@ -112,6 +117,9 @@ function App() {
 
   // Firebase
   const firebase = useFirebase();
+
+  // Desktop mode
+  const isDesktop = useDesktopMode();
 
   // Refs
   const justLoggedRef = useRef(false);
@@ -460,6 +468,63 @@ function App() {
     localStorage.setItem('lastStackPrefillDate', todayKey);
   }, [stackEntries, stackItems]);
 
+  // Desktop keyboard shortcuts
+  useEffect(() => {
+    if (!isDesktop) return;
+    const handleKeyDown = (e) => {
+      // Don't fire when typing in inputs/textareas
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+      // Don't fire when rapid entry is open (it has its own keyboard handler)
+      if (rapidEntryMode) return;
+
+      if (e.key === '1') {
+        setShowInsights(false);
+        setAppMode('symptoms');
+      } else if (e.key === '2') {
+        setShowInsights(false);
+        setAppMode('protocol');
+      } else if (e.key === '3') {
+        setShowInsights(true);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setSelectedDate(prev => {
+          const d = new Date(prev);
+          d.setDate(d.getDate() - 1);
+          return d;
+        });
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setSelectedDate(prev => {
+          const d = new Date(prev);
+          d.setDate(d.getDate() + 1);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return d > today ? prev : d;
+        });
+      } else if (e.key === 't' || e.key === 'T') {
+        setSelectedDate(new Date());
+      } else if (e.key === 'r' || e.key === 'R') {
+        if (!showSettings && !showCalendar && !showExport && !showNoteModal && !showSymptomGraph && !showSupplementGraph) {
+          setRapidEntryMode(true);
+        }
+      } else if (e.key === 'Escape') {
+        // Close modals in priority order
+        if (showSymptomGraph) setShowSymptomGraph(null);
+        else if (showSupplementGraph) setShowSupplementGraph(null);
+        else if (showSettings) setShowSettings(false);
+        else if (showCalendar) setShowCalendar(false);
+        else if (showExport) setShowExport(false);
+        else if (showNoteModal) setShowNoteModal(false);
+        else if (showAddSymptom) setShowAddSymptom(false);
+        else if (showManageStack) setShowManageStack(false);
+        else if (showManageInputs) setShowManageInputs(false);
+        else if (showInsights) setShowInsights(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDesktop, rapidEntryMode, showSettings, showCalendar, showExport, showNoteModal, showSymptomGraph, showSupplementGraph, showInsights, showAddSymptom, showManageStack, showManageInputs]);
+
   // Handlers
   const changeDate = useCallback((days) => {
     setSelectedDate(prevDate => {
@@ -654,7 +719,7 @@ function App() {
     {/* Desktop max-width wrapper */}
     <div
       style={{
-        maxWidth: '500px',
+        maxWidth: isDesktop ? '1400px' : '500px',
         width: '100%',
         margin: '0 auto',
         height: '100%',
@@ -662,7 +727,7 @@ function App() {
         flexDirection: 'column',
         overflow: 'hidden',
         background: '#08090A',
-        boxShadow: window.innerWidth > 500 ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
+        boxShadow: !isDesktop && window.innerWidth > 500 ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
       }}
     >
       {/* Rapid Entry Mode */}
@@ -683,11 +748,131 @@ function App() {
           setEntries={setEntries}
           getMostRecentEntry={getMostRecentEntry}
           setCopyToastMessage={setCopyToastMessage}
+          isDesktop={isDesktop}
         />
       )}
 
-      {/* Header - hide when in edit modes */}
-      {!showAddSymptom && !showManageStack && !showManageInputs && (
+      {/* Desktop Toolbar - replaces Header + BottomNav on desktop */}
+      {isDesktop && !showAddSymptom && !showManageStack && !showManageInputs && (
+        <DesktopToolbar
+          selectedDate={selectedDate}
+          changeDate={changeDate}
+          canGoForward={canGoForward}
+          setShowCalendar={setShowCalendar}
+          setCalendarMonth={setCalendarMonth}
+          appMode={appMode}
+          setAppMode={setAppMode}
+          showInsights={showInsights}
+          setShowInsights={setShowInsights}
+          quickLogTime={quickLogTime}
+          setQuickLogTime={setQuickLogTime}
+          trackingMode={trackingMode}
+          flashColumn={flashColumn}
+          setFlashColumn={setFlashColumn}
+          setCopyToastMessage={setCopyToastMessage}
+          onRapidEntry={() => {
+            const effectiveTime = quickLogTime || getCurrentTimePeriod(trackingMode);
+            if (trackingMode === 'ampm' && !quickLogTime) {
+              setQuickLogTime(effectiveTime);
+            }
+            const dateKey = getDateKey(selectedDate);
+            const timeKey = trackingMode === 'ampm' ? effectiveTime : 'daily';
+            const allActive = symptoms.filter(s => s.active).sort((a, b) => {
+              const aPinned = pinnedSymptoms.has(a.id);
+              const bPinned = pinnedSymptoms.has(b.id);
+              if (aPinned && !bPinned) return -1;
+              if (!aPinned && bPinned) return 1;
+              return (a.order || 0) - (b.order || 0);
+            });
+            const firstIncomplete = allActive.findIndex(s => !entries[`${dateKey}-${s.id}-${timeKey}`]);
+            setRapidEntryIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
+            if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
+              setRapidEntryConfirm(true);
+              setRapidEntryMode(true);
+            } else {
+              setRapidEntryMode(true);
+            }
+          }}
+          onEditNote={() => setShowNoteModal(true)}
+          onCopyData={quickCopyData}
+          copyDays={copyDays}
+          onEditSymptoms={() => setShowAddSymptom(true)}
+          onCheckAll={() => {
+            const dateKey = getDateKey(selectedDate);
+            const activeItems = stackItems.filter(i =>
+              i.active && isScheduledForDate(i.schedule, selectedDate)
+            );
+            setStackEntries(prev => {
+              const newEntries = { ...prev };
+              activeItems.forEach(item => {
+                const entryKey = `${dateKey}-${item.id}`;
+                newEntries[entryKey] = {
+                  date: dateKey,
+                  itemId: item.id,
+                  dose: item.defaultDose,
+                  taken: true
+                };
+              });
+              return newEntries;
+            });
+            haptic('success');
+            setLastAction('All selected');
+          }}
+          onClear={() => {
+            const dateKey = getDateKey(selectedDate);
+            setStackEntries(prev => {
+              const newEntries = { ...prev };
+              Object.keys(newEntries).forEach(key => {
+                if (key.startsWith(dateKey)) {
+                  delete newEntries[key];
+                }
+              });
+              return newEntries;
+            });
+            setLastAction('All cleared');
+          }}
+          onMatchYesterday={() => {
+            const dateKey = getDateKey(selectedDate);
+            const yesterday = new Date(selectedDate);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayKey = getDateKey(yesterday);
+            setStackEntries(prev => {
+              const yesterdayEntries = Object.entries(prev).filter(([key]) => key.startsWith(yesterdayKey));
+              if (yesterdayEntries.length === 0) {
+                setLastAction('No entries from yesterday');
+                return prev;
+              }
+              const newEntries = { ...prev };
+              let copiedCount = 0;
+              yesterdayEntries.forEach(([key, entry]) => {
+                const itemId = key.substring(yesterdayKey.length + 1);
+                const item = stackItems.find(i => i.id === itemId);
+                if (item && item.active && isScheduledForDate(item.schedule, selectedDate)) {
+                  newEntries[`${dateKey}-${itemId}`] = {
+                    date: dateKey,
+                    itemId: itemId,
+                    dose: entry.dose,
+                    taken: true
+                  };
+                  copiedCount++;
+                }
+              });
+              setLastAction(`Matched ${copiedCount} from yesterday`);
+              return newEntries;
+            });
+            haptic('success');
+          }}
+          onEditStack={() => setShowManageStack(true)}
+          onEditInputs={() => setShowManageInputs(true)}
+          onOpenSettings={() => {
+            setShowSettings(true);
+            setShowInsights(false);
+          }}
+        />
+      )}
+
+      {/* Mobile Header - hide on desktop and when in edit modes */}
+      {!isDesktop && !showAddSymptom && !showManageStack && !showManageInputs && (
         <Header
           selectedDate={selectedDate}
           changeDate={changeDate}
@@ -697,78 +882,337 @@ function App() {
         />
       )}
 
-      {/* Scrollable Content Area */}
-      <div ref={scrollContainerRef} style={{
-        flex: 1,
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        paddingBottom: '155px',
-        WebkitOverflowScrolling: 'touch',
-      }}>
-        <div style={{
-          width: '100%',
+      {/* Desktop Content Area */}
+      {isDesktop ? (
+        <div ref={scrollContainerRef} style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
         }}>
-          {appMode === 'symptoms' ? (
-            <SymptomList
-              symptoms={symptoms}
-              setSymptoms={setSymptoms}
-              activeSymptoms={activeSymptoms}
-              entries={entries}
-              setEntries={setEntries}
-              selectedDate={selectedDate}
-              trackingMode={trackingMode}
-              timePeriods={timePeriods}
-              pinnedSymptoms={pinnedSymptoms}
-              setPinnedSymptoms={setPinnedSymptoms}
-              quickLogSymptom={quickLogSymptom}
-              setQuickLogSymptom={setQuickLogSymptom}
-              quickLogTime={quickLogTime}
-              setQuickLogTime={setQuickLogTime}
-              quickLog={quickLog}
-              setLastAction={setLastAction}
-              symptomSearch={symptomSearch}
-              setSymptomSearch={setSymptomSearch}
-              searchVisible={searchVisible}
-              setSearchVisible={setSearchVisible}
-              showAddSymptom={showAddSymptom}
-              setShowAddSymptom={setShowAddSymptom}
-              getSymptomEntries={getSymptomEntries}
-              getMostRecentEntry={getMostRecentEntry}
-              getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
-              trendWindow={trendWindow}
-              flashColumn={flashColumn}
-              onOpenGraph={setShowSymptomGraph}
-            />
-          ) : (
-            <>
-              {protocolView === 'stack' ? (
-                <Stack
-                  stackItems={stackItems}
-                  setStackItems={setStackItems}
-                  stackEntries={stackEntries}
-                  setStackEntries={setStackEntries}
-                  selectedDate={selectedDate}
-                  setLastAction={setLastAction}
-                  showManageStack={showManageStack}
-                  setShowManageStack={setShowManageStack}
-                  recentStackEditsRef={recentStackEditsRef}
-                />
-              ) : (
-                <Inputs
-                  inputItems={inputItems}
-                  setInputItems={setInputItems}
-                  inputEntries={inputEntries}
-                  setInputEntries={setInputEntries}
-                  selectedDate={selectedDate}
-                  setLastAction={setLastAction}
-                  showManageInputs={showManageInputs}
-                  setShowManageInputs={setShowManageInputs}
-                />
-              )}
-            </>
-          )}
+          <div style={{
+            maxWidth: showInsights ? '1800px' : '1400px',
+            margin: '0 auto',
+            padding: '24px 32px',
+            paddingBottom: '80px',
+          }}>
+            {showInsights ? (
+              <Insights
+                entries={entries}
+                symptoms={symptoms}
+                stackItems={stackItems}
+                stackEntries={stackEntries}
+                insightsWindow={insightsWindow}
+                setInsightsWindow={setInsightsWindow}
+                onOpenGraph={setShowSymptomGraph}
+                onOpenSupplementGraph={setShowSupplementGraph}
+                isDesktop={true}
+                trackingMode={trackingMode}
+              />
+            ) : appMode === 'symptoms' ? (
+              <SymptomList
+                symptoms={symptoms}
+                setSymptoms={setSymptoms}
+                activeSymptoms={activeSymptoms}
+                entries={entries}
+                setEntries={setEntries}
+                selectedDate={selectedDate}
+                trackingMode={trackingMode}
+                timePeriods={timePeriods}
+                pinnedSymptoms={pinnedSymptoms}
+                setPinnedSymptoms={setPinnedSymptoms}
+                quickLogSymptom={quickLogSymptom}
+                setQuickLogSymptom={setQuickLogSymptom}
+                quickLogTime={quickLogTime}
+                setQuickLogTime={setQuickLogTime}
+                quickLog={quickLog}
+                setLastAction={setLastAction}
+                symptomSearch={symptomSearch}
+                setSymptomSearch={setSymptomSearch}
+                searchVisible={searchVisible}
+                setSearchVisible={setSearchVisible}
+                showAddSymptom={showAddSymptom}
+                setShowAddSymptom={setShowAddSymptom}
+                getSymptomEntries={getSymptomEntries}
+                getMostRecentEntry={getMostRecentEntry}
+                getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
+                trendWindow={trendWindow}
+                flashColumn={flashColumn}
+                onOpenGraph={setShowSymptomGraph}
+                isDesktop={isDesktop}
+                onRapidEntry={() => {
+                  const effectiveTime = quickLogTime || getCurrentTimePeriod(trackingMode);
+                  if (trackingMode === 'ampm' && !quickLogTime) {
+                    setQuickLogTime(effectiveTime);
+                  }
+                  const dateKey = getDateKey(selectedDate);
+                  const timeKey = trackingMode === 'ampm' ? effectiveTime : 'daily';
+                  const allActive = symptoms.filter(s => s.active).sort((a, b) => {
+                    const aPinned = pinnedSymptoms.has(a.id);
+                    const bPinned = pinnedSymptoms.has(b.id);
+                    if (aPinned && !bPinned) return -1;
+                    if (!aPinned && bPinned) return 1;
+                    return (a.order || 0) - (b.order || 0);
+                  });
+                  const firstIncomplete = allActive.findIndex(s => !entries[`${dateKey}-${s.id}-${timeKey}`]);
+                  setRapidEntryIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
+                  if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
+                    setRapidEntryConfirm(true);
+                    setRapidEntryMode(true);
+                  } else {
+                    setRapidEntryMode(true);
+                  }
+                }}
+                onEditNote={() => setShowNoteModal(true)}
+                onCopyData={quickCopyData}
+                copyDays={copyDays}
+                setCopyDays={setCopyDays}
+                onEditSymptoms={() => setShowAddSymptom(true)}
+              />
+            ) : (
+              /* Protocol: action bar + side-by-side supplements + inputs */
+              <div>
+                {/* Protocol action bar — matches symptoms layout */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '16px',
+                }}>
+                  {/* Search — ~25% width */}
+                  <div style={{ position: 'relative', width: '25%', minWidth: '180px', flexShrink: 0 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input
+                      type="text"
+                      value={protocolSearch}
+                      onChange={(e) => setProtocolSearch(e.target.value)}
+                      placeholder="Search..."
+                      style={{
+                        width: '100%',
+                        padding: '8px 32px 8px 34px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '8px',
+                        color: '#f8fafc',
+                        fontSize: '13px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    {protocolSearch && (
+                      <button
+                        onClick={() => setProtocolSearch('')}
+                        style={{
+                          position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
+                          background: 'transparent', border: 'none', color: '#6b7280',
+                          fontSize: '14px', cursor: 'pointer', padding: '2px 6px',
+                        }}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Actions — right-aligned */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+                    {[
+                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>, label: 'Match Yesterday', action: () => {
+                        const dateKey = getDateKey(selectedDate);
+                        const yesterday = new Date(selectedDate);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        const yesterdayKey = getDateKey(yesterday);
+                        setStackEntries(prev => {
+                          const yesterdayEntries = Object.entries(prev).filter(([key]) => key.startsWith(yesterdayKey));
+                          if (yesterdayEntries.length === 0) { setLastAction('No entries from yesterday'); return prev; }
+                          const newEntries = { ...prev };
+                          let copiedCount = 0;
+                          yesterdayEntries.forEach(([key, entry]) => {
+                            const itemId = key.substring(yesterdayKey.length + 1);
+                            const item = stackItems.find(i => i.id === itemId);
+                            if (item && item.active && isScheduledForDate(item.schedule, selectedDate)) {
+                              newEntries[`${dateKey}-${itemId}`] = { date: dateKey, itemId, dose: entry.dose, taken: true };
+                              copiedCount++;
+                            }
+                          });
+                          setLastAction(`Matched ${copiedCount} from yesterday`);
+                          return newEntries;
+                        });
+                        haptic('success');
+                      }},
+                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>, label: 'Check All', action: () => {
+                        const dateKey = getDateKey(selectedDate);
+                        const activeItems = stackItems.filter(i => i.active && isScheduledForDate(i.schedule, selectedDate));
+                        setStackEntries(prev => {
+                          const newEntries = { ...prev };
+                          activeItems.forEach(item => {
+                            newEntries[`${dateKey}-${item.id}`] = { date: dateKey, itemId: item.id, dose: item.defaultDose, taken: true };
+                          });
+                          return newEntries;
+                        });
+                        haptic('success');
+                        setLastAction('All selected');
+                      }},
+                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>, label: 'Clear', action: () => {
+                        const dateKey = getDateKey(selectedDate);
+                        setStackEntries(prev => {
+                          const newEntries = { ...prev };
+                          Object.keys(newEntries).forEach(key => { if (key.startsWith(dateKey)) delete newEntries[key]; });
+                          return newEntries;
+                        });
+                        setLastAction('All cleared');
+                      }},
+                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>, label: 'Edit Stack', action: () => setShowManageStack(true) },
+                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>, label: 'Edit Inputs', action: () => setShowManageInputs(true) },
+                    ].map(({ icon, label, action }) => (
+                      <button
+                        key={label}
+                        onClick={action}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '5px',
+                          padding: '6px 10px', background: 'transparent',
+                          border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px',
+                          color: '#9ca3af', fontSize: '12px', fontWeight: '500',
+                          cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#e5e7eb'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#9ca3af'; }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', width: '14px', height: '14px' }}>{icon}</span>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Side-by-side panels */}
+                <div style={{
+                  display: 'flex',
+                  gap: '24px',
+                }}>
+                  <div style={{
+                    flex: 1,
+                    background: 'rgba(255,255,255,0.02)',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    overflow: 'hidden',
+                  }}>
+                    <Stack
+                      stackItems={stackItems}
+                      setStackItems={setStackItems}
+                      stackEntries={stackEntries}
+                      setStackEntries={setStackEntries}
+                      selectedDate={selectedDate}
+                      setLastAction={setLastAction}
+                      showManageStack={showManageStack}
+                      setShowManageStack={setShowManageStack}
+                      recentStackEditsRef={recentStackEditsRef}
+                      onOpenSupplementGraph={setShowSupplementGraph}
+                      isDesktop={isDesktop}
+                      searchFilter={protocolSearch}
+                    />
+                  </div>
+                  <div style={{
+                    flex: 1,
+                    background: 'rgba(255,255,255,0.02)',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    overflow: 'hidden',
+                  }}>
+                    <Inputs
+                      inputItems={inputItems}
+                      setInputItems={setInputItems}
+                      inputEntries={inputEntries}
+                      setInputEntries={setInputEntries}
+                      selectedDate={selectedDate}
+                      setLastAction={setLastAction}
+                      showManageInputs={showManageInputs}
+                      setShowManageInputs={setShowManageInputs}
+                      isDesktop={isDesktop}
+                      searchFilter={protocolSearch}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Mobile: tab-switching layout */
+        <div ref={scrollContainerRef} style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingBottom: '155px',
+          WebkitOverflowScrolling: 'touch',
+        }}>
+          <div style={{
+            width: '100%',
+          }}>
+            {appMode === 'symptoms' ? (
+              <SymptomList
+                symptoms={symptoms}
+                setSymptoms={setSymptoms}
+                activeSymptoms={activeSymptoms}
+                entries={entries}
+                setEntries={setEntries}
+                selectedDate={selectedDate}
+                trackingMode={trackingMode}
+                timePeriods={timePeriods}
+                pinnedSymptoms={pinnedSymptoms}
+                setPinnedSymptoms={setPinnedSymptoms}
+                quickLogSymptom={quickLogSymptom}
+                setQuickLogSymptom={setQuickLogSymptom}
+                quickLogTime={quickLogTime}
+                setQuickLogTime={setQuickLogTime}
+                quickLog={quickLog}
+                setLastAction={setLastAction}
+                symptomSearch={symptomSearch}
+                setSymptomSearch={setSymptomSearch}
+                searchVisible={searchVisible}
+                setSearchVisible={setSearchVisible}
+                showAddSymptom={showAddSymptom}
+                setShowAddSymptom={setShowAddSymptom}
+                getSymptomEntries={getSymptomEntries}
+                getMostRecentEntry={getMostRecentEntry}
+                getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
+                trendWindow={trendWindow}
+                flashColumn={flashColumn}
+                onOpenGraph={setShowSymptomGraph}
+              />
+            ) : (
+              <>
+                {protocolView === 'stack' ? (
+                  <Stack
+                    stackItems={stackItems}
+                    setStackItems={setStackItems}
+                    stackEntries={stackEntries}
+                    setStackEntries={setStackEntries}
+                    selectedDate={selectedDate}
+                    setLastAction={setLastAction}
+                    showManageStack={showManageStack}
+                    setShowManageStack={setShowManageStack}
+                    recentStackEditsRef={recentStackEditsRef}
+                    onOpenSupplementGraph={setShowSupplementGraph}
+                  />
+                ) : (
+                  <Inputs
+                    inputItems={inputItems}
+                    setInputItems={setInputItems}
+                    inputEntries={inputEntries}
+                    setInputEntries={setInputEntries}
+                    selectedDate={selectedDate}
+                    setLastAction={setLastAction}
+                    showManageInputs={showManageInputs}
+                    setShowManageInputs={setShowManageInputs}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Note Modal */}
       {showNoteModal && (
@@ -777,11 +1221,12 @@ function App() {
           dailyNotes={dailyNotes}
           setDailyNotes={setDailyNotes}
           onClose={() => setShowNoteModal(false)}
+          isDesktop={isDesktop}
         />
       )}
 
-      {/* Floating AM/PM + Rapid Entry Pill - only on symptoms page in AM/PM mode */}
-      {appMode === 'symptoms' && trackingMode === 'ampm' && !showAddSymptom && !showManageStack && !showManageInputs && !showInsights && !showSettings && !showSymptomGraph && !rapidEntryMode && (
+      {/* Floating AM/PM + Rapid Entry Pill - mobile only, symptoms page in AM/PM mode */}
+      {!isDesktop && appMode === 'symptoms' && trackingMode === 'ampm' && !showAddSymptom && !showManageStack && !showManageInputs && !showInsights && !showSettings && !showSymptomGraph && !rapidEntryMode && (
         <div style={{
           position: 'fixed',
           bottom: 'calc(105px + env(safe-area-inset-bottom))',
@@ -905,17 +1350,22 @@ function App() {
           setCalendarMonth={setCalendarMonth}
           entries={entries}
           onClose={() => setShowCalendar(false)}
+          isDesktop={isDesktop}
         />
       )}
 
-      {/* Insights */}
-      {showInsights && (
+      {/* Insights - mobile only as overlay (desktop renders inline) */}
+      {showInsights && !isDesktop && (
         <Insights
           entries={entries}
           symptoms={symptoms}
+          stackItems={stackItems}
+          stackEntries={stackEntries}
           insightsWindow={insightsWindow}
           setInsightsWindow={setInsightsWindow}
           onOpenGraph={setShowSymptomGraph}
+          onOpenSupplementGraph={setShowSupplementGraph}
+          trackingMode={trackingMode}
         />
       )}
 
@@ -929,6 +1379,22 @@ function App() {
           trackingMode={trackingMode}
           onClose={() => setShowSymptomGraph(null)}
           onChangeSymptom={setShowSymptomGraph}
+          isDesktop={isDesktop}
+        />
+      )}
+
+      {/* Supplement Graph */}
+      {showSupplementGraph && (
+        <SupplementGraph
+          primaryItemId={showSupplementGraph}
+          stackItems={stackItems}
+          stackEntries={stackEntries}
+          symptoms={symptoms}
+          entries={entries}
+          trackingMode={trackingMode}
+          onClose={() => setShowSupplementGraph(null)}
+          onChangeItem={setShowSupplementGraph}
+          isDesktop={isDesktop}
         />
       )}
 
@@ -971,6 +1437,7 @@ function App() {
           setCopyToastMessage={setCopyToastMessage}
           setShowExport={setShowExport}
           setShowSettings={setShowSettings}
+          isDesktop={isDesktop}
         />
       )}
 
@@ -987,11 +1454,12 @@ function App() {
           inputEntries={inputEntries}
           setCopyToastMessage={setCopyToastMessage}
           onClose={() => setShowExport(false)}
+          isDesktop={isDesktop}
         />
       )}
 
-      {/* Bottom Navigation - hide when in edit modes */}
-      {!showAddSymptom && !showManageStack && !showManageInputs && (
+      {/* Bottom Navigation - mobile only, hide when in edit modes */}
+      {!isDesktop && !showAddSymptom && !showManageStack && !showManageInputs && (
         <BottomNav
           appMode={appMode}
           setAppMode={setAppMode}

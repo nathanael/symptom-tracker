@@ -9,6 +9,7 @@ export default function Calendar({
   setCalendarMonth,
   entries,
   onClose,
+  isDesktop,
 }) {
   // Calculate days in month
   const calendarDays = useMemo(() => {

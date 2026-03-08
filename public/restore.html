@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Restore Data</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { background: #08090A; color: #e5e7eb; font-family: system-ui; padding: 20px; max-width: 600px; margin: 0 auto; }
+  h1 { color: #a78bfa; }
+  pre { background: #1a1a2e; padding: 12px; border-radius: 8px; overflow: auto; font-size: 12px; max-height: 300px; }
+  button { background: #8b5cf6; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin: 8px 4px; }
+  button:hover { background: #7c3aed; }
+  button.danger { background: #dc2626; }
+  .success { color: #4ade80; }
+  .warn { color: #fbbf24; }
+  .error { color: #f87171; }
+  #log { margin-top: 16px; font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<h1>Restore March 3 Data</h1>
+<p>Restores daily note and supplement entries for <strong>March 3, 2026</strong>.</p>
+<p class="warn">Only entries that don't already exist will be added (won't overwrite).</p>
+
+<button onclick="runRestore(false)">Preview (dry run)</button>
+<button onclick="runRestore(true)">Restore Data</button>
+
+<div id="log"></div>
+
+<script>
+function log(msg, cls) {
+  const el = document.getElementById('log');
+  const p = document.createElement('div');
+  p.className = cls || '';
+  p.textContent = msg;
+  el.appendChild(p);
+}
+
+function runRestore(forReal) {
+  document.getElementById('log').innerHTML = '';
+  log(forReal ? '=== RESTORING DATA ===' : '=== DRY RUN (preview) ===', 'warn');
+
+  // Load current data
+  const stackEntries = JSON.parse(localStorage.getItem('symptomTracker_stackEntries') || '{}');
+  const dailyNotes = JSON.parse(localStorage.getItem('symptomTracker_notes') || '{}');
+
+  // === SUPPLEMENT ENTRIES TO RESTORE ===
+  const supplementData = {
+    "2026-03-03-ketotifen": {
+      "dose": 0.5,
+      "date": "2026-03-03",
+      "taken": true,
+      "itemId": "ketotifen"
+    },
+    "2026-03-03-nac-1771759057579": {
+      "itemId": "nac-1771759057579",
+      "taken": true,
+      "date": "2026-03-03",
+      "dose": 500
+    },
+    "2026-03-03-magnesium": {
+      "dose": 300,
+      "date": "2026-03-03",
+      "itemId": "magnesium",
+      "taken": true
+    },
+    "2026-03-03-creatine-1771062220849": {
+      "dose": 3,
+      "date": "2026-03-03",
+      "itemId": "creatine-1771062220849",
+      "taken": true
+    },
+    "2026-03-03-omega-3-1771620128782": {
+      "itemId": "omega-3-1771620128782",
+      "taken": true,
+      "dose": 2,
+      "date": "2026-03-03"
+    },
+    "2026-03-03-glycine": {
+      "date": "2026-03-03",
+      "dose": 10,
+      "itemId": "glycine",
+      "taken": true
+    }
+  };
+
+  let restoredSupplements = 0;
+  let skippedSupplements = 0;
+
+  Object.entries(supplementData).forEach(([key, value]) => {
+    if (stackEntries[key]) {
+      log('Skipping ' + key + ' (already exists)');
+      skippedSupplements++;
+      return;
+    }
+    log('+ Supplement: ' + key + ' dose=' + value.dose, 'success');
+    if (forReal) {
+      stackEntries[key] = value;
+    }
+    restoredSupplements++;
+  });
+
+  log('');
+  log('Supplement entries: ' + restoredSupplements + ' to restore, ' + skippedSupplements + ' already exist',
+    restoredSupplements > 0 ? 'success' : '');
+
+  // === DAILY NOTE TO RESTORE ===
+  const noteDate = '2026-03-03';
+  const noteText = 'Took 1mg alprazolam in the evening to offset some stress issues. ';
+
+  if (dailyNotes[noteDate]) {
+    log('');
+    log('Skipping note for ' + noteDate + ' (already exists): "' + dailyNotes[noteDate].substring(0, 60) + '..."');
+  } else {
+    log('');
+    log('+ Note: ' + noteDate + ' "' + noteText + '"', 'success');
+    if (forReal) {
+      dailyNotes[noteDate] = noteText;
+    }
+  }
+
+  // === SAVE ===
+  if (forReal) {
+    localStorage.setItem('symptomTracker_stackEntries', JSON.stringify(stackEntries));
+    localStorage.setItem('symptomTracker_notes', JSON.stringify(dailyNotes));
+    // Update timestamp so this gets synced to cloud
+    localStorage.setItem('symptomTracker_localUpdatedAt', Date.now().toString());
+
+    log('');
+    log('=== DATA SAVED TO LOCALSTORAGE ===', 'success');
+    log('Reload the app to see restored data. It will auto-sync to cloud.', 'success');
+  } else {
+    log('');
+    log('=== DRY RUN COMPLETE — nothing was changed ===', 'warn');
+    log('Click "Restore Data" to actually save.', 'warn');
+  }
+}
+</script>
+</body>
+</html>
