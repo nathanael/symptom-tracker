@@ -249,6 +249,13 @@ function App() {
       trackingMode,
       inputItems,
       inputEntries,
+    }).then(success => {
+      if (!success) {
+        // Reset ref so auto-sync retries on next trigger instead of
+        // silently assuming the data was synced
+        lastSyncDataRef.current = '';
+        setTimeout(() => setSyncTrigger(prev => prev + 1), 3000);
+      }
     });
   }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode, inputItems, inputEntries, syncTrigger]);
 

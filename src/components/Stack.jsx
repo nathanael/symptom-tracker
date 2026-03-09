@@ -177,7 +177,6 @@ export default function Stack({
   const toggleStackItemActive = (itemId) => {
     if (recentStackEditsRef?.current) {
       recentStackEditsRef.current.set(itemId, Date.now());
-      setTimeout(() => recentStackEditsRef.current.delete(itemId), 5000);
     }
     setStackItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
@@ -221,7 +220,6 @@ export default function Stack({
       // Protect this item from cloud sync overwrites for 5 seconds
       if (recentStackEditsRef?.current) {
         recentStackEditsRef.current.set(editingSupplementId, Date.now());
-        setTimeout(() => recentStackEditsRef.current.delete(editingSupplementId), 5000);
       }
 
       // Use functional updater to avoid stale closure issues with stackItems

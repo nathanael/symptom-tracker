@@ -66,7 +66,7 @@ export function useFirebase() {
   // Save to Cloud
   const saveToCloud = useCallback(async (data) => {
     const firebaseDb = getFirebaseDb();
-    if (!user || !firebaseDb) return;
+    if (!user || !firebaseDb) return false;
 
     // Safety check: never overwrite cloud data with less data.
     // Read current cloud document and abort if local data has fewer entries.
@@ -87,13 +87,13 @@ export function useFirebase() {
         const failed = checks.filter(c => c.cloud > 0 && c.local < c.cloud * 0.5);
         if (failed.length > 0) {
           console.warn('Cloud sync aborted: local data has significantly fewer items than cloud.', failed.map(c => `${c.name}: ${c.local} vs ${c.cloud}`).join(', '));
-          return;
+          return false;
         }
       }
     } catch (prefetchErr) {
       // If we can't read cloud (offline etc), ABORT the sync rather than risk overwriting
       console.warn('Cloud prefetch check failed, aborting sync to protect data:', prefetchErr);
-      return;
+      return false;
     }
 
     setSyncing(true);
@@ -106,6 +106,7 @@ export function useFirebase() {
         version: '3.4',
       }, { merge: true });
       setLastSynced(new Date());
+      return true;
     } catch (error) {
       console.error('Error saving to cloud:', error);
       if (error.message?.includes('offline') || error.code === 'unavailable') {
@@ -117,6 +118,7 @@ export function useFirebase() {
       } else {
         setSyncError(error.message);
       }
+      return false;
     } finally {
       setSyncing(false);
     }
