@@ -224,7 +224,7 @@ export default class SyncEngine {
           const raw = localStorage.getItem(storageKey);
           if (raw !== null) {
             const data = JSON.parse(raw);
-            this.pendingChanges.set(domain, domain === 'pinnedSymptoms' ? data : data);
+            this.pendingChanges.set(domain, data);
           }
         } catch (e) {
           // Ignore parse errors
