@@ -9,6 +9,8 @@ export default function Settings({
   syncError,
   setSyncError,
   firebaseError,
+  authError,
+  setAuthError,
   signInWithGoogle,
   signInWithEmail,
   forgotPassword,
@@ -55,10 +57,10 @@ export default function Settings({
       setConfirmClearData(true);
       return;
     }
-    setEntries({});
-    setStackEntries({});
-    setInputEntries({});
-    setDailyNotes({});
+    setEntries(() => ({}));
+    setStackEntries(() => ({}));
+    setInputEntries(() => ({}));
+    setDailyNotes(() => ({}));
     setConfirmClearData(false);
     setLastAction('All data cleared');
   };
@@ -74,7 +76,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '3.23.2',
+      version: '4.0.0',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -110,47 +112,48 @@ export default function Settings({
         const backup = JSON.parse(e.target.result);
 
         // Merge restore: backup fills in missing data without overwriting existing
-        let added = 0;
+        // Count additions outside setState closures to avoid batching issues
+        const addedRef = { count: 0 };
         if (backup.symptoms) setSymptoms(prev => {
           const map = new Map(prev.map(s => [s.id, s]));
-          backup.symptoms.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); added++; } });
+          backup.symptoms.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); addedRef.count++; } });
           return Array.from(map.values());
         });
         if (backup.entries) setEntries(prev => {
           const merged = { ...prev };
-          Object.entries(backup.entries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; added++; } });
+          Object.entries(backup.entries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; addedRef.count++; } });
           return merged;
         });
         if (backup.dailyNotes) setDailyNotes(prev => {
           const merged = { ...prev };
-          Object.entries(backup.dailyNotes).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; added++; } });
+          Object.entries(backup.dailyNotes).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; addedRef.count++; } });
           return merged;
         });
         if (backup.stackItems) setStackItems(prev => {
           const map = new Map(prev.map(s => [s.id, s]));
-          backup.stackItems.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); added++; } });
+          backup.stackItems.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); addedRef.count++; } });
           return Array.from(map.values());
         });
         if (backup.stackEntries) setStackEntries(prev => {
           const merged = { ...prev };
-          Object.entries(backup.stackEntries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; added++; } });
+          Object.entries(backup.stackEntries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; addedRef.count++; } });
           return merged;
         });
         if (backup.inputItems) setInputItems(prev => {
           const map = new Map(prev.map(s => [s.id, s]));
-          backup.inputItems.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); added++; } });
+          backup.inputItems.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); addedRef.count++; } });
           return Array.from(map.values());
         });
         if (backup.inputEntries) setInputEntries(prev => {
           const merged = { ...prev };
-          Object.entries(backup.inputEntries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; added++; } });
+          Object.entries(backup.inputEntries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; addedRef.count++; } });
           return merged;
         });
         if (backup.trackingMode) setTrackingMode(backup.trackingMode);
         if (backup.pinnedSymptoms) setPinnedSymptoms(new Set(backup.pinnedSymptoms));
 
-        setLastAction(added > 0
-          ? `Merged ${added} missing entries from backup`
+        setLastAction(addedRef.count > 0
+          ? `Merged ${addedRef.count} missing entries from backup`
           : 'Backup loaded but no missing entries found — all data already present');
       } catch (err) {
         setLastAction('Error: Invalid backup file');
@@ -375,7 +378,7 @@ export default function Settings({
               </form>
 
               <button
-                onClick={() => { setIsSignUp(!isSignUp); setSyncError(null); }}
+                onClick={() => { setIsSignUp(!isSignUp); if (setAuthError) setAuthError(null); }}
                 style={{
                   display: 'block',
                   width: '100%',
@@ -453,7 +456,7 @@ export default function Settings({
                 Continue with Google
               </button>
 
-              {syncError && (
+              {authError && (
                 <div style={{
                   color: '#f87171',
                   fontSize: '11px',
@@ -462,7 +465,7 @@ export default function Settings({
                   padding: '8px',
                   borderRadius: '3px',
                 }}>
-                  {syncError}
+                  {authError}
                 </div>
               )}
             </>
@@ -718,7 +721,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v3.23.2
+              v4.0.0
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useLocalStorage, useLocalStorageSet } from './hooks/useLocalStorage';
 import { useFirebase } from './hooks/useFirebase';
+import { useSyncEngine } from './hooks/useSyncEngine';
 import { useDesktopMode } from './hooks/useMediaQuery';
 import {
   STORAGE_KEY_SYMPTOMS,
@@ -12,7 +13,6 @@ import {
   STORAGE_KEY_PINNED,
   STORAGE_KEY_COPY_DAYS,
   STORAGE_KEY_TREND_WINDOW,
-  STORAGE_KEY_LOCAL_UPDATED_AT,
   STORAGE_KEY_INPUT_ITEMS,
   STORAGE_KEY_INPUT_ENTRIES,
   severityColors,
@@ -64,18 +64,76 @@ function App() {
   const [protocolView, setProtocolView] = useState('stack');
   const scrollContainerRef = useRef(null);
 
-  // Core data state
-  const [symptoms, setSymptoms] = useLocalStorage(STORAGE_KEY_SYMPTOMS, []);
-  const [entries, setEntries] = useLocalStorage(STORAGE_KEY_ENTRIES, {});
-  const [dailyNotes, setDailyNotes] = useLocalStorage(STORAGE_KEY_NOTES, {});
-  const [trackingMode, setTrackingMode] = useLocalStorage(STORAGE_KEY_MODE, 'ampm');
-  const [stackItems, setStackItems] = useLocalStorage(STORAGE_KEY_STACK_ITEMS, []);
-  const [stackEntries, setStackEntries] = useLocalStorage(STORAGE_KEY_STACK_ENTRIES, {});
-  const [pinnedSymptoms, setPinnedSymptoms] = useLocalStorageSet(STORAGE_KEY_PINNED, new Set());
-  const [inputItems, setInputItems] = useLocalStorage(STORAGE_KEY_INPUT_ITEMS, []);
-  const [inputEntries, setInputEntries] = useLocalStorage(STORAGE_KEY_INPUT_ENTRIES, {});
+  // Firebase (auth only)
+  const firebase = useFirebase();
+
+  // Shared ref: prevents feedback loops when applying cloud data to local state.
+  // When true, useLocalStorage onChange callbacks skip notifying the sync engine.
+  const isApplyingCloudRef = useRef(false);
+
+  // Ref to hold the sync engine's notifyChange function (breaks circular dep)
+  const syncNotifyRef = useRef(null);
+
+  // Core data state — with onChange callbacks for sync
+  const [symptoms, setSymptoms] = useLocalStorage(STORAGE_KEY_SYMPTOMS, [],
+    (data) => syncNotifyRef.current?.('symptoms', data),
+    isApplyingCloudRef
+  );
+  const [entries, setEntries] = useLocalStorage(STORAGE_KEY_ENTRIES, {},
+    (data) => syncNotifyRef.current?.('entries', data),
+    isApplyingCloudRef
+  );
+  const [dailyNotes, setDailyNotes] = useLocalStorage(STORAGE_KEY_NOTES, {},
+    (data) => syncNotifyRef.current?.('dailyNotes', data),
+    isApplyingCloudRef
+  );
+  const [trackingMode, setTrackingMode] = useLocalStorage(STORAGE_KEY_MODE, 'ampm',
+    (data) => syncNotifyRef.current?.('trackingMode', data),
+    isApplyingCloudRef
+  );
+  const [stackItems, setStackItems] = useLocalStorage(STORAGE_KEY_STACK_ITEMS, [],
+    (data) => syncNotifyRef.current?.('stackItems', data),
+    isApplyingCloudRef
+  );
+  const [stackEntries, setStackEntries] = useLocalStorage(STORAGE_KEY_STACK_ENTRIES, {},
+    (data) => syncNotifyRef.current?.('stackEntries', data),
+    isApplyingCloudRef
+  );
+  const [pinnedSymptoms, setPinnedSymptoms] = useLocalStorageSet(STORAGE_KEY_PINNED, new Set(),
+    (data) => syncNotifyRef.current?.('pinnedSymptoms', data),
+    isApplyingCloudRef
+  );
+  const [inputItems, setInputItems] = useLocalStorage(STORAGE_KEY_INPUT_ITEMS, [],
+    (data) => syncNotifyRef.current?.('inputItems', data),
+    isApplyingCloudRef
+  );
+  const [inputEntries, setInputEntries] = useLocalStorage(STORAGE_KEY_INPUT_ENTRIES, {},
+    (data) => syncNotifyRef.current?.('inputEntries', data),
+    isApplyingCloudRef
+  );
   const [copyDays, setCopyDays] = useLocalStorage(STORAGE_KEY_COPY_DAYS, 7);
   const [trendWindow, setTrendWindow] = useLocalStorage(STORAGE_KEY_TREND_WINDOW, 7);
+
+  // Sync engine — bridges state to Firestore
+  const sync = useSyncEngine(
+    firebase.user?.uid,
+    firebase.firebaseReady,
+    {
+      symptoms: setSymptoms,
+      entries: setEntries,
+      dailyNotes: setDailyNotes,
+      stackItems: setStackItems,
+      stackEntries: setStackEntries,
+      pinnedSymptoms: setPinnedSymptoms,
+      trackingMode: setTrackingMode,
+      inputItems: setInputItems,
+      inputEntries: setInputEntries,
+    },
+    isApplyingCloudRef
+  );
+
+  // Wire up the sync notifyChange function so onChange callbacks can reach it
+  syncNotifyRef.current = sync.notifyChange;
 
   // Date state
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -114,9 +172,6 @@ function App() {
   const [showAddSymptom, setShowAddSymptom] = useState(false);
   const [showManageStack, setShowManageStack] = useState(false);
   const [showManageInputs, setShowManageInputs] = useState(false);
-
-  // Firebase
-  const firebase = useFirebase();
 
   // Desktop mode
   const isDesktop = useDesktopMode();
@@ -209,230 +264,12 @@ function App() {
     }
   }, [lastAction]);
 
-  // Auto-sync to cloud
-  const syncTimeoutRef = useRef(null);
-  const lastSyncDataRef = useRef('');
-  // Start true to prevent initial localStorage load from updating timestamp
-  const isLoadingDataRef = useRef(true);
-  // Counter to force auto-sync re-check after initial cloud merge completes
-  const [syncTrigger, setSyncTrigger] = useState(0);
-  // Track recently edited stack item IDs to protect from cloud sync overwrites
-  const recentStackEditsRef = useRef(new Map());
-
-  // Re-lock loading flag when user signs in, BEFORE effects run
-  // This prevents auto-sync from pushing empty local data to cloud
-  // before loadFromCloud() has a chance to complete
-  const prevUserRef = useRef(firebase.user);
-  if (firebase.user && !prevUserRef.current) {
-    isLoadingDataRef.current = true;
-  }
-  prevUserRef.current = firebase.user;
-
-  useEffect(() => {
-    if (!firebase.user || firebase.syncing || isLoadingDataRef.current) return;
-
-    const currentData = JSON.stringify({
-      symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms: [...pinnedSymptoms], trackingMode, inputItems, inputEntries
-    });
-
-    if (currentData === lastSyncDataRef.current) return;
-
-    // Set ref eagerly so the cloud listener skips the echo of our own write
-    lastSyncDataRef.current = currentData;
-    firebase.saveToCloud({
-      symptoms,
-      entries,
-      dailyNotes,
-      stackItems,
-      stackEntries,
-      pinnedSymptoms: [...pinnedSymptoms],
-      trackingMode,
-      inputItems,
-      inputEntries,
-    }).then(success => {
-      if (!success) {
-        // Reset ref so auto-sync retries on next trigger instead of
-        // silently assuming the data was synced
-        lastSyncDataRef.current = '';
-        setTimeout(() => setSyncTrigger(prev => prev + 1), 3000);
-      }
-    });
-  }, [firebase.user, firebase.syncing, symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode, inputItems, inputEntries, syncTrigger]);
-
-  // Track local update timestamp for sync conflict resolution
-  // Only update when user makes changes, not during initial load or cloud sync
-  const isSyncingFromCloudRef = useRef(false);
-  useEffect(() => {
-    if (isLoadingDataRef.current || isSyncingFromCloudRef.current) return;
-    localStorage.setItem(STORAGE_KEY_LOCAL_UPDATED_AT, Date.now().toString());
-  }, [symptoms, entries, dailyNotes, stackItems, stackEntries, pinnedSymptoms, trackingMode, inputItems, inputEntries]);
-
-  // Apply cloud data with union merge (preserves local items not in cloud, cloud wins for conflicts)
-  const applyCloudData = (data, isRealTime) => {
-    isSyncingFromCloudRef.current = true;
-    // Reset after React processes the state updates
-    setTimeout(() => { isSyncingFromCloudRef.current = false; }, 0);
-    if (data.symptoms?.length > 0) {
-      setSymptoms(prev => {
-        const localMap = new Map(prev.map(s => [s.id, s]));
-        data.symptoms.forEach(s => localMap.set(s.id, s));
-        return Array.from(localMap.values());
-      });
-    }
-    if (data.entries) {
-      setEntries(prev => ({ ...prev, ...data.entries }));
-    }
-    if (data.dailyNotes) {
-      setDailyNotes(prev => ({ ...prev, ...data.dailyNotes }));
-    }
-    if (data.stackItems?.length > 0) {
-      setStackItems(prev => {
-        const localMap = new Map(prev.map(s => [s.id, s]));
-        data.stackItems.forEach(s => {
-          // Don't overwrite recently edited items with cloud data
-          if (isRealTime) {
-            const editTime = recentStackEditsRef.current.get(s.id);
-            if (editTime && Date.now() - editTime < 5000) return;
-          }
-          localMap.set(s.id, s);
-        });
-        return Array.from(localMap.values());
-      });
-    }
-    if (data.stackEntries) {
-      setStackEntries(prev => {
-        const merged = { ...prev, ...data.stackEntries };
-        // Restore local entries for recently edited items
-        if (isRealTime) {
-          recentStackEditsRef.current.forEach((editTime, itemId) => {
-            if (Date.now() - editTime < 5000) {
-              Object.keys(prev).forEach(key => {
-                if (key.includes(itemId)) merged[key] = prev[key];
-              });
-            }
-          });
-        }
-        return merged;
-      });
-    }
-    if (data.trackingMode) setTrackingMode(data.trackingMode);
-    if (data.pinnedSymptoms) setPinnedSymptoms(new Set(data.pinnedSymptoms));
-    if (data.inputItems?.length > 0) {
-      setInputItems(prev => {
-        const localMap = new Map(prev.map(s => [s.id, s]));
-        data.inputItems.forEach(s => localMap.set(s.id, s));
-        return Array.from(localMap.values());
-      });
-    }
-    if (data.inputEntries) {
-      setInputEntries(prev => ({ ...prev, ...data.inputEntries }));
-    }
-  };
-
-  // Listen to cloud changes in real-time
-  const isInitialCloudLoad = useRef(true);
-  // Track whether we received a server-confirmed snapshot (not just cache)
-  const hasServerDataRef = useRef(false);
-  useEffect(() => {
-    if (firebase.user && firebase.firebaseReady) {
-      isInitialCloudLoad.current = true;
-      hasServerDataRef.current = false;
-      const unsubscribe = firebase.listenToCloud((data, metadata) => {
-        const isInitial = isInitialCloudLoad.current;
-        const isFromCache = metadata?.fromCache === true;
-
-        // Update lastSyncDataRef so auto-sync doesn't immediately push back
-        const incomingData = JSON.stringify({
-          symptoms: data.symptoms, entries: data.entries, dailyNotes: data.dailyNotes,
-          stackItems: data.stackItems, stackEntries: data.stackEntries,
-          pinnedSymptoms: data.pinnedSymptoms || [], trackingMode: data.trackingMode,
-          inputItems: data.inputItems, inputEntries: data.inputEntries
-        });
-
-        if (!isInitial && incomingData === lastSyncDataRef.current) return;
-
-        // Skip snapshots with pending local writes (our own echoes).
-        // Firestore fires onSnapshot immediately for local writes before server
-        // confirmation. When multiple writes are queued, intermediate confirmations
-        // can arrive with stale data (e.g., server confirming a hide/unhide write
-        // AFTER we've already pushed a dose change). Only processing confirmed
-        // snapshots (hasPendingWrites=false) prevents stale data from overwriting.
-        if (!isInitial && metadata?.hasPendingWrites) return;
-
-        // For initial load: if this is a cached snapshot (Firestore offline cache),
-        // apply it for display but DON'T mark initial load as complete and DON'T
-        // unlock isLoadingDataRef. Wait for the server-confirmed snapshot to avoid
-        // pushing stale cached data that overwrites newer cloud data from other devices.
-        if (isInitial && isFromCache && !hasServerDataRef.current) {
-          // Apply cached data for fast display using cloud-priority merge
-          applyCloudData(data, false);
-          lastSyncDataRef.current = incomingData;
-          // Don't unlock isLoadingDataRef — wait for server data
-          return;
-        }
-
-        // Mark that we've processed the real initial load
-        if (isInitial) {
-          isInitialCloudLoad.current = false;
-          hasServerDataRef.current = true;
-        }
-
-        // On initial load (server-confirmed), use union merge to preserve both sides.
-        // On subsequent updates, accept cloud data with merge.
-        if (isInitial) {
-          // Server-confirmed initial load — always use cloud-priority union merge.
-          // This preserves any local-only items while accepting cloud as source of truth.
-          applyCloudData(data, false);
-        } else {
-          // Real-time update from another device — merge to preserve local items
-          applyCloudData(data, true);
-        }
-
-        lastSyncDataRef.current = incomingData;
-        // Enable timestamp updates after cloud sync completes (only for server data)
-        if (isLoadingDataRef.current) {
-          setTimeout(() => {
-            isLoadingDataRef.current = false;
-            // Force auto-sync to re-check — the ref change alone won't trigger a re-render,
-            // so local-only data from the merge would never get pushed to cloud
-            setSyncTrigger(prev => prev + 1);
-          }, 100);
-        }
-      });
-
-      // If listener setup fails or takes too long, still unlock
-      const fallback = setTimeout(() => {
-        if (isLoadingDataRef.current) {
-          isLoadingDataRef.current = false;
-          setSyncTrigger(prev => prev + 1);
-        }
-      }, 5000);
-
-      return () => {
-        if (unsubscribe) unsubscribe();
-        clearTimeout(fallback);
-      };
-    } else if (!firebase.user && !firebase.authLoading) {
-      // No user logged in, enable timestamp updates
-      setTimeout(() => { isLoadingDataRef.current = false; }, 100);
-    }
-  }, [firebase.user, firebase.firebaseReady, firebase.authLoading]);
-
-  // Fallback: enable timestamp updates after 10s ONLY if user is not signed in.
-  // If user IS signed in but cloud hasn't loaded, keep locked to prevent empty data push.
-  useEffect(() => {
-    const fallbackTimer = setTimeout(() => {
-      if (isLoadingDataRef.current && !firebase.user) {
-        isLoadingDataRef.current = false;
-      }
-    }, 10000);
-    return () => clearTimeout(fallbackTimer);
-  }, [firebase.user]);
-
   // Auto-prefill today's stack from yesterday's checked entries
   const lastPrefillDateRef = useRef(localStorage.getItem('lastStackPrefillDate'));
   useEffect(() => {
-    if (isLoadingDataRef.current) return;
+    // Wait for sync engine to be ready before prefilling (prevents pushing stale data)
+    if (firebase.user && !sync.isReady) return;
+
     const todayKey = getDateKey(new Date());
     if (lastPrefillDateRef.current === todayKey) return;
 
@@ -455,11 +292,13 @@ function App() {
       return;
     }
 
+    // Capture stackItems snapshot outside the updater to avoid stale closure
+    const currentStackItems = stackItems;
     setStackEntries(prev => {
       const newEntries = { ...prev };
       yesterdayEntries.forEach(([key, entry]) => {
         const itemId = key.substring(yesterdayKey.length + 1);
-        const item = stackItems.find(i => i.id === itemId);
+        const item = currentStackItems.find(i => i.id === itemId);
         if (item && item.active && isScheduledForDate(item.schedule, new Date())) {
           newEntries[`${todayKey}-${itemId}`] = {
             date: todayKey,
@@ -473,7 +312,7 @@ function App() {
     });
     lastPrefillDateRef.current = todayKey;
     localStorage.setItem('lastStackPrefillDate', todayKey);
-  }, [stackEntries, stackItems]);
+  }, [stackEntries, stackItems, firebase.user, sync.isReady]);
 
   // Desktop keyboard shortcuts
   useEffect(() => {
@@ -1114,7 +953,6 @@ function App() {
                       setLastAction={setLastAction}
                       showManageStack={showManageStack}
                       setShowManageStack={setShowManageStack}
-                      recentStackEditsRef={recentStackEditsRef}
                       onOpenSupplementGraph={setShowSupplementGraph}
                       isDesktop={isDesktop}
                       searchFilter={protocolSearch}
@@ -1200,7 +1038,6 @@ function App() {
                     setLastAction={setLastAction}
                     showManageStack={showManageStack}
                     setShowManageStack={setShowManageStack}
-                    recentStackEditsRef={recentStackEditsRef}
                     onOpenSupplementGraph={setShowSupplementGraph}
                   />
                 ) : (
@@ -1409,11 +1246,13 @@ function App() {
       {showSettings && (
         <Settings
           user={firebase.user}
-          syncing={firebase.syncing}
-          lastSynced={firebase.lastSynced}
-          syncError={firebase.syncError}
-          setSyncError={firebase.setSyncError}
+          syncing={sync.syncing}
+          lastSynced={sync.lastSynced}
+          syncError={sync.syncError}
+          setSyncError={sync.setSyncError}
           firebaseError={firebase.firebaseError}
+          authError={firebase.authError}
+          setAuthError={firebase.setAuthError}
           signInWithGoogle={firebase.signInWithGoogle}
           signInWithEmail={firebase.signInWithEmail}
           forgotPassword={firebase.forgotPassword}

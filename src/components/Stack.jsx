@@ -12,7 +12,6 @@ export default function Stack({
   setLastAction,
   showManageStack,
   setShowManageStack,
-  recentStackEditsRef,
   onOpenSupplementGraph,
   isDesktop,
   searchFilter,
@@ -175,9 +174,6 @@ export default function Stack({
   };
 
   const toggleStackItemActive = (itemId) => {
-    if (recentStackEditsRef?.current) {
-      recentStackEditsRef.current.set(itemId, Date.now());
-    }
     setStackItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
 
@@ -217,11 +213,6 @@ export default function Stack({
     if (updatedData.name.trim() && editingSupplementId) {
       const newDefaultDose = parseFloat(updatedData.defaultDose);
 
-      // Protect this item from cloud sync overwrites for 5 seconds
-      if (recentStackEditsRef?.current) {
-        recentStackEditsRef.current.set(editingSupplementId, Date.now());
-      }
-
       // Use functional updater to avoid stale closure issues with stackItems
       setStackItems(prev => prev.map(item => {
         if (item.id !== editingSupplementId) return item;
@@ -249,11 +240,12 @@ export default function Stack({
       // Update today's entry to the new dose (only if it still has the old default)
       if (newDefaultDose) {
         const entryKey = `${dateKey}-${editingSupplementId}`;
+        // Capture old dose outside the updater to avoid stale closure over stackItems
+        const oldItem = stackItems.find(i => i.id === editingSupplementId);
+        const oldDose = oldItem?.defaultDose;
         setStackEntries(prev => {
           if (!prev[entryKey]) return prev;
           // Skip if user manually customized the dose to something other than the original default
-          const oldItem = stackItems.find(i => i.id === editingSupplementId);
-          const oldDose = oldItem?.defaultDose;
           if (oldDose !== undefined && prev[entryKey].dose !== oldDose) return prev;
           return {
             ...prev,

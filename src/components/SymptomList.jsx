@@ -571,7 +571,7 @@ export default function SymptomList({
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#9ca3af'; }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              Edit Today's Notes
+              Today's Notes
             </button>
 
             {/* Edit Symptoms */}
@@ -798,7 +798,7 @@ export default function SymptomList({
               vals.push(sevs.length > 0 ? sevs.reduce((a, b) => a + b, 0) / sevs.length : null);
             }
             const hasSparkData = vals.some(v => v !== null);
-            const sparkW = 200, sparkH = 30;
+            const sparkW = 200, sparkH = 40;
             const nonNullPts = [];
             vals.forEach((v, i) => {
               if (v !== null) nonNullPts.push({ x: (i / (vals.length - 1)) * sparkW, y: sparkH - (v / 5) * sparkH });
@@ -824,12 +824,12 @@ export default function SymptomList({
                   background: 'rgba(255,255,255,0.02)',
                   border: '1px solid rgba(255,255,255,0.06)',
                   borderRadius: '10px',
-                  padding: '16px',
+                  padding: '18px 16px',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px',
+                  gap: '14px',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
@@ -994,7 +994,7 @@ export default function SymptomList({
                 {/* Sparkline — full tile width */}
                 {hasSparkData && (
                   <div
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: 'pointer', margin: '0 -10px -6px 0' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (onOpenGraph) onOpenGraph(symptom.id);

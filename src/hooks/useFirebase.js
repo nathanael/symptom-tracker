@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { initFirebase, getFirebaseAuth, getFirebaseDb, getGoogleProvider, isAuthSupported } from '../utils/firebase';
+import { useState, useEffect, useCallback } from 'react';
+import { initFirebase, getFirebaseAuth, getGoogleProvider, isAuthSupported } from '../utils/firebase';
 import { isStandalone } from '../utils/helpers';
 
 export function useFirebase() {
@@ -7,9 +7,7 @@ export function useFirebase() {
   const [authLoading, setAuthLoading] = useState(true);
   const [firebaseReady, setFirebaseReady] = useState(false);
   const [firebaseError, setFirebaseError] = useState(null);
-  const [syncing, setSyncing] = useState(false);
-  const [lastSynced, setLastSynced] = useState(null);
-  const [syncError, setSyncError] = useState(null);
+  const [authError, setAuthError] = useState(null);
 
   // Initialize Firebase
   useEffect(() => {
@@ -63,123 +61,32 @@ export function useFirebase() {
     };
   }, []);
 
-  // Save to Cloud
-  const saveToCloud = useCallback(async (data) => {
-    const firebaseDb = getFirebaseDb();
-    if (!user || !firebaseDb) return false;
-
-    // Safety check: never overwrite cloud data with less data.
-    // Read current cloud document and abort if local data has fewer entries.
-    try {
-      const docSnap = await firebaseDb.collection('users').doc(user.uid).get({ source: 'server' });
-      if (docSnap.exists) {
-        const cloud = docSnap.data();
-        const checks = [
-          { name: 'entries', local: Object.keys(data.entries || {}).length, cloud: Object.keys(cloud.entries || {}).length },
-          { name: 'symptoms', local: (data.symptoms || []).length, cloud: (cloud.symptoms || []).length },
-          { name: 'stackEntries', local: Object.keys(data.stackEntries || {}).length, cloud: Object.keys(cloud.stackEntries || {}).length },
-          { name: 'stackItems', local: (data.stackItems || []).length, cloud: (cloud.stackItems || []).length },
-          { name: 'inputItems', local: (data.inputItems || []).length, cloud: (cloud.inputItems || []).length },
-          { name: 'inputEntries', local: Object.keys(data.inputEntries || {}).length, cloud: Object.keys(cloud.inputEntries || {}).length },
-          { name: 'dailyNotes', local: Object.keys(data.dailyNotes || {}).length, cloud: Object.keys(cloud.dailyNotes || {}).length },
-        ];
-
-        const failed = checks.filter(c => c.cloud > 0 && c.local < c.cloud * 0.5);
-        if (failed.length > 0) {
-          console.warn('Cloud sync aborted: local data has significantly fewer items than cloud.', failed.map(c => `${c.name}: ${c.local} vs ${c.cloud}`).join(', '));
-          return false;
-        }
-      }
-    } catch (prefetchErr) {
-      // If we can't read cloud (offline etc), ABORT the sync rather than risk overwriting
-      console.warn('Cloud prefetch check failed, aborting sync to protect data:', prefetchErr);
-      return false;
-    }
-
-    setSyncing(true);
-    setSyncError(null);
-
-    try {
-      await firebaseDb.collection('users').doc(user.uid).set({
-        ...data,
-        updatedAt: window.firebase.firestore.FieldValue.serverTimestamp(),
-        version: '3.4',
-      }, { merge: true });
-      setLastSynced(new Date());
-      return true;
-    } catch (error) {
-      console.error('Error saving to cloud:', error);
-      if (error.message?.includes('offline') || error.code === 'unavailable') {
-        // Don't set error for offline
-      } else if (error.code === 'not-found') {
-        setSyncError('Database not set up. Create Firestore database in Firebase Console.');
-      } else if (error.code === 'permission-denied') {
-        setSyncError('Permission denied. Check Firestore security rules.');
-      } else {
-        setSyncError(error.message);
-      }
-      return false;
-    } finally {
-      setSyncing(false);
-    }
-  }, [user]);
-
-  // Load from Cloud
-  const loadFromCloud = useCallback(async () => {
-    const firebaseDb = getFirebaseDb();
-    if (!user || !firebaseDb) return null;
-
-    setSyncing(true);
-    setSyncError(null);
-
-    try {
-      const docSnap = await firebaseDb.collection('users').doc(user.uid).get();
-
-      if (docSnap.exists) {
-        const data = docSnap.data();
-        setLastSynced(data.updatedAt?.toDate() || new Date());
-        return data;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error loading from cloud:', error);
-      if (!error.message?.includes('offline') && error.code !== 'unavailable') {
-        setSyncError(error.message);
-      }
-      return null;
-    } finally {
-      setSyncing(false);
-    }
-  }, [user]);
-
   // Sign In with Google
   const signInWithGoogle = useCallback(async () => {
     const firebaseAuth = getFirebaseAuth();
     const googleProvider = getGoogleProvider();
 
     if (!firebaseAuth || !googleProvider) {
-      setSyncError('Firebase not loaded');
+      setAuthError('Firebase not loaded');
       return;
     }
 
     if (!isAuthSupported()) {
       if (window.location.protocol === 'file:') {
-        setSyncError('Cannot sign in from local file. Deploy to a web server.');
+        setAuthError('Cannot sign in from local file. Deploy to a web server.');
       } else {
-        setSyncError('Sign-in not supported in this environment.');
+        setAuthError('Sign-in not supported in this environment.');
       }
       return;
     }
 
     if (isStandalone()) {
-      setSyncError('Google Sign-In is not available in home screen mode. Use email sign-in above.');
+      setAuthError('Google Sign-In is not available in home screen mode. Use email sign-in above.');
       return;
     }
 
     try {
-      setSyncing(true);
-      setSyncError(null);
-
+      setAuthError(null);
       try {
         const result = await firebaseAuth.signInWithPopup(googleProvider);
         if (result.user) {
@@ -195,14 +102,12 @@ export function useFirebase() {
     } catch (error) {
       console.error('Sign in error:', error);
       if (error.code === 'auth/popup-closed-by-user') {
-        setSyncError('Sign-in cancelled');
+        setAuthError('Sign-in cancelled');
       } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
-        setSyncError('Google Sign-In unavailable in this mode. Try email sign-in instead.');
+        setAuthError('Google Sign-In unavailable in this mode. Try email sign-in instead.');
       } else if (error.code !== 'auth/cancelled-popup-request') {
-        setSyncError(error.message);
+        setAuthError(error.message);
       }
-    } finally {
-      setSyncing(false);
     }
   }, []);
 
@@ -211,24 +116,22 @@ export function useFirebase() {
     const firebaseAuth = getFirebaseAuth();
 
     if (!firebaseAuth) {
-      setSyncError('Firebase not loaded');
+      setAuthError('Firebase not loaded');
       return false;
     }
 
     if (!email || !password) {
-      setSyncError('Please enter email and password');
+      setAuthError('Please enter email and password');
       return false;
     }
 
     if (password.length < 6) {
-      setSyncError('Password must be at least 6 characters');
+      setAuthError('Password must be at least 6 characters');
       return false;
     }
 
     try {
-      setSyncing(true);
-      setSyncError(null);
-
+      setAuthError(null);
       let result;
       if (isSignUp) {
         result = await firebaseAuth.createUserWithEmailAndPassword(email, password);
@@ -244,24 +147,22 @@ export function useFirebase() {
       console.error('Email sign in error:', error);
 
       if (error.code === 'auth/user-not-found') {
-        setSyncError('No account with this email. Tap "Create account" to sign up.');
+        setAuthError('No account with this email. Tap "Create account" to sign up.');
       } else if (error.code === 'auth/wrong-password') {
-        setSyncError('Incorrect password');
+        setAuthError('Incorrect password');
       } else if (error.code === 'auth/email-already-in-use') {
-        setSyncError('Account exists. Tap "Sign in" instead.');
+        setAuthError('Account exists. Tap "Sign in" instead.');
       } else if (error.code === 'auth/invalid-email') {
-        setSyncError('Invalid email address');
+        setAuthError('Invalid email address');
       } else if (error.code === 'auth/weak-password') {
-        setSyncError('Password must be at least 6 characters');
+        setAuthError('Password must be at least 6 characters');
       } else if (error.code === 'auth/too-many-requests') {
-        setSyncError('Too many attempts. Try again later.');
+        setAuthError('Too many attempts. Try again later.');
       } else if (error.code === 'auth/invalid-credential') {
-        setSyncError('Invalid email or password');
+        setAuthError('Invalid email or password');
       } else {
-        setSyncError(error.message);
+        setAuthError(error.message);
       }
-    } finally {
-      setSyncing(false);
     }
 
     return false;
@@ -272,59 +173,34 @@ export function useFirebase() {
     const firebaseAuth = getFirebaseAuth();
 
     if (!firebaseAuth) {
-      setSyncError('Firebase not loaded');
+      setAuthError('Firebase not loaded');
       return false;
     }
 
     if (!email) {
-      setSyncError('Enter your email address first');
+      setAuthError('Enter your email address first');
       return false;
     }
 
     try {
-      setSyncing(true);
-      setSyncError(null);
+      setAuthError(null);
       await firebaseAuth.sendPasswordResetEmail(email);
       return true;
     } catch (error) {
       console.error('Password reset error:', error);
       if (error.code === 'auth/user-not-found') {
-        setSyncError('No account with this email. Create one first.');
+        setAuthError('No account with this email. Create one first.');
       } else if (error.code === 'auth/invalid-email') {
-        setSyncError('Invalid email address');
+        setAuthError('Invalid email address');
       } else if (error.code === 'auth/too-many-requests') {
-        setSyncError('Too many attempts. Try again later.');
+        setAuthError('Too many attempts. Try again later.');
       } else {
-        setSyncError(error.message);
+        setAuthError(error.message);
       }
-    } finally {
-      setSyncing(false);
     }
 
     return false;
   }, []);
-
-  // Listen to cloud changes in real-time
-  const listenToCloud = useCallback((onData) => {
-    const firebaseDb = getFirebaseDb();
-    if (!user || !firebaseDb) return null;
-
-    return firebaseDb.collection('users').doc(user.uid).onSnapshot(
-      (docSnap) => {
-        if (docSnap.exists) {
-          const data = docSnap.data();
-          setLastSynced(data.updatedAt?.toDate() || new Date());
-          onData(data, docSnap.metadata);
-        }
-      },
-      (error) => {
-        console.error('Cloud listener error:', error);
-        if (!error.message?.includes('offline') && error.code !== 'unavailable') {
-          setSyncError(error.message);
-        }
-      }
-    );
-  }, [user]);
 
   // Sign Out
   const signOut = useCallback(async () => {
@@ -333,7 +209,6 @@ export function useFirebase() {
 
     try {
       await firebaseAuth.signOut();
-      setLastSynced(null);
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -344,13 +219,8 @@ export function useFirebase() {
     authLoading,
     firebaseReady,
     firebaseError,
-    syncing,
-    lastSynced,
-    syncError,
-    setSyncError,
-    saveToCloud,
-    loadFromCloud,
-    listenToCloud,
+    authError,
+    setAuthError,
     signInWithGoogle,
     signInWithEmail,
     forgotPassword,
