@@ -124,10 +124,13 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
 
     engineRef.current = engine;
 
-    // Initialize and apply server data
+    // Initialize and apply server data (skip domains with pending local changes)
     engine.initialize().then((serverData) => {
       if (serverData && !engine._destroyed) {
-        applyCloudData(engine._extractDomains(serverData), true);
+        const domains = engine._extractDomains(serverData, true);
+        if (Object.keys(domains).length > 0) {
+          applyCloudData(domains, true);
+        }
         const ts = serverData.updatedAt?.toDate();
         if (ts) {
           setSyncStatus(prev => ({ ...prev, lastSynced: ts }));

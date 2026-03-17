@@ -84,6 +84,10 @@ export default class SyncEngine {
           resolved = true;
           this._ready = true;
           this._initializing = false;
+          // Flush any changes the user made during initialization
+          if (this.pendingChanges.size > 0) {
+            this._scheduleFlush();
+          }
           // Resolve with cached data if we have it, otherwise null
           resolve(cachedData);
         }
@@ -115,7 +119,11 @@ export default class SyncEngine {
               // Cache hit — apply for fast display but wait for server
               cachedData = data;
               this._seedVersions(data);
-              this.onCloudUpdate(this._extractDomains(data), true);
+              // Skip domains with pending local changes to preserve user edits
+              const domains = this._extractDomains(data, true);
+              if (Object.keys(domains).length > 0) {
+                this.onCloudUpdate(domains, true);
+              }
             } else {
               // Server-confirmed data — resolve initialization
               clearTimeout(timeout);
@@ -124,6 +132,10 @@ export default class SyncEngine {
               this._seedVersions(data);
               this._ready = true;
               this._initializing = false;
+              // Flush any changes the user made during initialization
+              if (this.pendingChanges.size > 0) {
+                this._scheduleFlush();
+              }
               resolve(data);
             }
           } else {
@@ -142,6 +154,9 @@ export default class SyncEngine {
             resolved = true;
             this._ready = true;
             this._initializing = false;
+            if (this.pendingChanges.size > 0) {
+              this._scheduleFlush();
+            }
             resolve(cachedData);
           }
         }
@@ -152,21 +167,31 @@ export default class SyncEngine {
   /**
    * Seed the version vector from cloud data.
    * If cloud has _v_* fields, use them. Otherwise start at 0.
+   * If there are pending local changes for a domain, ensure our version
+   * exceeds the cloud version so our flush takes precedence.
    */
   _seedVersions(data) {
     SYNC_DOMAINS.forEach(domain => {
       const key = `_v_${domain}`;
-      this.versions[domain] = (typeof data[key] === 'number') ? data[key] : 0;
+      const cloudVersion = (typeof data[key] === 'number') ? data[key] : 0;
+      if (this.pendingChanges.has(domain)) {
+        this.versions[domain] = Math.max(this.versions[domain], cloudVersion + 1);
+      } else {
+        this.versions[domain] = cloudVersion;
+      }
     });
   }
 
   /**
    * Extract just the synced domain data from a Firestore doc.
+   * Skips domains with pending local changes to prevent cloud data
+   * from overwriting the user's in-flight edits.
    */
-  _extractDomains(data) {
+  _extractDomains(data, skipPending = false) {
     const result = {};
     SYNC_DOMAINS.forEach(domain => {
       if (data[domain] !== undefined) {
+        if (skipPending && this.pendingChanges.has(domain)) return;
         result[domain] = data[domain];
       }
     });
@@ -217,13 +242,17 @@ export default class SyncEngine {
   /**
    * Called when local data changes in a domain.
    * Queues the change and schedules a debounced flush.
+   * Changes are queued even before initialization completes — they'll flush
+   * once the engine is ready, and block cloud data from overwriting them.
    */
   notifyLocalChange(domain, data) {
-    if (!this._ready || this._destroyed) return;
+    if (this._destroyed) return;
 
     this.pendingChanges.set(domain, data);
     this.versions[domain]++;
-    this._scheduleFlush();
+    if (this._ready) {
+      this._scheduleFlush();
+    }
   }
 
   /**
