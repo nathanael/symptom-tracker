@@ -138,7 +138,20 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       }
     });
 
+    // Flush pending changes when app goes to background or closes
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        engine.flushNow();
+      }
+    };
+    const handleUnload = () => engine.flushNow();
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('beforeunload', handleUnload);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', handleUnload);
+      engine.flushNow();
       engine.destroy();
       if (engineRef.current === engine) {
         engineRef.current = null;
@@ -146,9 +159,9 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     };
   }, [uid, firebaseReady, applyCloudData]);
 
-  // Notify engine of a local change
+  // Notify engine of a local change (always queue, even before ready)
   const notifyChange = useCallback((domain, data) => {
-    if (engineRef.current && engineRef.current.isReady()) {
+    if (engineRef.current) {
       engineRef.current.notifyLocalChange(domain, data);
     }
   }, []);

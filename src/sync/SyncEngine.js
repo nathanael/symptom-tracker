@@ -264,6 +264,20 @@ export default class SyncEngine {
   }
 
   /**
+   * Cancel any pending debounce and flush immediately.
+   * Called when the app is about to close/background.
+   */
+  flushNow() {
+    if (this._flushTimer) {
+      clearTimeout(this._flushTimer);
+      this._flushTimer = null;
+    }
+    if (this._ready && this.pendingChanges.size > 0) {
+      this.flush();
+    }
+  }
+
+  /**
    * Flush pending changes to Firestore.
    */
   async flush() {
