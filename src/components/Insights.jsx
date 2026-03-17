@@ -50,9 +50,14 @@ export default function Insights({
   onOpenSupplementGraph,
   isDesktop,
   trackingMode,
+  insightsSubtab: insightsSubtabProp,
+  setInsightsSubtab: setInsightsSubtabProp,
 }) {
   const [expandedId, setExpandedId] = useState(null);
-  const [insightsSubtab, setInsightsSubtab] = useState('studio');
+  // Desktop manages its own local subtab state; mobile gets it from App via BottomNav
+  const [localSubtab, setLocalSubtab] = useState('studio');
+  const insightsSubtab = insightsSubtabProp || localSubtab;
+  const setInsightsSubtab = setInsightsSubtabProp || setLocalSubtab;
 
   const data = useMemo(() =>
     getInsights(insightsWindow, entries, symptoms),
@@ -82,40 +87,42 @@ export default function Insights({
       }}
     >
       <div style={{ maxWidth: isDesktop ? '100%' : '700px', margin: '0 auto' }}>
-        {/* Subtab toggle */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '4px',
-          padding: '4px',
-          marginBottom: '24px',
-          borderRadius: '12px',
-          background: 'rgba(23, 23, 23, 0.5)',
-          border: '1px solid rgba(255,255,255,0.1)',
-        }}>
-          {[
-            { id: 'studio', label: 'Comparison Studio' },
-            { id: 'quick', label: 'Quick Insights' },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => { setInsightsSubtab(tab.id); haptic('light'); }}
-              style={{
-                padding: '10px',
-                borderRadius: '8px',
-                border: 'none',
-                background: insightsSubtab === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent',
-                boxShadow: insightsSubtab === tab.id ? '0 1px 2px rgba(0,0,0,0.05), inset 0 0 0 1px rgba(255,255,255,0.05)' : 'none',
-                color: insightsSubtab === tab.id ? '#fff' : '#a3a3a3',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Subtab toggle — desktop only (mobile uses BottomNav) */}
+        {isDesktop && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '4px',
+            padding: '4px',
+            marginBottom: '24px',
+            borderRadius: '12px',
+            background: 'rgba(23, 23, 23, 0.5)',
+            border: '1px solid rgba(255,255,255,0.1)',
+          }}>
+            {[
+              { id: 'studio', label: 'Comparison Studio' },
+              { id: 'quick', label: 'Quick Insights' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => { setInsightsSubtab(tab.id); haptic('light'); }}
+                style={{
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: insightsSubtab === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  boxShadow: insightsSubtab === tab.id ? '0 1px 2px rgba(0,0,0,0.05), inset 0 0 0 1px rgba(255,255,255,0.05)' : 'none',
+                  color: insightsSubtab === tab.id ? '#fff' : '#a3a3a3',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {insightsSubtab === 'studio' ? (
           <ComparisonStudio

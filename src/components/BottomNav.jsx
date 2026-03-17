@@ -7,6 +7,8 @@ export default function BottomNav({
   setProtocolView,
   showInsights,
   setShowInsights,
+  insightsSubtab,
+  setInsightsSubtab,
   showSettings,
   setShowSettings,
   showExport,
@@ -69,6 +71,45 @@ export default function BottomNav({
                 }}
               >
                 {view === 'stack' ? 'Supplements' : 'Other Inputs'}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pinned Insights Tabs */}
+      {showInsights && !showSettings && !showExport && (
+        <div style={{
+          maxWidth: '500px',
+          margin: '0 auto',
+          padding: '8px 16px',
+          display: 'flex',
+          gap: '8px',
+        }}>
+          {[
+            { id: 'studio', label: 'Comparison Studio' },
+            { id: 'quick', label: 'Quick Insights' },
+          ].map(tab => {
+            const isActive = insightsSubtab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setInsightsSubtab(tab.id)}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  background: isActive ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
+                  color: isActive ? '#a78bfa' : '#64748b',
+                  border: isActive
+                    ? '1px solid rgba(139, 92, 246, 0.3)'
+                    : '1px solid rgba(255, 255, 255, 0.08)',
+                }}
+              >
+                {tab.label}
               </button>
             );
           })}

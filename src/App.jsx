@@ -142,6 +142,7 @@ function App() {
   // View state
   const [showCalendar, setShowCalendar] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
+  const [insightsSubtab, setInsightsSubtab] = useState('studio');
   const [showSettings, setShowSettings] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
@@ -1210,6 +1211,8 @@ function App() {
           onOpenGraph={setShowSymptomGraph}
           onOpenSupplementGraph={setShowSupplementGraph}
           trackingMode={trackingMode}
+          insightsSubtab={insightsSubtab}
+          setInsightsSubtab={setInsightsSubtab}
         />
       )}
 
@@ -1313,6 +1316,8 @@ function App() {
           setProtocolView={setProtocolView}
           showInsights={showInsights}
           setShowInsights={setShowInsights}
+          insightsSubtab={insightsSubtab}
+          setInsightsSubtab={setInsightsSubtab}
           showSettings={showSettings}
           setShowSettings={setShowSettings}
           showExport={showExport}
