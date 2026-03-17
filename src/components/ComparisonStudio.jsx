@@ -94,6 +94,7 @@ export default function ComparisonStudio({
 
   // Mobile pan gesture state
   const panRef = useRef({ startX: 0, startOffset: 0, isPanning: false, startTime: 0 });
+  const maxOffsetRef = useRef(0);
 
   // Auto-focus search inputs when pickers open
   useEffect(() => { if (showSupplementPicker) { setSuppSearch(''); setTimeout(() => suppSearchRef.current?.focus(), 50); } }, [showSupplementPicker]);
@@ -277,13 +278,13 @@ export default function ComparisonStudio({
       const daysPer_px = timeframe / chartPxWidth;
       // Dragging right = going back in time (increase offset), left = forward (decrease)
       const daysDelta = Math.round(dx * daysPer_px);
-      const newOffset = Math.max(0, Math.min(maxOffset, panRef.current.startOffset + daysDelta));
+      const newOffset = Math.max(0, Math.min(maxOffsetRef.current, panRef.current.startOffset + daysDelta));
       setStartOffset(newOffset);
     } else {
       // Small movement — show crosshair
       setTouchX(getSnappedIndex(x));
     }
-  }, [timeframe, maxOffset, getSnappedIndex]);
+  }, [timeframe, getSnappedIndex]);
 
   const handleMobileTouchEnd = useCallback(() => {
     panRef.current.isPanning = false;
@@ -377,6 +378,7 @@ export default function ComparisonStudio({
     const totalDays = Math.round((today - earliestDate) / (1000 * 60 * 60 * 24));
     return Math.max(0, totalDays - timeframe);
   }, [selectedSymptoms, selectedSupplement, entries, stackEntries, timeframe]);
+  maxOffsetRef.current = maxOffset;
 
   // Clamp startOffset when maxOffset shrinks
   useEffect(() => { setStartOffset(prev => Math.min(prev, maxOffset)); }, [maxOffset]);
