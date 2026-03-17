@@ -12,6 +12,19 @@ export const SYNC_DOMAINS = [
   'inputEntries',
 ];
 
+// Maps sync domain names to localStorage keys
+const DOMAIN_STORAGE_KEYS = {
+  symptoms: 'symptomTracker_symptoms',
+  entries: 'symptomTracker_entries',
+  dailyNotes: 'symptomTracker_notes',
+  stackItems: 'symptomTracker_stackItems',
+  stackEntries: 'symptomTracker_stackEntries',
+  pinnedSymptoms: 'symptomTracker_pinned',
+  trackingMode: 'symptomTracker_mode',
+  inputItems: 'symptomTracker_inputItems',
+  inputEntries: 'symptomTracker_inputEntries',
+};
+
 const DEBOUNCE_MS = 500;
 const INIT_TIMEOUT_MS = 3000;
 
@@ -28,6 +41,13 @@ export default class SyncEngine {
 
     // Pending local changes waiting to be flushed
     this.pendingChanges = new Map();
+
+    // Domains with unsynced local changes (persisted to localStorage to survive restarts)
+    try {
+      this._dirtyDomains = new Set(JSON.parse(localStorage.getItem(`syncDirty_${uid}`) || '[]'));
+    } catch (e) {
+      this._dirtyDomains = new Set();
+    }
 
     // Debounce timer
     this._flushTimer = null;
@@ -84,11 +104,7 @@ export default class SyncEngine {
           resolved = true;
           this._ready = true;
           this._initializing = false;
-          // Flush any changes the user made during initialization
-          if (this.pendingChanges.size > 0) {
-            this._scheduleFlush();
-          }
-          // Resolve with cached data if we have it, otherwise null
+          this._requeueDirtyDomains();
           resolve(cachedData);
         }
       }, INIT_TIMEOUT_MS);
@@ -104,6 +120,7 @@ export default class SyncEngine {
               resolved = true;
               this._ready = true;
               this._initializing = false;
+              this._requeueDirtyDomains();
               resolve(null);
             }
             return;
@@ -119,7 +136,7 @@ export default class SyncEngine {
               // Cache hit — apply for fast display but wait for server
               cachedData = data;
               this._seedVersions(data);
-              // Skip domains with pending local changes to preserve user edits
+              // Skip domains with pending/dirty local changes to preserve user edits
               const domains = this._extractDomains(data, true);
               if (Object.keys(domains).length > 0) {
                 this.onCloudUpdate(domains, true);
@@ -132,10 +149,7 @@ export default class SyncEngine {
               this._seedVersions(data);
               this._ready = true;
               this._initializing = false;
-              // Flush any changes the user made during initialization
-              if (this.pendingChanges.size > 0) {
-                this._scheduleFlush();
-              }
+              this._requeueDirtyDomains();
               resolve(data);
             }
           } else {
@@ -154,9 +168,7 @@ export default class SyncEngine {
             resolved = true;
             this._ready = true;
             this._initializing = false;
-            if (this.pendingChanges.size > 0) {
-              this._scheduleFlush();
-            }
+            this._requeueDirtyDomains();
             resolve(cachedData);
           }
         }
@@ -167,14 +179,14 @@ export default class SyncEngine {
   /**
    * Seed the version vector from cloud data.
    * If cloud has _v_* fields, use them. Otherwise start at 0.
-   * If there are pending local changes for a domain, ensure our version
+   * If there are pending/dirty local changes for a domain, ensure our version
    * exceeds the cloud version so our flush takes precedence.
    */
   _seedVersions(data) {
     SYNC_DOMAINS.forEach(domain => {
       const key = `_v_${domain}`;
       const cloudVersion = (typeof data[key] === 'number') ? data[key] : 0;
-      if (this.pendingChanges.has(domain)) {
+      if (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain)) {
         this.versions[domain] = Math.max(this.versions[domain], cloudVersion + 1);
       } else {
         this.versions[domain] = cloudVersion;
@@ -184,18 +196,44 @@ export default class SyncEngine {
 
   /**
    * Extract just the synced domain data from a Firestore doc.
-   * Skips domains with pending local changes to prevent cloud data
+   * Skips domains with pending/dirty local changes to prevent cloud data
    * from overwriting the user's in-flight edits.
    */
   _extractDomains(data, skipPending = false) {
     const result = {};
     SYNC_DOMAINS.forEach(domain => {
       if (data[domain] !== undefined) {
-        if (skipPending && this.pendingChanges.has(domain)) return;
+        if (skipPending && (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain))) return;
         result[domain] = data[domain];
       }
     });
     return result;
+  }
+
+  /**
+   * Re-read dirty domain data from localStorage and queue for flush.
+   * Called after initialization completes to push any unsynced changes.
+   */
+  _requeueDirtyDomains() {
+    if (this._dirtyDomains.size === 0) return;
+    this._dirtyDomains.forEach(domain => {
+      if (!this.pendingChanges.has(domain)) {
+        try {
+          const storageKey = DOMAIN_STORAGE_KEYS[domain];
+          if (!storageKey) return;
+          const raw = localStorage.getItem(storageKey);
+          if (raw !== null) {
+            const data = JSON.parse(raw);
+            this.pendingChanges.set(domain, domain === 'pinnedSymptoms' ? data : data);
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    });
+    if (this.pendingChanges.size > 0) {
+      this._scheduleFlush();
+    }
   }
 
   /**
@@ -220,7 +258,7 @@ export default class SyncEngine {
         // If we have pending local changes for this domain, don't apply cloud data —
         // it would overwrite the user's in-flight changes during the debounce window.
         // Bump our version past the cloud so our pending flush takes precedence.
-        if (this.pendingChanges.has(domain)) {
+        if (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain)) {
           this.versions[domain] = cloudVersion + 1;
           return;
         }
@@ -250,6 +288,8 @@ export default class SyncEngine {
 
     this.pendingChanges.set(domain, data);
     this.versions[domain]++;
+    this._dirtyDomains.add(domain);
+    this._persistDirty();
     if (this._ready) {
       this._scheduleFlush();
     }
@@ -274,6 +314,17 @@ export default class SyncEngine {
     }
     if (this._ready && this.pendingChanges.size > 0) {
       this.flush();
+    }
+  }
+
+  /**
+   * Persist dirty domain flags to localStorage so they survive app restarts.
+   */
+  _persistDirty() {
+    try {
+      localStorage.setItem(`syncDirty_${this.uid}`, JSON.stringify([...this._dirtyDomains]));
+    } catch (e) {
+      // Ignore storage errors
     }
   }
 
@@ -314,6 +365,11 @@ export default class SyncEngine {
       await db.collection('users').doc(this.uid).set(payload, { merge: true });
       this.lastSynced = new Date();
       this.syncError = null;
+      // Clear dirty flags for successfully synced domains
+      changes.forEach((data, domain) => {
+        this._dirtyDomains.delete(domain);
+      });
+      this._persistDirty();
     } catch (error) {
       console.error('SyncEngine: flush failed', error);
 
@@ -380,7 +436,7 @@ export default class SyncEngine {
       this._flushTimer = null;
     }
     // Best-effort: flush remaining changes synchronously won't work,
-    // but at least they're in localStorage
+    // but at least they're in localStorage with dirty flags
     this.pendingChanges.clear();
   }
 }
