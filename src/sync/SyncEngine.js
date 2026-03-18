@@ -27,6 +27,7 @@ const DOMAIN_STORAGE_KEYS = {
 
 const DEBOUNCE_MS = 500;
 const INIT_TIMEOUT_MS = 3000;
+const DIRTY_EXPIRY_MS = 30000; // Dirty flags older than 30s are likely stale
 
 export default class SyncEngine {
   constructor(uid, onCloudUpdate) {
@@ -44,7 +45,18 @@ export default class SyncEngine {
 
     // Domains with unsynced local changes (persisted to localStorage to survive restarts)
     try {
-      this._dirtyDomains = new Set(JSON.parse(localStorage.getItem(`syncDirty_${uid}`) || '[]'));
+      const dirtyRaw = JSON.parse(localStorage.getItem(`syncDirty_${uid}`) || '{}');
+      // v4.0.6+: stored as { domains: [...], ts: <epoch> }. Legacy: plain array.
+      const dirtyArr = Array.isArray(dirtyRaw) ? dirtyRaw : (dirtyRaw.domains || []);
+      const dirtyTs = dirtyRaw.ts || 0;
+      // Expire stale dirty flags — if the app closed >30s ago, the flush either
+      // completed or the data is too old to safely overwrite the server with.
+      if (dirtyTs && (Date.now() - dirtyTs > DIRTY_EXPIRY_MS)) {
+        this._dirtyDomains = new Set();
+        localStorage.removeItem(`syncDirty_${uid}`);
+      } else {
+        this._dirtyDomains = new Set(dirtyArr);
+      }
     } catch (e) {
       this._dirtyDomains = new Set();
     }
@@ -70,6 +82,11 @@ export default class SyncEngine {
 
     // Whether we've seen server-confirmed data (not just cache)
     this._hasServerData = false;
+
+    // Cache the most recent snapshot so we can re-process it after flush
+    // clears dirty flags (fixes: snapshot arrives before flush completes → skipped → never retried)
+    this._lastSnapshotData = null;
+    this._lastSnapshotMeta = null;
 
     // Flag: currently flushing (prevents re-entrant flushes)
     this._flushing = false;
@@ -246,6 +263,18 @@ export default class SyncEngine {
     // Skip our own confirmed echoes
     if (data._lastWriteId && data._lastWriteId === this._lastWriteId) return;
 
+    // Cache latest snapshot so we can re-process after flush clears dirty flags
+    this._lastSnapshotData = data;
+    this._lastSnapshotMeta = metadata;
+
+    this._applySnapshot(data);
+  }
+
+  /**
+   * Apply domain data from a snapshot. Separated from _handleSnapshot so it
+   * can be re-invoked after a flush clears dirty flags.
+   */
+  _applySnapshot(data) {
     // Per-domain: only accept if cloud version > our local version
     const updates = {};
     let hasUpdates = false;
@@ -322,7 +351,14 @@ export default class SyncEngine {
    */
   _persistDirty() {
     try {
-      localStorage.setItem(`syncDirty_${this.uid}`, JSON.stringify([...this._dirtyDomains]));
+      if (this._dirtyDomains.size === 0) {
+        localStorage.removeItem(`syncDirty_${this.uid}`);
+      } else {
+        localStorage.setItem(`syncDirty_${this.uid}`, JSON.stringify({
+          domains: [...this._dirtyDomains],
+          ts: Date.now(),
+        }));
+      }
     } catch (e) {
       // Ignore storage errors
     }
@@ -366,10 +402,18 @@ export default class SyncEngine {
       this.lastSynced = new Date();
       this.syncError = null;
       // Clear dirty flags for successfully synced domains
+      const hadDirty = this._dirtyDomains.size > 0;
       changes.forEach((data, domain) => {
         this._dirtyDomains.delete(domain);
       });
       this._persistDirty();
+
+      // If dirty flags were blocking cloud data, re-process the last snapshot
+      // now that they're cleared. This handles the race where a snapshot arrived
+      // while dirty flags were set, was skipped, and no new snapshot follows.
+      if (hadDirty && this._dirtyDomains.size === 0 && this._lastSnapshotData) {
+        this._applySnapshot(this._lastSnapshotData);
+      }
     } catch (error) {
       console.error('SyncEngine: flush failed', error);
 

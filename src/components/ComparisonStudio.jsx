@@ -463,7 +463,7 @@ export default function ComparisonStudio({
             onKeyDown={(e) => {
               if (e.key === 'Escape') { e.stopPropagation(); if (suppSearch) setSuppSearch(''); else setShowSupplementPicker(false); }
               if (e.key === 'Enter') {
-                const filtered = allSupplements.filter(s => s.name.toLowerCase().includes(suppSearch.toLowerCase()));
+                const filtered = allSupplements.filter(s => s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
                 if (filtered.length === 1) { selectSupplement(filtered[0].id); setShowSupplementPicker(false); }
               }
             }}
@@ -481,7 +481,7 @@ export default function ComparisonStudio({
             gap: '8px',
           }}>
             {(() => {
-              const filtered = allSupplements.filter(s => !suppSearch || s.name.toLowerCase().includes(suppSearch.toLowerCase()));
+              const filtered = allSupplements.filter(s => !suppSearch || s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
               const autoSelected = filtered.length === 1;
               return filtered.map(supp => {
               const isSelected = selectedSupplement === supp.id;
@@ -505,11 +505,25 @@ export default function ComparisonStudio({
                     background: highlighted ? SUPP_COLOR : '#4b5563',
                   }} />
                   <span style={{
-                    flex: 1, color: highlighted ? '#e5e7eb' : '#9ca3af',
-                    fontSize: '13px', fontWeight: highlighted ? '500' : '400',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    flex: 1, minWidth: 0,
+                    display: 'flex', flexDirection: 'column',
                   }}>
-                    {supp.name}
+                    <span style={{
+                      color: highlighted ? '#e5e7eb' : '#9ca3af',
+                      fontSize: '13px', fontWeight: highlighted ? '500' : '400',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {supp.name}
+                    </span>
+                    {supp.description && (
+                      <span style={{
+                        color: highlighted ? '#9ca3af' : '#6b7280',
+                        fontSize: '11px', fontWeight: '400',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {supp.description}
+                      </span>
+                    )}
                   </span>
                   {highlighted && (
                     <span style={{ color: SUPP_COLOR, fontSize: '14px', flexShrink: 0 }}>✓</span>
