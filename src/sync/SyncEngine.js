@@ -51,9 +51,10 @@ export default class SyncEngine {
       const dirtyTs = dirtyRaw.ts || 0;
       // Expire stale dirty flags — if the app closed >30s ago, the flush either
       // completed or the data is too old to safely overwrite the server with.
-      if (dirtyTs && (Date.now() - dirtyTs > DIRTY_EXPIRY_MS)) {
+      // Also expire if no timestamp (legacy format) since we can't tell how old they are.
+      if (!dirtyTs || (Date.now() - dirtyTs > DIRTY_EXPIRY_MS)) {
         this._dirtyDomains = new Set();
-        localStorage.removeItem(`syncDirty_${uid}`);
+        if (dirtyArr.length > 0) localStorage.removeItem(`syncDirty_${uid}`);
       } else {
         this._dirtyDomains = new Set(dirtyArr);
       }
@@ -213,14 +214,22 @@ export default class SyncEngine {
 
   /**
    * Extract just the synced domain data from a Firestore doc.
-   * Skips domains with pending/dirty local changes to prevent cloud data
-   * from overwriting the user's in-flight edits.
+   * @param {object} data - Firestore doc data
+   * @param {'all'|'skipPending'|'skipDirty'} mode
+   *   'all'         — return all domains
+   *   'skipPending'  — skip domains with pending in-flight changes (this session only)
+   *   'skipDirty'    — skip domains with pending OR dirty flags (most conservative)
    */
-  _extractDomains(data, skipPending = false) {
+  _extractDomains(data, mode = 'all') {
+    // Backward compat: boolean true → 'skipDirty', false → 'all'
+    if (mode === true) mode = 'skipDirty';
+    if (mode === false) mode = 'all';
+
     const result = {};
     SYNC_DOMAINS.forEach(domain => {
       if (data[domain] !== undefined) {
-        if (skipPending && (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain))) return;
+        if (mode === 'skipDirty' && (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain))) return;
+        if (mode === 'skipPending' && this.pendingChanges.has(domain)) return;
         result[domain] = data[domain];
       }
     });

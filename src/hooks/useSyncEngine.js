@@ -87,16 +87,25 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       setters.inputEntries(prev => ({ ...prev, ...updates.inputEntries }));
     }
 
-    // Reset flag after React processes the batch.
-    // Use counter to handle overlapping applies correctly.
+    // Reset flag after React has committed the batch AND run all useEffect
+    // callbacks triggered by the state changes above.  The old setTimeout(0)
+    // raced with React 18's effect scheduling (effects fire via MessageChannel,
+    // which can interleave with setTimeout(0)), causing useLocalStorage effects
+    // to see isApplyingCloudRef=false and erroneously notify the sync engine of
+    // "local" changes — marking domains dirty and blocking future server pulls.
+    //
+    // Two-frame delay: requestAnimationFrame fires after paint, then setTimeout
+    // fires in the next macrotask — well after React's useEffect commit phase.
     if (cloudRef) {
-      setTimeout(() => {
-        applyCountRef.current--;
-        if (applyCountRef.current <= 0) {
-          applyCountRef.current = 0;
-          cloudRef.current = false;
-        }
-      }, 0);
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          applyCountRef.current--;
+          if (applyCountRef.current <= 0) {
+            applyCountRef.current = 0;
+            cloudRef.current = false;
+          }
+        }, 0);
+      });
     }
   }, []);
 
@@ -124,10 +133,12 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
 
     engineRef.current = engine;
 
-    // Initialize and apply server data (skip domains with pending local changes)
+    // Initialize and apply server data.
+    // On init, server data is authoritative — only skip domains where the user
+    // made changes THIS session (pendingChanges), not stale dirty flags.
     engine.initialize().then((serverData) => {
       if (serverData && !engine._destroyed) {
-        const domains = engine._extractDomains(serverData, true);
+        const domains = engine._extractDomains(serverData, 'skipPending');
         if (Object.keys(domains).length > 0) {
           applyCloudData(domains, true);
         }
