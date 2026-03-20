@@ -72,7 +72,6 @@ export default function ComparisonStudio({
           supplement: suppValid ? saved.supplement : '',
           symptoms: validSymptoms.length > 0 ? validSymptoms : (smartDefaults.symptom ? [smartDefaults.symptom] : []),
           viewMode: saved.viewMode && ['daily', 'weekly', 'monthly', 'cumulative'].includes(saved.viewMode) ? saved.viewMode : 'daily',
-          aggMode: saved.aggMode && ['average', 'total'].includes(saved.aggMode) ? saved.aggMode : 'average',
         };
       }
     } catch {}
@@ -80,7 +79,6 @@ export default function ComparisonStudio({
       supplement: '',
       symptoms: smartDefaults.symptom ? [smartDefaults.symptom] : [],
       viewMode: 'daily',
-      aggMode: 'average',
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount only
@@ -98,7 +96,6 @@ export default function ComparisonStudio({
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
   const [viewMode, setViewMode] = useState(initialSelections.viewMode);
-  const [aggMode, setAggMode] = useState(initialSelections.aggMode);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
 
@@ -113,10 +110,9 @@ export default function ComparisonStudio({
         supplement: selectedSupplement,
         symptoms: selectedSymptoms,
         viewMode,
-        aggMode,
       }));
     } catch {}
-  }, [selectedSupplement, selectedSymptoms, viewMode, aggMode]);
+  }, [selectedSupplement, selectedSymptoms, viewMode]);
 
   // Close category picker when view/supplement changes
   useEffect(() => { setShowCategoryPicker(false); }, [viewMode, selectedSupplement]);
@@ -188,8 +184,8 @@ export default function ComparisonStudio({
   // Transform helper
   const transformDose = useCallback((series, dts) => {
     switch (viewMode) {
-      case 'weekly': return aggregateWeekly(series, dts, aggMode);
-      case 'monthly': return aggregateMonthly(series, dts, aggMode);
+      case 'weekly': return aggregateWeekly(series, dts, 'average');
+      case 'monthly': return aggregateMonthly(series, dts, 'average');
       case 'cumulative': {
         const item = (stackItems || []).find(i => i.id === selectedSupplement);
         const category = item?.halfLifeCategory || null;
@@ -197,7 +193,7 @@ export default function ComparisonStudio({
       }
       default: return aggregateDaily(series, dts);
     }
-  }, [viewMode, aggMode, stackItems, selectedSupplement]);
+  }, [viewMode, stackItems, selectedSupplement]);
 
   // Transformed supplement data
   const suppTransformed = useMemo(() => {
@@ -537,34 +533,6 @@ export default function ComparisonStudio({
       )}
     </div>
   );
-
-  const aggModeToggle = (mobile) => (viewMode === 'weekly' || viewMode === 'monthly') ? (
-    <div style={{
-      display: 'flex', gap: '0',
-      borderRadius: '7px',
-      border: '1px solid rgba(255,255,255,0.08)',
-      background: 'rgba(255,255,255,0.04)',
-      padding: '2px',
-      marginBottom: mobile ? '6px' : '8px',
-      maxWidth: '160px',
-    }}>
-      {['average', 'total'].map(mode => (
-        <button key={mode}
-          onClick={() => { setAggMode(mode); haptic('light'); }}
-          style={{
-            padding: mobile ? '5px 0' : '3px 0',
-            flex: 1,
-            borderRadius: '5px', border: 'none',
-            background: aggMode === mode ? 'rgba(255,255,255,0.12)' : 'transparent',
-            color: aggMode === mode ? '#fff' : '#6b7280',
-            fontSize: mobile ? '11px' : '10px', fontWeight: '500', cursor: 'pointer',
-          }}
-        >
-          {mode === 'average' ? 'Avg/Day' : 'Total'}
-        </button>
-      ))}
-    </div>
-  ) : null;
 
 
   // Area fill path for cumulative view
@@ -1123,18 +1091,17 @@ export default function ComparisonStudio({
                   display: 'flex', flexDirection: 'column',
                   borderRight: '1px solid rgba(255,255,255,0.04)',
                 }}>
-                  {/* View Mode Selector */}
-                  {viewModeSelector(false)}
-                  {aggModeToggle(false)}
-
-                  {/* Timeframe pills */}
+                  {/* Range section */}
+                  <div style={{ color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                    Range
+                  </div>
                   <div style={{
                     display: 'flex', gap: '0',
                     borderRadius: '7px',
                     border: '1px solid rgba(255,255,255,0.08)',
                     background: 'rgba(255,255,255,0.04)',
                     padding: '2px',
-                    marginBottom: '20px',
+                    marginBottom: '8px',
                   }}>
                     {TIMEFRAMES.map(tf => (
                       <button key={tf.days}
@@ -1154,7 +1121,7 @@ export default function ComparisonStudio({
                   </div>
 
                   {/* Arrow nav row */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '22px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '0' }}>
                     <div style={{ display: 'flex', gap: '2px' }}>
                       <button
                         onClick={() => { setStartOffset(maxOffset); haptic('light'); }}
@@ -1203,6 +1170,15 @@ export default function ComparisonStudio({
                       >&gt;|</button>
                     </div>
                   </div>
+
+                  {/* Divider */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '16px 0' }} />
+
+                  {/* View section */}
+                  <div style={{ color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                    View
+                  </div>
+                  {viewModeSelector(false)}
 
                   {/* Date / Average header */}
                   <div style={{
@@ -1253,10 +1229,6 @@ export default function ComparisonStudio({
             ) : (
               /* ── Mobile: vertical stack ── */
               <div>
-                {/* View Mode Selector */}
-                {viewModeSelector(true)}
-                {aggModeToggle(true)}
-
                 {/* Timeframe pills — full width */}
                 <div style={{
                   display: 'flex', gap: '0',
@@ -1264,7 +1236,7 @@ export default function ComparisonStudio({
                   border: '1px solid rgba(255,255,255,0.08)',
                   background: 'rgba(255,255,255,0.04)',
                   padding: '2px',
-                  marginBottom: '10px',
+                  marginBottom: '8px',
                 }}>
                   {TIMEFRAMES.map(tf => (
                     <button key={tf.days}
@@ -1342,6 +1314,11 @@ export default function ComparisonStudio({
                   >
                     {chartSVGContent}
                   </svg>
+                </div>
+
+                {/* View Mode Selector — below chart */}
+                <div style={{ marginTop: '10px', marginBottom: '8px' }}>
+                  {viewModeSelector(true)}
                 </div>
 
                 {/* Stats row below chart */}
