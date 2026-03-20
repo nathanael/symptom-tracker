@@ -1,3 +1,5 @@
+import { CATEGORY_HALF_LIVES } from './supplementLookup';
+
 /**
  * Passthrough — returns data as-is.
  */
@@ -87,4 +89,25 @@ export function aggregateMonthly(series, dates, mode) {
       return MONTH_NAMES[monthIdx];
     }
   );
+}
+
+/**
+ * Compute estimated body level using exponential decay model.
+ * Receives raw series (with nulls). Nulls treated as dose=0.
+ * Returns continuous array with no nulls.
+ */
+export function computeCumulativeLevel(series, dates, halfLifeCategory) {
+  const halfLife = CATEGORY_HALF_LIVES[halfLifeCategory] || CATEGORY_HALF_LIVES.moderate;
+  const decayFactor = Math.pow(0.5, 1 / halfLife);
+
+  const values = [];
+  let bodyLevel = 0;
+
+  for (let i = 0; i < series.length; i++) {
+    const dose = (series[i] !== null && series[i] !== undefined) ? series[i] : 0;
+    bodyLevel = bodyLevel * decayFactor + dose;
+    values.push(bodyLevel);
+  }
+
+  return { values, dates: [...dates], labels: [...dates] };
 }

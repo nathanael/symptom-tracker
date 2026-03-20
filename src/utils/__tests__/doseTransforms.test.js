@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateWeekly, aggregateMonthly, aggregateDaily } from '../doseTransforms';
+import { aggregateWeekly, aggregateMonthly, aggregateDaily, computeCumulativeLevel } from '../doseTransforms';
 
 describe('aggregateWeekly', () => {
   // Mon Mar 2 to Sun Mar 15, 2026 = two full weeks
@@ -99,5 +99,61 @@ describe('aggregateDaily', () => {
     expect(result.values).toEqual([100, null, 200]);
     expect(result.dates).toEqual(dates);
     expect(result.labels).toEqual(dates);
+  });
+});
+
+describe('computeCumulativeLevel', () => {
+  const dates = ['2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04', '2026-03-05'];
+
+  it('accumulates with decay for moderate category', () => {
+    const series = [100, 100, 100, 100, 100];
+    const result = computeCumulativeLevel(series, dates, 'moderate');
+    expect(result.values).toHaveLength(5);
+    expect(result.dates).toEqual(dates);
+    expect(result.values[0]).toBeCloseTo(100);
+    expect(result.values[1]).toBeGreaterThan(100);
+    for (let i = 1; i < 5; i++) {
+      expect(result.values[i]).toBeGreaterThan(result.values[i - 1]);
+    }
+  });
+
+  it('decays when doses are missed', () => {
+    const series = [100, 100, null, null, null];
+    const result = computeCumulativeLevel(series, dates, 'moderate');
+    expect(result.values[2]).toBeLessThan(result.values[1]);
+    expect(result.values[3]).toBeLessThan(result.values[2]);
+    expect(result.values[4]).toBeLessThan(result.values[3]);
+    expect(result.values[4]).toBeGreaterThan(0);
+  });
+
+  it('fast decay clears faster than slow', () => {
+    const series = [1000, null, null, null, null];
+    const fast = computeCumulativeLevel(series, dates, 'fast');
+    const slow = computeCumulativeLevel(series, dates, 'slow');
+    expect(fast.values[4]).toBeLessThan(slow.values[4]);
+  });
+
+  it('defaults to moderate when category is null', () => {
+    const series = [100, 100, 100, 100, 100];
+    const withNull = computeCumulativeLevel(series, dates, null);
+    const withModerate = computeCumulativeLevel(series, dates, 'moderate');
+    expect(withNull.values).toEqual(withModerate.values);
+  });
+
+  it('returns continuous array with no nulls', () => {
+    const series = [100, null, 100, null, 100];
+    const result = computeCumulativeLevel(series, dates, 'moderate');
+    result.values.forEach(v => {
+      expect(v).not.toBeNull();
+      expect(typeof v).toBe('number');
+    });
+  });
+
+  it('starts from zero (no prior supplementation)', () => {
+    const series = [0, 0, 0, 0, 100];
+    const result = computeCumulativeLevel(series, dates, 'moderate');
+    expect(result.values[0]).toBe(0);
+    expect(result.values[3]).toBe(0);
+    expect(result.values[4]).toBe(100);
   });
 });
