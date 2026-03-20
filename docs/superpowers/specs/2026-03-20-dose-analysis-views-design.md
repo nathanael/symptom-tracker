@@ -41,7 +41,7 @@ Data points are plotted at the midpoint of each period. Rendered as a line chart
 
 ### Symptom Overlays
 
-Symptoms in Weekly/Monthly views: non-null daily values are averaged within each period (null days are excluded from the average, not treated as 0). No smoothing step — smoothing is unnecessary when already aggregating. No avg/total toggle for symptoms — average is the only meaningful aggregation for severity scores. If a period has no non-null values, it produces null (gap in the line).
+Symptoms in Weekly/Monthly views: ComparisonStudio applies its existing interpolation and smoothing pipeline first, then passes the smoothed data to `aggregateSymptoms`, which averages non-null values within each period (null days excluded from the average, not treated as 0). No avg/total toggle for symptoms — average is the only meaningful aggregation for severity scores. If a period has no non-null values, it produces null (gap in the line).
 
 ### X-Axis Labels
 
@@ -62,7 +62,7 @@ decayFactor = 0.5 ^ (1 / halfLifeInDays)
 
 **Initial condition**: `previousBodyLevel = 0` for the first day in the date range. This assumes no prior supplementation. (Modeling pre-range buildup would require scanning all historical data, adding complexity for marginal accuracy gain.)
 
-**Null/missing doses**: When a dose is null (supplement not taken that day), treat `todaysDose = 0`. The body level continues to decay — no gap in the line. This accurately models the body clearing the substance.
+**Null/missing doses**: `computeCumulativeLevel` receives the raw series (with nulls) and handles null→0 conversion internally. When a dose is null (supplement not taken that day), treat `todaysDose = 0`. The body level continues to decay — no gap in the line. This accurately models the body clearing the substance. The function always returns a continuous array of numbers with no nulls.
 
 This naturally shows:
 - Buildup to steady state with consistent dosing
@@ -126,10 +126,10 @@ When Cumulative view is active:
 Pure functions, no React dependencies:
 
 - `aggregateDaily(series, dates)` — passthrough, returns `{ values, dates }` unchanged
-- `aggregateWeekly(series, dates, mode)` — groups by ISO calendar week, returns `{ values: number[], dates: string[] }` where dates are midpoint YYYY-MM-DD strings and values are avg or total per period. All-null input returns empty arrays.
-- `aggregateMonthly(series, dates, mode)` — groups by calendar month, returns `{ values: number[], dates: string[] }` same format as weekly. All-null input returns empty arrays.
+- `aggregateWeekly(series, dates, mode)` — groups by ISO calendar week, returns `{ values: number[], dates: string[], labels: string[] }` where `dates` are midpoint YYYY-MM-DD strings (for chart point positioning), `labels` are the Monday YYYY-MM-DD strings (for X-axis display), and `values` are avg or total per period. All-null input returns empty arrays.
+- `aggregateMonthly(series, dates, mode)` — groups by calendar month, returns `{ values: number[], dates: string[], labels: string[] }` where `dates` are midpoint YYYY-MM-DD strings, `labels` are month name strings (e.g., "Jan"), and `values` are avg or total. All-null input returns empty arrays.
 - `computeCumulativeLevel(series, dates, halfLifeCategory)` — runs exponential decay model, returns `{ values: number[], dates: string[] }` with one point per day (same dates as input)
-- `aggregateSymptoms(series, dates, viewMode)` — averages for weekly/monthly (matching period grouping), passthrough for daily/cumulative. Returns `{ values, dates }`.
+- `aggregateSymptoms(series, dates, viewMode)` — receives already-smoothed symptom data from ComparisonStudio. Averages non-null values for weekly/monthly (matching period grouping), passthrough for daily/cumulative. Returns `{ values, dates, labels }` matching the format of the dose transforms.
 
 ### New Module: `src/utils/supplementLookup.js`
 
