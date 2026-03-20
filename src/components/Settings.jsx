@@ -42,6 +42,7 @@ export default function Settings({
   setShowExport,
   setShowSettings,
   isDesktop,
+  onForcePush,
 }) {
   const [confirmClearData, setConfirmClearData] = useState(false);
   const [confirmFullReset, setConfirmFullReset] = useState(false);
@@ -76,7 +77,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '4.0.7',
+      version: '4.1.0',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -310,6 +311,31 @@ export default function Settings({
                   {syncError}
                 </div>
               )}
+
+              <button
+                onClick={async () => {
+                  if (onForcePush) {
+                    await onForcePush();
+                    setLastAction('Data pushed to cloud');
+                  }
+                }}
+                disabled={syncing}
+                style={{
+                  marginTop: '12px',
+                  width: '100%',
+                  padding: '10px',
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  borderRadius: '8px',
+                  color: '#a5b4fc',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: syncing ? 'not-allowed' : 'pointer',
+                  opacity: syncing ? 0.5 : 1,
+                }}
+              >
+                Force Push to Cloud
+              </button>
             </>
           ) : (
             <>
@@ -721,7 +747,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v4.0.7
+              v4.1.0
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

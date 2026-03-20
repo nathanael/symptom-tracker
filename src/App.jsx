@@ -114,6 +114,17 @@ function App() {
   const [copyDays, setCopyDays] = useLocalStorage(STORAGE_KEY_COPY_DAYS, 7);
   const [trendWindow, setTrendWindow] = useLocalStorage(STORAGE_KEY_TREND_WINDOW, 7);
 
+  // Reset the cloud-apply flag AFTER all useLocalStorage effects have run.
+  // React guarantees effects run in declaration order within a component,
+  // so this fires after every useLocalStorage effect above has checked the flag.
+  // This replaces the unreliable timer-based reset (setTimeout/rAF race with
+  // React 18's MessageChannel-based effect scheduling).
+  useEffect(() => {
+    if (isApplyingCloudRef.current) {
+      isApplyingCloudRef.current = false;
+    }
+  });
+
   // Sync engine — bridges state to Firestore
   const sync = useSyncEngine(
     firebase.user?.uid,
@@ -755,6 +766,7 @@ function App() {
                 onOpenSupplementGraph={setShowSupplementGraph}
                 isDesktop={true}
                 trackingMode={trackingMode}
+                setStackItems={setStackItems}
               />
             ) : appMode === 'symptoms' ? (
               <SymptomList
@@ -1213,6 +1225,7 @@ function App() {
           trackingMode={trackingMode}
           insightsSubtab={insightsSubtab}
           setInsightsSubtab={setInsightsSubtab}
+          setStackItems={setStackItems}
         />
       )}
 
@@ -1287,6 +1300,17 @@ function App() {
           setShowExport={setShowExport}
           setShowSettings={setShowSettings}
           isDesktop={isDesktop}
+          onForcePush={() => sync.forcePush({
+            symptoms,
+            entries,
+            dailyNotes,
+            stackItems,
+            stackEntries,
+            pinnedSymptoms: [...pinnedSymptoms],
+            trackingMode,
+            inputItems,
+            inputEntries,
+          })}
         />
       )}
 

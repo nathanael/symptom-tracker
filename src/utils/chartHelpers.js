@@ -96,6 +96,11 @@ export function smooth(values, windowSize) {
   });
 }
 
+export function formatXLabelWeekly(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export function formatXLabel(dateStr, timeframe) {
   const d = new Date(dateStr + 'T12:00:00');
   if (timeframe <= 28) {

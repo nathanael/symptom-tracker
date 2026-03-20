@@ -3,12 +3,17 @@ import { haptic } from '../utils/helpers';
 import {
   TIMEFRAMES, SMOOTH_WINDOWS,
   interpolateSmallGaps, smooth,
-  formatXLabel, getXLabelInterval, buildPath,
+  formatXLabel, formatXLabelWeekly, getXLabelInterval, buildPath,
 } from '../utils/chartHelpers';
 import {
   getSymptomDailySeries,
   getSupplementDoseSeries,
 } from '../utils/correlationHelpers';
+import {
+  aggregateDaily, aggregateWeekly, aggregateMonthly,
+  computeCumulativeLevel, aggregateSymptoms,
+} from '../utils/doseTransforms';
+import { matchSupplementCategory } from '../utils/supplementLookup';
 
 const SYMPTOM_STYLES = [
   { color: '#fb7185', chipBg: 'rgba(251,113,133,0.12)', chipBorder: 'rgba(251,113,133,0.35)' },
@@ -25,6 +30,7 @@ export default function ComparisonStudio({
   stackEntries,
   trackingMode,
   isDesktop,
+  setStackItems,
 }) {
   const STORAGE_KEY = 'comparisonStudioSelections';
 
@@ -39,7 +45,6 @@ export default function ComparisonStudio({
 
   // Compute smart defaults: supplement with most history, one random active symptom
   const smartDefaults = useMemo(() => {
-    // Find supplement with most entries in stackEntries
     let bestSupp = '';
     let bestCount = 0;
     for (const item of (stackItems || [])) {
@@ -50,7 +55,6 @@ export default function ComparisonStudio({
       }
       if (count > bestCount) { bestCount = count; bestSupp = item.id; }
     }
-    // Pick first active symptom as fallback "random" pick
     const defaultSymptom = activeSymptoms.length > 0 ? activeSymptoms[0].id : '';
     return { supplement: bestSupp, symptom: defaultSymptom };
   }, [stackItems, stackEntries, activeSymptoms]);
@@ -60,21 +64,23 @@ export default function ComparisonStudio({
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (saved) {
-        // Validate saved supplement still exists
         const suppValid = saved.supplement && (stackItems || []).some(i => i.id === saved.supplement);
-        // Validate saved symptoms still exist as active
         const validSymptoms = (saved.symptoms || []).filter(
           id => (symptoms || []).some(s => s.id === id && s.active)
         );
         return {
           supplement: suppValid ? saved.supplement : '',
           symptoms: validSymptoms.length > 0 ? validSymptoms : (smartDefaults.symptom ? [smartDefaults.symptom] : []),
+          viewMode: saved.viewMode && ['daily', 'weekly', 'monthly', 'cumulative'].includes(saved.viewMode) ? saved.viewMode : 'daily',
+          aggMode: saved.aggMode && ['average', 'total'].includes(saved.aggMode) ? saved.aggMode : 'average',
         };
       }
     } catch {}
     return {
       supplement: '',
       symptoms: smartDefaults.symptom ? [smartDefaults.symptom] : [],
+      viewMode: 'daily',
+      aggMode: 'average',
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount only
@@ -88,9 +94,12 @@ export default function ComparisonStudio({
   const suppSearchRef = useRef(null);
   const symSearchRef = useRef(null);
   const [timeframe, setTimeframe] = useState(60);
-  const [startOffset, setStartOffset] = useState(0); // days back from today for the end of the window
+  const [startOffset, setStartOffset] = useState(0);
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
+  const [viewMode, setViewMode] = useState(initialSelections.viewMode);
+  const [aggMode, setAggMode] = useState(initialSelections.aggMode);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   // Mobile pan gesture state
   const panRef = useRef({ startX: 0, startOffset: 0, isPanning: false, startTime: 0 });
@@ -106,9 +115,14 @@ export default function ComparisonStudio({
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         supplement: selectedSupplement,
         symptoms: selectedSymptoms,
+        viewMode,
+        aggMode,
       }));
     } catch {}
-  }, [selectedSupplement, selectedSymptoms]);
+  }, [selectedSupplement, selectedSymptoms, viewMode, aggMode]);
+
+  // Close category picker when view/supplement changes
+  useEffect(() => { setShowCategoryPicker(false); }, [viewMode, selectedSupplement]);
 
   // Symptom selection
   const toggleSymptom = (symId) => {
@@ -148,7 +162,7 @@ export default function ComparisonStudio({
   );
   const suppUnit = suppItem?.unit || 'mg';
 
-  // SVG — narrower chart, 40% taller, legend goes to the right
+  // SVG dimensions
   const W = 500, H = 280;
   const padLeft = 36, padRight = 20, padTop = 14, padBottom = 22;
   const chartW = W - padLeft - padRight;
@@ -158,11 +172,10 @@ export default function ComparisonStudio({
 
   const windowSize = SMOOTH_WINDOWS[timeframe] || 5;
 
-  // Supplement: dose series — 0 on untaken days so the line is continuous
-  const suppDoseRaw = useMemo(() => {
+  // Supplement: raw dose series with outlier capping
+  const suppDoseDaily = useMemo(() => {
     if (!selectedSupplement) return null;
     const raw = getSupplementDoseSeries(stackEntries, stackItems, selectedSupplement, dates);
-    // Cap outlier doses: use 95th percentile × 3 to ignore bogus spikes
     const valid = raw.filter(v => v !== null && v > 0).sort((a, b) => a - b);
     let capped = raw;
     if (valid.length > 2) {
@@ -170,20 +183,41 @@ export default function ComparisonStudio({
       const cap = p95 * 3;
       capped = raw.map(v => (v !== null && v > cap) ? cap : v);
     }
-    // Fill nulls with 0 so the line drops to 0 on untaken days
+    // For cumulative view, keep nulls (computeCumulativeLevel handles them internally)
+    if (viewMode === 'cumulative') return capped;
     return capped.map(v => v === null ? 0 : v);
-  }, [selectedSupplement, stackEntries, stackItems, dates]);
+  }, [selectedSupplement, stackEntries, stackItems, dates, viewMode]);
 
-  // Dose Y-axis range
+  // Transform helper
+  const transformDose = useCallback((series, dts) => {
+    switch (viewMode) {
+      case 'weekly': return aggregateWeekly(series, dts, aggMode);
+      case 'monthly': return aggregateMonthly(series, dts, aggMode);
+      case 'cumulative': {
+        const item = (stackItems || []).find(i => i.id === selectedSupplement);
+        const category = item?.halfLifeCategory || null;
+        return computeCumulativeLevel(series, dts, category);
+      }
+      default: return aggregateDaily(series, dts);
+    }
+  }, [viewMode, aggMode, stackItems, selectedSupplement]);
+
+  // Transformed supplement data
+  const suppTransformed = useMemo(() => {
+    if (!suppDoseDaily) return null;
+    return transformDose(suppDoseDaily, dates);
+  }, [suppDoseDaily, dates, transformDose]);
+
+  // Y-axis range (from transformed data)
   const suppYMax = useMemo(() => {
-    if (!suppDoseRaw) return 100;
-    let max = 0;
-    suppDoseRaw.forEach(v => { if (v !== null && v > max) max = v; });
-    const ceiling = max > 0 ? Math.ceil(max * 1.1) : (suppItem?.defaultDose || 100);
-    return Math.max(ceiling, suppItem?.defaultDose || 100);
-  }, [suppDoseRaw, suppItem]);
+    if (!suppTransformed) return 100;
+    const max = Math.max(...suppTransformed.values.filter(v => v !== null && v !== undefined));
+    if (!isFinite(max) || max <= 0) return suppItem?.defaultDose || 100;
+    const ceiling = Math.ceil(max * 1.1);
+    return viewMode === 'cumulative' ? ceiling : Math.max(ceiling, suppItem?.defaultDose || 100);
+  }, [suppTransformed, suppItem, viewMode]);
 
-  // Nice-number Y-axis labels: always ~4-6 labels regardless of range
+  // Nice-number Y-axis labels
   const suppYLabels = useMemo(() => {
     const range = suppYMax;
     const roughStep = range / 5;
@@ -195,38 +229,70 @@ export default function ComparisonStudio({
     return labels;
   }, [suppYMax]);
 
-  const symptomData = useMemo(() =>
+  // Symptom data with transforms
+  const symptomTransformed = useMemo(() =>
     selectedSymptoms.map(symId => {
       const filled = interpolateSmallGaps(getSymptomDailySeries(entries, symId, dates, trackingMode));
-      return { raw: filled, smoothed: smooth(filled, windowSize) };
+      const smoothed = smooth(filled, windowSize);
+      const transformed = aggregateSymptoms(smoothed, dates, viewMode);
+      return { raw: filled, smoothed, transformed };
     }),
-    [selectedSymptoms, entries, dates, trackingMode, windowSize]
+    [selectedSymptoms, entries, dates, trackingMode, windowSize, viewMode]
   );
 
   // ── Chart points ──
 
   const suppPoints = useMemo(() => {
-    if (!suppDoseRaw) return null;
-    return suppDoseRaw.map((val, i) => ({
-      x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
-      y: val === null ? null : padTop + chartH - (val / suppYMax) * chartH,
-      val,
-    }));
-  }, [suppDoseRaw, dates.length, chartW, chartH, suppYMax]);
+    if (!suppTransformed) return null;
+    const { values, dates: txDates } = suppTransformed;
+    const maxIdx = Math.max(1, txDates.length - 1);
+    return values.map((val, i) => {
+      const dateIdx = dates.indexOf(txDates[i]);
+      const x = dateIdx >= 0
+        ? padLeft + (dateIdx / Math.max(1, dates.length - 1)) * chartW
+        : padLeft + (i / maxIdx) * chartW;
+      return {
+        x,
+        y: val === null ? null : padTop + chartH - (val / suppYMax) * chartH,
+        val,
+      };
+    });
+  }, [suppTransformed, dates, chartW, chartH, suppYMax]);
 
   const symptomPointSets = useMemo(() =>
-    symptomData.map(sd =>
-      sd.smoothed.map((val, i) => ({
-        x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
-        y: val === null ? null : padTop + chartH - (val / 5) * chartH,
-        val,
-      }))
-    ),
-    [symptomData, dates.length, chartW, chartH]
+    symptomTransformed.map(sd => {
+      const { values, dates: txDates } = sd.transformed;
+      const maxIdx = Math.max(1, txDates.length - 1);
+      return values.map((val, i) => {
+        const dateIdx = dates.indexOf(txDates[i]);
+        const x = dateIdx >= 0
+          ? padLeft + (dateIdx / Math.max(1, dates.length - 1)) * chartW
+          : padLeft + (i / maxIdx) * chartW;
+        return {
+          x,
+          y: val === null ? null : padTop + chartH - (val / 5) * chartH,
+          val,
+        };
+      });
+    }),
+    [symptomTransformed, dates, chartW, chartH]
   );
 
   const interval = getXLabelInterval(timeframe);
   const xLabels = useMemo(() => {
+    if (viewMode === 'weekly' || viewMode === 'monthly') {
+      if (!suppTransformed) return [];
+      return suppTransformed.dates.map((dateStr, i) => {
+        const dateIdx = dates.indexOf(dateStr);
+        const x = dateIdx >= 0
+          ? padLeft + (dateIdx / Math.max(1, dates.length - 1)) * chartW
+          : padLeft + (i / Math.max(1, suppTransformed.dates.length - 1)) * chartW;
+        const label = viewMode === 'weekly'
+          ? formatXLabelWeekly(suppTransformed.labels[i])
+          : suppTransformed.labels[i];
+        return { x, label };
+      });
+    }
     const labels = [];
     for (let i = 0; i < dates.length; i += interval) {
       labels.push({
@@ -235,15 +301,25 @@ export default function ComparisonStudio({
       });
     }
     return labels;
-  }, [dates, interval, chartW, timeframe]);
+  }, [viewMode, suppTransformed, dates, interval, chartW, timeframe]);
 
-  // Touch/mouse
+  // Touch/mouse — adapted for aggregated views
   const getSnappedIndex = useCallback((clientX) => {
     if (!svgRef.current) return null;
     const rect = svgRef.current.getBoundingClientRect();
-    const idx = Math.round(((clientX - rect.left) / rect.width * W - padLeft) / chartW * (dates.length - 1));
+    const xPx = (clientX - rect.left) / rect.width * W;
+
+    if ((viewMode === 'weekly' || viewMode === 'monthly') && suppPoints) {
+      let minDist = Infinity, bestIdx = 0;
+      for (let i = 0; i < suppPoints.length; i++) {
+        const dist = Math.abs(suppPoints[i].x - xPx);
+        if (dist < minDist) { minDist = dist; bestIdx = i; }
+      }
+      return bestIdx;
+    }
+    const idx = Math.round((xPx - padLeft) / chartW * (dates.length - 1));
     return Math.max(0, Math.min(dates.length - 1, idx));
-  }, [chartW, dates.length]);
+  }, [chartW, dates.length, viewMode, suppPoints]);
 
   // Desktop: simple crosshair on hover
   const handleMouseMove = (e) => setTouchX(getSnappedIndex(e.clientX));
@@ -268,20 +344,16 @@ export default function ComparisonStudio({
     const dx = x - panRef.current.startX;
     const absDx = Math.abs(dx);
 
-    // If moved more than 15px horizontally, treat as pan gesture
     if (absDx > 15) {
       panRef.current.isPanning = true;
-      setTouchX(null); // hide crosshair during pan
-      // Convert pixel distance to days: full chart width = timeframe days
+      setTouchX(null);
       if (!svgRef.current) return;
       const chartPxWidth = svgRef.current.getBoundingClientRect().width;
       const daysPer_px = timeframe / chartPxWidth;
-      // Dragging right = going back in time (increase offset), left = forward (decrease)
       const daysDelta = Math.round(dx * daysPer_px);
       const newOffset = Math.max(0, Math.min(maxOffsetRef.current, panRef.current.startOffset + daysDelta));
       setStartOffset(newOffset);
     } else {
-      // Small movement — show crosshair
       setTouchX(getSnappedIndex(x));
     }
   }, [timeframe, getSnappedIndex]);
@@ -293,29 +365,46 @@ export default function ComparisonStudio({
 
   const crosshairData = useMemo(() => {
     if (touchX === null) return null;
-    const d = new Date(dates[touchX] + 'T12:00:00');
-    const dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const items = [];
-    if (suppPoints) {
-      items.push({
-        name: suppItem?.name,
-        color: SUPP_COLOR,
-        val: suppPoints[touchX]?.val,
-        unit: suppUnit,
+
+    let dateLabel, suppVal, suppX, symptomVals;
+
+    if (viewMode === 'weekly' || viewMode === 'monthly') {
+      const txLabel = suppTransformed?.labels?.[touchX];
+      dateLabel = viewMode === 'weekly'
+        ? formatXLabelWeekly(txLabel)
+        : txLabel;
+      suppVal = suppPoints?.[touchX]?.val;
+      suppX = suppPoints?.[touchX]?.x;
+      symptomVals = selectedSymptoms.map((_, idx) => {
+        const symTx = symptomTransformed[idx]?.transformed;
+        return symTx?.values?.[touchX] ?? null;
+      });
+    } else {
+      const d = new Date(dates[touchX] + 'T12:00:00');
+      dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      suppVal = suppPoints?.[touchX]?.val;
+      suppX = padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW;
+      symptomVals = selectedSymptoms.map((_, idx) => {
+        const pts = symptomPointSets[idx];
+        return pts?.[touchX]?.val ?? null;
       });
     }
+
+    const items = [];
+    if (suppPoints) {
+      items.push({ name: suppItem?.name, color: SUPP_COLOR, val: suppVal, unit: suppUnit });
+    }
     selectedSymptoms.forEach((symId, idx) => {
-      if (symptomPointSets[idx]) {
-        items.push({
-          name: symptoms.find(s => s.id === symId)?.name,
-          color: SYMPTOM_STYLES[idx].color,
-          val: symptomPointSets[idx][touchX]?.val,
-          unit: '/5',
-        });
-      }
+      items.push({
+        name: symptoms.find(s => s.id === symId)?.name,
+        color: SYMPTOM_STYLES[idx].color,
+        val: symptomVals[idx],
+        unit: '/5',
+      });
     });
-    return { dateLabel, items, x: padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW };
-  }, [touchX, dates, suppPoints, symptomPointSets, suppItem, suppUnit, symptoms, selectedSymptoms, chartW]);
+    return { dateLabel, items, x: suppX };
+  }, [touchX, viewMode, dates, suppPoints, suppTransformed, symptomTransformed,
+    symptomPointSets, suppItem, suppUnit, symptoms, selectedSymptoms, chartW]);
 
   // Legend: show crosshair values when hovering, averages otherwise
   const legendItems = useMemo(() => {
@@ -325,13 +414,13 @@ export default function ComparisonStudio({
       return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
     };
     const items = [];
-    if (suppDoseRaw) {
-      const takenOnly = suppDoseRaw.filter(v => v > 0);
-      const suppAvg = takenOnly.length > 0 ? takenOnly.reduce((a, b) => a + b, 0) / takenOnly.length : null;
+    if (suppTransformed) {
+      const vals = suppTransformed.values.filter(v => v !== null && v > 0);
+      const suppAvg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
       items.push({ name: suppItem?.name, color: SUPP_COLOR, val: suppAvg, unit: suppUnit });
     }
     selectedSymptoms.forEach((symId, idx) => {
-      const sd = symptomData[idx];
+      const sd = symptomTransformed[idx];
       if (sd) {
         items.push({
           name: symptoms.find(s => s.id === symId)?.name,
@@ -342,7 +431,7 @@ export default function ComparisonStudio({
       }
     });
     return { dateLabel: 'Average', items, x: null };
-  }, [crosshairData, suppDoseRaw, symptomData, suppItem, suppUnit, symptoms, selectedSymptoms]);
+  }, [crosshairData, suppTransformed, symptomTransformed, suppItem, suppUnit, symptoms, selectedSymptoms]);
 
   // Max offset: based on earliest data point across selected symptoms/supplement
   const maxOffset = useMemo(() => {
@@ -350,7 +439,6 @@ export default function ComparisonStudio({
     today.setHours(12, 0, 0, 0);
     let earliest = null;
 
-    // Check selected symptoms
     for (const symId of selectedSymptoms) {
       for (const key of Object.keys(entries || {})) {
         if (key.includes(`-${symId}-`)) {
@@ -360,7 +448,6 @@ export default function ComparisonStudio({
       }
     }
 
-    // Check selected supplement
     if (selectedSupplement) {
       for (const key of Object.keys(stackEntries || {})) {
         if (key.endsWith(`-${selectedSupplement}`)) {
@@ -391,7 +478,7 @@ export default function ComparisonStudio({
   }, [dates]);
 
   const hasAnySeries = selectedSupplement || selectedSymptoms.length > 0;
-  const showDots = timeframe <= 28;
+  const showDots = timeframe <= 28 && (viewMode === 'daily' || viewMode === 'cumulative');
 
   // Shared input box style for all three selectors
   const inputBoxStyle = {
@@ -401,6 +488,137 @@ export default function ComparisonStudio({
     height: '38px',
     boxSizing: 'border-box',
   };
+
+  // ── View mode selector (shared between desktop/mobile) ──
+  const viewModeSelector = (mobile) => (
+    <div style={{
+      display: 'flex', gap: '0',
+      borderRadius: '7px',
+      border: '1px solid rgba(255,255,255,0.08)',
+      background: 'rgba(255,255,255,0.04)',
+      padding: '2px',
+      marginBottom: mobile ? '6px' : '8px',
+    }}>
+      {['daily', 'weekly', 'monthly', 'cumulative'].map(mode => (
+        <button key={mode}
+          onClick={() => { setViewMode(mode); haptic('light'); }}
+          style={{
+            padding: mobile ? '5px 0' : '3px 0',
+            flex: 1,
+            borderRadius: '5px', border: 'none',
+            background: viewMode === mode ? 'rgba(255,255,255,0.12)' : 'transparent',
+            color: viewMode === mode ? '#fff' : '#6b7280',
+            fontSize: mobile ? '11px' : '10px', fontWeight: '500', cursor: 'pointer',
+            textTransform: 'capitalize',
+          }}
+        >
+          {mode}
+        </button>
+      ))}
+    </div>
+  );
+
+  const aggModeToggle = (mobile) => (viewMode === 'weekly' || viewMode === 'monthly') ? (
+    <div style={{
+      display: 'flex', gap: '0',
+      borderRadius: '7px',
+      border: '1px solid rgba(255,255,255,0.08)',
+      background: 'rgba(255,255,255,0.04)',
+      padding: '2px',
+      marginBottom: mobile ? '6px' : '8px',
+      maxWidth: '160px',
+    }}>
+      {['average', 'total'].map(mode => (
+        <button key={mode}
+          onClick={() => { setAggMode(mode); haptic('light'); }}
+          style={{
+            padding: mobile ? '5px 0' : '3px 0',
+            flex: 1,
+            borderRadius: '5px', border: 'none',
+            background: aggMode === mode ? 'rgba(255,255,255,0.12)' : 'transparent',
+            color: aggMode === mode ? '#fff' : '#6b7280',
+            fontSize: mobile ? '11px' : '10px', fontWeight: '500', cursor: 'pointer',
+          }}
+        >
+          {mode === 'average' ? 'Avg/Day' : 'Total'}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
+  // Inline half-life category editor (cumulative view only)
+  const categoryBadge = viewMode === 'cumulative' && selectedSupplement && (() => {
+    const item = (stackItems || []).find(i => i.id === selectedSupplement);
+    const category = item?.halfLifeCategory
+      || matchSupplementCategory(item?.name)
+      || 'moderate';
+    const isDefault = !item?.halfLifeCategory;
+    return (
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <button
+          onClick={() => setShowCategoryPicker(prev => !prev)}
+          style={{
+            padding: '2px 8px',
+            borderRadius: '10px',
+            border: '1px solid rgba(255,255,255,0.15)',
+            background: 'rgba(139,92,246,0.15)',
+            color: '#a78bfa',
+            fontSize: '10px',
+            cursor: 'pointer',
+            marginLeft: '8px',
+          }}
+        >
+          {category.charAt(0).toUpperCase() + category.slice(1)}
+          {isDefault ? ' (default)' : ''} decay
+        </button>
+        {showCategoryPicker && (
+          <div style={{
+            position: 'absolute', top: '100%', left: '8px',
+            marginTop: '4px', zIndex: 10,
+            background: '#1e293b', border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '8px', padding: '4px', minWidth: '120px',
+          }}>
+            {['fast', 'moderate', 'slow'].map(cat => (
+              <button key={cat}
+                onClick={() => {
+                  if (setStackItems) {
+                    setStackItems(prev => prev.map(i =>
+                      i.id === selectedSupplement ? { ...i, halfLifeCategory: cat } : i
+                    ));
+                  }
+                  setShowCategoryPicker(false);
+                  haptic('light');
+                }}
+                style={{
+                  display: 'block', width: '100%', padding: '6px 10px',
+                  border: 'none', borderRadius: '4px',
+                  background: cat === category ? 'rgba(139,92,246,0.2)' : 'transparent',
+                  color: '#e2e8f0', fontSize: '12px', cursor: 'pointer',
+                  textAlign: 'left', textTransform: 'capitalize',
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  })();
+
+  // Area fill path for cumulative view
+  const areaFillPath = useMemo(() => {
+    if (viewMode !== 'cumulative' || !suppPoints) return '';
+    const validPoints = suppPoints.filter(pt => pt.y !== null);
+    if (validPoints.length === 0) return '';
+    let d = `M${validPoints[0].x},${padTop + chartH}`;
+    d += `L${validPoints[0].x},${validPoints[0].y}`;
+    for (let i = 1; i < validPoints.length; i++) {
+      d += `L${validPoints[i].x},${validPoints[i].y}`;
+    }
+    d += `L${validPoints[validPoints.length - 1].x},${padTop + chartH}Z`;
+    return d;
+  }, [viewMode, suppPoints, chartH]);
 
   // ── Supplement picker panel ──
   const selectSupplement = (suppId) => {
@@ -671,6 +889,88 @@ export default function ComparisonStudio({
     </div>
   ) : null;
 
+  // ── SVG chart content (shared between desktop/mobile) ──
+  const chartSVGContent = (
+    <>
+      {/* Grid lines */}
+      {selectedSupplement ? (
+        suppYLabels.map(val => {
+          const y = padTop + chartH - (val / suppYMax) * chartH;
+          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
+        })
+      ) : (
+        [0, 1, 2, 3, 4, 5].map(sev => {
+          const y = padTop + chartH - (sev / 5) * chartH;
+          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
+        })
+      )}
+
+      {/* Left Y-axis */}
+      {selectedSupplement ? (
+        suppYLabels.map(val => {
+          const y = padTop + chartH - (val / suppYMax) * chartH;
+          return (
+            <text key={`l-${val}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
+              fill="#6b7280" fontSize="7" fontFamily="system-ui">{val}</text>
+          );
+        })
+      ) : (
+        [0, 1, 2, 3, 4, 5].map(sev => {
+          const y = padTop + chartH - (sev / 5) * chartH;
+          return (
+            <text key={`l-${sev}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
+              fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
+          );
+        })
+      )}
+
+      {/* Right Y-axis: severity (only when dual-axis mode) */}
+      {selectedSupplement && selectedSymptoms.length > 0 && [0, 2.5, 5].map(sev => {
+        const y = padTop + chartH - (sev / 5) * chartH;
+        return (
+          <text key={`r-${sev}`} x={W - padRight + 5} y={y + 2.5} textAnchor="start"
+            fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
+        );
+      })}
+
+      {/* X-axis */}
+      {xLabels.map((lbl, i) => (
+        <text key={i} x={lbl.x} y={H - 5} textAnchor="middle"
+          fill="#6b7280" fontSize="7" fontFamily="system-ui">{lbl.label}</text>
+      ))}
+
+      {/* Cumulative area fill */}
+      {areaFillPath && (
+        <path d={areaFillPath} fill={SUPP_COLOR} fillOpacity="0.12" stroke="none" />
+      )}
+
+      {/* Supplement line */}
+      {suppPoints && (
+        <g>
+          <path d={buildPath(suppPoints)} fill="none" stroke={SUPP_COLOR} strokeWidth="1.2" strokeLinejoin="round" />
+          {showDots && suppPoints.map((pt, i) => (
+            pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r="1.8" fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth="0.8" />
+          ))}
+        </g>
+      )}
+
+      {/* Symptom lines */}
+      {symptomPointSets.map((pts, idx) => (
+        <g key={`sym-${idx}`}>
+          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="1" strokeLinejoin="round" />
+          {showDots && pts.map((pt, i) => (
+            pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r="1.2" fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="0.7" />
+          ))}
+        </g>
+      ))}
+
+      {/* Crosshair */}
+      {crosshairData && (
+        <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
+      )}
+    </>
+  );
+
   // ── Render ──
 
   return (
@@ -827,6 +1127,7 @@ export default function ComparisonStudio({
               + Symptom
             </span>
           )}
+          {categoryBadge}
         </div>
       )}
 
@@ -869,6 +1170,10 @@ export default function ComparisonStudio({
                   display: 'flex', flexDirection: 'column',
                   borderRight: '1px solid rgba(255,255,255,0.04)',
                 }}>
+                  {/* View Mode Selector */}
+                  {viewModeSelector(false)}
+                  {aggModeToggle(false)}
+
                   {/* Timeframe pills */}
                   <div style={{
                     display: 'flex', gap: '0',
@@ -905,6 +1210,13 @@ export default function ComparisonStudio({
                       />
                     </div>
                   </div>
+
+                  {/* Category badge (desktop) */}
+                  {categoryBadge && (
+                    <div style={{ marginBottom: '14px' }}>
+                      {categoryBadge}
+                    </div>
+                  )}
 
                   {/* Date / Average header */}
                   <div style={{
@@ -949,83 +1261,17 @@ export default function ComparisonStudio({
                     onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
                     style={{ display: 'block' }}
                   >
-                    {/* Grid lines */}
-                    {selectedSupplement ? (
-                      suppYLabels.map(val => {
-                        const y = padTop + chartH - (val / suppYMax) * chartH;
-                        return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
-                      })
-                    ) : (
-                      [0, 1, 2, 3, 4, 5].map(sev => {
-                        const y = padTop + chartH - (sev / 5) * chartH;
-                        return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
-                      })
-                    )}
-
-                    {/* Left Y-axis */}
-                    {selectedSupplement ? (
-                      suppYLabels.map(val => {
-                        const y = padTop + chartH - (val / suppYMax) * chartH;
-                        return (
-                          <text key={`l-${val}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
-                            fill="#6b7280" fontSize="7" fontFamily="system-ui">{val}</text>
-                        );
-                      })
-                    ) : (
-                      [0, 1, 2, 3, 4, 5].map(sev => {
-                        const y = padTop + chartH - (sev / 5) * chartH;
-                        return (
-                          <text key={`l-${sev}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
-                            fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
-                        );
-                      })
-                    )}
-
-                    {/* Right Y-axis: severity (only when dual-axis mode) */}
-                    {selectedSupplement && selectedSymptoms.length > 0 && [0, 2.5, 5].map(sev => {
-                      const y = padTop + chartH - (sev / 5) * chartH;
-                      return (
-                        <text key={`r-${sev}`} x={W - padRight + 5} y={y + 2.5} textAnchor="start"
-                          fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
-                      );
-                    })}
-
-                    {/* X-axis */}
-                    {xLabels.map((lbl, i) => (
-                      <text key={i} x={lbl.x} y={H - 5} textAnchor="middle"
-                        fill="#6b7280" fontSize="7" fontFamily="system-ui">{lbl.label}</text>
-                    ))}
-
-                    {/* Supplement line */}
-                    {suppPoints && (
-                      <g>
-                        <path d={buildPath(suppPoints)} fill="none" stroke={SUPP_COLOR} strokeWidth="1.2" strokeLinejoin="round" />
-                        {showDots && suppPoints.map((pt, i) => (
-                          pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r="1.8" fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth="0.8" />
-                        ))}
-                      </g>
-                    )}
-
-                    {/* Symptom lines */}
-                    {symptomPointSets.map((pts, idx) => (
-                      <g key={`sym-${idx}`}>
-                        <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="1" strokeLinejoin="round" />
-                        {showDots && pts.map((pt, i) => (
-                          pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r="1.2" fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="0.7" />
-                        ))}
-                      </g>
-                    ))}
-
-                    {/* Crosshair */}
-                    {crosshairData && (
-                      <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-                    )}
+                    {chartSVGContent}
                   </svg>
                 </div>
               </div>
             ) : (
               /* ── Mobile: vertical stack ── */
               <div>
+                {/* View Mode Selector */}
+                {viewModeSelector(true)}
+                {aggModeToggle(true)}
+
                 {/* Timeframe pills — full width */}
                 <div style={{
                   display: 'flex', gap: '0',
@@ -1052,7 +1298,7 @@ export default function ComparisonStudio({
                   ))}
                 </div>
 
-                {/* Date range label — swipe chart to scroll */}
+                {/* Date range label */}
                 <div style={{ textAlign: 'center', marginBottom: '6px' }}>
                   <span style={{ color: '#9ca3af', fontSize: '10px' }}>{dateWindowLabel}</span>
                 </div>
@@ -1064,77 +1310,7 @@ export default function ComparisonStudio({
                     onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
                     style={{ display: 'block' }}
                   >
-                    {/* Grid lines */}
-                    {selectedSupplement ? (
-                      suppYLabels.map(val => {
-                        const y = padTop + chartH - (val / suppYMax) * chartH;
-                        return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
-                      })
-                    ) : (
-                      [0, 1, 2, 3, 4, 5].map(sev => {
-                        const y = padTop + chartH - (sev / 5) * chartH;
-                        return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
-                      })
-                    )}
-
-                    {/* Left Y-axis */}
-                    {selectedSupplement ? (
-                      suppYLabels.map(val => {
-                        const y = padTop + chartH - (val / suppYMax) * chartH;
-                        return (
-                          <text key={`l-${val}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
-                            fill="#6b7280" fontSize="7" fontFamily="system-ui">{val}</text>
-                        );
-                      })
-                    ) : (
-                      [0, 1, 2, 3, 4, 5].map(sev => {
-                        const y = padTop + chartH - (sev / 5) * chartH;
-                        return (
-                          <text key={`l-${sev}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
-                            fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
-                        );
-                      })
-                    )}
-
-                    {/* Right Y-axis: severity (only when dual-axis mode) */}
-                    {selectedSupplement && selectedSymptoms.length > 0 && [0, 2.5, 5].map(sev => {
-                      const y = padTop + chartH - (sev / 5) * chartH;
-                      return (
-                        <text key={`r-${sev}`} x={W - padRight + 5} y={y + 2.5} textAnchor="start"
-                          fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
-                      );
-                    })}
-
-                    {/* X-axis */}
-                    {xLabels.map((lbl, i) => (
-                      <text key={i} x={lbl.x} y={H - 5} textAnchor="middle"
-                        fill="#6b7280" fontSize="7" fontFamily="system-ui">{lbl.label}</text>
-                    ))}
-
-                    {/* Supplement line */}
-                    {suppPoints && (
-                      <g>
-                        <path d={buildPath(suppPoints)} fill="none" stroke={SUPP_COLOR} strokeWidth="1.2" strokeLinejoin="round" />
-                        {showDots && suppPoints.map((pt, i) => (
-                          pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r="1.8" fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth="0.8" />
-                        ))}
-                      </g>
-                    )}
-
-                    {/* Symptom lines */}
-                    {symptomPointSets.map((pts, idx) => (
-                      <g key={`sym-${idx}`}>
-                        <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="1" strokeLinejoin="round" />
-                        {showDots && pts.map((pt, i) => (
-                          pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r="1.2" fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="0.7" />
-                        ))}
-                      </g>
-                    ))}
-
-                    {/* Crosshair */}
-                    {crosshairData && (
-                      <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-                    )}
+                    {chartSVGContent}
                   </svg>
                 </div>
 

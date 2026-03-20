@@ -12,6 +12,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
     schedule: { type: 'daily' },
   });
   const [revertedIndex, setRevertedIndex] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Initialize form data from item - only when editing a different supplement
   // Using item?.id prevents cloud sync from resetting user's in-progress edits
@@ -26,6 +27,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
         defaultDose: item.defaultDose || '',
         unit: item.unit || 'mg',
         schedule: item.schedule || { type: 'daily' },
+        halfLifeCategory: item.halfLifeCategory || null,
       });
     }
   }, [item]);
@@ -50,6 +52,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
         defaultDose: restoredState.defaultDose || '',
         unit: restoredState.unit || 'mg',
         schedule: restoredState.schedule || { type: 'daily' },
+        halfLifeCategory: restoredState.halfLifeCategory || null,
       });
       setRevertedIndex(index);
       // Clear the flash after animation
@@ -65,6 +68,7 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
       defaultDose: parseFloat(formData.defaultDose) || item.defaultDose,
       unit: formData.unit,
       schedule: formData.schedule,
+      halfLifeCategory: formData.halfLifeCategory,
     });
   }, [formData, item, onSave]);
 
@@ -315,6 +319,52 @@ export default function SupplementEdit({ item, onSave, onCancel }) {
               schedule={formData.schedule}
               onChange={(schedule) => setFormData({ ...formData, schedule })}
             />
+          </div>
+
+          {/* Advanced Settings */}
+          <div style={{ marginBottom: '24px' }}>
+            <button
+              onClick={() => setShowAdvanced(prev => !prev)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#64748b', fontSize: '12px', fontWeight: '500',
+                padding: '0', display: 'flex', alignItems: 'center', gap: '4px',
+              }}
+            >
+              <span style={{
+                transform: showAdvanced ? 'rotate(90deg)' : 'rotate(0deg)',
+                transition: 'transform 0.15s', display: 'inline-block', fontSize: '10px',
+              }}>▶</span>
+              Advanced
+            </button>
+            {showAdvanced && (
+              <div style={{ marginTop: '12px' }}>
+                <label style={{
+                  color: '#94a3b8', fontSize: '13px', fontWeight: '500',
+                  marginBottom: '6px', display: 'block',
+                }}>
+                  Decay Rate
+                </label>
+                <select
+                  value={formData.halfLifeCategory || ''}
+                  onChange={(e) => setFormData({ ...formData, halfLifeCategory: e.target.value || null })}
+                  style={{
+                    width: '100%', padding: '10px 12px', borderRadius: '8px',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(255,255,255,0.06)', color: '#e2e8f0',
+                    fontSize: '14px',
+                  }}
+                >
+                  <option value="">Auto / Default (Moderate)</option>
+                  <option value="fast">Fast (~12 hours)</option>
+                  <option value="moderate">Moderate (~3 days)</option>
+                  <option value="slow">Slow (~21 days)</option>
+                </select>
+                <div style={{ color: '#64748b', fontSize: '11px', marginTop: '4px' }}>
+                  Controls how the cumulative body level chart models this supplement's clearance rate.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* History Section */}

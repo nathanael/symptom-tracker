@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { getDateKey, haptic, isScheduledForDate, createHistoryEntry, recordHistoryChange, reconstructStateAtDate } from '../utils/helpers';
 import SchedulePicker, { formatSchedule } from './SchedulePicker';
 import SupplementEdit from './SupplementEdit';
+import { matchSupplementCategory } from '../utils/supplementLookup';
 
 export default function Stack({
   stackItems,
@@ -152,6 +153,8 @@ export default function Stack({
       ? newStackItem.schedule
       : { ...newStackItem.schedule, startDate: new Date().toISOString().split('T')[0] };
 
+    const autoCategory = matchSupplementCategory(newStackItem.name.trim());
+
     const newItem = {
       id: id,
       name: newStackItem.name.trim(),
@@ -159,6 +162,7 @@ export default function Stack({
       defaultDose: parseFloat(newStackItem.defaultDose),
       description: newStackItem.description.trim() || '',
       schedule: schedule,
+      halfLifeCategory: autoCategory || null,
       active: true,
       order: maxOrder + 1
     };
@@ -223,6 +227,7 @@ export default function Stack({
           unit: updatedData.unit,
           description: updatedData.description.trim(),
           schedule: updatedData.schedule,
+          halfLifeCategory: updatedData.halfLifeCategory ?? item.halfLifeCategory ?? null,
           active: item.active
         };
 

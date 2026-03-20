@@ -52,6 +52,7 @@ export default function Insights({
   trackingMode,
   insightsSubtab: insightsSubtabProp,
   setInsightsSubtab: setInsightsSubtabProp,
+  setStackItems,
 }) {
   const [expandedId, setExpandedId] = useState(null);
   // Desktop manages its own local subtab state; mobile gets it from App via BottomNav
@@ -132,6 +133,7 @@ export default function Insights({
             stackEntries={stackEntries}
             trackingMode={trackingMode}
             isDesktop={isDesktop}
+            setStackItems={setStackItems}
           />
         ) : (
         <>
