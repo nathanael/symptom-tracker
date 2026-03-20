@@ -490,6 +490,13 @@ export default function ComparisonStudio({
   };
 
   // ── View mode selector (shared between desktop/mobile) ──
+  // Resolve current decay category for cumulative view
+  const cumulativeCategory = (() => {
+    if (!selectedSupplement) return 'moderate';
+    const item = (stackItems || []).find(i => i.id === selectedSupplement);
+    return item?.halfLifeCategory || matchSupplementCategory(item?.name) || 'moderate';
+  })();
+
   const viewModeSelector = (mobile) => (
     <div style={{
       display: 'flex', gap: '0',
@@ -498,6 +505,7 @@ export default function ComparisonStudio({
       background: 'rgba(255,255,255,0.04)',
       padding: '2px',
       marginBottom: mobile ? '6px' : '8px',
+      position: 'relative',
     }}>
       {['daily', 'weekly', 'monthly', 'cumulative'].map(mode => (
         <button key={mode}
@@ -510,11 +518,63 @@ export default function ComparisonStudio({
             color: viewMode === mode ? '#fff' : '#6b7280',
             fontSize: mobile ? '11px' : '10px', fontWeight: '500', cursor: 'pointer',
             textTransform: 'capitalize',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
           }}
         >
           {mode}
+          {mode === 'cumulative' && viewMode === 'cumulative' && selectedSupplement && (
+            <span
+              onClick={(e) => { e.stopPropagation(); setShowCategoryPicker(prev => !prev); }}
+              style={{
+                fontSize: mobile ? '8px' : '7px',
+                padding: '1px 4px',
+                borderRadius: '6px',
+                background: 'rgba(139,92,246,0.25)',
+                color: '#a78bfa',
+                cursor: 'pointer',
+                lineHeight: '1.3',
+                textTransform: 'lowercase',
+              }}
+            >
+              {cumulativeCategory === 'moderate' ? 'mod' : cumulativeCategory}
+            </span>
+          )}
         </button>
       ))}
+      {showCategoryPicker && viewMode === 'cumulative' && (
+        <div style={{
+          position: 'absolute', top: '100%', right: '0',
+          marginTop: '4px', zIndex: 10,
+          background: '#1e293b', border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: '8px', padding: '4px', minWidth: '120px',
+        }}>
+          {['fast', 'moderate', 'slow'].map(cat => (
+            <button key={cat}
+              onClick={() => {
+                if (setStackItems) {
+                  setStackItems(prev => prev.map(i =>
+                    i.id === selectedSupplement ? { ...i, halfLifeCategory: cat } : i
+                  ));
+                }
+                setShowCategoryPicker(false);
+                haptic('light');
+              }}
+              style={{
+                display: 'block', width: '100%', padding: '6px 10px',
+                border: 'none', borderRadius: '4px',
+                background: cat === cumulativeCategory ? 'rgba(139,92,246,0.2)' : 'transparent',
+                color: '#e2e8f0', fontSize: '12px', cursor: 'pointer',
+                textAlign: 'left', textTransform: 'capitalize',
+              }}
+            >
+              {cat}
+              <span style={{ color: '#6b7280', fontSize: '10px', marginLeft: '6px' }}>
+                {cat === 'fast' ? '~12h' : cat === 'moderate' ? '~3d' : '~21d'}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -546,65 +606,6 @@ export default function ComparisonStudio({
     </div>
   ) : null;
 
-  // Inline half-life category editor (cumulative view only)
-  const categoryBadge = viewMode === 'cumulative' && selectedSupplement && (() => {
-    const item = (stackItems || []).find(i => i.id === selectedSupplement);
-    const category = item?.halfLifeCategory
-      || matchSupplementCategory(item?.name)
-      || 'moderate';
-    const isDefault = !item?.halfLifeCategory;
-    return (
-      <div style={{ position: 'relative', display: 'inline-block' }}>
-        <button
-          onClick={() => setShowCategoryPicker(prev => !prev)}
-          style={{
-            padding: '2px 8px',
-            borderRadius: '10px',
-            border: '1px solid rgba(255,255,255,0.15)',
-            background: 'rgba(139,92,246,0.15)',
-            color: '#a78bfa',
-            fontSize: '10px',
-            cursor: 'pointer',
-            marginLeft: '8px',
-          }}
-        >
-          {category.charAt(0).toUpperCase() + category.slice(1)}
-          {isDefault ? ' (default)' : ''} decay
-        </button>
-        {showCategoryPicker && (
-          <div style={{
-            position: 'absolute', top: '100%', left: '8px',
-            marginTop: '4px', zIndex: 10,
-            background: '#1e293b', border: '1px solid rgba(255,255,255,0.15)',
-            borderRadius: '8px', padding: '4px', minWidth: '120px',
-          }}>
-            {['fast', 'moderate', 'slow'].map(cat => (
-              <button key={cat}
-                onClick={() => {
-                  if (setStackItems) {
-                    setStackItems(prev => prev.map(i =>
-                      i.id === selectedSupplement ? { ...i, halfLifeCategory: cat } : i
-                    ));
-                  }
-                  setShowCategoryPicker(false);
-                  haptic('light');
-                }}
-                style={{
-                  display: 'block', width: '100%', padding: '6px 10px',
-                  border: 'none', borderRadius: '4px',
-                  background: cat === category ? 'rgba(139,92,246,0.2)' : 'transparent',
-                  color: '#e2e8f0', fontSize: '12px', cursor: 'pointer',
-                  textAlign: 'left', textTransform: 'capitalize',
-                }}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  })();
 
   // Area fill path for cumulative view
   const areaFillPath = useMemo(() => {
@@ -1127,7 +1128,6 @@ export default function ComparisonStudio({
               + Symptom
             </span>
           )}
-          {categoryBadge}
         </div>
       )}
 
@@ -1211,12 +1211,7 @@ export default function ComparisonStudio({
                     </div>
                   </div>
 
-                  {/* Category badge (desktop) */}
-                  {categoryBadge && (
-                    <div style={{ marginBottom: '14px' }}>
-                      {categoryBadge}
-                    </div>
-                  )}
+
 
                   {/* Date / Average header */}
                   <div style={{
