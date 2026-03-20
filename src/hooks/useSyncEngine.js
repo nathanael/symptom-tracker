@@ -26,14 +26,14 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
   const cloudRefRef = useRef(isApplyingCloudRef);
   cloudRefRef.current = isApplyingCloudRef;
 
-  // Counter to track how many apply batches are in flight
-  const applyCountRef = useRef(0);
-
-  // Apply cloud data to React state with union merge strategy
+  // Apply cloud data to React state with union merge strategy.
+  // Sets isApplyingCloudRef=true so useLocalStorage effects skip onChange.
+  // The ref is reset by a useEffect in App.jsx declared AFTER all useLocalStorage
+  // hooks — React guarantees declaration-order effect execution within a component,
+  // so the reset runs after all useLocalStorage effects have checked the flag.
   const applyCloudData = useCallback((updates, isInitial) => {
     const cloudRef = cloudRefRef.current;
     if (cloudRef) {
-      applyCountRef.current++;
       cloudRef.current = true;
     }
 
@@ -87,26 +87,8 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       setters.inputEntries(prev => ({ ...prev, ...updates.inputEntries }));
     }
 
-    // Reset flag after React has committed the batch AND run all useEffect
-    // callbacks triggered by the state changes above.  The old setTimeout(0)
-    // raced with React 18's effect scheduling (effects fire via MessageChannel,
-    // which can interleave with setTimeout(0)), causing useLocalStorage effects
-    // to see isApplyingCloudRef=false and erroneously notify the sync engine of
-    // "local" changes — marking domains dirty and blocking future server pulls.
-    //
-    // Two-frame delay: requestAnimationFrame fires after paint, then setTimeout
-    // fires in the next macrotask — well after React's useEffect commit phase.
-    if (cloudRef) {
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          applyCountRef.current--;
-          if (applyCountRef.current <= 0) {
-            applyCountRef.current = 0;
-            cloudRef.current = false;
-          }
-        }, 0);
-      });
-    }
+    // No timer-based reset here. The ref is reset by a useEffect in App.jsx
+    // that runs after all useLocalStorage effects (React declaration-order guarantee).
   }, []);
 
   // Create/destroy engine when uid changes
@@ -139,6 +121,7 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     engine.initialize().then((serverData) => {
       if (serverData && !engine._destroyed) {
         const domains = engine._extractDomains(serverData, 'skipPending');
+        console.log('[Sync] useSyncEngine: init resolved, applying domains:', Object.keys(domains), 'skippedPending:', [...engine.pendingChanges.keys()]);
         if (Object.keys(domains).length > 0) {
           applyCloudData(domains, true);
         }
@@ -146,6 +129,12 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
         if (ts) {
           setSyncStatus(prev => ({ ...prev, lastSynced: ts }));
         }
+      } else {
+        console.log('[Sync] useSyncEngine: init resolved with', serverData ? 'data (but destroyed)' : 'null');
+      }
+      // Start polling fallback if streaming listener isn't delivering server data
+      if (!engine._destroyed) {
+        engine._startPollingIfNeeded();
       }
     });
 
@@ -184,8 +173,16 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     }
   }, []);
 
+  const forcePush = useCallback((allData) => {
+    if (engineRef.current) {
+      return engineRef.current.forcePush(allData);
+    }
+    return Promise.resolve();
+  }, []);
+
   return {
     notifyChange,
+    forcePush,
     syncing: syncStatus.syncing,
     lastSynced: syncStatus.lastSynced,
     syncError: syncStatus.syncError,

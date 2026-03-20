@@ -29,6 +29,62 @@ const DEBOUNCE_MS = 500;
 const INIT_TIMEOUT_MS = 3000;
 const DIRTY_EXPIRY_MS = 30000; // Dirty flags older than 30s are likely stale
 
+const LOG_PREFIX = '[Sync]';
+const log = (...args) => console.log(LOG_PREFIX, ...args);
+const logWarn = (...args) => console.warn(LOG_PREFIX, ...args);
+const WRITE_TIMEOUT_MS = 8000;
+
+// Domains with large nested maps that must be stored as JSON strings
+// to avoid Firestore's INDEX_ENTRIES_COUNT_LIMIT_EXCEEDED (40k entry limit).
+const STRINGIFIED_DOMAINS = new Set([
+  'entries', 'dailyNotes', 'stackEntries', 'stackItems',
+  'symptoms', 'inputItems', 'inputEntries', 'pinnedSymptoms',
+]);
+
+/** Encode domain data for Firestore: stringify large domains. */
+function encodeDomain(domain, data) {
+  if (STRINGIFIED_DOMAINS.has(domain)) {
+    return JSON.stringify(data);
+  }
+  return data;
+}
+
+/** Decode domain data from Firestore: parse if it was stringified. */
+function decodeDomain(domain, data) {
+  if (typeof data === 'string' && STRINGIFIED_DOMAINS.has(domain)) {
+    try { return JSON.parse(data); } catch (e) { return data; }
+  }
+  return data;
+}
+
+/** Race a promise against a timeout. Resolves 'timeout' if it takes too long. */
+const withTimeout = (promise, ms = WRITE_TIMEOUT_MS) =>
+  Promise.race([
+    promise.then(() => 'ok'),
+    new Promise(resolve => setTimeout(() => resolve('timeout'), ms)),
+  ]);
+
+/** Convert a JS value to Firestore REST API value format. */
+function jsToFirestoreValue(value) {
+  if (value === null || value === undefined) return { nullValue: null };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
+  if (typeof value === 'string') return { stringValue: value };
+  if (Array.isArray(value)) {
+    return { arrayValue: { values: value.map(jsToFirestoreValue) } };
+  }
+  if (typeof value === 'object') {
+    const fields = {};
+    for (const [k, v] of Object.entries(value)) {
+      fields[k] = jsToFirestoreValue(v);
+    }
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(value) };
+}
+
 export default class SyncEngine {
   constructor(uid, onCloudUpdate) {
     this.uid = uid;
@@ -54,13 +110,18 @@ export default class SyncEngine {
       // Also expire if no timestamp (legacy format) since we can't tell how old they are.
       if (!dirtyTs || (Date.now() - dirtyTs > DIRTY_EXPIRY_MS)) {
         this._dirtyDomains = new Set();
-        if (dirtyArr.length > 0) localStorage.removeItem(`syncDirty_${uid}`);
+        if (dirtyArr.length > 0) {
+          log('Expired stale dirty flags:', dirtyArr, 'ts:', dirtyTs, 'age:', Date.now() - dirtyTs);
+          localStorage.removeItem(`syncDirty_${uid}`);
+        }
       } else {
         this._dirtyDomains = new Set(dirtyArr);
+        logWarn('Active dirty flags:', dirtyArr, 'age:', Date.now() - dirtyTs, 'ms');
       }
     } catch (e) {
       this._dirtyDomains = new Set();
     }
+    log('Constructor: session=', this.sessionId, 'dirtyDomains=', [...this._dirtyDomains]);
 
     // Debounce timer
     this._flushTimer = null;
@@ -92,6 +153,10 @@ export default class SyncEngine {
     // Flag: currently flushing (prevents re-entrant flushes)
     this._flushing = false;
 
+    // Polling fallback when streaming listener is broken
+    this._pollTimer = null;
+    this._listenerWorking = false; // true once onSnapshot delivers server data
+
     // Status change callback (for React to pick up syncing/lastSynced/syncError)
     this.onStatusChange = null;
   }
@@ -103,9 +168,11 @@ export default class SyncEngine {
   initialize() {
     if (this._initializing || this._ready) return Promise.resolve(null);
     this._initializing = true;
+    log('Initializing...');
 
     const db = getFirebaseDb();
     if (!db) {
+      logWarn('No Firestore DB — init aborted');
       this._ready = true;
       this._initializing = false;
       return Promise.resolve(null);
@@ -119,11 +186,43 @@ export default class SyncEngine {
 
       const timeout = setTimeout(() => {
         if (!resolved) {
-          resolved = true;
-          this._ready = true;
-          this._initializing = false;
-          this._requeueDirtyDomains();
-          resolve(cachedData);
+          logWarn('Init TIMEOUT after', INIT_TIMEOUT_MS, 'ms — listener never got server data, trying direct get()...');
+          // The onSnapshot listener uses a streaming channel that may be blocked.
+          // Fallback: try a direct get() which uses a single HTTP request.
+          docRef.get({ source: 'server' }).then(snap => {
+            if (resolved || this._destroyed) return;
+            if (snap.exists) {
+              const data = snap.data();
+              const versionInfo = {};
+              SYNC_DOMAINS.forEach(d => {
+                if (data[`_v_${d}`] !== undefined) versionInfo[d] = data[`_v_${d}`];
+              });
+              log('Direct get() SUCCESS: versions=', versionInfo);
+              resolved = true;
+              this._hasServerData = true;
+              this._seedVersions(data);
+              this._ready = true;
+              this._initializing = false;
+              this._requeueDirtyDomains();
+              resolve(data);
+            } else {
+              log('Direct get(): doc does not exist');
+              resolved = true;
+              this._ready = true;
+              this._initializing = false;
+              this._requeueDirtyDomains();
+              resolve(null);
+            }
+          }).catch(err => {
+            logWarn('Direct get() FAILED:', err.message, '— resolving with', cachedData ? 'cached data' : 'null');
+            if (!resolved) {
+              resolved = true;
+              this._ready = true;
+              this._initializing = false;
+              this._requeueDirtyDomains();
+              resolve(cachedData);
+            }
+          });
         }
       }, INIT_TIMEOUT_MS);
 
@@ -132,7 +231,7 @@ export default class SyncEngine {
           if (this._destroyed) return;
 
           if (!docSnap.exists) {
-            // No cloud doc yet — ready immediately
+            log('Snapshot: doc does not exist');
             if (!resolved) {
               clearTimeout(timeout);
               resolved = true;
@@ -147,31 +246,45 @@ export default class SyncEngine {
           const data = docSnap.data();
           const metadata = docSnap.metadata;
           const isFromCache = metadata.fromCache === true;
+          const hasPending = metadata.hasPendingWrites === true;
+
+          // Log version info from server
+          const versionInfo = {};
+          SYNC_DOMAINS.forEach(d => {
+            if (data[`_v_${d}`] !== undefined) versionInfo[d] = data[`_v_${d}`];
+          });
 
           if (!resolved) {
             // Still initializing
             if (isFromCache && !this._hasServerData) {
-              // Cache hit — apply for fast display but wait for server
+              log('Snapshot (INIT/CACHE): versions=', versionInfo, 'hasPending=', hasPending);
               cachedData = data;
               this._seedVersions(data);
-              // Skip domains with pending/dirty local changes to preserve user edits
               const domains = this._extractDomains(data, true);
+              log('  Applying cache domains:', Object.keys(domains));
               if (Object.keys(domains).length > 0) {
                 this.onCloudUpdate(domains, true);
               }
             } else {
-              // Server-confirmed data — resolve initialization
+              log('Snapshot (INIT/SERVER): versions=', versionInfo, 'hasPending=', hasPending, 'fromCache=', isFromCache);
               clearTimeout(timeout);
               resolved = true;
               this._hasServerData = true;
+              this._listenerWorking = true;
               this._seedVersions(data);
               this._ready = true;
               this._initializing = false;
               this._requeueDirtyDomains();
+              log('  Local versions after seed:', { ...this.versions });
+              log('  Dirty domains:', [...this._dirtyDomains], 'Pending:', [...this.pendingChanges.keys()]);
               resolve(data);
             }
           } else {
-            // Post-initialization: real-time updates
+            log('Snapshot (REALTIME): versions=', versionInfo, 'fromCache=', isFromCache, 'hasPending=', hasPending, 'writeId=', data._lastWriteId);
+            if (!isFromCache && !hasPending) {
+              this._listenerWorking = true;
+              this._stopPolling();
+            }
             this._handleSnapshot(data, metadata);
           }
         },
@@ -230,7 +343,7 @@ export default class SyncEngine {
       if (data[domain] !== undefined) {
         if (mode === 'skipDirty' && (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain))) return;
         if (mode === 'skipPending' && this.pendingChanges.has(domain)) return;
-        result[domain] = data[domain];
+        result[domain] = decodeDomain(domain, data[domain]);
       }
     });
     return result;
@@ -267,10 +380,16 @@ export default class SyncEngine {
    */
   _handleSnapshot(data, metadata) {
     // Skip our own unconfirmed writes
-    if (metadata.hasPendingWrites) return;
+    if (metadata.hasPendingWrites) {
+      log('  _handleSnapshot: SKIP (hasPendingWrites)');
+      return;
+    }
 
     // Skip our own confirmed echoes
-    if (data._lastWriteId && data._lastWriteId === this._lastWriteId) return;
+    if (data._lastWriteId && data._lastWriteId === this._lastWriteId) {
+      log('  _handleSnapshot: SKIP (own echo)', data._lastWriteId);
+      return;
+    }
 
     // Cache latest snapshot so we can re-process after flush clears dirty flags
     this._lastSnapshotData = data;
@@ -287,26 +406,29 @@ export default class SyncEngine {
     // Per-domain: only accept if cloud version > our local version
     const updates = {};
     let hasUpdates = false;
+    const skipped = {};
 
     SYNC_DOMAINS.forEach(domain => {
       const cloudVersion = (typeof data[`_v_${domain}`] === 'number') ? data[`_v_${domain}`] : 0;
       const localVersion = this.versions[domain];
 
       if (cloudVersion > localVersion) {
-        // If we have pending local changes for this domain, don't apply cloud data —
-        // it would overwrite the user's in-flight changes during the debounce window.
-        // Bump our version past the cloud so our pending flush takes precedence.
         if (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain)) {
+          skipped[domain] = `dirty/pending (cloud=${cloudVersion} local=${localVersion})`;
           this.versions[domain] = cloudVersion + 1;
           return;
         }
         if (data[domain] !== undefined) {
-          updates[domain] = data[domain];
+          updates[domain] = decodeDomain(domain, data[domain]);
           this.versions[domain] = cloudVersion;
           hasUpdates = true;
         }
+      } else if (cloudVersion < localVersion) {
+        skipped[domain] = `local ahead (cloud=${cloudVersion} local=${localVersion})`;
       }
     });
+
+    log('  _applySnapshot: applying=', Object.keys(updates), 'skipped=', skipped);
 
     if (hasUpdates) {
       this.lastSynced = data.updatedAt?.toDate() || new Date();
@@ -324,6 +446,7 @@ export default class SyncEngine {
   notifyLocalChange(domain, data) {
     if (this._destroyed) return;
 
+    log('notifyLocalChange:', domain, 'version:', this.versions[domain], '->', this.versions[domain] + 1);
     this.pendingChanges.set(domain, data);
     this.versions[domain]++;
     this._dirtyDomains.add(domain);
@@ -394,7 +517,7 @@ export default class SyncEngine {
     // Build the Firestore update payload
     const payload = {};
     changes.forEach((data, domain) => {
-      payload[domain] = data;
+      payload[domain] = encodeDomain(domain, data);
       payload[`_v_${domain}`] = this.versions[domain];
     });
 
@@ -406,11 +529,20 @@ export default class SyncEngine {
     payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
     payload.version = '4.0';
 
+    log('Flushing domains:', [...changes.keys()], 'writeId:', writeId);
+
     try {
-      await db.collection('users').doc(this.uid).set(payload, { merge: true });
+      const result = await withTimeout(
+        db.collection('users').doc(this.uid).set(payload, { merge: true })
+      );
+      if (result === 'timeout') {
+        log('Flush TIMEOUT for:', [...changes.keys()], '(queued locally, server pending)');
+      } else {
+        log('Flush SUCCESS for:', [...changes.keys()]);
+      }
+      // Treat both as success — data is saved locally, server will eventually get it
       this.lastSynced = new Date();
       this.syncError = null;
-      // Clear dirty flags for successfully synced domains
       const hadDirty = this._dirtyDomains.size > 0;
       changes.forEach((data, domain) => {
         this._dirtyDomains.delete(domain);
@@ -469,6 +601,123 @@ export default class SyncEngine {
   }
 
   /**
+   * Force-push ALL local data to the server, overriding version checks.
+   * Uses the Firestore REST API directly (via fetch) to bypass the SDK's
+   * broken streaming channel — the SDK's set() hangs when the gRPC/WebSocket
+   * channel is down, but regular HTTP requests work fine.
+   * @param {Object} allData - Map of domain name to current local data
+   */
+  async forcePush(allData) {
+    if (this._destroyed) return;
+
+    this.syncing = true;
+    this.syncError = null;
+    this._notifyStatus();
+
+    const payload = {};
+    SYNC_DOMAINS.forEach(domain => {
+      if (allData[domain] !== undefined) {
+        payload[domain] = encodeDomain(domain, allData[domain]);
+        this.versions[domain] = (this.versions[domain] || 0) + 100;
+        payload[`_v_${domain}`] = this.versions[domain];
+      }
+    });
+
+    this.writeCounter++;
+    const writeId = `${this.sessionId}-${this.writeCounter}`;
+    this._lastWriteId = writeId;
+    payload._lastWriteId = writeId;
+    payload.updatedAt = new Date().toISOString();
+    payload.version = '4.0';
+
+    try {
+      // Get auth token for REST API
+      const token = await window.firebase.auth().currentUser.getIdToken();
+      const projectId = 'symptoms-dae26';
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${this.uid}`;
+
+      // Convert JS data to Firestore REST format
+      const firestoreDoc = { fields: {} };
+      for (const [key, value] of Object.entries(payload)) {
+        firestoreDoc.fields[key] = jsToFirestoreValue(value);
+      }
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(firestoreDoc),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`REST API error ${response.status}: ${errText}`);
+      }
+
+      log('forcePush SUCCESS (REST API), new versions:', { ...this.versions });
+      this.lastSynced = new Date();
+      this.syncError = null;
+      this._dirtyDomains.clear();
+      this.pendingChanges.clear();
+      this._persistDirty();
+    } catch (error) {
+      console.error('SyncEngine: forcePush failed', error);
+      this.syncError = error.message;
+    } finally {
+      this.syncing = false;
+      this._notifyStatus();
+    }
+  }
+
+  /**
+   * Start polling fallback if the streaming listener isn't working.
+   * Called after initialization completes.
+   */
+  _startPollingIfNeeded() {
+    if (this._listenerWorking || this._pollTimer || this._destroyed) return;
+
+    const POLL_INTERVAL_MS = 30000;
+    log('Streaming listener not working — starting poll every', POLL_INTERVAL_MS / 1000, 's');
+
+    const poll = async () => {
+      if (this._destroyed || this._listenerWorking) {
+        this._stopPolling();
+        return;
+      }
+
+      const db = getFirebaseDb();
+      if (!db) return;
+
+      try {
+        const snap = await db.collection('users').doc(this.uid).get({ source: 'server' });
+        if (snap.exists && !this._destroyed) {
+          const data = snap.data();
+          // Use the same logic as _applySnapshot for version-based merging
+          this._lastSnapshotData = data;
+          this._applySnapshot(data);
+        }
+      } catch (e) {
+        // Silently ignore poll failures (offline, etc.)
+      }
+    };
+
+    this._pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+  }
+
+  /**
+   * Stop the polling fallback (e.g., when the streaming listener starts working).
+   */
+  _stopPolling() {
+    if (this._pollTimer) {
+      log('Stopping poll fallback (listener now working)');
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
+    }
+  }
+
+  /**
    * Whether initialization is complete and writes are accepted.
    */
   isReady() {
@@ -488,8 +737,7 @@ export default class SyncEngine {
       clearTimeout(this._flushTimer);
       this._flushTimer = null;
     }
-    // Best-effort: flush remaining changes synchronously won't work,
-    // but at least they're in localStorage with dirty flags
+    this._stopPolling();
     this.pendingChanges.clear();
   }
 }
