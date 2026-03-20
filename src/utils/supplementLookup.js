@@ -3,6 +3,20 @@ export const CATEGORY_HALF_LIVES = { fast: 0.5, moderate: 3, slow: 21 };
 // Each entry: [tokens to match, category]
 // Tokens are lowercase. A supplement matches if it contains any token set.
 const LOOKUP_TABLE = [
+  // Slow (~21 days) — fat-soluble vitamins FIRST (multi-token entries must
+  // precede single-token entries that could false-positive on short tokens like "d")
+  [['vitamin', 'd'], 'slow'],
+  [['vitamin', 'k'], 'slow'],
+  [['vitamin', 'a'], 'slow'],
+  [['vitamin', 'e'], 'slow'],
+  [['fish', 'oil'], 'slow'],
+  [['omega'], 'slow'],
+  [['dha'], 'slow'],
+  [['epa'], 'slow'],
+  [['retinol'], 'slow'],
+  [['cholecalciferol'], 'slow'],
+  [['tocopherol'], 'slow'],
+
   // Fast (~12 hours) — water-soluble vitamins, amino acids
   [['vitamin', 'c'], 'fast'],
   [['vitamin', 'b'], 'fast'],
@@ -48,18 +62,6 @@ const LOOKUP_TABLE = [
   [['nac'], 'moderate'],
   [['alpha', 'lipoic'], 'moderate'],
 
-  // Slow (~21 days) — fat-soluble vitamins, accumulated compounds
-  [['vitamin', 'd'], 'slow'],
-  [['vitamin', 'k'], 'slow'],
-  [['vitamin', 'a'], 'slow'],
-  [['vitamin', 'e'], 'slow'],
-  [['fish', 'oil'], 'slow'],
-  [['omega'], 'slow'],
-  [['dha'], 'slow'],
-  [['epa'], 'slow'],
-  [['retinol'], 'slow'],
-  [['cholecalciferol'], 'slow'],
-  [['tocopherol'], 'slow'],
 ];
 
 /**
@@ -73,7 +75,14 @@ export function matchSupplementCategory(name) {
 
   for (const [matchTokens, category] of LOOKUP_TABLE) {
     if (matchTokens.every(token =>
-      nameTokens.some(nt => nt.includes(token) || token.includes(nt))
+      nameTokens.some(nt => {
+        // Short tokens: exact match or name token starts with lookup token
+        // e.g. lookup "d" matches name "d3", but "c" doesn't match "cholecalciferol"
+        if (token.length <= 2 || nt.length <= 2) {
+          return nt === token || nt.startsWith(token);
+        }
+        return nt.includes(token) || token.includes(nt);
+      })
     )) {
       return category;
     }
