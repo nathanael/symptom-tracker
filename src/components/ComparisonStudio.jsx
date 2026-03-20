@@ -101,9 +101,6 @@ export default function ComparisonStudio({
   const [aggMode, setAggMode] = useState(initialSelections.aggMode);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
-  // Mobile pan gesture state
-  const panRef = useRef({ startX: 0, startOffset: 0, isPanning: false, startTime: 0 });
-  const maxOffsetRef = useRef(0);
 
   // Auto-focus search inputs when pickers open
   useEffect(() => { if (showSupplementPicker) { setSuppSearch(''); setTimeout(() => suppSearchRef.current?.focus(), 50); } }, [showSupplementPicker]);
@@ -325,43 +322,7 @@ export default function ComparisonStudio({
   const handleMouseMove = (e) => setTouchX(getSnappedIndex(e.clientX));
   const handleMouseLeave = () => setTouchX(null);
 
-  // Desktop touch: crosshair only
-  const handleDesktopTouchStart = (e) => { e.preventDefault(); setTouchX(getSnappedIndex(e.touches[0].clientX)); };
-  const handleDesktopTouchMove = (e) => { e.preventDefault(); setTouchX(getSnappedIndex(e.touches[0].clientX)); };
-  const handleDesktopTouchEnd = () => setTouchX(null);
 
-  // Mobile touch: pan to scroll date window, with crosshair on long-press / slow drag
-  const handleMobileTouchStart = useCallback((e) => {
-    e.preventDefault();
-    const x = e.touches[0].clientX;
-    panRef.current = { startX: x, startOffset: startOffset, isPanning: false, startTime: Date.now() };
-    setTouchX(getSnappedIndex(x));
-  }, [startOffset, getSnappedIndex]);
-
-  const handleMobileTouchMove = useCallback((e) => {
-    e.preventDefault();
-    const x = e.touches[0].clientX;
-    const dx = x - panRef.current.startX;
-    const absDx = Math.abs(dx);
-
-    if (absDx > 15) {
-      panRef.current.isPanning = true;
-      setTouchX(null);
-      if (!svgRef.current) return;
-      const chartPxWidth = svgRef.current.getBoundingClientRect().width;
-      const daysPer_px = timeframe / chartPxWidth;
-      const daysDelta = Math.round(dx * daysPer_px);
-      const newOffset = Math.max(0, Math.min(maxOffsetRef.current, panRef.current.startOffset + daysDelta));
-      setStartOffset(newOffset);
-    } else {
-      setTouchX(getSnappedIndex(x));
-    }
-  }, [timeframe, getSnappedIndex]);
-
-  const handleMobileTouchEnd = useCallback(() => {
-    panRef.current.isPanning = false;
-    setTouchX(null);
-  }, []);
 
   const crosshairData = useMemo(() => {
     if (touchX === null) return null;
@@ -465,7 +426,6 @@ export default function ComparisonStudio({
     const totalDays = Math.round((today - earliestDate) / (1000 * 60 * 60 * 24));
     return Math.max(0, totalDays - timeframe);
   }, [selectedSymptoms, selectedSupplement, entries, stackEntries, timeframe]);
-  maxOffsetRef.current = maxOffset;
 
   // Clamp startOffset when maxOffset shrinks
   useEffect(() => { setStartOffset(prev => Math.min(prev, maxOffset)); }, [maxOffset]);
@@ -1144,13 +1104,6 @@ export default function ComparisonStudio({
         </div>
       ) : (
         <>
-          {/* Shared slider CSS */}
-          <style>{`
-            .cs-slider { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: #f59e0b; outline: none; direction: rtl; }
-            .cs-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #f59e0b; cursor: pointer; border: 2px solid #1a1a2e; }
-            .cs-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #f59e0b; cursor: pointer; border: 2px solid #1a1a2e; }
-            .cs-slider::-moz-range-track { background: #f59e0b; height: 6px; border-radius: 3px; }
-          `}</style>
 
           {/* ── Chart card ── */}
           <div style={{
@@ -1200,17 +1153,6 @@ export default function ComparisonStudio({
                     ))}
                   </div>
 
-                  {/* Date window slider */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '22px' }}>
-                    <span style={{ color: '#9ca3af', fontSize: '8px', whiteSpace: 'nowrap' }}>{dateWindowLabel}</span>
-                    <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-                      <input type="range" className="cs-slider" min="0" max={maxOffset} step="1" value={startOffset}
-                        onChange={(e) => setStartOffset(parseInt(e.target.value))}
-                        style={{ width: '120px' }}
-                      />
-                    </div>
-                  </div>
-
 
 
                   {/* Date / Average header */}
@@ -1252,7 +1194,6 @@ export default function ComparisonStudio({
                 {/* SVG chart — right side */}
                 <div style={{ flex: 1, minWidth: 0, touchAction: 'none', paddingLeft: '6px' }}>
                   <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
-                    onTouchStart={handleDesktopTouchStart} onTouchMove={handleDesktopTouchMove} onTouchEnd={handleDesktopTouchEnd}
                     onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
                     style={{ display: 'block' }}
                   >
@@ -1293,15 +1234,9 @@ export default function ComparisonStudio({
                   ))}
                 </div>
 
-                {/* Date range label */}
-                <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-                  <span style={{ color: '#9ca3af', fontSize: '10px' }}>{dateWindowLabel}</span>
-                </div>
-
                 {/* Full-width SVG chart */}
                 <div style={{ touchAction: 'none' }}>
                   <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
-                    onTouchStart={handleMobileTouchStart} onTouchMove={handleMobileTouchMove} onTouchEnd={handleMobileTouchEnd}
                     onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
                     style={{ display: 'block' }}
                   >
