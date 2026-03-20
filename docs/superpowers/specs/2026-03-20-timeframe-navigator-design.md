@@ -15,7 +15,7 @@ Replace the slider-based time window control in ComparisonStudio with an arrow-b
 | Button | Action | Shift Amount | Disabled When |
 |--------|--------|-------------|---------------|
 | `\|<` | Jump to earliest data point across all selected series | N/A — sets offset to `maxOffset` | `startOffset >= maxOffset` |
-| `<` | Shift window into the past | 50% of current timeframe (`Math.round(timeframe / 2)`) | `startOffset >= maxOffset` (clamped, not blocked — partial shifts allowed) |
+| `<` | Shift window into the past | 50% of current timeframe (`Math.round(timeframe / 2)`) | `startOffset >= maxOffset` |
 | `>` | Shift window toward present | 50% of current timeframe (`Math.round(timeframe / 2)`) | `startOffset === 0` |
 | `>\|` | Jump to today | N/A — sets offset to `0` | `startOffset === 0` |
 
@@ -45,7 +45,7 @@ Arrow buttons trigger `haptic('light')` on press, consistent with timeframe pill
 ```
 
 - Full width, same horizontal padding as pills
-- `marginBottom: '10px'` on the arrow row
+- The timeframe pills row keeps its existing `marginBottom: '10px'`; the arrow nav row below it also gets `marginBottom: '10px'` before the chart
 
 ### Desktop (>= 1024px)
 
@@ -62,8 +62,10 @@ Both rows in the left sidebar, where the slider currently lives:
 ## Removals
 
 - `<input type="range">` slider (desktop, lines ~1204-1212)
-- Mobile swipe pan gesture handlers: `handleMobileTouchStart`, `handleMobileTouchMove`, `handleMobileTouchEnd` and associated touch tracking refs
-- Desktop touch pan handlers: `handleDesktopTouchStart`, `handleDesktopTouchMove`, `handleDesktopTouchEnd` (if used for panning)
+- Mobile swipe pan gesture handlers: `handleMobileTouchStart`, `handleMobileTouchMove`, `handleMobileTouchEnd`
+- Desktop touch pan handlers: `handleDesktopTouchStart`, `handleDesktopTouchMove`, `handleDesktopTouchEnd`
+- `panRef` and any other refs exclusively used by the pan gesture handlers
+- After removal, chart touch/crosshair interaction is handled by mouse events (`onMouseMove`/`onMouseLeave`) only
 
 ## What Stays
 
@@ -80,6 +82,7 @@ Both rows in the left sidebar, where the slider currently lives:
 - Border radius: `5px`
 - Text color: `#9ca3af`
 - Font size: `11px` mobile, `10px` desktop
+- Date label font size: `10px` (both mobile and desktop), matching the existing label
 - Disabled state: `opacity: 0.3`, `cursor: default`, no click handler
 - Text characters for arrows — no icon dependencies
 
