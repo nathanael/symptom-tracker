@@ -430,7 +430,7 @@ export default function ComparisonStudio({
   // Clamp startOffset when maxOffset shrinks
   useEffect(() => { setStartOffset(prev => Math.min(prev, maxOffset)); }, [maxOffset]);
 
-  // Date window label for the slider
+  // Date window label
   const dateWindowLabel = useMemo(() => {
     if (dates.length === 0) return '';
     const fmt = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -1153,7 +1153,56 @@ export default function ComparisonStudio({
                     ))}
                   </div>
 
-
+                  {/* Arrow nav row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '22px' }}>
+                    <div style={{ display: 'flex', gap: '2px' }}>
+                      <button
+                        onClick={() => { setStartOffset(maxOffset); haptic('light'); }}
+                        disabled={startOffset >= maxOffset}
+                        style={{
+                          padding: '3px 6px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '10px',
+                          cursor: startOffset >= maxOffset ? 'default' : 'pointer',
+                          opacity: startOffset >= maxOffset ? 0.3 : 1,
+                        }}
+                      >|&lt;</button>
+                      <button
+                        onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
+                        disabled={startOffset >= maxOffset}
+                        style={{
+                          padding: '3px 6px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '10px',
+                          cursor: startOffset >= maxOffset ? 'default' : 'pointer',
+                          opacity: startOffset >= maxOffset ? 0.3 : 1,
+                        }}
+                      >&lt;</button>
+                    </div>
+                    <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '10px', whiteSpace: 'nowrap' }}>
+                      {dateWindowLabel}
+                    </span>
+                    <div style={{ display: 'flex', gap: '2px' }}>
+                      <button
+                        onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
+                        disabled={startOffset === 0}
+                        style={{
+                          padding: '3px 6px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '10px',
+                          cursor: startOffset === 0 ? 'default' : 'pointer',
+                          opacity: startOffset === 0 ? 0.3 : 1,
+                        }}
+                      >&gt;</button>
+                      <button
+                        onClick={() => { setStartOffset(0); haptic('light'); }}
+                        disabled={startOffset === 0}
+                        style={{
+                          padding: '3px 6px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '10px',
+                          cursor: startOffset === 0 ? 'default' : 'pointer',
+                          opacity: startOffset === 0 ? 0.3 : 1,
+                        }}
+                      >&gt;|</button>
+                    </div>
+                  </div>
 
                   {/* Date / Average header */}
                   <div style={{
@@ -1234,8 +1283,59 @@ export default function ComparisonStudio({
                   ))}
                 </div>
 
+                {/* Arrow nav row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', gap: '2px' }}>
+                    <button
+                      onClick={() => { setStartOffset(maxOffset); haptic('light'); }}
+                      disabled={startOffset >= maxOffset}
+                      style={{
+                        padding: '4px 7px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '11px',
+                        cursor: startOffset >= maxOffset ? 'default' : 'pointer',
+                        opacity: startOffset >= maxOffset ? 0.3 : 1,
+                      }}
+                    >|&lt;</button>
+                    <button
+                      onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
+                      disabled={startOffset >= maxOffset}
+                      style={{
+                        padding: '4px 7px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '11px',
+                        cursor: startOffset >= maxOffset ? 'default' : 'pointer',
+                        opacity: startOffset >= maxOffset ? 0.3 : 1,
+                      }}
+                    >&lt;</button>
+                  </div>
+                  <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '10px', whiteSpace: 'nowrap' }}>
+                    {dateWindowLabel}
+                  </span>
+                  <div style={{ display: 'flex', gap: '2px' }}>
+                    <button
+                      onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
+                      disabled={startOffset === 0}
+                      style={{
+                        padding: '4px 7px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '11px',
+                        cursor: startOffset === 0 ? 'default' : 'pointer',
+                        opacity: startOffset === 0 ? 0.3 : 1,
+                      }}
+                    >&gt;</button>
+                    <button
+                      onClick={() => { setStartOffset(0); haptic('light'); }}
+                      disabled={startOffset === 0}
+                      style={{
+                        padding: '4px 7px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '11px',
+                        cursor: startOffset === 0 ? 'default' : 'pointer',
+                        opacity: startOffset === 0 ? 0.3 : 1,
+                      }}
+                    >&gt;|</button>
+                  </div>
+                </div>
+
                 {/* Full-width SVG chart */}
-                <div style={{ touchAction: 'none' }}>
+                <div>
                   <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
                     onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
                     style={{ display: 'block' }}
