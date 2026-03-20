@@ -15,7 +15,7 @@ A new tab-styled button group sits directly above the existing timeframe selecto
 
 - Same visual style as the existing timeframe pill/tab buttons
 - Default selection: Daily (preserves current behavior exactly)
-- Selection persists in localStorage alongside existing ComparisonStudio preferences
+- Selection persists in localStorage: extend existing `comparisonStudioSelections` object to include `viewMode` ("daily" | "weekly" | "monthly" | "cumulative") and `aggMode` ("average" | "total"). `aggMode` is stored once and shared across Weekly/Monthly. Missing fields default to `viewMode: "daily"` and `aggMode: "average"` — no migration needed, just graceful fallback.
 - Both supplement dose lines and symptom overlay lines adapt to the selected view mode
 
 ## Daily View
@@ -29,13 +29,23 @@ Raw daily data is grouped into weekly or monthly periods. Each period provides t
 - **Average daily dose** within the period (default)
 - **Total dose** for the period
 
+The avg/total toggle preference persists in localStorage. When switching between Daily/Cumulative and back to Weekly/Monthly, the last-used mode is restored.
+
 Data points are plotted at the midpoint of each period. Rendered as a line chart (consistent with other views).
 
-**Symptom overlays** in Weekly/Monthly: averaged severity per period. No avg/total toggle — average is the only meaningful aggregation for severity scores.
+### Period Definitions
 
-**Partial periods** at the edges of the date range use whatever days are available.
+- **Weekly**: Calendar weeks starting Monday (ISO 8601). Partial weeks at the start/end of the date range are included.
+- **Monthly**: Calendar months. Partial months at the start/end of the date range are included.
+- **Midpoint calculation**: The middle day of the actual available days in the period, regardless of whether the period is complete. E.g., a partial week with 3 days (Mon-Wed) plots at Tuesday.
 
-**X-axis labels** adapt: daily shows dates, weekly shows week-start dates, monthly shows month names.
+### Symptom Overlays
+
+Symptoms in Weekly/Monthly views: non-null daily values are averaged within each period (null days are excluded from the average, not treated as 0). No smoothing step — smoothing is unnecessary when already aggregating. No avg/total toggle for symptoms — average is the only meaningful aggregation for severity scores. If a period has no non-null values, it produces null (gap in the line).
+
+### X-Axis Labels
+
+Daily shows dates. Weekly shows the Monday date of each week. Monthly shows month names (e.g., "Jan", "Feb").
 
 ## Cumulative View — Estimated Body Level
 
@@ -49,6 +59,10 @@ Simple exponential decay, computed per day:
 bodyLevel = (previousBodyLevel * decayFactor) + todaysDose
 decayFactor = 0.5 ^ (1 / halfLifeInDays)
 ```
+
+**Initial condition**: `previousBodyLevel = 0` for the first day in the date range. This assumes no prior supplementation. (Modeling pre-range buildup would require scanning all historical data, adding complexity for marginal accuracy gain.)
+
+**Null/missing doses**: When a dose is null (supplement not taken that day), treat `todaysDose = 0`. The body level continues to decay — no gap in the line. This accurately models the body clearing the substance.
 
 This naturally shows:
 - Buildup to steady state with consistent dosing
@@ -69,13 +83,16 @@ Three simple presets instead of exact half-life values:
 
 ### Supplement Lookup Table
 
-A built-in map of ~30-50 common supplement names to their half-life category. Uses fuzzy matching on the supplement name (e.g., "Vit D3" matches "Vitamin D"). Auto-assigns a category when a supplement is created or when names match. Always overridable by the user.
+A built-in map of common supplement names to their half-life category. Uses case-insensitive token matching: the supplement name is split into tokens and compared against lookup table entries. A match occurs when tokens overlap meaningfully (e.g., "Vit D3 5000IU" matches "Vitamin D" because "D" and "Vit/Vitamin" overlap). Multi-ingredient or brand-name supplements that don't match default to Moderate.
+
+**Auto-detection lifecycle**: Runs once when a supplement is first created. Subsequent name edits do not re-trigger detection. The user can manually change the category at any time via settings or the inline picker. If the user explicitly clears their override (sets back to null/auto), the lookup runs again against the current name.
 
 ### Visual Treatment
 
 - Line chart with a **semi-transparent area fill** under the curve (~10-15% opacity of the line color) to visually communicate "level" / accumulation
+- **Area fill construction**: Create a closed SVG `<path>` that traces the full line (which is always continuous — nulls are treated as 0 so there are no gaps), then draws straight down to the chart bottom (`padTop + chartH`), back along the bottom to the first point's x, and closes.
 - Other views (Daily, Weekly, Monthly) remain line-only
-- Y-axis: dynamic, labeled in the supplement's unit (mg, IU, etc.)
+- **Y-axis**: dynamic, scaled to the maximum cumulative body level in the visible date range, rounded up to a clean number using the existing nice-number logic. Labeled in the supplement's unit (mg, IU, etc.)
 
 ### Symptom Overlays in Cumulative View
 
@@ -97,7 +114,7 @@ Options: Fast, Moderate, Slow. If the lookup table matched the supplement name, 
 
 When Cumulative view is active:
 
-- A small pill/badge near the selected supplement name shows the current category (e.g., "Moderate")
+- A small pill/badge appears immediately after the supplement name chip/button at the top of the chart area, showing the current category (e.g., "Moderate")
 - Tapping opens a simple three-option picker (Fast / Moderate / Slow) — no modal, just a small inline dropdown or popover
 - Changing it updates the supplement's `halfLifeCategory` and the chart re-renders immediately
 - If no category is set and no lookup match exists, shows "Moderate (default)" to make the implicit default visible
@@ -108,23 +125,23 @@ When Cumulative view is active:
 
 Pure functions, no React dependencies:
 
-- `aggregateDaily(series, dates)` — passthrough
-- `aggregateWeekly(series, dates, mode)` — groups by week, returns avg or total with midpoint dates
-- `aggregateMonthly(series, dates, mode)` — groups by month, returns avg or total with midpoint dates
-- `computeCumulativeLevel(series, dates, halfLifeCategory)` — exponential decay model
-- `aggregateSymptoms(series, dates, viewMode)` — averages for weekly/monthly, passthrough for daily/cumulative
+- `aggregateDaily(series, dates)` — passthrough, returns `{ values, dates }` unchanged
+- `aggregateWeekly(series, dates, mode)` — groups by ISO calendar week, returns `{ values: number[], dates: string[] }` where dates are midpoint YYYY-MM-DD strings and values are avg or total per period. All-null input returns empty arrays.
+- `aggregateMonthly(series, dates, mode)` — groups by calendar month, returns `{ values: number[], dates: string[] }` same format as weekly. All-null input returns empty arrays.
+- `computeCumulativeLevel(series, dates, halfLifeCategory)` — runs exponential decay model, returns `{ values: number[], dates: string[] }` with one point per day (same dates as input)
+- `aggregateSymptoms(series, dates, viewMode)` — averages for weekly/monthly (matching period grouping), passthrough for daily/cumulative. Returns `{ values, dates }`.
 
 ### New Module: `src/utils/supplementLookup.js`
 
-- `HALF_LIFE_TABLE` — map of supplement names to categories
-- `CATEGORY_HALF_LIVES` — maps category strings to half-life in days
-- `matchSupplementCategory(name)` — fuzzy matches supplement name against table, returns category or null
+- `HALF_LIFE_TABLE` — map of supplement names/tokens to categories
+- `CATEGORY_HALF_LIVES` — `{ fast: 0.5, moderate: 3, slow: 21 }` (days)
+- `matchSupplementCategory(name)` — case-insensitive token match against table, returns category string or null
 
 ### Data Flow in ComparisonStudio
 
 1. Raw series fetched via existing `getSupplementDoseSeries()` and symptom entries
 2. New `viewMode` state determines which transform function is applied
-3. Transformed data (with potentially different X-axis points for weekly/monthly) passed to SVG renderer
+3. Transformed data `{ values, dates }` (with potentially fewer X-axis points for weekly/monthly) passed to SVG renderer
 4. Cumulative view additionally renders an SVG `<path>` area fill under the dose curve
 
 ### Changes to Existing Code
