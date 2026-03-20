@@ -39,12 +39,8 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
 
     const setters = settersRef.current;
 
-    if (updates.symptoms?.length > 0 && setters.symptoms) {
-      setters.symptoms(prev => {
-        const localMap = new Map(prev.map(s => [s.id, s]));
-        updates.symptoms.forEach(s => localMap.set(s.id, s));
-        return Array.from(localMap.values());
-      });
+    if (updates.symptoms && setters.symptoms) {
+      setters.symptoms(() => updates.symptoms);
     }
 
     if (updates.entries && setters.entries) {
@@ -55,12 +51,8 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       setters.dailyNotes(prev => ({ ...prev, ...updates.dailyNotes }));
     }
 
-    if (updates.stackItems?.length > 0 && setters.stackItems) {
-      setters.stackItems(prev => {
-        const localMap = new Map(prev.map(s => [s.id, s]));
-        updates.stackItems.forEach(s => localMap.set(s.id, s));
-        return Array.from(localMap.values());
-      });
+    if (updates.stackItems && setters.stackItems) {
+      setters.stackItems(() => updates.stackItems);
     }
 
     if (updates.stackEntries && setters.stackEntries) {
@@ -75,12 +67,8 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       setters.pinnedSymptoms(() => new Set(updates.pinnedSymptoms));
     }
 
-    if (updates.inputItems?.length > 0 && setters.inputItems) {
-      setters.inputItems(prev => {
-        const localMap = new Map(prev.map(s => [s.id, s]));
-        updates.inputItems.forEach(s => localMap.set(s.id, s));
-        return Array.from(localMap.values());
-      });
+    if (updates.inputItems && setters.inputItems) {
+      setters.inputItems(() => updates.inputItems);
     }
 
     if (updates.inputEntries && setters.inputEntries) {

@@ -27,7 +27,7 @@ const DOMAIN_STORAGE_KEYS = {
 
 const DEBOUNCE_MS = 500;
 const INIT_TIMEOUT_MS = 3000;
-const DIRTY_EXPIRY_MS = 30000; // Dirty flags older than 30s are likely stale
+const DIRTY_EXPIRY_MS = 300000; // Dirty flags older than 5min are likely stale
 
 const LOG_PREFIX = '[Sync]';
 const log = (...args) => console.log(LOG_PREFIX, ...args);
