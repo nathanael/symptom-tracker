@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateWeekly, aggregateMonthly, aggregateDaily, computeCumulativeLevel } from '../doseTransforms';
+import { aggregateWeekly, aggregateMonthly, aggregateDaily, computeCumulativeLevel, aggregateSymptoms } from '../doseTransforms';
 
 describe('aggregateWeekly', () => {
   // Mon Mar 2 to Sun Mar 15, 2026 = two full weeks
@@ -155,5 +155,51 @@ describe('computeCumulativeLevel', () => {
     expect(result.values[0]).toBe(0);
     expect(result.values[3]).toBe(0);
     expect(result.values[4]).toBe(100);
+  });
+});
+
+describe('aggregateSymptoms', () => {
+  // Two full ISO weeks: Mon Mar 2 - Sun Mar 15
+  const dates = [];
+  for (let d = 2; d <= 15; d++) {
+    dates.push(`2026-03-${String(d).padStart(2, '0')}`);
+  }
+
+  it('passes through for daily view', () => {
+    const series = [3, null, 4, 2, 5, null, 1, 3, 4, 2, 5, 3, 1, 4];
+    const result = aggregateSymptoms(series, dates, 'daily');
+    expect(result.values).toEqual(series);
+    expect(result.dates).toEqual(dates);
+  });
+
+  it('passes through for cumulative view', () => {
+    const series = [3, null, 4, 2, 5, null, 1, 3, 4, 2, 5, 3, 1, 4];
+    const result = aggregateSymptoms(series, dates, 'cumulative');
+    expect(result.values).toEqual(series);
+  });
+
+  it('averages non-null values per week for weekly view', () => {
+    const series = [3, null, 4, 2, 5, null, 1, 3, 4, 2, 5, 3, 1, 4];
+    const result = aggregateSymptoms(series, dates, 'weekly');
+    expect(result.values).toHaveLength(2);
+    expect(result.values[0]).toBe(3);
+    expect(result.values[1]).toBeCloseTo(22 / 7);
+  });
+
+  it('averages per month for monthly view', () => {
+    const monthDates = [];
+    for (let d = 1; d <= 28; d++) {
+      monthDates.push(`2026-02-${String(d).padStart(2, '0')}`);
+    }
+    const series = Array(28).fill(4);
+    const result = aggregateSymptoms(series, monthDates, 'monthly');
+    expect(result.values).toHaveLength(1);
+    expect(result.values[0]).toBe(4);
+  });
+
+  it('skips all-null periods', () => {
+    const series = Array(14).fill(null);
+    const result = aggregateSymptoms(series, dates, 'weekly');
+    expect(result.values).toEqual([]);
   });
 });

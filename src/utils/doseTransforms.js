@@ -111,3 +111,23 @@ export function computeCumulativeLevel(series, dates, halfLifeCategory) {
 
   return { values, dates: [...dates], labels: [...dates] };
 }
+
+/**
+ * Aggregate symptom data by view mode.
+ * Receives already-smoothed data from ComparisonStudio.
+ * Weekly/Monthly: averages non-null values per period.
+ * Daily/Cumulative: passthrough.
+ */
+export function aggregateSymptoms(series, dates, viewMode) {
+  if (viewMode === 'daily' || viewMode === 'cumulative') {
+    return { values: [...series], dates: [...dates], labels: [...dates] };
+  }
+  const getKey = viewMode === 'weekly' ? getWeekStart : getMonthKey;
+  const getLabel = viewMode === 'weekly'
+    ? (period) => getWeekStart(period.dates[0])
+    : (period) => {
+        const monthIdx = parseInt(period.key.slice(5, 7), 10) - 1;
+        return MONTH_NAMES[monthIdx];
+      };
+  return aggregateByPeriod(series, dates, 'average', getKey, getLabel);
+}
