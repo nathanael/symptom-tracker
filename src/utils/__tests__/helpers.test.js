@@ -3,7 +3,6 @@ import { applyHistoricalState } from '../helpers';
 
 describe('applyHistoricalState', () => {
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
 
   const baseItem = {
     id: 'mag-1',
