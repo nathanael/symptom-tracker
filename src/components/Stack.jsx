@@ -33,6 +33,7 @@ export default function Stack({
   // Long-press state for opening graph
   const longPressTimerRef = useRef(null);
   const longPressTriggeredRef = useRef(false);
+  const pendingLogAfterAdd = useRef(false);
 
   // Drag reorder state
   const [dragReorderId, setDragReorderId] = useState(null);
@@ -161,6 +162,13 @@ export default function Stack({
 
     setStackItems(prev => [...prev, newItem]);
 
+    // Auto-log if triggered from "Add new supplement" in picker
+    if (pendingLogAfterAdd.current) {
+      pendingLogAfterAdd.current = false;
+      // Use setTimeout to let state update first
+      setTimeout(() => toggleStackItem(id), 0);
+    }
+
     setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
     setShowAddForm(false);
     setLastAction(`Added ${newStackItem.name}`);
@@ -260,20 +268,6 @@ export default function Stack({
     item.name.toLowerCase().includes(newStackItem.name.toLowerCase())
   );
 
-  // Supplements available to log retroactively (active items without entries for this date, respecting schedule)
-  const availableToLog = stackItems.filter(i => {
-    if (!i.active || stackEntries[`${dateKey}-${i.id}`]) return false;
-    // Don't offer to log items that didn't exist on this date
-    if (i.schedule?.startDate) {
-      const start = new Date(i.schedule.startDate + 'T00:00:00');
-      start.setHours(0, 0, 0, 0);
-      const target = new Date(selectedDate);
-      target.setHours(0, 0, 0, 0);
-      if (target < start) return false;
-    }
-    return true;
-  }).sort((a, b) => (a.order || 0) - (b.order || 0));
-
   // Determine which items to display based on date
   const displayItems = (() => {
     // Unified path: reconstruct historical state first, then filter
@@ -296,6 +290,22 @@ export default function Stack({
     const s = searchFilter.toLowerCase();
     return item.name.toLowerCase().includes(s) || (item.description || '').toLowerCase().includes(s);
   });
+
+  const availableToLog = (() => {
+    // Items available for ad-hoc logging: active, not already displayed, existed on this date
+    const displayedIds = new Set(displayItems.map(i => i.id));
+    return stackItems.filter(i => {
+      if (!i.active || displayedIds.has(i.id)) return false;
+      if (i.schedule?.startDate) {
+        const start = new Date(i.schedule.startDate + 'T00:00:00');
+        start.setHours(0, 0, 0, 0);
+        const target = new Date(selectedDate);
+        target.setHours(0, 0, 0, 0);
+        if (target < start) return false;
+      }
+      return true;
+    }).sort((a, b) => (a.order || 0) - (b.order || 0));
+  })();
 
   // Drag reorder handlers
   const handleDragStart = (e, itemId) => {
@@ -712,7 +722,7 @@ export default function Stack({
           Manage stack
         </button>
       )}
-      {!showManageStack && !isToday && availableToLog.length > 0 && (
+      {!showManageStack && availableToLog.length > 0 && (
         <button
           onClick={() => setShowLogPicker(true)}
           style={{
@@ -732,7 +742,7 @@ export default function Stack({
           }}
         >
           <span style={{ fontSize: '14px' }}>+</span>
-          Log supplement
+          Add supplement
         </button>
       )}
 
@@ -1307,7 +1317,7 @@ export default function Stack({
               alignItems: 'center',
             }}>
               <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
-                Log supplement
+                Add supplement
               </h3>
               <button
                 onClick={() => setShowLogPicker(false)}
@@ -1376,6 +1386,32 @@ export default function Stack({
                   </span>
                 </button>
               ))}
+              {/* Add new supplement option */}
+              <button
+                onClick={() => {
+                  pendingLogAfterAdd.current = true;
+                  setShowLogPicker(false);
+                  setShowManageStack(true);
+                  setShowAddForm(true);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '16px 20px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                  color: '#9ca3af',
+                  fontSize: '14px',
+                  fontWeight: '400',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <span style={{ fontSize: '18px', color: '#6b7280' }}>+</span>
+                Add new supplement
+              </button>
             </div>
           </div>
         </div>
