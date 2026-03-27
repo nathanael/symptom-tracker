@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { getDateKey, haptic, isScheduledForDate, createHistoryEntry, recordHistoryChange, reconstructStateAtDate } from '../utils/helpers';
+import { useState, useRef, useEffect, Fragment } from 'react';
+import { getDateKey, haptic, isScheduledForDate, createHistoryEntry, recordHistoryChange, reconstructStateAtDate, applyHistoricalState } from '../utils/helpers';
 import SchedulePicker, { formatSchedule } from './SchedulePicker';
 import SupplementEdit from './SupplementEdit';
 import { matchSupplementCategory } from '../utils/supplementLookup';
@@ -287,26 +287,21 @@ export default function Stack({
 
   // Determine which items to display based on date
   const displayItems = (() => {
-    const active = stackItems.filter(i => i.active);
+    // Unified path: reconstruct historical state first, then filter
+    const withHistory = stackItems.map(item => applyHistoricalState(item, selectedDate));
 
-    // Today: show active items that are scheduled for today
-    if (isToday) {
-      return active.filter(item => isScheduledForDate(item.schedule, selectedDate));
-    }
+    // Protocol items: active on this date AND scheduled for this date
+    const protocol = withHistory
+      .filter(item => item.active !== false)
+      .filter(item => isScheduledForDate(item.schedule, selectedDate));
 
-    // Past dates: ONLY show items that have entries for this date
-    // Use historical state so properties reflect what they were at that time
-    const itemIdsWithEntries = new Set(
-      Object.keys(stackEntries)
-        .filter(key => key.startsWith(dateKey))
-        .map(key => key.substring(dateKey.length + 1))
-    );
+    // Ad-hoc items: not in protocol but have entries for this date
+    const protocolIds = new Set(protocol.map(i => i.id));
+    const adHoc = withHistory
+      .filter(item => !protocolIds.has(item.id) && stackEntries[`${dateKey}-${item.id}`])
+      .map(item => ({ ...item, _adHoc: true }));
 
-    return stackItems.filter(i => itemIdsWithEntries.has(i.id)).map(i => {
-      const historical = reconstructStateAtDate(i.history, dateKey);
-      if (!historical) return i;
-      return { ...i, name: historical.name, description: historical.description, unit: historical.unit, defaultDose: historical.defaultDose, schedule: historical.schedule };
-    });
+    return [...protocol, ...adHoc];
   })().sort((a, b) => (a.order || 0) - (b.order || 0)).filter(item => {
     if (!searchFilter) return true;
     const s = searchFilter.toLowerCase();
@@ -478,10 +473,23 @@ export default function Stack({
         const entry = getStackEntry(item.id);
         const isTaken = !!entry;
         const isEditing = editingStackItem === item.id;
+        const isFirstAdHoc = item._adHoc && (index === 0 || !displayItems[index - 1]._adHoc);
 
         return (
+          <Fragment key={item.id}>
+            {isFirstAdHoc && (
+              <div style={{
+                padding: '8px 20px 4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.35)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ad-hoc</span>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+              </div>
+            )}
           <div
-            key={item.id}
             style={{
               background: 'transparent',
               borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
@@ -491,6 +499,7 @@ export default function Stack({
               justifyContent: 'space-between',
               gap: '16px',
               cursor: 'pointer',
+              opacity: item._adHoc ? 0.7 : 1,
               transition: isDesktop ? 'background 0.15s ease' : 'none',
             }}
             onMouseEnter={isDesktop ? (e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; } : undefined}
@@ -686,6 +695,7 @@ export default function Stack({
               </div>
             </div>
           </div>
+          </Fragment>
         );
       })}
 
