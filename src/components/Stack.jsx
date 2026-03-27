@@ -119,27 +119,16 @@ export default function Stack({
   };
 
   const getStackProgress = () => {
-    // Use same logic as displayItems to count what's actually shown
-    const active = stackItems.filter(i => i.active);
+    // Unified: reconstruct historical state, then filter to scheduled protocol
+    const withHistory = stackItems.map(item => applyHistoricalState(item, selectedDate));
+    const protocol = withHistory
+      .filter(item => item.active !== false)
+      .filter(item => isScheduledForDate(item.schedule, selectedDate));
 
-    let itemsToCount;
-    if (isToday) {
-      // Only count items scheduled for today
-      itemsToCount = active.filter(item => isScheduledForDate(item.schedule, selectedDate));
-    } else {
-      // Past dates: ONLY show items that have entries for this date
-      const itemIdsWithEntries = new Set(
-        Object.keys(stackEntries)
-          .filter(key => key.startsWith(dateKey))
-          .map(key => key.substring(dateKey.length + 1))
-      );
-      itemsToCount = stackItems.filter(i => itemIdsWithEntries.has(i.id));
-    }
-
-    const takenCount = itemsToCount.filter(item =>
+    const takenCount = protocol.filter(item =>
       stackEntries[`${dateKey}-${item.id}`]
     ).length;
-    return { taken: takenCount, total: itemsToCount.length };
+    return { taken: takenCount, total: protocol.length };
   };
 
   const addStackItem = () => {
