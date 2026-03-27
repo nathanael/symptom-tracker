@@ -138,6 +138,35 @@ export const reconstructStateAtDate = (historyArray, dateStr) => {
   return state;
 };
 
+// Apply historical state to a supplement item for display on a given date.
+// For today, returns the item unchanged. For past dates, overlays historical
+// name, dose, unit, description, schedule, and active status.
+// Items with no history (legacy) are returned unchanged.
+export const applyHistoricalState = (item, selectedDate) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(selectedDate);
+  target.setHours(0, 0, 0, 0);
+
+  if (target >= today) return item;
+
+  if (!item.history || item.history.length === 0) return item;
+
+  const dateStr = target.toISOString().split('T')[0];
+  const historical = reconstructStateAtDate(item.history, dateStr);
+  if (!historical) return item;
+
+  return {
+    ...item,
+    name: historical.name,
+    description: historical.description,
+    unit: historical.unit,
+    defaultDose: historical.defaultDose,
+    schedule: historical.schedule,
+    active: historical.active
+  };
+};
+
 // Format timestamp as relative time
 export const formatRelativeTime = (timestamp) => {
   const date = new Date(timestamp);
