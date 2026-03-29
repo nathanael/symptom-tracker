@@ -1200,46 +1200,15 @@ export default function ComparisonStudio({
                   </svg>
                 </div>
 
-                {/* Mini-insight bars for non-primary series */}
-                {[selectedSupplement, ...selectedSymptoms].filter(id => id && id !== primarySeriesId).map((id, i) => {
-                  const isSymptom = selectedSymptoms.includes(id);
-                  const item = isSymptom ? symptoms.find(s => s.id === id) : stackItems.find(s => s.id === id);
-                  const color = isSymptom ? SYMPTOM_STYLES[selectedSymptoms.indexOf(id)].color : SUPP_COLOR;
-                  const unit = isSymptom ? '/5' : (item?.unit || 'mg');
-                  let avg = null;
-                  if (id === selectedSupplement && suppTransformed) {
-                    const vals = suppTransformed.values.filter(v => v !== null && v !== undefined && v > 0);
-                    avg = vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
-                  } else {
-                    const symIdx = selectedSymptoms.indexOf(id);
-                    if (symIdx >= 0 && symptomTransformed[symIdx]) {
-                      const vals = symptomTransformed[symIdx].smoothed.filter(v => v !== null);
-                      avg = vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
-                    }
-                  }
-                  const formattedAvg = avg !== null ? (Number.isInteger(avg) ? avg : avg.toFixed(1)) : '--';
-                  const secStat = insightData?.secondaryStats?.find(s => s.name === item?.name);
-                  const pct = secStat && secStat.priorAverage > 0
-                    ? ((secStat.average - secStat.priorAverage) / secStat.priorAverage) * 100
-                    : null;
-                  return (
-                    <div key={id} style={{
-                      marginTop: i === 0 ? '8px' : '4px',
-                      display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px',
-                      background: `${color}0a`, border: `1px solid ${color}26`, borderRadius: '8px',
-                    }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, flexShrink: 0 }} />
-                      <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                        {item?.name} avg <span style={{ color, fontWeight: '500' }}>{formattedAvg}{unit === '/5' ? '/5' : ' ' + unit}</span>
-                        {pct !== null && Math.abs(pct) >= 2 && (
-                          <span style={{ color: getLevelColor(pct, isSymptom), fontWeight: '600' }}>
-                            {' · '}{pct > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pct))}% vs prior
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })}
+                {/* Insight text */}
+                {insightData && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af', lineHeight: '1.5', padding: '8px 4px' }}>
+                    {insightData.insightSegments.map((seg, i) => seg.color
+                      ? <span key={i} style={{ color: seg.color, fontWeight: '600' }}>{seg.text}</span>
+                      : seg.text
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
