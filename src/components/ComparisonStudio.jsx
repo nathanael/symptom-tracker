@@ -955,7 +955,7 @@ export default function ComparisonStudio({
           onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
           style={{
             display: 'flex', alignItems: 'center',
-            padding: addBtnPad, borderRadius: '8px',
+            padding: addBtnPad, borderRadius: chipRadius,
             border: `${addBtnBorderW} dashed rgba(139,92,246,0.4)`,
             background: 'transparent',
             color: 'rgba(139,92,246,0.7)', fontSize: addBtnText, fontWeight: '500',
@@ -1028,7 +1028,7 @@ export default function ComparisonStudio({
           onClick={() => { setShowSymptomPicker(true); haptic('light'); }}
           style={{
             display: 'flex', alignItems: 'center',
-            padding: addBtnPad, borderRadius: '8px',
+            padding: addBtnPad, borderRadius: chipRadius,
             border: `${addBtnBorderW} dashed rgba(251,113,133,0.4)`,
             background: 'transparent',
             color: 'rgba(251,113,133,0.7)', fontSize: addBtnText, fontWeight: '500',
