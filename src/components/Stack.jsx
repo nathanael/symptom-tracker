@@ -292,17 +292,12 @@ export default function Stack({
   });
 
   const availableToLog = (() => {
-    // Items available for ad-hoc logging: active, not already displayed, existed on this date
+    // Items available for ad-hoc logging: not already displayed
+    // On historical days, show all supplements (including hidden) so user can log any
     const displayedIds = new Set(displayItems.map(i => i.id));
     return stackItems.filter(i => {
-      if (!i.active || displayedIds.has(i.id)) return false;
-      if (i.schedule?.startDate) {
-        const start = new Date(i.schedule.startDate + 'T00:00:00');
-        start.setHours(0, 0, 0, 0);
-        const target = new Date(selectedDate);
-        target.setHours(0, 0, 0, 0);
-        if (target < start) return false;
-      }
+      if (displayedIds.has(i.id)) return false;
+      if (isToday && !i.active) return false;
       return true;
     }).sort((a, b) => (a.order || 0) - (b.order || 0));
   })();
