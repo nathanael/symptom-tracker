@@ -101,6 +101,8 @@ export function formatXLabel(dateStr, timeframe) {
     return d.toLocaleDateString('en-US', { weekday: 'short' });
   } else if (timeframe <= 30) {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } else if (timeframe <= 90) {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   } else {
     return d.toLocaleDateString('en-US', { month: 'short' });
   }
@@ -109,6 +111,7 @@ export function formatXLabel(dateStr, timeframe) {
 export function getXLabelInterval(timeframe) {
   if (timeframe <= 7) return 1;
   if (timeframe <= 30) return 7;
+  if (timeframe <= 90) return 10;
   return 30;
 }
 

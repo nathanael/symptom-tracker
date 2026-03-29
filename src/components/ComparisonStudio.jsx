@@ -779,7 +779,7 @@ export default function ComparisonStudio({
       {/* Supplement line */}
       {suppPoints && (
         <g>
-          <path d={buildPath(suppPoints)} fill="none" stroke={SUPP_COLOR} strokeWidth={1.2 * s} strokeLinejoin="round" opacity={primaryIsSupplement ? 0.4 : 0.2} />
+          <path d={buildPath(suppPoints)} fill="none" stroke={SUPP_COLOR} strokeWidth={1.4 * s} strokeLinejoin="round" opacity={primaryIsSupplement ? 0.8 : 0.45} />
           {showDots && primaryIsSupplement && suppPoints.map((pt, i) => (
             pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r={1.8 * s} fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth={0.8 * s} />
           ))}
@@ -789,7 +789,7 @@ export default function ComparisonStudio({
       {/* Symptom lines */}
       {symptomPointSets.map((pts, idx) => (
         <g key={`sym-${idx}`}>
-          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={1.4 * s} strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? 0.4 : 0.2} />
+          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={1.6 * s} strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? 0.8 : 0.45} />
           {showDots && selectedSymptoms[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={0.7 * s} />
           ))}
