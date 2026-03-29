@@ -339,9 +339,16 @@ export default function ComparisonStudio({
     return Math.max(0, Math.min(dates.length - 1, idx));
   }, [chartW, dates.length]);
 
-  // Desktop: simple crosshair on hover
-  const handleMouseMove = (e) => setTouchX(getSnappedIndex(e.clientX));
-  const handleMouseLeave = () => setTouchX(null);
+  // Desktop: crosshair + tooltip on hover
+  const [mouseY, setMouseY] = useState(null);
+  const handleMouseMove = (e) => {
+    setTouchX(getSnappedIndex(e.clientX));
+    if (svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+      setMouseY((e.clientY - rect.top) / rect.height * H);
+    }
+  };
+  const handleMouseLeave = () => { setTouchX(null); setMouseY(null); };
 
 
 
@@ -830,9 +837,51 @@ export default function ComparisonStudio({
         );
       })}
 
-      {/* Crosshair */}
+      {/* Crosshair + tooltip */}
       {crosshairData && (
-        <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth={0.5 * s} />
+        <>
+          <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth={0.5 * s} />
+          {isDesktop && mouseY !== null && (() => {
+            const tooltipW = 140 * s;
+            const tooltipH = (28 + crosshairData.items.length * 20) * s;
+            const flipX = crosshairData.x + tooltipW + 15 * s > W - padRight;
+            const tx = flipX ? crosshairData.x - tooltipW - 10 * s : crosshairData.x + 10 * s;
+            const ty = Math.max(padTop, Math.min(mouseY - tooltipH / 2, padTop + chartH - tooltipH));
+            return (
+              <foreignObject x={tx} y={ty} width={tooltipW} height={tooltipH}>
+                <div xmlns="http://www.w3.org/1999/xhtml" style={{
+                  background: 'rgba(20,22,28,0.95)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: `${6 * s}px`,
+                  padding: `${6 * s}px ${8 * s}px`,
+                  fontFamily: 'system-ui',
+                  pointerEvents: 'none',
+                }}>
+                  <div style={{ color: '#9ca3af', fontSize: `${7 * s}px`, marginBottom: `${4 * s}px`, fontWeight: '500' }}>
+                    {(() => {
+                      const d = new Date(dates[touchX] + 'T12:00:00');
+                      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                    })()}
+                  </div>
+                  {crosshairData.items.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: `${4 * s}px`, marginTop: `${2 * s}px` }}>
+                      <span style={{ width: `${5 * s}px`, height: `${5 * s}px`, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                      <span style={{ color: '#d1d5db', fontSize: `${7 * s}px`, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.name}
+                      </span>
+                      <span style={{ color: '#f3f4f6', fontSize: `${7.5 * s}px`, fontWeight: '600', fontVariantNumeric: 'tabular-nums' }}>
+                        {item.val !== null && item.val !== undefined && isFinite(item.val)
+                          ? (item.unit === '/5' ? item.val.toFixed(1) : (Number.isInteger(item.val) ? item.val : item.val.toFixed(1)))
+                          : '—'}
+                      </span>
+                      <span style={{ color: '#6b7280', fontSize: `${6 * s}px` }}>{item.unit}</span>
+                    </div>
+                  ))}
+                </div>
+              </foreignObject>
+            );
+          })()}
+        </>
       )}
     </>
   );
