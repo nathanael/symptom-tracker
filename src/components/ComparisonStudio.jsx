@@ -809,7 +809,40 @@ export default function ComparisonStudio({
         </g>
       ))}
 
-      {/* Layer 1: Trend lines — rendered first (bottom) */}
+      {/* Level segments: 4 layers — bg boxes, then trend lines, then text */}
+      {/* Layer 1: Dark background boxes (behind everything) */}
+      {levels.map((level, i) => {
+        if (level.average === null) return null;
+        if (isDesktop) return null;
+        const yMax = primaryIsSupplement ? suppYMax : 5;
+        const y = padTop + chartH - (level.average / yMax) * chartH;
+        const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
+        const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
+        const xMid = (x1 + x2) / 2;
+        const avgLabel = primaryIsSymptom
+          ? level.average.toFixed(1)
+          : (Number.isInteger(level.average) ? level.average : Math.round(level.average));
+        const avgFs = 11 * s;
+        const pctFs = 10 * s;
+        const hasPct = level.percentChange !== null && Math.abs(level.percentChange) >= 2;
+        const pctText = hasPct ? `${level.percentChange > 0 ? '+' : ''}${Math.round(level.percentChange)}%` : null;
+        const bgPadX = 5 * s;
+        const bgPadY = 3 * s;
+        const avgW = String(avgLabel).length * avgFs * 0.65 + bgPadX * 2;
+        const avgH = avgFs + bgPadY * 2;
+        return (
+          <g key={`level-bg-${i}`}>
+            <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs - bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.90)" />
+            {pctText && (() => {
+              const pctW = pctText.length * pctFs * 0.6 + bgPadX * 2;
+              const pctH = pctFs + bgPadY * 2;
+              return <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs - bgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.90)" />;
+            })()}
+          </g>
+        );
+      })}
+
+      {/* Layer 2: Trend lines (on top of bg boxes) */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
         const yMax = primaryIsSupplement ? suppYMax : 5;
@@ -823,7 +856,7 @@ export default function ComparisonStudio({
         );
       })}
 
-      {/* Layer 2: Average numbers with dark bg boxes — ON TOP of trend lines */}
+      {/* Layer 3: Text labels only (on top of trend lines) */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
         const yMax = primaryIsSupplement ? suppYMax : 5;
@@ -836,44 +869,20 @@ export default function ComparisonStudio({
           ? level.average.toFixed(1)
           : (Number.isInteger(level.average) ? level.average : Math.round(level.average));
         const avgFs = (isDesktop ? 8 : 11) * s;
-        const bgPadX = 5 * s;
-        const bgPadY = 3 * s;
-        const avgW = String(avgLabel).length * avgFs * 0.65 + bgPadX * 2;
-        const avgH = avgFs + bgPadY * 2;
+        const pctFs = (isDesktop ? 7 : 10) * s;
+        const hasPct = level.percentChange !== null && Math.abs(level.percentChange) >= 2;
         return (
-          <g key={`level-avg-${i}`}>
-            {!isDesktop && <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs - bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.90)" />}
+          <g key={`level-text-${i}`}>
             <text x={xMid} y={y - 6 * s} textAnchor="middle"
               fill={isDesktop ? color : '#fff'} fontSize={avgFs} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
               {avgLabel}
             </text>
-          </g>
-        );
-      })}
-
-      {/* Layer 3: Percent change labels — dark bg box + original colors, ON TOP of trend lines */}
-      {levels.map((level, i) => {
-        if (level.average === null) return null;
-        if (level.percentChange === null || Math.abs(level.percentChange) < 2) return null;
-        const yMax = primaryIsSupplement ? suppYMax : 5;
-        const y = padTop + chartH - (level.average / yMax) * chartH;
-        const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
-        const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
-        const xMid = (x1 + x2) / 2;
-        const color = getLevelColor(level.percentChange, primaryIsSymptom);
-        const pctFs = (isDesktop ? 7 : 10) * s;
-        const pctText = `${level.percentChange > 0 ? '+' : ''}${Math.round(level.percentChange)}%`;
-        const pctBgPadX = 5 * s;
-        const pctBgPadY = 3 * s;
-        const pctW = pctText.length * pctFs * 0.6 + pctBgPadX * 2;
-        const pctH = pctFs + pctBgPadY * 2;
-        return (
-          <g key={`level-pct-${i}`}>
-            {!isDesktop && <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs - pctBgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.90)" />}
-            <text x={xMid} y={y + 13 * s} textAnchor="middle"
-              fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
-              {pctText}
-            </text>
+            {hasPct && (
+              <text x={xMid} y={y + 13 * s} textAnchor="middle"
+                fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
+                {level.percentChange > 0 ? '+' : ''}{Math.round(level.percentChange)}%
+              </text>
+            )}
           </g>
         );
       })}
