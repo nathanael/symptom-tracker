@@ -840,27 +840,26 @@ export default function ComparisonStudio({
         const pctText = level.percentChange !== null && Math.abs(level.percentChange) >= 2
           ? `${level.percentChange > 0 ? '+' : ''}${Math.round(level.percentChange)}%`
           : null;
-        const bgPadX = 3 * s;
-        const bgPadY = 2 * s;
-        const avgW = String(avgLabel).length * avgFs * 0.65 + bgPadX * 2;
-        const avgH = avgFs + bgPadY * 2;
-        const pctW = pctText ? pctText.length * pctFs * 0.6 + bgPadX * 2 : 0;
-        const pctH = pctFs + bgPadY * 2;
+        const bgPadX = 4 * s;
+        const bgPadY = 3 * s;
+        const bgW = Math.max(
+          String(avgLabel).length * avgFs * 0.65,
+          pctText ? pctText.length * pctFs * 0.6 : 0
+        ) + bgPadX * 2;
+        const bgTop = y - 6 * s - avgFs - bgPadY;
+        const bgBottom = pctText ? y + 13 * s + bgPadY : y + bgPadY * 2;
         return (
           <g key={`level-label-${i}`}>
-            {!isDesktop && <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs + bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.90)" />}
+            {!isDesktop && <rect x={xMid - bgW / 2} y={bgTop} width={bgW} height={bgBottom - bgTop} rx={3 * s} fill="rgba(0,0,0,0.90)" />}
             <text x={xMid} y={y - 6 * s} textAnchor="middle"
               fill={color} fontSize={avgFs} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
               {avgLabel}
             </text>
             {pctText && (
-              <>
-                {!isDesktop && <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs + bgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.90)" />}
-                <text x={xMid} y={y + 13 * s} textAnchor="middle"
-                  fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
-                  {pctText}
-                </text>
-              </>
+              <text x={xMid} y={y + 13 * s} textAnchor="middle"
+                fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
+                {pctText}
+              </text>
             )}
           </g>
         );
