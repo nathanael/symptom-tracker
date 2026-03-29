@@ -849,8 +849,8 @@ export default function ComparisonStudio({
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '10px 12px', borderRadius: '8px',
-              background: isPrimary ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.08)',
-              border: isPrimary ? '2px solid rgba(139,92,246,0.5)' : '1px solid rgba(139,92,246,0.25)',
+              background: isPrimary ? 'rgba(139,92,246,0.28)' : 'rgba(139,92,246,0.08)',
+              border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : '1px solid rgba(139,92,246,0.25)',
               cursor: 'pointer',
             }}
           >
@@ -921,8 +921,8 @@ export default function ComparisonStudio({
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '10px 12px', borderRadius: '8px',
-              background: isPrimary ? `${st.color}20` : st.chipBg,
-              border: isPrimary ? `2px solid ${st.color}80` : `1px solid ${st.chipBorder}`,
+              background: isPrimary ? `${st.color}45` : st.chipBg,
+              border: isPrimary ? `2px solid ${st.color}90` : `1px solid ${st.chipBorder}`,
               cursor: 'pointer',
             }}
           >
