@@ -1,0 +1,50 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "users",
+      "fieldPath": "entries",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "dailyNotes",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "stackEntries",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "stackItems",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "symptoms",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "pinnedSymptoms",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "inputItems",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "inputEntries",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "users",
+      "fieldPath": "trackingMode",
+      "indexes": []
+    }
+  ]
+}
