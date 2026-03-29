@@ -889,14 +889,16 @@ export default function ComparisonStudio({
   );
 
   // ── Series chips with inline stats (shared between desktop/mobile) ──
-  const chipPad = isDesktop ? '10px 12px' : '12px 16px';
+  const chipPad = isDesktop ? '10px 12px' : '15px 16px';
   const chipText = isDesktop ? '13px' : '15px';
   const chipUnitText = isDesktop ? '11px' : '12px';
   const chipDot = isDesktop ? '6px' : '8px';
   const chipBorderW = isDesktop ? '1px' : '1.5px';
   const chipRadius = isDesktop ? '8px' : '10px';
-  const chipCloseOpacity = isDesktop ? 0.5 : 0.7;
-  const addBtnPad = isDesktop ? '10px 12px' : '12px 16px';
+  const chipCloseOpacity = isDesktop ? 0.5 : 0.85;
+  const chipCloseSize = isDesktop ? '14px' : '18px';
+  const chipCloseMargin = isDesktop ? '0' : '4px';
+  const addBtnPad = isDesktop ? '10px 12px' : '15px 16px';
   const addBtnText = isDesktop ? '13px' : '14px';
   const addBtnBorderW = isDesktop ? '1px' : '1.5px';
   const seriesChips = (
@@ -948,7 +950,7 @@ export default function ComparisonStudio({
             )}
             <span
               onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }}
-              style={{ color: SUPP_COLOR, fontSize: '14px', lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer' }}
+              style={{ color: SUPP_COLOR, fontSize: chipCloseSize, lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer', marginLeft: chipCloseMargin, padding: '4px' }}
             >&times;</span>
           </div>
         );
@@ -1018,7 +1020,7 @@ export default function ComparisonStudio({
             )}
             <span
               onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }}
-              style={{ color: st.color, fontSize: '14px', lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer' }}
+              style={{ color: st.color, fontSize: chipCloseSize, lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer', marginLeft: chipCloseMargin, padding: '4px' }}
             >&times;</span>
           </div>
         );
@@ -1208,7 +1210,7 @@ export default function ComparisonStudio({
 
                 {/* Insight text */}
                 {insightData && (
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af', lineHeight: '1.5', padding: '8px 4px' }}>
+                  <div style={{ marginTop: '14px', fontSize: '15px', color: '#9ca3af', lineHeight: '1.7', padding: '10px 4px' }}>
                     {insightData.insightSegments.map((seg, i) => seg.color
                       ? <span key={i} style={{ color: seg.color, fontWeight: '600' }}>{seg.text}</span>
                       : seg.text
