@@ -877,7 +877,7 @@ export default function ComparisonStudio({
         const supp = allSupplements.find(s => s.id === selectedSupplement);
         return (
           <div
-            onClick={() => { setSelectedSupplement(''); haptic('light'); }}
+            onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '6px 10px', borderRadius: '8px',
@@ -927,7 +927,7 @@ export default function ComparisonStudio({
             }}
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {sym?.name}{sym?.description ? <span style={{ opacity: 0.7, fontWeight: '400' }}> — {sym.description}</span> : null}
+              {sym?.name}{sym?.description ? <span style={{ opacity: 0.6, fontWeight: '400' }}> — {sym?.description}</span> : null}
             </span>
             <span style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7, flexShrink: 0, marginLeft: '8px' }}>&times;</span>
           </div>
