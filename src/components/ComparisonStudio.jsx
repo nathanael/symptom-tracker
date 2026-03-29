@@ -12,9 +12,9 @@ import {
 import { computeLevels, computeInsight, getLevelColor } from '../utils/insightHelpers';
 
 const SYMPTOM_STYLES = [
-  { color: '#fb7185', chipBg: 'rgba(251,113,133,0.12)', chipBorder: 'rgba(251,113,133,0.35)' },
-  { color: '#38bdf8', chipBg: 'rgba(56,189,248,0.12)', chipBorder: 'rgba(56,189,248,0.35)' },
-  { color: '#f59e0b', chipBg: 'rgba(245,158,11,0.12)', chipBorder: 'rgba(245,158,11,0.35)' },
+  { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
+  { color: '#5ccbff', chipBg: 'rgba(92,203,255,0.12)', chipBorder: 'rgba(92,203,255,0.35)' },
+  { color: '#ffb830', chipBg: 'rgba(255,184,48,0.12)', chipBorder: 'rgba(255,184,48,0.35)' },
 ];
 
 const SUPP_COLOR = '#8b5cf6';
@@ -789,7 +789,7 @@ export default function ComparisonStudio({
       {/* Symptom lines */}
       {symptomPointSets.map((pts, idx) => (
         <g key={`sym-${idx}`}>
-          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={1 * s} strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? 0.4 : 0.2} />
+          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={1.4 * s} strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? 0.4 : 0.2} />
           {showDots && selectedSymptoms[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={0.7 * s} />
           ))}
@@ -811,7 +811,7 @@ export default function ComparisonStudio({
         return (
           <g key={`level-${i}`}>
             <line x1={x1} y1={y} x2={x2} y2={y}
-              stroke={color} strokeWidth={2 * s} />
+              stroke={color} strokeWidth={1.6 * s} />
             <text x={xMid} y={y - 5 * s} textAnchor="middle"
               fill={color} fontSize={8 * s} fontWeight="600" fontFamily="system-ui">
               {avgLabel}
