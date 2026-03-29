@@ -39,23 +39,6 @@ export default function ComparisonStudio({
     [symptoms]
   );
 
-  // Compute smart defaults: supplement with most history, one random active symptom
-  const smartDefaults = useMemo(() => {
-    let bestSupp = '';
-    let bestCount = 0;
-    for (const item of (stackItems || [])) {
-      let count = 0;
-      const keys = Object.keys(stackEntries || {});
-      for (const key of keys) {
-        if (key.endsWith(`-${item.id}`) && stackEntries[key]?.taken) count++;
-      }
-      if (count > bestCount) { bestCount = count; bestSupp = item.id; }
-    }
-    const defaultSymptom = activeSymptoms.length > 0 ? activeSymptoms[0].id : '';
-    return { supplement: bestSupp, symptom: defaultSymptom };
-  }, [stackItems, stackEntries, activeSymptoms]);
-
-  // Load saved or compute initial selections
   const initialSelections = useMemo(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -66,16 +49,12 @@ export default function ComparisonStudio({
         );
         return {
           supplement: suppValid ? saved.supplement : '',
-          symptoms: validSymptoms.length > 0 ? validSymptoms : (smartDefaults.symptom ? [smartDefaults.symptom] : []),
+          symptoms: validSymptoms,
           primarySeriesId: saved.primarySeriesId || '',
         };
       }
     } catch {}
-    return {
-      supplement: '',
-      symptoms: smartDefaults.symptom ? [smartDefaults.symptom] : [],
-      primarySeriesId: '',
-    };
+    return { supplement: '', symptoms: [], primarySeriesId: '' };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount only
 
@@ -464,7 +443,6 @@ export default function ComparisonStudio({
     return `${fmt(dates[0])} — ${fmt(dates[dates.length - 1])}`;
   }, [dates]);
 
-  const hasAnySeries = selectedSupplement || selectedSymptoms.length > 0;
   const showDots = timeframe <= 7;
 
   // ── Supplement picker panel ──
@@ -855,6 +833,101 @@ export default function ComparisonStudio({
     </>
   );
 
+  // ── Series chips (shared between desktop/mobile) ──
+  const seriesChips = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {/* Supplement chip or + button */}
+      {selectedSupplement ? (() => {
+        const supp = allSupplements.find(s => s.id === selectedSupplement);
+        const isPrimary = selectedSupplement === primarySeriesId;
+        return (
+          <div
+            onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '6px 10px', borderRadius: '8px',
+              background: isPrimary ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.12)',
+              border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : '1px solid rgba(139,92,246,0.35)',
+              color: SUPP_COLOR, fontSize: '13px', fontWeight: isPrimary ? '600' : '500',
+              cursor: 'pointer',
+            }}
+          >
+            <span
+              onClick={(e) => { e.stopPropagation(); makePrimary(selectedSupplement); }}
+              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {isPrimary ? '\u25C6 ' : ''}{supp?.name}
+            </span>
+            <span
+              onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }}
+              style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7, flexShrink: 0, marginLeft: '8px' }}
+            >&times;</span>
+          </div>
+        );
+      })() : (
+        <div
+          onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
+          style={{
+            display: 'flex', alignItems: 'center',
+            padding: '6px 10px', borderRadius: '8px',
+            border: '1px dashed rgba(139,92,246,0.4)',
+            background: 'transparent',
+            color: 'rgba(139,92,246,0.7)', fontSize: '13px', fontWeight: '500',
+            cursor: 'pointer',
+          }}
+        >
+          + Supplement
+        </div>
+      )}
+
+      {/* Symptom chips */}
+      {selectedSymptoms.map((symId, idx) => {
+        const sym = activeSymptoms.find(s => s.id === symId);
+        const st = SYMPTOM_STYLES[idx];
+        const isPrimary = symId === primarySeriesId;
+        return (
+          <div
+            key={symId}
+            onClick={() => { makePrimary(symId); }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '6px 10px', borderRadius: '8px',
+              background: isPrimary ? `${st.color}33` : st.chipBg,
+              border: isPrimary ? `2px solid ${st.color}99` : `1px solid ${st.chipBorder}`,
+              color: st.color, fontSize: '13px', fontWeight: isPrimary ? '600' : '500',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {isPrimary ? '\u25C6 ' : ''}{sym?.name}{sym?.description ? <span style={{ opacity: 0.6, fontWeight: '400' }}> — {sym?.description}</span> : null}
+            </span>
+            <span
+              onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }}
+              style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7, flexShrink: 0, marginLeft: '8px' }}
+            >&times;</span>
+          </div>
+        );
+      })}
+
+      {/* + Symptom button (if room) */}
+      {selectedSymptoms.length < 3 && (
+        <div
+          onClick={() => { setShowSymptomPicker(true); haptic('light'); }}
+          style={{
+            display: 'flex', alignItems: 'center',
+            padding: '6px 10px', borderRadius: '8px',
+            border: '1px dashed rgba(251,113,133,0.4)',
+            background: 'transparent',
+            color: 'rgba(251,113,133,0.7)', fontSize: '13px', fontWeight: '500',
+            cursor: 'pointer',
+          }}
+        >
+          + Symptom
+        </div>
+      )}
+    </div>
+  );
+
   // ── Render ──
 
   return (
@@ -862,252 +935,77 @@ export default function ComparisonStudio({
       {supplementPickerPanel}
       {symptomPickerPanel}
 
-      {/* ── Selectors ── */}
-      {isDesktop ? (
-        <div style={{ marginBottom: '20px' }}>
-          {/* Supplement selector row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={{ color: '#9ca3af', fontSize: '12px', width: '80px', flexShrink: 0 }}>Supplement</span>
-            <div onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
-              style={{
-                display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center',
-                flex: 1, minHeight: '34px', padding: '4px 10px',
-                borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.04)', cursor: 'pointer',
-              }}>
-              {selectedSupplement && (() => {
-                const supp = allSupplements.find(s => s.id === selectedSupplement);
-                const isPrimary = selectedSupplement === primarySeriesId;
-                return (
-                  <span
-                    onClick={(e) => { e.stopPropagation(); makePrimary(selectedSupplement); }}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '5px',
-                      padding: '3px 8px', borderRadius: '6px',
-                      background: isPrimary ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.12)',
-                      border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : '1px solid rgba(139,92,246,0.35)',
-                      color: SUPP_COLOR, fontSize: '13px', fontWeight: isPrimary ? '600' : '500', lineHeight: '1.3',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {isPrimary ? '\u25C6 ' : ''}{supp?.name}
-                    <span
-                      onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }}
-                      style={{ color: SUPP_COLOR, fontSize: '14px', lineHeight: 1, opacity: 0.7 }}
-                    >\u00D7</span>
+      {/* ── Mobile header (above chart card) ── */}
+      {!isDesktop && (
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            {insightData ? (
+              <div>
+                <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Average</div>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: '#e5e7eb', lineHeight: 1 }}>
+                  {Number.isInteger(insightData.average) ? insightData.average : insightData.average.toFixed(1)}
+                  {' '}<span style={{ fontSize: '12px', fontWeight: '400', color: '#6b7280' }}>
+                    {insightData.unit === '/5' ? '/5' : insightData.unit}
                   </span>
-                );
-              })()}
-              {!selectedSupplement && (
-                <span style={{ color: '#6b7280', fontSize: '13px', pointerEvents: 'none' }}>Select supplement...</span>
-              )}
-            </div>
-          </div>
-          {/* Symptom selector row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-            <span style={{ color: '#9ca3af', fontSize: '12px', width: '80px', flexShrink: 0 }}>Symptoms</span>
-            <div onClick={() => { setShowSymptomPicker(true); haptic('light'); }}
-              style={{
-                display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center',
-                flex: 1, minHeight: '34px', padding: '4px 10px',
-                borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.04)', cursor: 'pointer',
-              }}>
-              {selectedSymptoms.map((symId, idx) => {
-                const sym = activeSymptoms.find(s => s.id === symId);
-                const st = SYMPTOM_STYLES[idx];
-                const isPrimary = symId === primarySeriesId;
-                const colorRgb = st.color.replace(/^#/, '');
-                const r = parseInt(colorRgb.slice(0, 2), 16);
-                const g = parseInt(colorRgb.slice(2, 4), 16);
-                const b = parseInt(colorRgb.slice(4, 6), 16);
-                return (
-                  <span
-                    key={symId}
-                    onClick={(e) => { e.stopPropagation(); makePrimary(symId); }}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '5px',
-                      padding: '3px 8px', borderRadius: '6px',
-                      background: isPrimary ? `rgba(${r},${g},${b},0.2)` : st.chipBg,
-                      border: isPrimary ? `2px solid rgba(${r},${g},${b},0.6)` : `1px solid ${st.chipBorder}`,
-                      color: st.color, fontSize: '13px', fontWeight: isPrimary ? '600' : '500', lineHeight: '1.3',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {isPrimary ? '\u25C6 ' : ''}{sym?.name}
-                    <span
-                      onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }}
-                      style={{ color: st.color, fontSize: '14px', lineHeight: 1, opacity: 0.7 }}
-                    >\u00D7</span>
-                  </span>
-                );
-              })}
-              {selectedSymptoms.length === 0 && (
-                <span style={{ color: '#6b7280', fontSize: '13px', pointerEvents: 'none' }}>Select symptoms...</span>
-              )}
-              {selectedSymptoms.length > 0 && selectedSymptoms.length < 3 && (
-                <span style={{ color: '#4b5563', fontSize: '11px' }}>{selectedSymptoms.length}/3</span>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* Mobile: split chip rows */
-        <div>
-          {/* Supplement row */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {selectedSupplement ? (() => {
-              const supp = allSupplements.find(s => s.id === selectedSupplement);
-              const isPrimary = selectedSupplement === primarySeriesId;
-              return (
-                <span
-                  onClick={() => makePrimary(selectedSupplement)}
+                </div>
+              </div>
+            ) : <div />}
+            {/* W/M/6M pills */}
+            <div style={{ display: 'flex', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', padding: '2px' }}>
+              {TIMEFRAMES.map(tf => (
+                <button key={tf.days} onClick={() => { setTimeframe(tf.days); haptic('light'); }}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '5px',
-                    padding: '4px 10px', borderRadius: '14px',
-                    background: isPrimary ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.12)',
-                    border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : '1px solid rgba(139,92,246,0.35)',
-                    color: SUPP_COLOR, fontSize: '13px', fontWeight: isPrimary ? '600' : '500',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {isPrimary ? '\u25C6 ' : ''}{supp?.name}
-                  <span
-                    onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }}
-                    style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7 }}
-                  >\u00D7</span>
-                </span>
-              );
-            })() : (
-              <span onClick={() => { setShowSupplementPicker(true); haptic('light'); }} style={{
-                display: 'inline-flex', alignItems: 'center', gap: '4px',
-                padding: '4px 10px', borderRadius: '14px',
-                border: '1px dashed rgba(139,92,246,0.4)',
-                background: 'transparent',
-                color: 'rgba(139,92,246,0.7)', fontSize: '13px', fontWeight: '500',
-                cursor: 'pointer',
-              }}>
-                + Supplement
+                    padding: '6px 12px', fontSize: '16px', borderRadius: '6px',
+                    border: 'none', cursor: 'pointer',
+                    color: timeframe === tf.days ? '#fff' : '#6b7280',
+                    background: timeframe === tf.days ? 'rgba(255,255,255,0.12)' : 'transparent',
+                    fontWeight: '500',
+                  }}>
+                  {tf.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* % badge */}
+          {insightData && insightData.percentChange !== null && Math.abs(insightData.percentChange) >= 2 && (
+            <div style={{
+              display: 'inline-flex', marginTop: '6px', padding: '3px 8px', borderRadius: '6px',
+              background: getLevelColor(insightData.percentChange, primaryIsSymptom) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+              border: `1px solid ${getLevelColor(insightData.percentChange, primaryIsSymptom)}40`,
+            }}>
+              <span style={{ color: getLevelColor(insightData.percentChange, primaryIsSymptom), fontSize: '11px', fontWeight: '600' }}>
+                {insightData.percentChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(insightData.percentChange))}% vs. prior {timeframe <= 7 ? 'week' : timeframe <= 30 ? 'month' : '6 months'}
               </span>
-            )}
-          </div>
-          {/* Symptom row */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {selectedSymptoms.map((symId, idx) => {
-              const sym = activeSymptoms.find(s => s.id === symId);
-              const st = SYMPTOM_STYLES[idx];
-              const isPrimary = symId === primarySeriesId;
-              const colorRgb = st.color.replace(/^#/, '');
-              const r = parseInt(colorRgb.slice(0, 2), 16);
-              const g = parseInt(colorRgb.slice(2, 4), 16);
-              const b = parseInt(colorRgb.slice(4, 6), 16);
-              return (
-                <span key={symId} onClick={() => makePrimary(symId)} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '5px',
-                  padding: '4px 10px', borderRadius: '14px',
-                  background: isPrimary ? `rgba(${r},${g},${b},0.2)` : st.chipBg,
-                  border: isPrimary ? `2px solid rgba(${r},${g},${b},0.6)` : `1px solid ${st.chipBorder}`,
-                  color: st.color, fontSize: '13px', fontWeight: isPrimary ? '600' : '500',
-                  cursor: 'pointer',
-                }}>
-                  {isPrimary ? '\u25C6 ' : ''}{sym?.name}
-                  <span
-                    onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }}
-                    style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7 }}
-                  >\u00D7</span>
-                </span>
-              );
-            })}
-            {selectedSymptoms.length < 3 && (
-              <span onClick={() => { setShowSymptomPicker(true); haptic('light'); }} style={{
-                display: 'inline-flex', alignItems: 'center', gap: '4px',
-                padding: '4px 10px', borderRadius: '14px',
-                border: '1px dashed rgba(251,113,133,0.4)',
-                background: 'transparent',
-                color: 'rgba(251,113,133,0.7)', fontSize: '13px', fontWeight: '500',
-                cursor: 'pointer',
-              }}>
-                + Symptom
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {!hasAnySeries ? (
-        <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '12px',
-          padding: '48px 20px', textAlign: 'center',
-        }}>
-          <div style={{ color: '#6b7280', fontSize: '13px', lineHeight: '1.6' }}>
-            Select at least one supplement or symptom<br />to visualize trends over time
-          </div>
-        </div>
-      ) : (
-        <>
-
-          {/* ── Mobile insight header (above chart card) ── */}
-          {!isDesktop && insightData && (
-            <div style={{ marginBottom: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Average</div>
-                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#e5e7eb', lineHeight: 1 }}>
-                    {Number.isInteger(insightData.average) ? insightData.average : insightData.average.toFixed(1)}
-                    {' '}<span style={{ fontSize: '12px', fontWeight: '400', color: '#6b7280' }}>
-                      {insightData.unit === '/5' ? '/5' : insightData.unit}
-                    </span>
-                  </div>
-                </div>
-                {/* W/M/6M pills */}
-                <div style={{ display: 'flex', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', padding: '2px' }}>
-                  {TIMEFRAMES.map(tf => (
-                    <button key={tf.days} onClick={() => { setTimeframe(tf.days); haptic('light'); }}
-                      style={{
-                        padding: '6px 12px', fontSize: '16px', borderRadius: '6px',
-                        border: 'none', cursor: 'pointer',
-                        color: timeframe === tf.days ? '#fff' : '#6b7280',
-                        background: timeframe === tf.days ? 'rgba(255,255,255,0.12)' : 'transparent',
-                        fontWeight: '500',
-                      }}>
-                      {tf.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* % badge */}
-              {insightData.percentChange !== null && Math.abs(insightData.percentChange) >= 2 && (
-                <div style={{
-                  display: 'inline-flex', marginTop: '6px', padding: '3px 8px', borderRadius: '6px',
-                  background: getLevelColor(insightData.percentChange, primaryIsSymptom) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-                  border: `1px solid ${getLevelColor(insightData.percentChange, primaryIsSymptom)}40`,
-                }}>
-                  <span style={{ color: getLevelColor(insightData.percentChange, primaryIsSymptom), fontSize: '11px', fontWeight: '600' }}>
-                    {insightData.percentChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(insightData.percentChange))}% vs. prior {timeframe <= 7 ? 'week' : timeframe <= 30 ? 'month' : '6 months'}
-                  </span>
-                </div>
-              )}
-              {/* Date nav */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                <button onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
-                  disabled={startOffset >= maxOffset}
-                  style={{ background: 'none', border: 'none', color: startOffset >= maxOffset ? 'rgba(107,114,128,0.3)' : '#6b7280', fontSize: '27px', cursor: startOffset >= maxOffset ? 'default' : 'pointer', padding: '0 4px' }}>{'\u2039'}</button>
-                <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '16px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{dateWindowLabel}</span>
-                <button onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
-                  disabled={startOffset === 0}
-                  style={{ background: 'none', border: 'none', color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#6b7280', fontSize: '27px', cursor: startOffset === 0 ? 'default' : 'pointer', padding: '0 4px' }}>{'\u203A'}</button>
-              </div>
-              {/* Insight text */}
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af', lineHeight: '1.5' }}>
-                {insightData.insightSegments.map((seg, i) => seg.color
-                        ? <span key={i} style={{ color: seg.color, fontWeight: '600' }}>{seg.text}</span>
-                        : seg.text
-                      )}
-              </div>
             </div>
           )}
+          {/* Date nav */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+            <button onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
+              disabled={startOffset >= maxOffset}
+              style={{ background: 'none', border: 'none', color: startOffset >= maxOffset ? 'rgba(107,114,128,0.3)' : '#6b7280', fontSize: '27px', cursor: startOffset >= maxOffset ? 'default' : 'pointer', padding: '0 4px' }}>{'\u2039'}</button>
+            <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '16px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{dateWindowLabel}</span>
+            <button onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
+              disabled={startOffset === 0}
+              style={{ background: 'none', border: 'none', color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#6b7280', fontSize: '27px', cursor: startOffset === 0 ? 'default' : 'pointer', padding: '0 4px' }}>{'\u203A'}</button>
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '10px 0' }} />
+
+          {/* Series chips */}
+          {seriesChips}
+
+          {/* Insight text */}
+          {insightData && (
+            <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af', lineHeight: '1.5' }}>
+              {insightData.insightSegments.map((seg, i) => seg.color
+                      ? <span key={i} style={{ color: seg.color, fontWeight: '600' }}>{seg.text}</span>
+                      : seg.text
+                    )}
+            </div>
+          )}
+        </div>
+      )}
 
           {/* ── Chart card ── */}
           <div style={{
@@ -1179,6 +1077,12 @@ export default function ComparisonStudio({
                       }}
                     >›</button>
                   </div>
+
+                  {/* Divider */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '16px 0' }} />
+
+                  {/* Series chips */}
+                  {seriesChips}
 
                   {/* Divider */}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '16px 0' }} />
@@ -1369,8 +1273,6 @@ export default function ComparisonStudio({
             )}
           </div>
 
-        </>
-      )}
     </div>
   );
 }
