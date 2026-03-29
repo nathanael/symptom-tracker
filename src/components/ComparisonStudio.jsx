@@ -809,7 +809,21 @@ export default function ComparisonStudio({
         </g>
       ))}
 
-      {/* Level segments */}
+      {/* Level segment lines (rendered first, behind labels) */}
+      {levels.map((level, i) => {
+        if (level.average === null) return null;
+        const yMax = primaryIsSupplement ? suppYMax : 5;
+        const y = padTop + chartH - (level.average / yMax) * chartH;
+        const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
+        const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
+        const color = getLevelColor(level.percentChange, primaryIsSymptom);
+        return (
+          <line key={`level-line-${i}`} x1={x1} y1={y} x2={x2} y2={y}
+            stroke={color} strokeWidth={(isDesktop ? 1.6 : 3.0) * s} strokeLinecap="round" />
+        );
+      })}
+
+      {/* Level segment labels (rendered on top of lines) */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
         const yMax = primaryIsSupplement ? suppYMax : 5;
@@ -833,9 +847,7 @@ export default function ComparisonStudio({
         const pctW = pctText ? pctText.length * pctFs * 0.6 + bgPadX * 2 : 0;
         const pctH = pctFs + bgPadY * 2;
         return (
-          <g key={`level-${i}`}>
-            <line x1={x1} y1={y} x2={x2} y2={y}
-              stroke={color} strokeWidth={(isDesktop ? 1.6 : 3.0) * s} strokeLinecap="round" />
+          <g key={`level-label-${i}`}>
             {!isDesktop && <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs + bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.90)" />}
             <text x={xMid} y={y - 6 * s} textAnchor="middle"
               fill={color} fontSize={avgFs} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
