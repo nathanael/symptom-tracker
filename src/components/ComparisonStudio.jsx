@@ -840,8 +840,18 @@ export default function ComparisonStudio({
         const pctText = level.percentChange !== null && Math.abs(level.percentChange) >= 2
           ? `${level.percentChange > 0 ? '+' : ''}${Math.round(level.percentChange)}%`
           : null;
+        const bgPadX = 5 * s;
+        const bgPadY = 4 * s;
+        const avgTextW = String(avgLabel).length * avgFs * 0.65;
+        const pctTextW = pctText ? pctText.length * pctFs * 0.6 : 0;
+        const bgW = Math.max(avgTextW, pctTextW) + bgPadX * 2;
+        // avg text baseline at y - 6*s, top of text ~avgFs above that
+        const bgTop = y - 6 * s - avgFs - bgPadY;
+        // bottom: if pct exists, its baseline is at y + 13*s, extend below; otherwise just below the line
+        const bgBottom = pctText ? y + 13 * s + bgPadY + 2 * s : y + bgPadY + 4 * s;
         return (
           <g key={`level-label-${i}`}>
+            {!isDesktop && <rect x={xMid - bgW / 2} y={bgTop} width={bgW} height={bgBottom - bgTop} rx={4 * s} fill="rgba(0,0,0,0.90)" />}
             <text x={xMid} y={y - 6 * s} textAnchor="middle"
               fill={isDesktop ? color : '#fff'} fontSize={avgFs} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
               {avgLabel}
