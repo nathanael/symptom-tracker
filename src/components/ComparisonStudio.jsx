@@ -835,7 +835,7 @@ export default function ComparisonStudio({
 
   // ── Series chips with inline stats (shared between desktop/mobile) ──
   const seriesChips = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {/* Supplement chip or + button */}
       {selectedSupplement ? (() => {
         const supp = allSupplements.find(s => s.id === selectedSupplement);
@@ -847,8 +847,8 @@ export default function ComparisonStudio({
           <div
             onClick={() => makePrimary(selectedSupplement)}
             style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: isPrimary ? '8px 10px' : '6px 10px', borderRadius: '8px',
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 12px', borderRadius: '8px',
               background: isPrimary ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.08)',
               border: isPrimary ? '2px solid rgba(139,92,246,0.5)' : '1px solid rgba(139,92,246,0.25)',
               cursor: 'pointer',
@@ -860,11 +860,11 @@ export default function ComparisonStudio({
               fontSize: '13px', fontWeight: isPrimary ? '600' : '400', flex: 1,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
-              {isPrimary ? '\u25C6 ' : ''}{supp?.name}
+              {supp?.name}
             </span>
             <span style={{
-              color: '#e5e7eb', fontSize: isPrimary ? '16px' : '13px',
-              fontWeight: isPrimary ? '700' : '600', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+              color: '#b0b5be', fontSize: '13px',
+              fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
             }}>
               {val !== null && val !== undefined && isFinite(val)
                 ? (Number.isInteger(val) ? val : val.toFixed(1))
@@ -892,7 +892,7 @@ export default function ComparisonStudio({
           onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
           style={{
             display: 'flex', alignItems: 'center',
-            padding: '6px 10px', borderRadius: '8px',
+            padding: '10px 12px', borderRadius: '8px',
             border: '1px dashed rgba(139,92,246,0.4)',
             background: 'transparent',
             color: 'rgba(139,92,246,0.7)', fontSize: '13px', fontWeight: '500',
@@ -902,6 +902,9 @@ export default function ComparisonStudio({
           + Supplement
         </div>
       )}
+
+      {/* Spacer between supplements and symptoms */}
+      <div style={{ height: '4px' }} />
 
       {/* Symptom chips with stats */}
       {selectedSymptoms.map((symId, idx) => {
@@ -916,8 +919,8 @@ export default function ComparisonStudio({
             key={symId}
             onClick={() => makePrimary(symId)}
             style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: isPrimary ? '8px 10px' : '6px 10px', borderRadius: '8px',
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 12px', borderRadius: '8px',
               background: isPrimary ? `${st.color}20` : st.chipBg,
               border: isPrimary ? `2px solid ${st.color}80` : `1px solid ${st.chipBorder}`,
               cursor: 'pointer',
@@ -929,11 +932,11 @@ export default function ComparisonStudio({
               fontSize: '13px', fontWeight: isPrimary ? '600' : '400', flex: 1,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
-              {isPrimary ? '\u25C6 ' : ''}{sym?.name}
+              {sym?.name}
             </span>
             <span style={{
-              color: '#e5e7eb', fontSize: isPrimary ? '16px' : '13px',
-              fontWeight: isPrimary ? '700' : '600', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+              color: '#b0b5be', fontSize: '13px',
+              fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
             }}>
               {val !== null && val !== undefined && isFinite(val) ? val.toFixed(1) : '--'}
             </span>
@@ -962,7 +965,7 @@ export default function ComparisonStudio({
           onClick={() => { setShowSymptomPicker(true); haptic('light'); }}
           style={{
             display: 'flex', alignItems: 'center',
-            padding: '6px 10px', borderRadius: '8px',
+            padding: '10px 12px', borderRadius: '8px',
             border: '1px dashed rgba(251,113,133,0.4)',
             background: 'transparent',
             color: 'rgba(251,113,133,0.7)', fontSize: '13px', fontWeight: '500',
