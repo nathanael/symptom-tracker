@@ -821,19 +821,34 @@ export default function ComparisonStudio({
         const avgLabel = primaryIsSymptom
           ? level.average.toFixed(1)
           : (Number.isInteger(level.average) ? level.average : Math.round(level.average));
+        const avgFs = (isDesktop ? 8 : 11) * s;
+        const pctFs = (isDesktop ? 7 : 10) * s;
+        const pctText = level.percentChange !== null && Math.abs(level.percentChange) >= 2
+          ? `${level.percentChange > 0 ? '+' : ''}${Math.round(level.percentChange)}%`
+          : null;
+        const bgPadX = 3 * s;
+        const bgPadY = 2 * s;
+        const avgW = String(avgLabel).length * avgFs * 0.65 + bgPadX * 2;
+        const avgH = avgFs + bgPadY * 2;
+        const pctW = pctText ? pctText.length * pctFs * 0.6 + bgPadX * 2 : 0;
+        const pctH = pctFs + bgPadY * 2;
         return (
           <g key={`level-${i}`}>
             <line x1={x1} y1={y} x2={x2} y2={y}
               stroke={color} strokeWidth={(isDesktop ? 1.6 : 3.0) * s} strokeLinecap="round" />
+            {!isDesktop && <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs + bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.55)" />}
             <text x={xMid} y={y - 6 * s} textAnchor="middle"
-              fill={color} fontSize={(isDesktop ? 8 : 11) * s} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
+              fill={color} fontSize={avgFs} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
               {avgLabel}
             </text>
-            {level.percentChange !== null && Math.abs(level.percentChange) >= 2 && (
-              <text x={xMid} y={y + 13 * s} textAnchor="middle"
-                fill={color} fontSize={(isDesktop ? 7 : 10) * s} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
-                {level.percentChange > 0 ? '+' : ''}{Math.round(level.percentChange)}%
-              </text>
+            {pctText && (
+              <>
+                {!isDesktop && <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs + bgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.55)" />}
+                <text x={xMid} y={y + 13 * s} textAnchor="middle"
+                  fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
+                  {pctText}
+                </text>
+              </>
             )}
           </g>
         );
