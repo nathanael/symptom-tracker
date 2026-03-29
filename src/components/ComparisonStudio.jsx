@@ -851,7 +851,7 @@ export default function ComparisonStudio({
         );
       })}
 
-      {/* Layer 3: Percent change labels — original colors, ON TOP of trend lines */}
+      {/* Layer 3: Percent change labels — dark bg box + original colors, ON TOP of trend lines */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
         if (level.percentChange === null || Math.abs(level.percentChange) < 2) return null;
@@ -863,11 +863,18 @@ export default function ComparisonStudio({
         const color = getLevelColor(level.percentChange, primaryIsSymptom);
         const pctFs = (isDesktop ? 7 : 10) * s;
         const pctText = `${level.percentChange > 0 ? '+' : ''}${Math.round(level.percentChange)}%`;
+        const pctBgPadX = 5 * s;
+        const pctBgPadY = 3 * s;
+        const pctW = pctText.length * pctFs * 0.6 + pctBgPadX * 2;
+        const pctH = pctFs + pctBgPadY * 2;
         return (
-          <text key={`level-pct-${i}`} x={xMid} y={y + 13 * s} textAnchor="middle"
-            fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
-            {pctText}
-          </text>
+          <g key={`level-pct-${i}`}>
+            {!isDesktop && <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs - pctBgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.90)" />}
+            <text x={xMid} y={y + 13 * s} textAnchor="middle"
+              fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
+              {pctText}
+            </text>
+          </g>
         );
       })}
 
