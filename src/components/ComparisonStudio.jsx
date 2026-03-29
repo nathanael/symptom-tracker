@@ -809,7 +809,21 @@ export default function ComparisonStudio({
         </g>
       ))}
 
-      {/* Layer 1: Average numbers ABOVE trend lines — white on dark bg, rendered behind the line */}
+      {/* Layer 1: Trend lines — rendered first (bottom) */}
+      {levels.map((level, i) => {
+        if (level.average === null) return null;
+        const yMax = primaryIsSupplement ? suppYMax : 5;
+        const y = padTop + chartH - (level.average / yMax) * chartH;
+        const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
+        const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
+        const color = getLevelColor(level.percentChange, primaryIsSymptom);
+        return (
+          <line key={`level-line-${i}`} x1={x1} y1={y} x2={x2} y2={y}
+            stroke={color} strokeWidth={(isDesktop ? 1.6 : 3.0) * s} strokeLinecap="round" />
+        );
+      })}
+
+      {/* Layer 2: Average numbers with dark bg boxes — ON TOP of trend lines */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
         const yMax = primaryIsSupplement ? suppYMax : 5;
@@ -837,21 +851,7 @@ export default function ComparisonStudio({
         );
       })}
 
-      {/* Layer 2: Trend lines — on top of the avg numbers */}
-      {levels.map((level, i) => {
-        if (level.average === null) return null;
-        const yMax = primaryIsSupplement ? suppYMax : 5;
-        const y = padTop + chartH - (level.average / yMax) * chartH;
-        const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
-        const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
-        const color = getLevelColor(level.percentChange, primaryIsSymptom);
-        return (
-          <line key={`level-line-${i}`} x1={x1} y1={y} x2={x2} y2={y}
-            stroke={color} strokeWidth={(isDesktop ? 1.6 : 3.0) * s} strokeLinecap="round" />
-        );
-      })}
-
-      {/* Layer 3: Percent change labels BELOW trend lines — original colors, on top of everything */}
+      {/* Layer 3: Percent change labels — original colors, ON TOP of trend lines */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
         if (level.percentChange === null || Math.abs(level.percentChange) < 2) return null;
