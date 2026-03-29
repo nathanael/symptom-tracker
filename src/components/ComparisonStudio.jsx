@@ -887,6 +887,16 @@ export default function ComparisonStudio({
   );
 
   // ── Series chips with inline stats (shared between desktop/mobile) ──
+  const chipPad = isDesktop ? '10px 12px' : '12px 16px';
+  const chipText = isDesktop ? '13px' : '15px';
+  const chipUnitText = isDesktop ? '11px' : '12px';
+  const chipDot = isDesktop ? '6px' : '8px';
+  const chipBorderW = isDesktop ? '1px' : '1.5px';
+  const chipRadius = isDesktop ? '8px' : '10px';
+  const chipCloseOpacity = isDesktop ? 0.5 : 0.7;
+  const addBtnPad = isDesktop ? '10px 12px' : '12px 16px';
+  const addBtnText = isDesktop ? '13px' : '14px';
+  const addBtnBorderW = isDesktop ? '1px' : '1.5px';
   const seriesChips = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {/* Supplement chip or + button */}
@@ -901,29 +911,29 @@ export default function ComparisonStudio({
             onClick={() => makePrimary(selectedSupplement)}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 12px', borderRadius: '8px',
+              padding: chipPad, borderRadius: chipRadius,
               background: isPrimary ? 'rgba(139,92,246,0.28)' : 'rgba(139,92,246,0.08)',
-              border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : '1px solid rgba(139,92,246,0.25)',
+              border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : `${chipBorderW} solid rgba(139,92,246,0.35)`,
               cursor: 'pointer',
             }}
           >
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: SUPP_COLOR, flexShrink: 0 }} />
+            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: SUPP_COLOR, flexShrink: 0 }} />
             <span style={{
               color: isPrimary ? SUPP_COLOR : '#9ca3af',
-              fontSize: '13px', fontWeight: isPrimary ? '600' : '400', flex: 1,
+              fontSize: chipText, fontWeight: isPrimary ? '600' : '400', flex: 1,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {supp?.name}
             </span>
             <span style={{
-              color: '#b0b5be', fontSize: '13px',
+              color: '#b0b5be', fontSize: chipText,
               fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
             }}>
               {val !== null && val !== undefined && isFinite(val)
                 ? (Number.isInteger(val) ? val : val.toFixed(1))
                 : '--'}
             </span>
-            <span style={{ color: '#6b7280', fontSize: '11px', flexShrink: 0 }}>{suppUnit}</span>
+            <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>{suppUnit}</span>
             {pctChange !== null && Math.abs(pctChange) >= 2 && (
               <span style={{
                 padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
@@ -936,7 +946,7 @@ export default function ComparisonStudio({
             )}
             <span
               onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }}
-              style={{ color: SUPP_COLOR, fontSize: '14px', lineHeight: 1, opacity: 0.5, flexShrink: 0, cursor: 'pointer' }}
+              style={{ color: SUPP_COLOR, fontSize: '14px', lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer' }}
             >&times;</span>
           </div>
         );
@@ -945,10 +955,10 @@ export default function ComparisonStudio({
           onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
           style={{
             display: 'flex', alignItems: 'center',
-            padding: '10px 12px', borderRadius: '8px',
-            border: '1px dashed rgba(139,92,246,0.4)',
+            padding: addBtnPad, borderRadius: '8px',
+            border: `${addBtnBorderW} dashed rgba(139,92,246,0.4)`,
             background: 'transparent',
-            color: 'rgba(139,92,246,0.7)', fontSize: '13px', fontWeight: '500',
+            color: 'rgba(139,92,246,0.7)', fontSize: addBtnText, fontWeight: '500',
             cursor: 'pointer',
           }}
         >
@@ -973,27 +983,27 @@ export default function ComparisonStudio({
             onClick={() => makePrimary(symId)}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 12px', borderRadius: '8px',
+              padding: chipPad, borderRadius: chipRadius,
               background: isPrimary ? `${st.color}45` : st.chipBg,
-              border: isPrimary ? `2px solid ${st.color}90` : `1px solid ${st.chipBorder}`,
+              border: isPrimary ? `2px solid ${st.color}90` : `${chipBorderW} solid ${st.chipBorder}`,
               cursor: 'pointer',
             }}
           >
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: st.color, flexShrink: 0 }} />
+            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: st.color, flexShrink: 0 }} />
             <span style={{
               color: isPrimary ? st.color : '#9ca3af',
-              fontSize: '13px', fontWeight: isPrimary ? '600' : '400', flex: 1,
+              fontSize: chipText, fontWeight: isPrimary ? '600' : '400', flex: 1,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
               {sym?.name}
             </span>
             <span style={{
-              color: '#b0b5be', fontSize: '13px',
+              color: '#b0b5be', fontSize: chipText,
               fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
             }}>
               {val !== null && val !== undefined && isFinite(val) ? val.toFixed(1) : '--'}
             </span>
-            <span style={{ color: '#6b7280', fontSize: '11px', flexShrink: 0 }}>/5</span>
+            <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>/5</span>
             {pctChange !== null && Math.abs(pctChange) >= 2 && (
               <span style={{
                 padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
@@ -1006,7 +1016,7 @@ export default function ComparisonStudio({
             )}
             <span
               onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }}
-              style={{ color: st.color, fontSize: '14px', lineHeight: 1, opacity: 0.5, flexShrink: 0, cursor: 'pointer' }}
+              style={{ color: st.color, fontSize: '14px', lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer' }}
             >&times;</span>
           </div>
         );
@@ -1018,10 +1028,10 @@ export default function ComparisonStudio({
           onClick={() => { setShowSymptomPicker(true); haptic('light'); }}
           style={{
             display: 'flex', alignItems: 'center',
-            padding: '10px 12px', borderRadius: '8px',
-            border: '1px dashed rgba(251,113,133,0.4)',
+            padding: addBtnPad, borderRadius: '8px',
+            border: `${addBtnBorderW} dashed rgba(251,113,133,0.4)`,
             background: 'transparent',
-            color: 'rgba(251,113,133,0.7)', fontSize: '13px', fontWeight: '500',
+            color: 'rgba(251,113,133,0.7)', fontSize: addBtnText, fontWeight: '500',
             cursor: 'pointer',
           }}
         >
