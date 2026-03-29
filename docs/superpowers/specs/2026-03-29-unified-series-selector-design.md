@@ -18,7 +18,10 @@ Move supplement and symptom selectors from a dedicated top-level row into the ch
 ### Removal
 
 - Delete the entire top-level selector row (desktop: labeled boxes, mobile: horizontal chip row).
+- Delete the `inputBoxStyle` constant (only used by removed selectors).
 - Change defaults to empty — no supplement, no symptoms selected on first load.
+- Keep localStorage persistence — returning users restore their previous selections.
+- **Remove the `hasAnySeries` empty-state gate.** The chart card always renders. When no series are selected, the chart area shows the existing placeholder message, but the range/date nav and `+` buttons above it remain visible so users can add series.
 
 ### Chip Placement
 
@@ -30,7 +33,7 @@ Each selected series renders as a full-width row:
 - **Supplement chip:** Purple color (`#8b5cf6`), background `rgba(139,92,246,0.12)`, dashed border when empty
 - **Symptom chips:** Use existing `SYMPTOM_STYLES` colors (pink, blue, amber) based on selection order
 - Each chip shows the series name and a `×` dismiss button on the right
-- Tapping the chip itself (not `×`) does nothing — it's display only
+- Tapping anywhere on the chip dismisses it (existing behavior — whole chip is tap target)
 
 ### Empty Slots
 
@@ -50,7 +53,6 @@ Each selected series renders as a full-width row:
 6. Divider
 7. View mode selector
 8. Stats/legend items
-9. Insight text
 
 **Mobile (above chart):**
 1. Range tabs (W/M/3M/6M)
@@ -59,13 +61,13 @@ Each selected series renders as a full-width row:
 4. Supplement chip or `+ Supplement` slot (full-width)
 5. Symptom chips + `+ Symptom` slot (full-width)
 6. Divider
-7. View mode selector
+7. View mode selector (moved from below chart to above chart, matching desktop order)
 8. Chart
 9. Stats panel below chart
 
 ### No Labels
 
-No "Supplement" / "Symptoms" section headers. Color coding and `+` button text provide sufficient affordance.
+No "Supplement" / "Symptoms" section headers for the chip area. Color coding and `+` button text provide sufficient affordance. Existing "Range" and "View" section headers in the desktop left panel remain unchanged.
 
 ### Interaction
 
