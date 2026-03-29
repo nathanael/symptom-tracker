@@ -34,6 +34,10 @@ const log = (...args) => console.log(LOG_PREFIX, ...args);
 const logWarn = (...args) => console.warn(LOG_PREFIX, ...args);
 const WRITE_TIMEOUT_MS = 8000;
 
+// Domains stored as key-value maps (objects). Cloud data can be safely merged
+// as a base layer under local changes: { ...cloudData, ...localData }.
+const MAP_DOMAINS = new Set(['entries', 'dailyNotes', 'stackEntries', 'inputEntries']);
+
 // Domains with large nested maps that must be stored as JSON strings
 // to avoid Firestore's INDEX_ENTRIES_COUNT_LIMIT_EXCEEDED (40k entry limit).
 const STRINGIFIED_DOMAINS = new Set([
@@ -63,6 +67,28 @@ const withTimeout = (promise, ms = WRITE_TIMEOUT_MS) =>
     promise.then(() => 'ok'),
     new Promise(resolve => setTimeout(() => resolve('timeout'), ms)),
   ]);
+
+/** Convert a Firestore REST API value back to a JS value. */
+function firestoreValueToJs(value) {
+  if (value === null || value === undefined) return null;
+  if ('nullValue' in value) return null;
+  if ('booleanValue' in value) return value.booleanValue;
+  if ('integerValue' in value) return Number(value.integerValue);
+  if ('doubleValue' in value) return value.doubleValue;
+  if ('stringValue' in value) return value.stringValue;
+  if ('timestampValue' in value) return { toDate: () => new Date(value.timestampValue) };
+  if ('arrayValue' in value) {
+    return (value.arrayValue.values || []).map(firestoreValueToJs);
+  }
+  if ('mapValue' in value) {
+    const result = {};
+    for (const [k, v] of Object.entries(value.mapValue.fields || {})) {
+      result[k] = firestoreValueToJs(v);
+    }
+    return result;
+  }
+  return null;
+}
 
 /** Convert a JS value to Firestore REST API value format. */
 function jsToFirestoreValue(value) {
@@ -204,6 +230,7 @@ export default class SyncEngine {
               this._ready = true;
               this._initializing = false;
               this._requeueDirtyDomains();
+              this._mergeCloudIntoAllPending(data);
               resolve(data);
             } else {
               log('Direct get(): doc does not exist');
@@ -275,6 +302,8 @@ export default class SyncEngine {
               this._ready = true;
               this._initializing = false;
               this._requeueDirtyDomains();
+              // Merge cloud data into any pending changes so flush doesn't lose it
+              this._mergeCloudIntoAllPending(data);
               log('  Local versions after seed:', { ...this.versions });
               log('  Dirty domains:', [...this._dirtyDomains], 'Pending:', [...this.pendingChanges.keys()]);
               resolve(data);
@@ -341,8 +370,16 @@ export default class SyncEngine {
     const result = {};
     SYNC_DOMAINS.forEach(domain => {
       if (data[domain] !== undefined) {
-        if (mode === 'skipDirty' && (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain))) return;
-        if (mode === 'skipPending' && this.pendingChanges.has(domain)) return;
+        if (mode === 'skipDirty' && (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain))) {
+          // Domain skipped due to pending/dirty — merge cloud data into pending
+          // so the eventual flush includes cloud data too
+          this._mergeCloudIntoPending(domain, decodeDomain(domain, data[domain]));
+          return;
+        }
+        if (mode === 'skipPending' && this.pendingChanges.has(domain)) {
+          this._mergeCloudIntoPending(domain, decodeDomain(domain, data[domain]));
+          return;
+        }
         result[domain] = decodeDomain(domain, data[domain]);
       }
     });
@@ -399,6 +436,43 @@ export default class SyncEngine {
   }
 
   /**
+   * Merge cloud data into pending changes for a domain.
+   * For map domains (entries, dailyNotes, etc.): cloud as base, local on top.
+   * This preserves cloud keys the user hasn't touched while keeping user's changes.
+   * For non-map domains (arrays, scalars): local wins entirely (can't safely merge).
+   */
+  _mergeCloudIntoPending(domain, cloudDomainData) {
+    if (!this.pendingChanges.has(domain)) return false;
+    if (!MAP_DOMAINS.has(domain)) return false;
+    if (cloudDomainData === undefined) return false;
+
+    const localData = this.pendingChanges.get(domain);
+    // Cloud as base, local changes on top — local keys win for conflicts
+    const merged = { ...cloudDomainData, ...localData };
+    this.pendingChanges.set(domain, merged);
+
+    const cloudKeys = Object.keys(cloudDomainData).length;
+    const localKeys = Object.keys(localData).length;
+    const mergedKeys = Object.keys(merged).length;
+    log('  _mergeCloudIntoPending:', domain, `cloud=${cloudKeys} local=${localKeys} merged=${mergedKeys}`);
+    return true;
+  }
+
+  /**
+   * Merge cloud data into ALL pending changes (map domains only).
+   * Called during init when server data arrives and some domains have pending changes.
+   * Ensures the upcoming flush includes cloud data, not just stale local data.
+   */
+  _mergeCloudIntoAllPending(data) {
+    if (this.pendingChanges.size === 0) return;
+    this.pendingChanges.forEach((_, domain) => {
+      if (data[domain] !== undefined) {
+        this._mergeCloudIntoPending(domain, decodeDomain(domain, data[domain]));
+      }
+    });
+  }
+
+  /**
    * Apply domain data from a snapshot. Separated from _handleSnapshot so it
    * can be re-invoked after a flush clears dirty flags.
    */
@@ -415,6 +489,10 @@ export default class SyncEngine {
       if (cloudVersion > localVersion) {
         if (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain)) {
           skipped[domain] = `dirty/pending (cloud=${cloudVersion} local=${localVersion})`;
+          // Merge cloud data into pending changes so flush doesn't lose it
+          if (data[domain] !== undefined) {
+            this._mergeCloudIntoPending(domain, decodeDomain(domain, data[domain]));
+          }
           this.versions[domain] = cloudVersion + 1;
           return;
         }
@@ -672,6 +750,35 @@ export default class SyncEngine {
   }
 
   /**
+   * Read the user's document via Firestore REST API (bypasses SDK streaming).
+   * Returns the document data as a plain JS object, or null on failure.
+   */
+  async _restApiGet() {
+    try {
+      const currentUser = window.firebase?.auth()?.currentUser;
+      if (!currentUser) return null;
+      const token = await currentUser.getIdToken();
+      const projectId = 'symptoms-dae26';
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${this.uid}`;
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!response.ok) return null;
+      const doc = await response.json();
+      if (!doc.fields) return null;
+      // Convert Firestore REST format to plain JS object
+      const data = {};
+      for (const [key, value] of Object.entries(doc.fields)) {
+        data[key] = firestoreValueToJs(value);
+      }
+      return data;
+    } catch (e) {
+      log('REST API get failed:', e.message);
+      return null;
+    }
+  }
+
+  /**
    * Start polling fallback if the streaming listener isn't working.
    * Called after initialization completes.
    */
@@ -687,19 +794,27 @@ export default class SyncEngine {
         return;
       }
 
+      // Try SDK get() first, fall back to REST API if it fails
+      let data = null;
       const db = getFirebaseDb();
-      if (!db) return;
-
-      try {
-        const snap = await db.collection('users').doc(this.uid).get({ source: 'server' });
-        if (snap.exists && !this._destroyed) {
-          const data = snap.data();
-          // Use the same logic as _applySnapshot for version-based merging
-          this._lastSnapshotData = data;
-          this._applySnapshot(data);
+      if (db) {
+        try {
+          const snap = await db.collection('users').doc(this.uid).get({ source: 'server' });
+          if (snap.exists) data = snap.data();
+        } catch (e) {
+          log('SDK poll failed, trying REST API fallback');
         }
-      } catch (e) {
-        // Silently ignore poll failures (offline, etc.)
+      }
+
+      // REST API fallback — bypasses broken SDK streaming channel
+      if (!data) {
+        data = await this._restApiGet();
+        if (data) log('REST API poll succeeded');
+      }
+
+      if (data && !this._destroyed) {
+        this._lastSnapshotData = data;
+        this._applySnapshot(data);
       }
     };
 
