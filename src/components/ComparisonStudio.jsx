@@ -1041,72 +1041,37 @@ export default function ComparisonStudio({
       {/* ── Mobile header (above chart card) ── */}
       {!isDesktop && (
         <div style={{ marginBottom: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            {insightData ? (
-              <div>
-                <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Average</div>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: '#e5e7eb', lineHeight: 1 }}>
-                  {Number.isInteger(insightData.average) ? insightData.average : insightData.average.toFixed(1)}
-                  {' '}<span style={{ fontSize: '12px', fontWeight: '400', color: '#6b7280' }}>
-                    {insightData.unit === '/5' ? '/5' : insightData.unit}
-                  </span>
-                </div>
-              </div>
-            ) : <div />}
-            {/* W/M/6M pills */}
-            <div style={{ display: 'flex', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', padding: '2px' }}>
+          {/* Centered timeframe pills */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', gap: '3px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', padding: '3px' }}>
               {TIMEFRAMES.map(tf => (
                 <button key={tf.days} onClick={() => { setTimeframe(tf.days); haptic('light'); }}
                   style={{
-                    padding: '6px 12px', fontSize: '16px', borderRadius: '6px',
+                    padding: '8px 18px', fontSize: '18px', borderRadius: '6px',
                     border: 'none', cursor: 'pointer',
-                    color: timeframe === tf.days ? '#fff' : '#6b7280',
-                    background: timeframe === tf.days ? 'rgba(255,255,255,0.12)' : 'transparent',
-                    fontWeight: '500',
+                    color: timeframe === tf.days ? '#fff' : '#9ca3af',
+                    background: timeframe === tf.days ? 'rgba(255,255,255,0.15)' : 'transparent',
+                    fontWeight: timeframe === tf.days ? '600' : '500',
                   }}>
                   {tf.label}
                 </button>
               ))}
             </div>
           </div>
-          {/* % badge */}
-          {insightData && insightData.percentChange !== null && Math.abs(insightData.percentChange) >= 2 && (
-            <div style={{
-              display: 'inline-flex', marginTop: '6px', padding: '3px 8px', borderRadius: '6px',
-              background: getLevelColor(insightData.percentChange, primaryIsSymptom) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-              border: `1px solid ${getLevelColor(insightData.percentChange, primaryIsSymptom)}40`,
-            }}>
-              <span style={{ color: getLevelColor(insightData.percentChange, primaryIsSymptom), fontSize: '11px', fontWeight: '600' }}>
-                {insightData.percentChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(insightData.percentChange))}% vs. prior {timeframe <= 7 ? 'week' : timeframe <= 30 ? 'month' : '6 months'}
-              </span>
-            </div>
-          )}
-          {/* Date nav */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+
+          {/* Bold date range navigator */}
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '14px' }}>
             <button onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
               disabled={startOffset >= maxOffset}
-              style={{ background: 'none', border: 'none', color: startOffset >= maxOffset ? 'rgba(107,114,128,0.3)' : '#6b7280', fontSize: '27px', cursor: startOffset >= maxOffset ? 'default' : 'pointer', padding: '0 4px' }}>{'\u2039'}</button>
-            <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '16px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{dateWindowLabel}</span>
+              style={{ background: 'none', border: 'none', color: startOffset >= maxOffset ? 'rgba(107,114,128,0.3)' : '#e5e7eb', fontSize: '28px', fontWeight: '300', cursor: startOffset >= maxOffset ? 'default' : 'pointer', padding: '4px 8px' }}>{'\u2039'}</button>
+            <span style={{ flex: 1, textAlign: 'center', color: '#f3f4f6', fontSize: '17px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{dateWindowLabel}</span>
             <button onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
               disabled={startOffset === 0}
-              style={{ background: 'none', border: 'none', color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#6b7280', fontSize: '27px', cursor: startOffset === 0 ? 'default' : 'pointer', padding: '0 4px' }}>{'\u203A'}</button>
+              style={{ background: 'none', border: 'none', color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#e5e7eb', fontSize: '28px', fontWeight: '300', cursor: startOffset === 0 ? 'default' : 'pointer', padding: '4px 8px' }}>{'\u203A'}</button>
           </div>
-
-          {/* Divider */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '10px 0' }} />
 
           {/* Series chips */}
           {seriesChips}
-
-          {/* Insight text */}
-          {insightData && (
-            <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af', lineHeight: '1.5' }}>
-              {insightData.insightSegments.map((seg, i) => seg.color
-                      ? <span key={i} style={{ color: seg.color, fontWeight: '600' }}>{seg.text}</span>
-                      : seg.text
-                    )}
-            </div>
-          )}
         </div>
       )}
 
