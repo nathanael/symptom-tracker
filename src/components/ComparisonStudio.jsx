@@ -832,11 +832,11 @@ export default function ComparisonStudio({
         const avgH = avgFs + bgPadY * 2;
         return (
           <g key={`level-bg-${i}`}>
-            <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs - bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.90)" />
+            <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs - bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.50)" />
             {pctText && (() => {
               const pctW = pctText.length * pctFs * 0.6 + bgPadX * 2;
               const pctH = pctFs + bgPadY * 2;
-              return <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs - bgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.90)" />;
+              return <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs - bgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.50)" />;
             })()}
           </g>
         );
