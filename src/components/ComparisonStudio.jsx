@@ -140,7 +140,7 @@ export default function ComparisonStudio({
   const suppUnit = suppItem?.unit || 'mg';
 
   // SVG dimensions
-  const H_MOBILE = 400;
+  const H_MOBILE = 500;
   const chartContainerRef = useRef(null);
   const [desktopChartDims, setDesktopChartDims] = useState({ w: 500, h: 420 });
   useEffect(() => {
@@ -160,7 +160,7 @@ export default function ComparisonStudio({
   const H = isDesktop ? desktopChartDims.h : H_MOBILE;
   // Scale factor for fonts/strokes — designed for 500-unit base
   const s = W / 500;
-  const padLeft = 36 * s, padRight = 20 * s, padTop = 14 * s, padBottom = 22 * s;
+  const padLeft = (isDesktop ? 36 : 22) * s, padRight = (isDesktop ? 20 : 12) * s, padTop = 14 * s, padBottom = 22 * s;
   const chartW = W - padLeft - padRight;
   const chartH = H - padTop - padBottom;
 
