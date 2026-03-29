@@ -728,18 +728,18 @@ export default function ComparisonStudio({
       {primaryIsSupplement && selectedSupplement ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
-          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.12)" strokeWidth={0.5 * s} />;
+          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.18)"} strokeWidth={0.5 * s} />;
         })
       ) : (
         [0, 1, 2, 3, 4, 5].map(sev => {
           const y = padTop + chartH - (sev / 5) * chartH;
-          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.12)" strokeWidth={0.5 * s} />;
+          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.18)"} strokeWidth={0.5 * s} />;
         })
       )}
 
       {/* Axis lines — left and bottom edges */}
-      <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + chartH} stroke="rgba(255,255,255,0.2)" strokeWidth={0.7 * s} />
-      <line x1={padLeft} y1={padTop + chartH} x2={W - padRight} y2={padTop + chartH} stroke="rgba(255,255,255,0.2)" strokeWidth={0.7 * s} />
+      <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + chartH} stroke={isDesktop ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.25)"} strokeWidth={0.7 * s} />
+      <line x1={padLeft} y1={padTop + chartH} x2={W - padRight} y2={padTop + chartH} stroke={isDesktop ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.25)"} strokeWidth={0.7 * s} />
 
       {/* Left Y-axis — primary series scale */}
       {primaryIsSupplement && selectedSupplement ? (
@@ -790,7 +790,7 @@ export default function ComparisonStudio({
       {/* Supplement line */}
       {suppPoints && (
         <g>
-          <path d={buildPath(suppPoints)} fill="none" stroke={SUPP_COLOR} strokeWidth={0.9 * s} strokeLinejoin="round" opacity={primaryIsSupplement ? 0.8 : 0.45} />
+          <path d={buildPath(suppPoints)} fill="none" stroke={isDesktop ? SUPP_COLOR : '#a78bfa'} strokeWidth={(isDesktop ? 0.9 : 2.0) * s} strokeLinecap="round" strokeLinejoin="round" opacity={primaryIsSupplement ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
           {showDots && primaryIsSupplement && suppPoints.map((pt, i) => (
             pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r={1.8 * s} fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth={0.8 * s} />
           ))}
@@ -800,7 +800,7 @@ export default function ComparisonStudio({
       {/* Symptom lines */}
       {symptomPointSets.map((pts, idx) => (
         <g key={`sym-${idx}`}>
-          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={1.0 * s} strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? 0.8 : 0.45} />
+          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.0) * s} strokeLinecap="round" strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
           {showDots && selectedSymptoms[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={0.7 * s} />
           ))}
