@@ -1,8 +1,7 @@
 export const TIMEFRAMES = [
-  { label: '2W', days: 14 },
-  { label: '4W', days: 28 },
-  { label: '2M', days: 60 },
-  { label: '4M', days: 120 },
+  { label: 'W', days: 7 },
+  { label: 'M', days: 30 },
+  { label: '3M', days: 90 },
   { label: '6M', days: 180 },
 ];
 
@@ -46,7 +45,7 @@ export function getDailyValue(entries, dateKey, symptomId, trackingMode) {
   }
 }
 
-export const SMOOTH_WINDOWS = { 14: 3, 28: 5, 60: 7, 120: 9, 180: 10 };
+export const SMOOTH_WINDOWS = { 7: 1, 30: 3, 90: 7, 180: 10 };
 
 export function generateDateRange(days) {
   const dates = [];
@@ -96,14 +95,11 @@ export function smooth(values, windowSize) {
   });
 }
 
-export function formatXLabelWeekly(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 export function formatXLabel(dateStr, timeframe) {
   const d = new Date(dateStr + 'T12:00:00');
-  if (timeframe <= 28) {
+  if (timeframe <= 7) {
+    return d.toLocaleDateString('en-US', { weekday: 'short' });
+  } else if (timeframe <= 30) {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   } else {
     return d.toLocaleDateString('en-US', { month: 'short' });
@@ -112,9 +108,7 @@ export function formatXLabel(dateStr, timeframe) {
 
 export function getXLabelInterval(timeframe) {
   if (timeframe <= 7) return 1;
-  if (timeframe <= 14) return 2;
-  if (timeframe <= 28) return 7;
-  if (timeframe <= 90) return 14;
+  if (timeframe <= 30) return 7;
   return 30;
 }
 

@@ -3,17 +3,13 @@ import { haptic } from '../utils/helpers';
 import {
   TIMEFRAMES, SMOOTH_WINDOWS,
   interpolateSmallGaps, smooth,
-  formatXLabel, formatXLabelWeekly, getXLabelInterval, buildPath,
+  formatXLabel, getXLabelInterval, buildPath,
 } from '../utils/chartHelpers';
 import {
   getSymptomDailySeries,
   getSupplementDoseSeries,
 } from '../utils/correlationHelpers';
-import {
-  aggregateDaily, aggregateWeekly, aggregateMonthly,
-  computeCumulativeLevel, aggregateSymptoms,
-} from '../utils/doseTransforms';
-import { matchSupplementCategory } from '../utils/supplementLookup';
+import { computeLevels, computeInsight, getLevelColor } from '../utils/insightHelpers';
 
 const SYMPTOM_STYLES = [
   { color: '#fb7185', chipBg: 'rgba(251,113,133,0.12)', chipBorder: 'rgba(251,113,133,0.35)' },
@@ -43,6 +39,23 @@ export default function ComparisonStudio({
     [symptoms]
   );
 
+  // Compute smart defaults: supplement with most history, one random active symptom
+  const smartDefaults = useMemo(() => {
+    let bestSupp = '';
+    let bestCount = 0;
+    for (const item of (stackItems || [])) {
+      let count = 0;
+      const keys = Object.keys(stackEntries || {});
+      for (const key of keys) {
+        if (key.endsWith(`-${item.id}`) && stackEntries[key]?.taken) count++;
+      }
+      if (count > bestCount) { bestCount = count; bestSupp = item.id; }
+    }
+    const defaultSymptom = activeSymptoms.length > 0 ? activeSymptoms[0].id : '';
+    return { supplement: bestSupp, symptom: defaultSymptom };
+  }, [stackItems, stackEntries, activeSymptoms]);
+
+  // Load saved or compute initial selections
   const initialSelections = useMemo(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -53,29 +66,32 @@ export default function ComparisonStudio({
         );
         return {
           supplement: suppValid ? saved.supplement : '',
-          symptoms: validSymptoms,
-          viewMode: saved.viewMode && ['daily', 'weekly', 'monthly', 'cumulative'].includes(saved.viewMode) ? saved.viewMode : 'daily',
+          symptoms: validSymptoms.length > 0 ? validSymptoms : (smartDefaults.symptom ? [smartDefaults.symptom] : []),
+          primarySeriesId: saved.primarySeriesId || '',
         };
       }
     } catch {}
-    return { supplement: '', symptoms: [], viewMode: 'daily' };
+    return {
+      supplement: '',
+      symptoms: smartDefaults.symptom ? [smartDefaults.symptom] : [],
+      primarySeriesId: '',
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount only
 
   const [selectedSupplement, setSelectedSupplement] = useState(initialSelections.supplement);
   const [selectedSymptoms, setSelectedSymptoms] = useState(initialSelections.symptoms);
+  const [primarySeriesId, setPrimarySeriesId] = useState(initialSelections.primarySeriesId || '');
   const [showSupplementPicker, setShowSupplementPicker] = useState(false);
   const [showSymptomPicker, setShowSymptomPicker] = useState(false);
   const [suppSearch, setSuppSearch] = useState('');
   const [symSearch, setSymSearch] = useState('');
   const suppSearchRef = useRef(null);
   const symSearchRef = useRef(null);
-  const [timeframe, setTimeframe] = useState(60);
+  const [timeframe, setTimeframe] = useState(180);
   const [startOffset, setStartOffset] = useState(0);
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
-  const [viewMode, setViewMode] = useState(initialSelections.viewMode);
-  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
 
   // Auto-focus search inputs when pickers open
@@ -88,13 +104,18 @@ export default function ComparisonStudio({
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         supplement: selectedSupplement,
         symptoms: selectedSymptoms,
-        viewMode,
+        primarySeriesId,
       }));
     } catch {}
-  }, [selectedSupplement, selectedSymptoms, viewMode]);
+  }, [selectedSupplement, selectedSymptoms, primarySeriesId]);
 
-  // Close category picker when view/supplement changes
-  useEffect(() => { setShowCategoryPicker(false); }, [viewMode, selectedSupplement]);
+  // Auto-set primary to first available series when current primary is removed
+  useEffect(() => {
+    const allIds = [selectedSupplement, ...selectedSymptoms].filter(Boolean);
+    if (!allIds.includes(primarySeriesId) && allIds.length > 0) {
+      setPrimarySeriesId(allIds[0]);
+    }
+  }, [selectedSupplement, selectedSymptoms, primarySeriesId]);
 
   // Symptom selection
   const toggleSymptom = (symId) => {
@@ -107,6 +128,11 @@ export default function ComparisonStudio({
   };
   const removeSymptom = (symId) => {
     setSelectedSymptoms(prev => prev.filter(id => id !== symId));
+    haptic('light');
+  };
+
+  const makePrimary = (id) => {
+    setPrimarySeriesId(id);
     haptic('light');
   };
 
@@ -135,8 +161,27 @@ export default function ComparisonStudio({
   const suppUnit = suppItem?.unit || 'mg';
 
   // SVG dimensions
-  const W = 500, H = 280;
-  const padLeft = 36, padRight = 20, padTop = 14, padBottom = 22;
+  const H_MOBILE = 400;
+  const chartContainerRef = useRef(null);
+  const [desktopChartDims, setDesktopChartDims] = useState({ w: 500, h: 420 });
+  useEffect(() => {
+    if (!isDesktop) return;
+    const el = chartContainerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) {
+        setDesktopChartDims({ w: Math.round(width), h: Math.round(height) });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isDesktop]);
+  const W = isDesktop ? desktopChartDims.w : 500;
+  const H = isDesktop ? desktopChartDims.h : H_MOBILE;
+  // Scale factor for fonts/strokes — designed for 500-unit base
+  const s = W / 500;
+  const padLeft = 36 * s, padRight = 20 * s, padTop = 14 * s, padBottom = 22 * s;
   const chartW = W - padLeft - padRight;
   const chartH = H - padTop - padBottom;
 
@@ -155,30 +200,15 @@ export default function ComparisonStudio({
       const cap = p95 * 3;
       capped = raw.map(v => (v !== null && v > cap) ? cap : v);
     }
-    // For cumulative view, keep nulls (computeCumulativeLevel handles them internally)
-    if (viewMode === 'cumulative') return capped;
     return capped.map(v => v === null ? 0 : v);
-  }, [selectedSupplement, stackEntries, stackItems, dates, viewMode]);
+  }, [selectedSupplement, stackEntries, stackItems, dates]);
 
-  // Transform helper
-  const transformDose = useCallback((series, dts) => {
-    switch (viewMode) {
-      case 'weekly': return aggregateWeekly(series, dts, 'average');
-      case 'monthly': return aggregateMonthly(series, dts, 'average');
-      case 'cumulative': {
-        const item = (stackItems || []).find(i => i.id === selectedSupplement);
-        const category = item?.halfLifeCategory || null;
-        return computeCumulativeLevel(series, dts, category);
-      }
-      default: return aggregateDaily(series, dts);
-    }
-  }, [viewMode, stackItems, selectedSupplement]);
-
-  // Transformed supplement data
+  // Transformed supplement data (smoothed for display, raw kept for level computation)
   const suppTransformed = useMemo(() => {
     if (!suppDoseDaily) return null;
-    return transformDose(suppDoseDaily, dates);
-  }, [suppDoseDaily, dates, transformDose]);
+    const smoothed = windowSize > 1 ? smooth(suppDoseDaily, windowSize) : [...suppDoseDaily];
+    return { values: smoothed, dates: [...dates], labels: [...dates] };
+  }, [suppDoseDaily, dates, windowSize]);
 
   // Y-axis range (from transformed data)
   const suppYMax = useMemo(() => {
@@ -186,8 +216,8 @@ export default function ComparisonStudio({
     const max = Math.max(...suppTransformed.values.filter(v => v !== null && v !== undefined));
     if (!isFinite(max) || max <= 0) return suppItem?.defaultDose || 100;
     const ceiling = Math.ceil(max * 1.1);
-    return viewMode === 'cumulative' ? ceiling : Math.max(ceiling, suppItem?.defaultDose || 100);
-  }, [suppTransformed, suppItem, viewMode]);
+    return Math.max(ceiling, suppItem?.defaultDose || 100);
+  }, [suppTransformed, suppItem]);
 
   // Nice-number Y-axis labels
   const suppYLabels = useMemo(() => {
@@ -206,11 +236,71 @@ export default function ComparisonStudio({
     selectedSymptoms.map(symId => {
       const filled = interpolateSmallGaps(getSymptomDailySeries(entries, symId, dates, trackingMode));
       const smoothed = smooth(filled, windowSize);
-      const transformed = aggregateSymptoms(smoothed, dates, viewMode);
-      return { raw: filled, smoothed, transformed };
+      return { raw: filled, smoothed, transformed: { values: smoothed, dates, labels: dates } };
     }),
-    [selectedSymptoms, entries, dates, trackingMode, windowSize, viewMode]
+    [selectedSymptoms, entries, dates, trackingMode, windowSize]
   );
+
+  // ── Level segments & insight data ──
+
+  const primaryIsSymptom = selectedSymptoms.includes(primarySeriesId);
+  const primaryIsSupplement = primarySeriesId === selectedSupplement;
+
+  const primaryDailyValues = useMemo(() => {
+    if (primaryIsSupplement && suppDoseDaily) return suppDoseDaily;
+    const symIdx = selectedSymptoms.indexOf(primarySeriesId);
+    if (symIdx >= 0 && symptomTransformed[symIdx]) return symptomTransformed[symIdx].smoothed;
+    return null;
+  }, [primarySeriesId, primaryIsSupplement, suppDoseDaily, selectedSymptoms, symptomTransformed]);
+
+  const levels = useMemo(() => {
+    if (!primaryDailyValues) return [];
+    return computeLevels(primaryDailyValues, dates, timeframe);
+  }, [primaryDailyValues, dates, timeframe]);
+
+  const extendedDates = useMemo(() => {
+    const result = [];
+    const end = new Date();
+    end.setDate(end.getDate() - startOffset);
+    for (let i = (timeframe * 2) - 1; i >= 0; i--) {
+      const d = new Date(end);
+      d.setDate(d.getDate() - i);
+      result.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    }
+    return result;
+  }, [timeframe, startOffset]);
+
+  const insightData = useMemo(() => {
+    if (!primarySeriesId) return null;
+
+    const buildStats = (id, isSymptom) => {
+      let extSeries;
+      if (id === selectedSupplement) {
+        extSeries = getSupplementDoseSeries(stackEntries, stackItems, id, extendedDates).map(v => v === null ? 0 : v);
+      } else {
+        extSeries = interpolateSmallGaps(getSymptomDailySeries(entries, id, extendedDates, trackingMode));
+        extSeries = smooth(extSeries, windowSize);
+      }
+      const mid = extSeries.length / 2;
+      const prior = extSeries.slice(0, mid).filter(v => v !== null && v !== undefined);
+      const current = extSeries.slice(mid).filter(v => v !== null && v !== undefined);
+      const priorAvg = prior.length > 0 ? prior.reduce((s, v) => s + v, 0) / prior.length : 0;
+      const currentAvg = current.length > 0 ? current.reduce((s, v) => s + v, 0) / current.length : 0;
+      const item = isSymptom ? symptoms.find(s => s.id === id) : stackItems.find(i => i.id === id);
+      const unit = isSymptom ? '/5' : (item?.unit || 'mg');
+      return { name: item?.name || '', average: currentAvg, priorAverage: priorAvg, unit, isSymptom };
+    };
+
+    const primaryStats = buildStats(primarySeriesId, primaryIsSymptom);
+    const secondaryIds = [selectedSupplement, ...selectedSymptoms].filter(id => id && id !== primarySeriesId);
+    const secondaryStats = secondaryIds.map(id => buildStats(id, selectedSymptoms.includes(id)));
+
+    const tfLabel = timeframe <= 7 ? 'week' : timeframe <= 30 ? 'month' : '6 months';
+    const insight = computeInsight(primaryStats, secondaryStats, { timeframeLabel: tfLabel });
+    return insight ? { ...insight, secondaryStats } : null;
+  }, [primarySeriesId, primaryIsSymptom, selectedSupplement, selectedSymptoms,
+      stackEntries, stackItems, entries, symptoms, trackingMode,
+      extendedDates, timeframe, windowSize]);
 
   // ── Chart points ──
 
@@ -252,19 +342,6 @@ export default function ComparisonStudio({
 
   const interval = getXLabelInterval(timeframe);
   const xLabels = useMemo(() => {
-    if (viewMode === 'weekly' || viewMode === 'monthly') {
-      if (!suppTransformed) return [];
-      return suppTransformed.dates.map((dateStr, i) => {
-        const dateIdx = dates.indexOf(dateStr);
-        const x = dateIdx >= 0
-          ? padLeft + (dateIdx / Math.max(1, dates.length - 1)) * chartW
-          : padLeft + (i / Math.max(1, suppTransformed.dates.length - 1)) * chartW;
-        const label = viewMode === 'weekly'
-          ? formatXLabelWeekly(suppTransformed.labels[i])
-          : suppTransformed.labels[i];
-        return { x, label };
-      });
-    }
     const labels = [];
     for (let i = 0; i < dates.length; i += interval) {
       labels.push({
@@ -273,25 +350,15 @@ export default function ComparisonStudio({
       });
     }
     return labels;
-  }, [viewMode, suppTransformed, dates, interval, chartW, timeframe]);
+  }, [dates, interval, chartW, timeframe]);
 
-  // Touch/mouse — adapted for aggregated views
   const getSnappedIndex = useCallback((clientX) => {
     if (!svgRef.current) return null;
     const rect = svgRef.current.getBoundingClientRect();
     const xPx = (clientX - rect.left) / rect.width * W;
-
-    if ((viewMode === 'weekly' || viewMode === 'monthly') && suppPoints) {
-      let minDist = Infinity, bestIdx = 0;
-      for (let i = 0; i < suppPoints.length; i++) {
-        const dist = Math.abs(suppPoints[i].x - xPx);
-        if (dist < minDist) { minDist = dist; bestIdx = i; }
-      }
-      return bestIdx;
-    }
     const idx = Math.round((xPx - padLeft) / chartW * (dates.length - 1));
     return Math.max(0, Math.min(dates.length - 1, idx));
-  }, [chartW, dates.length, viewMode, suppPoints]);
+  }, [chartW, dates.length]);
 
   // Desktop: simple crosshair on hover
   const handleMouseMove = (e) => setTouchX(getSnappedIndex(e.clientX));
@@ -302,29 +369,14 @@ export default function ComparisonStudio({
   const crosshairData = useMemo(() => {
     if (touchX === null) return null;
 
-    let dateLabel, suppVal, suppX, symptomVals;
-
-    if (viewMode === 'weekly' || viewMode === 'monthly') {
-      const txLabel = suppTransformed?.labels?.[touchX];
-      dateLabel = viewMode === 'weekly'
-        ? formatXLabelWeekly(txLabel)
-        : txLabel;
-      suppVal = suppPoints?.[touchX]?.val;
-      suppX = suppPoints?.[touchX]?.x;
-      symptomVals = selectedSymptoms.map((_, idx) => {
-        const symTx = symptomTransformed[idx]?.transformed;
-        return symTx?.values?.[touchX] ?? null;
-      });
-    } else {
-      const d = new Date(dates[touchX] + 'T12:00:00');
-      dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      suppVal = suppPoints?.[touchX]?.val;
-      suppX = padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW;
-      symptomVals = selectedSymptoms.map((_, idx) => {
-        const pts = symptomPointSets[idx];
-        return pts?.[touchX]?.val ?? null;
-      });
-    }
+    const dateLabel = formatXLabel(dates[touchX], timeframe);
+    const suppVal = suppDoseDaily ? suppDoseDaily[touchX] : null;
+    const suppX = suppPoints ? suppPoints[touchX]?.x : null;
+    const symptomVals = symptomTransformed.map((sd, idx) => ({
+      val: sd.smoothed[touchX],
+      color: SYMPTOM_STYLES[idx].color,
+      name: symptoms.find(s => s.id === selectedSymptoms[idx])?.name,
+    }));
 
     const items = [];
     if (suppPoints) {
@@ -334,13 +386,13 @@ export default function ComparisonStudio({
       items.push({
         name: symptoms.find(s => s.id === symId)?.name,
         color: SYMPTOM_STYLES[idx].color,
-        val: symptomVals[idx],
+        val: symptomVals[idx]?.val ?? null,
         unit: '/5',
       });
     });
-    return { dateLabel, items, x: suppX };
-  }, [touchX, viewMode, dates, suppPoints, suppTransformed, symptomTransformed,
-    symptomPointSets, suppItem, suppUnit, symptoms, selectedSymptoms, chartW]);
+    const x = suppX || (suppPoints ? null : padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW);
+    return { dateLabel, items, x };
+  }, [touchX, dates, suppDoseDaily, suppPoints, symptomTransformed, symptoms, selectedSymptoms, timeframe, chartW, suppItem, suppUnit]);
 
   // Legend: show crosshair values when hovering, averages otherwise
   const legendItems = useMemo(() => {
@@ -412,111 +464,8 @@ export default function ComparisonStudio({
     return `${fmt(dates[0])} — ${fmt(dates[dates.length - 1])}`;
   }, [dates]);
 
-  const showDots = timeframe <= 28 && (viewMode === 'daily' || viewMode === 'cumulative');
-
-  // ── View mode selector (shared between desktop/mobile) ──
-  // Resolve current decay category for cumulative view
-  const cumulativeCategory = (() => {
-    if (!selectedSupplement) return 'moderate';
-    const item = (stackItems || []).find(i => i.id === selectedSupplement);
-    return item?.halfLifeCategory || matchSupplementCategory(item?.name) || 'moderate';
-  })();
-
-  const viewModeSelector = (mobile) => (
-    <div style={{
-      display: 'flex', gap: '0',
-      borderRadius: '7px',
-      border: '1px solid rgba(255,255,255,0.08)',
-      background: 'rgba(255,255,255,0.04)',
-      padding: '2px',
-      marginBottom: mobile ? '6px' : '8px',
-      position: 'relative',
-    }}>
-      {['daily', 'weekly', 'monthly', 'cumulative'].map(mode => (
-        <button key={mode}
-          onClick={() => { setViewMode(mode); haptic('light'); }}
-          style={{
-            padding: mobile ? '5px 0' : '3px 0',
-            flex: 1,
-            borderRadius: '5px', border: 'none',
-            background: viewMode === mode ? 'rgba(255,255,255,0.12)' : 'transparent',
-            color: viewMode === mode ? '#fff' : '#6b7280',
-            fontSize: mobile ? '11px' : '10px', fontWeight: '500', cursor: 'pointer',
-            textTransform: 'capitalize',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-          }}
-        >
-          {mode}
-          {mode === 'cumulative' && viewMode === 'cumulative' && selectedSupplement && (
-            <span
-              onClick={(e) => { e.stopPropagation(); setShowCategoryPicker(prev => !prev); }}
-              style={{
-                fontSize: mobile ? '8px' : '7px',
-                padding: '1px 4px',
-                borderRadius: '6px',
-                background: 'rgba(139,92,246,0.25)',
-                color: '#a78bfa',
-                cursor: 'pointer',
-                lineHeight: '1.3',
-                textTransform: 'lowercase',
-              }}
-            >
-              {cumulativeCategory === 'moderate' ? 'mod' : cumulativeCategory}
-            </span>
-          )}
-        </button>
-      ))}
-      {showCategoryPicker && viewMode === 'cumulative' && (
-        <div style={{
-          position: 'absolute', top: '100%', right: '0',
-          marginTop: '4px', zIndex: 10,
-          background: '#1e293b', border: '1px solid rgba(255,255,255,0.15)',
-          borderRadius: '8px', padding: '4px', minWidth: '120px',
-        }}>
-          {['fast', 'moderate', 'slow'].map(cat => (
-            <button key={cat}
-              onClick={() => {
-                if (setStackItems) {
-                  setStackItems(prev => prev.map(i =>
-                    i.id === selectedSupplement ? { ...i, halfLifeCategory: cat } : i
-                  ));
-                }
-                setShowCategoryPicker(false);
-                haptic('light');
-              }}
-              style={{
-                display: 'block', width: '100%', padding: '6px 10px',
-                border: 'none', borderRadius: '4px',
-                background: cat === cumulativeCategory ? 'rgba(139,92,246,0.2)' : 'transparent',
-                color: '#e2e8f0', fontSize: '12px', cursor: 'pointer',
-                textAlign: 'left', textTransform: 'capitalize',
-              }}
-            >
-              {cat}
-              <span style={{ color: '#6b7280', fontSize: '10px', marginLeft: '6px' }}>
-                {cat === 'fast' ? '~12h' : cat === 'moderate' ? '~3d' : '~21d'}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-
-  // Area fill path for cumulative view
-  const areaFillPath = useMemo(() => {
-    if (viewMode !== 'cumulative' || !suppPoints) return '';
-    const validPoints = suppPoints.filter(pt => pt.y !== null);
-    if (validPoints.length === 0) return '';
-    let d = `M${validPoints[0].x},${padTop + chartH}`;
-    d += `L${validPoints[0].x},${validPoints[0].y}`;
-    for (let i = 1; i < validPoints.length; i++) {
-      d += `L${validPoints[i].x},${validPoints[i].y}`;
-    }
-    d += `L${validPoints[validPoints.length - 1].x},${padTop + chartH}Z`;
-    return d;
-  }, [viewMode, suppPoints, chartH]);
+  const hasAnySeries = selectedSupplement || selectedSymptoms.length > 0;
+  const showDots = timeframe <= 7;
 
   // ── Supplement picker panel ──
   const selectSupplement = (suppId) => {
@@ -772,7 +721,7 @@ export default function ComparisonStudio({
                   fontSize: '13px', fontWeight: highlighted ? '500' : '400',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  {sym.name}{sym.description ? <span style={{ opacity: 0.6, fontWeight: '400' }}> — {sym.description}</span> : null}
+                  {sym.name}
                 </span>
                 {highlighted && (
                   <span style={{ color: isSelected ? SYMPTOM_STYLES[styleIdx].color : autoColor, fontSize: '14px', flexShrink: 0 }}>✓</span>
@@ -790,64 +739,71 @@ export default function ComparisonStudio({
   // ── SVG chart content (shared between desktop/mobile) ──
   const chartSVGContent = (
     <>
-      {/* Grid lines */}
-      {selectedSupplement ? (
+      {/* Grid lines — follow primary series scale */}
+      {primaryIsSupplement && selectedSupplement ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
-          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
+          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth={0.4 * s} />;
         })
       ) : (
         [0, 1, 2, 3, 4, 5].map(sev => {
           const y = padTop + chartH - (sev / 5) * chartH;
-          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="0.4" />;
+          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth={0.4 * s} />;
         })
       )}
 
-      {/* Left Y-axis */}
-      {selectedSupplement ? (
+      {/* Left Y-axis — primary series scale */}
+      {primaryIsSupplement && selectedSupplement ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
           return (
-            <text key={`l-${val}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
-              fill="#6b7280" fontSize="7" fontFamily="system-ui">{val}</text>
+            <text key={`l-${val}`} x={padLeft - 5 * s} y={y + 2.5 * s} textAnchor="end"
+              fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{val}</text>
           );
         })
       ) : (
         [0, 1, 2, 3, 4, 5].map(sev => {
           const y = padTop + chartH - (sev / 5) * chartH;
           return (
-            <text key={`l-${sev}`} x={padLeft - 5} y={y + 2.5} textAnchor="end"
-              fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
+            <text key={`l-${sev}`} x={padLeft - 5 * s} y={y + 2.5 * s} textAnchor="end"
+              fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{sev}</text>
           );
         })
       )}
 
-      {/* Right Y-axis: severity (only when dual-axis mode) */}
-      {selectedSupplement && selectedSymptoms.length > 0 && [0, 2.5, 5].map(sev => {
-        const y = padTop + chartH - (sev / 5) * chartH;
-        return (
-          <text key={`r-${sev}`} x={W - padRight + 5} y={y + 2.5} textAnchor="start"
-            fill="#6b7280" fontSize="7" fontFamily="system-ui">{sev}</text>
-        );
-      })}
+      {/* Right Y-axis: secondary scale (only when dual-axis mode) */}
+      {selectedSupplement && selectedSymptoms.length > 0 && (
+        primaryIsSupplement ? (
+          [0, 2.5, 5].map(sev => {
+            const y = padTop + chartH - (sev / 5) * chartH;
+            return (
+              <text key={`r-${sev}`} x={W - padRight + 5 * s} y={y + 2.5 * s} textAnchor="start"
+                fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{sev}</text>
+            );
+          })
+        ) : (
+          suppYLabels.map(val => {
+            const y = padTop + chartH - (val / suppYMax) * chartH;
+            return (
+              <text key={`r-${val}`} x={W - padRight + 5 * s} y={y + 2.5 * s} textAnchor="start"
+                fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{val}</text>
+            );
+          })
+        )
+      )}
 
       {/* X-axis */}
       {xLabels.map((lbl, i) => (
-        <text key={i} x={lbl.x} y={H - 5} textAnchor="middle"
-          fill="#6b7280" fontSize="7" fontFamily="system-ui">{lbl.label}</text>
+        <text key={i} x={lbl.x} y={H - 5 * s} textAnchor="middle"
+          fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{lbl.label}</text>
       ))}
-
-      {/* Cumulative area fill */}
-      {areaFillPath && (
-        <path d={areaFillPath} fill={SUPP_COLOR} fillOpacity="0.12" stroke="none" />
-      )}
 
       {/* Supplement line */}
       {suppPoints && (
         <g>
-          <path d={buildPath(suppPoints)} fill="none" stroke={SUPP_COLOR} strokeWidth="1.2" strokeLinejoin="round" />
-          {showDots && suppPoints.map((pt, i) => (
-            pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r="1.8" fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth="0.8" />
+          <path d={buildPath(suppPoints)} fill="none" stroke={SUPP_COLOR} strokeWidth={1.2 * s} strokeLinejoin="round" opacity={primaryIsSupplement ? 0.4 : 0.2} />
+          {showDots && primaryIsSupplement && suppPoints.map((pt, i) => (
+            pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r={1.8 * s} fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth={0.8 * s} />
           ))}
         </g>
       )}
@@ -855,102 +811,48 @@ export default function ComparisonStudio({
       {/* Symptom lines */}
       {symptomPointSets.map((pts, idx) => (
         <g key={`sym-${idx}`}>
-          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="1" strokeLinejoin="round" />
-          {showDots && pts.map((pt, i) => (
-            pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r="1.2" fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth="0.7" />
+          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={1 * s} strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? 0.4 : 0.2} />
+          {showDots && selectedSymptoms[idx] === primarySeriesId && pts.map((pt, i) => (
+            pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={0.7 * s} />
           ))}
         </g>
       ))}
 
-      {/* Crosshair */}
-      {crosshairData && (
-        <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-      )}
-    </>
-  );
-
-  // ── Series chips (shared between desktop/mobile) ──
-  const seriesChips = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {/* Supplement chip or + button */}
-      {selectedSupplement ? (() => {
-        const supp = allSupplements.find(s => s.id === selectedSupplement);
+      {/* Level segments */}
+      {levels.map((level, i) => {
+        if (level.average === null) return null;
+        const yMax = primaryIsSupplement ? suppYMax : 5;
+        const y = padTop + chartH - (level.average / yMax) * chartH;
+        const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
+        const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
+        const xMid = (x1 + x2) / 2;
+        const color = getLevelColor(level.percentChange, primaryIsSymptom);
+        const avgLabel = primaryIsSymptom
+          ? level.average.toFixed(1)
+          : (Number.isInteger(level.average) ? level.average : Math.round(level.average));
         return (
-          <div
-            onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '6px 10px', borderRadius: '8px',
-              background: 'rgba(139,92,246,0.12)',
-              border: '1px solid rgba(139,92,246,0.35)',
-              color: SUPP_COLOR, fontSize: '13px', fontWeight: '500',
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {supp?.name}
-            </span>
-            <span style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7, flexShrink: 0, marginLeft: '8px' }}>&times;</span>
-          </div>
-        );
-      })() : (
-        <div
-          onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
-          style={{
-            display: 'flex', alignItems: 'center',
-            padding: '6px 10px', borderRadius: '8px',
-            border: '1px dashed rgba(139,92,246,0.4)',
-            background: 'transparent',
-            color: 'rgba(139,92,246,0.7)', fontSize: '13px', fontWeight: '500',
-            cursor: 'pointer',
-          }}
-        >
-          + Supplement
-        </div>
-      )}
-
-      {/* Symptom chips */}
-      {selectedSymptoms.map((symId, idx) => {
-        const sym = activeSymptoms.find(s => s.id === symId);
-        const st = SYMPTOM_STYLES[idx];
-        return (
-          <div
-            key={symId}
-            onClick={() => { removeSymptom(symId); }}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '6px 10px', borderRadius: '8px',
-              background: st.chipBg,
-              border: `1px solid ${st.chipBorder}`,
-              color: st.color, fontSize: '13px', fontWeight: '500',
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {sym?.name}{sym?.description ? <span style={{ opacity: 0.6, fontWeight: '400' }}> — {sym?.description}</span> : null}
-            </span>
-            <span style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7, flexShrink: 0, marginLeft: '8px' }}>&times;</span>
-          </div>
+          <g key={`level-${i}`}>
+            <line x1={x1} y1={y} x2={x2} y2={y}
+              stroke={color} strokeWidth={2 * s} />
+            <text x={xMid} y={y - 5 * s} textAnchor="middle"
+              fill={color} fontSize={8 * s} fontWeight="600" fontFamily="system-ui">
+              {avgLabel}
+            </text>
+            {level.percentChange !== null && Math.abs(level.percentChange) >= 2 && (
+              <text x={xMid} y={y + 11 * s} textAnchor="middle"
+                fill={color} fontSize={7 * s} fontFamily="system-ui">
+                {level.percentChange > 0 ? '+' : ''}{Math.round(level.percentChange)}%
+              </text>
+            )}
+          </g>
         );
       })}
 
-      {/* + Symptom button (if room) */}
-      {selectedSymptoms.length < 3 && (
-        <div
-          onClick={() => { setShowSymptomPicker(true); haptic('light'); }}
-          style={{
-            display: 'flex', alignItems: 'center',
-            padding: '6px 10px', borderRadius: '8px',
-            border: '1px dashed rgba(251,113,133,0.4)',
-            background: 'transparent',
-            color: 'rgba(251,113,133,0.7)', fontSize: '13px', fontWeight: '500',
-            cursor: 'pointer',
-          }}
-        >
-          + Symptom
-        </div>
+      {/* Crosshair */}
+      {crosshairData && (
+        <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth={0.5 * s} />
       )}
-    </div>
+    </>
   );
 
   // ── Render ──
@@ -960,17 +862,265 @@ export default function ComparisonStudio({
       {supplementPickerPanel}
       {symptomPickerPanel}
 
-      {/* ── Chart card ── */}
-      <div style={{
+      {/* ── Selectors ── */}
+      {isDesktop ? (
+        <div style={{ marginBottom: '20px' }}>
+          {/* Supplement selector row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <span style={{ color: '#9ca3af', fontSize: '12px', width: '80px', flexShrink: 0 }}>Supplement</span>
+            <div onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
+              style={{
+                display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center',
+                flex: 1, minHeight: '34px', padding: '4px 10px',
+                borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.04)', cursor: 'pointer',
+              }}>
+              {selectedSupplement && (() => {
+                const supp = allSupplements.find(s => s.id === selectedSupplement);
+                const isPrimary = selectedSupplement === primarySeriesId;
+                return (
+                  <span
+                    onClick={(e) => { e.stopPropagation(); makePrimary(selectedSupplement); }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '5px',
+                      padding: '3px 8px', borderRadius: '6px',
+                      background: isPrimary ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.12)',
+                      border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : '1px solid rgba(139,92,246,0.35)',
+                      color: SUPP_COLOR, fontSize: '13px', fontWeight: isPrimary ? '600' : '500', lineHeight: '1.3',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isPrimary ? '\u25C6 ' : ''}{supp?.name}
+                    <span
+                      onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }}
+                      style={{ color: SUPP_COLOR, fontSize: '14px', lineHeight: 1, opacity: 0.7 }}
+                    >\u00D7</span>
+                  </span>
+                );
+              })()}
+              {!selectedSupplement && (
+                <span style={{ color: '#6b7280', fontSize: '13px', pointerEvents: 'none' }}>Select supplement...</span>
+              )}
+            </div>
+          </div>
+          {/* Symptom selector row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+            <span style={{ color: '#9ca3af', fontSize: '12px', width: '80px', flexShrink: 0 }}>Symptoms</span>
+            <div onClick={() => { setShowSymptomPicker(true); haptic('light'); }}
+              style={{
+                display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center',
+                flex: 1, minHeight: '34px', padding: '4px 10px',
+                borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.04)', cursor: 'pointer',
+              }}>
+              {selectedSymptoms.map((symId, idx) => {
+                const sym = activeSymptoms.find(s => s.id === symId);
+                const st = SYMPTOM_STYLES[idx];
+                const isPrimary = symId === primarySeriesId;
+                const colorRgb = st.color.replace(/^#/, '');
+                const r = parseInt(colorRgb.slice(0, 2), 16);
+                const g = parseInt(colorRgb.slice(2, 4), 16);
+                const b = parseInt(colorRgb.slice(4, 6), 16);
+                return (
+                  <span
+                    key={symId}
+                    onClick={(e) => { e.stopPropagation(); makePrimary(symId); }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '5px',
+                      padding: '3px 8px', borderRadius: '6px',
+                      background: isPrimary ? `rgba(${r},${g},${b},0.2)` : st.chipBg,
+                      border: isPrimary ? `2px solid rgba(${r},${g},${b},0.6)` : `1px solid ${st.chipBorder}`,
+                      color: st.color, fontSize: '13px', fontWeight: isPrimary ? '600' : '500', lineHeight: '1.3',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isPrimary ? '\u25C6 ' : ''}{sym?.name}
+                    <span
+                      onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }}
+                      style={{ color: st.color, fontSize: '14px', lineHeight: 1, opacity: 0.7 }}
+                    >\u00D7</span>
+                  </span>
+                );
+              })}
+              {selectedSymptoms.length === 0 && (
+                <span style={{ color: '#6b7280', fontSize: '13px', pointerEvents: 'none' }}>Select symptoms...</span>
+              )}
+              {selectedSymptoms.length > 0 && selectedSymptoms.length < 3 && (
+                <span style={{ color: '#4b5563', fontSize: '11px' }}>{selectedSymptoms.length}/3</span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Mobile: split chip rows */
+        <div>
+          {/* Supplement row */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {selectedSupplement ? (() => {
+              const supp = allSupplements.find(s => s.id === selectedSupplement);
+              const isPrimary = selectedSupplement === primarySeriesId;
+              return (
+                <span
+                  onClick={() => makePrimary(selectedSupplement)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                    padding: '4px 10px', borderRadius: '14px',
+                    background: isPrimary ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.12)',
+                    border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : '1px solid rgba(139,92,246,0.35)',
+                    color: SUPP_COLOR, fontSize: '13px', fontWeight: isPrimary ? '600' : '500',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isPrimary ? '\u25C6 ' : ''}{supp?.name}
+                  <span
+                    onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }}
+                    style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7 }}
+                  >\u00D7</span>
+                </span>
+              );
+            })() : (
+              <span onClick={() => { setShowSupplementPicker(true); haptic('light'); }} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                padding: '4px 10px', borderRadius: '14px',
+                border: '1px dashed rgba(139,92,246,0.4)',
+                background: 'transparent',
+                color: 'rgba(139,92,246,0.7)', fontSize: '13px', fontWeight: '500',
+                cursor: 'pointer',
+              }}>
+                + Supplement
+              </span>
+            )}
+          </div>
+          {/* Symptom row */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {selectedSymptoms.map((symId, idx) => {
+              const sym = activeSymptoms.find(s => s.id === symId);
+              const st = SYMPTOM_STYLES[idx];
+              const isPrimary = symId === primarySeriesId;
+              const colorRgb = st.color.replace(/^#/, '');
+              const r = parseInt(colorRgb.slice(0, 2), 16);
+              const g = parseInt(colorRgb.slice(2, 4), 16);
+              const b = parseInt(colorRgb.slice(4, 6), 16);
+              return (
+                <span key={symId} onClick={() => makePrimary(symId)} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '5px',
+                  padding: '4px 10px', borderRadius: '14px',
+                  background: isPrimary ? `rgba(${r},${g},${b},0.2)` : st.chipBg,
+                  border: isPrimary ? `2px solid rgba(${r},${g},${b},0.6)` : `1px solid ${st.chipBorder}`,
+                  color: st.color, fontSize: '13px', fontWeight: isPrimary ? '600' : '500',
+                  cursor: 'pointer',
+                }}>
+                  {isPrimary ? '\u25C6 ' : ''}{sym?.name}
+                  <span
+                    onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }}
+                    style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7 }}
+                  >\u00D7</span>
+                </span>
+              );
+            })}
+            {selectedSymptoms.length < 3 && (
+              <span onClick={() => { setShowSymptomPicker(true); haptic('light'); }} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                padding: '4px 10px', borderRadius: '14px',
+                border: '1px dashed rgba(251,113,133,0.4)',
+                background: 'transparent',
+                color: 'rgba(251,113,133,0.7)', fontSize: '13px', fontWeight: '500',
+                cursor: 'pointer',
+              }}>
+                + Symptom
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!hasAnySeries ? (
+        <div style={{
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '12px',
+          padding: '48px 20px', textAlign: 'center',
+        }}>
+          <div style={{ color: '#6b7280', fontSize: '13px', lineHeight: '1.6' }}>
+            Select at least one supplement or symptom<br />to visualize trends over time
+          </div>
+        </div>
+      ) : (
+        <>
+
+          {/* ── Mobile insight header (above chart card) ── */}
+          {!isDesktop && insightData && (
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: '10px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Average</div>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#e5e7eb', lineHeight: 1 }}>
+                    {Number.isInteger(insightData.average) ? insightData.average : insightData.average.toFixed(1)}
+                    {' '}<span style={{ fontSize: '12px', fontWeight: '400', color: '#6b7280' }}>
+                      {insightData.unit === '/5' ? '/5' : insightData.unit}
+                    </span>
+                  </div>
+                </div>
+                {/* W/M/6M pills */}
+                <div style={{ display: 'flex', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', padding: '2px' }}>
+                  {TIMEFRAMES.map(tf => (
+                    <button key={tf.days} onClick={() => { setTimeframe(tf.days); haptic('light'); }}
+                      style={{
+                        padding: '6px 12px', fontSize: '16px', borderRadius: '6px',
+                        border: 'none', cursor: 'pointer',
+                        color: timeframe === tf.days ? '#fff' : '#6b7280',
+                        background: timeframe === tf.days ? 'rgba(255,255,255,0.12)' : 'transparent',
+                        fontWeight: '500',
+                      }}>
+                      {tf.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* % badge */}
+              {insightData.percentChange !== null && Math.abs(insightData.percentChange) >= 2 && (
+                <div style={{
+                  display: 'inline-flex', marginTop: '6px', padding: '3px 8px', borderRadius: '6px',
+                  background: getLevelColor(insightData.percentChange, primaryIsSymptom) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+                  border: `1px solid ${getLevelColor(insightData.percentChange, primaryIsSymptom)}40`,
+                }}>
+                  <span style={{ color: getLevelColor(insightData.percentChange, primaryIsSymptom), fontSize: '11px', fontWeight: '600' }}>
+                    {insightData.percentChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(insightData.percentChange))}% vs. prior {timeframe <= 7 ? 'week' : timeframe <= 30 ? 'month' : '6 months'}
+                  </span>
+                </div>
+              )}
+              {/* Date nav */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                <button onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
+                  disabled={startOffset >= maxOffset}
+                  style={{ background: 'none', border: 'none', color: startOffset >= maxOffset ? 'rgba(107,114,128,0.3)' : '#6b7280', fontSize: '27px', cursor: startOffset >= maxOffset ? 'default' : 'pointer', padding: '0 4px' }}>{'\u2039'}</button>
+                <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '16px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{dateWindowLabel}</span>
+                <button onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
+                  disabled={startOffset === 0}
+                  style={{ background: 'none', border: 'none', color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#6b7280', fontSize: '27px', cursor: startOffset === 0 ? 'default' : 'pointer', padding: '0 4px' }}>{'\u203A'}</button>
+              </div>
+              {/* Insight text */}
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#9ca3af', lineHeight: '1.5' }}>
+                {insightData.insightSegments.map((seg, i) => seg.color
+                        ? <span key={i} style={{ color: seg.color, fontWeight: '600' }}>{seg.text}</span>
+                        : seg.text
+                      )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Chart card ── */}
+          <div style={{
             background: 'rgba(15,17,21,0.6)',
             borderRadius: '12px',
             border: '1px solid rgba(255,255,255,0.06)',
             padding: '14px 14px 10px',
             marginBottom: '16px',
+            ...(isDesktop ? { height: 'calc(95vh - 180px)', minHeight: '300px' } : {}),
           }}>
             {isDesktop ? (
               /* ── Desktop: Legend (left) + Chart (right) ── */
-              <div style={{ display: 'flex', gap: '0' }}>
+              <div style={{ display: 'flex', gap: '0', height: '100%' }}>
                 {/* Legend panel — left side */}
                 <div style={{
                   width: '255px', flexShrink: 0,
@@ -978,10 +1128,6 @@ export default function ComparisonStudio({
                   display: 'flex', flexDirection: 'column',
                   borderRight: '1px solid rgba(255,255,255,0.04)',
                 }}>
-                  {/* Range section */}
-                  <div style={{ color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-                    Range
-                  </div>
                   <div style={{
                     display: 'flex', gap: '0',
                     borderRadius: '7px',
@@ -994,12 +1140,12 @@ export default function ComparisonStudio({
                       <button key={tf.days}
                         onClick={() => { setTimeframe(tf.days); haptic('light'); }}
                         style={{
-                          padding: '3px 0',
+                          padding: '7px 0',
                           flex: 1,
                           borderRadius: '5px', border: 'none',
                           background: timeframe === tf.days ? 'rgba(255,255,255,0.12)' : 'transparent',
                           color: timeframe === tf.days ? '#fff' : '#6b7280',
-                          fontSize: '10px', fontWeight: '500', cursor: 'pointer',
+                          fontSize: '15px', fontWeight: '500', cursor: 'pointer',
                         }}
                       >
                         {tf.label}
@@ -1008,285 +1154,223 @@ export default function ComparisonStudio({
                   </div>
 
                   {/* Arrow nav row */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '0' }}>
-                    <div style={{ display: 'flex', gap: '2px' }}>
-                      <button
-                        onClick={() => { setStartOffset(maxOffset); haptic('light'); }}
-                        disabled={startOffset >= maxOffset}
-                        style={{
-                          padding: '3px 6px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
-                          background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '10px',
-                          cursor: startOffset >= maxOffset ? 'default' : 'pointer',
-                          opacity: startOffset >= maxOffset ? 0.3 : 1,
-                        }}
-                      >|&lt;</button>
-                      <button
-                        onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
-                        disabled={startOffset >= maxOffset}
-                        style={{
-                          padding: '3px 6px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
-                          background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '10px',
-                          cursor: startOffset >= maxOffset ? 'default' : 'pointer',
-                          opacity: startOffset >= maxOffset ? 0.3 : 1,
-                        }}
-                      >&lt;</button>
-                    </div>
-                    <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '10px', whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0', padding: '4px 0' }}>
+                    <button
+                      onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
+                      disabled={startOffset >= maxOffset}
+                      style={{
+                        background: 'none', border: 'none',
+                        color: startOffset >= maxOffset ? 'rgba(107,114,128,0.3)' : '#6b7280',
+                        fontSize: '24px', cursor: startOffset >= maxOffset ? 'default' : 'pointer',
+                        padding: '0 4px',
+                      }}
+                    >‹</button>
+                    <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '15px', fontWeight: '500', whiteSpace: 'nowrap' }}>
                       {dateWindowLabel}
                     </span>
-                    <div style={{ display: 'flex', gap: '2px' }}>
-                      <button
-                        onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
-                        disabled={startOffset === 0}
-                        style={{
-                          padding: '3px 6px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
-                          background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '10px',
-                          cursor: startOffset === 0 ? 'default' : 'pointer',
-                          opacity: startOffset === 0 ? 0.3 : 1,
-                        }}
-                      >&gt;</button>
-                      <button
-                        onClick={() => { setStartOffset(0); haptic('light'); }}
-                        disabled={startOffset === 0}
-                        style={{
-                          padding: '3px 6px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
-                          background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '10px',
-                          cursor: startOffset === 0 ? 'default' : 'pointer',
-                          opacity: startOffset === 0 ? 0.3 : 1,
-                        }}
-                      >&gt;|</button>
-                    </div>
+                    <button
+                      onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
+                      disabled={startOffset === 0}
+                      style={{
+                        background: 'none', border: 'none',
+                        color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#6b7280',
+                        fontSize: '24px', cursor: startOffset === 0 ? 'default' : 'pointer',
+                        padding: '0 4px',
+                      }}
+                    >›</button>
                   </div>
 
                   {/* Divider */}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '16px 0' }} />
 
-                  {/* Series chips */}
-                  {seriesChips}
-
-                  {/* Divider */}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '16px 0' }} />
-
-                  {/* View section */}
-                  <div style={{ color: '#6b7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-                    View
-                  </div>
-                  {viewModeSelector(false)}
-
-                  {/* Date / Average header + Series items (only when series selected) */}
-                  {(selectedSupplement || selectedSymptoms.length > 0) && (
-                    <>
+                  {/* Stats: Supplement row */}
+                  {selectedSupplement && (() => {
+                    const isPrimary = primarySeriesId === selectedSupplement;
+                    const suppLegendItem = legendItems.items.find(it => it.color === SUPP_COLOR);
+                    const val = suppLegendItem?.val ?? null;
+                    const pctChange = isPrimary && insightData ? insightData.percentChange : null;
+                    return (
                       <div style={{
-                        color: crosshairData ? '#e5e7eb' : '#9ca3af',
-                        fontSize: '10px', fontWeight: '500',
-                        marginBottom: '14px',
-                        letterSpacing: '0.03em',
-                      }}>
-                        {legendItems.dateLabel}
-                      </div>
-
-                      {legendItems.items.map((item, i) => (
-                        <div key={i} style={{ marginBottom: '14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-                            <span style={{
-                              color: '#9ca3af', fontSize: '11px',
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            }}>
-                              {item.name}
-                            </span>
-                          </div>
-                          <div style={{
-                            color: '#e5e7eb', fontSize: '16px', fontWeight: '600',
-                            fontVariantNumeric: 'tabular-nums', paddingLeft: '12px',
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: isPrimary ? '10px 8px' : '8px 0',
+                        background: isPrimary ? 'rgba(139,92,246,0.08)' : 'transparent',
+                        borderRadius: isPrimary ? '8px' : '0',
+                        margin: isPrimary ? '0 -8px' : '0',
+                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        cursor: 'pointer',
+                      }} onClick={() => makePrimary(selectedSupplement)}>
+                        <span style={{
+                          width: isPrimary ? '7px' : '6px', height: isPrimary ? '7px' : '6px',
+                          borderRadius: '50%', background: SUPP_COLOR, flexShrink: 0,
+                        }} />
+                        <span style={{
+                          color: isPrimary ? SUPP_COLOR : '#9ca3af',
+                          fontSize: isPrimary ? '14px' : '13px',
+                          fontWeight: isPrimary ? '600' : '400', flex: 1,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>{suppItem?.name}</span>
+                        <span style={{
+                          color: '#e5e7eb',
+                          fontSize: isPrimary ? '22px' : '16px',
+                          fontWeight: isPrimary ? '700' : '600',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}>
+                          {val !== null && val !== undefined && isFinite(val)
+                            ? (Number.isInteger(val) ? val : val.toFixed(1))
+                            : '--'}
+                        </span>
+                        <span style={{ color: '#6b7280', fontSize: isPrimary ? '12px' : '11px', width: '24px' }}>{suppUnit}</span>
+                        {pctChange !== null && Math.abs(pctChange) >= 2 && (
+                          <span style={{
+                            padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600',
+                            background: getLevelColor(pctChange, false) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+                            color: getLevelColor(pctChange, false),
+                            border: `1px solid ${getLevelColor(pctChange, false)}40`,
                           }}>
-                            {item.val !== null && item.val !== undefined && isFinite(item.val)
-                              ? item.unit === '/5'
-                                ? `${item.val.toFixed(1)}${item.unit}`
-                                : `${Number.isInteger(item.val) ? item.val : item.val.toFixed(1)} ${item.unit}`
-                              : '--'}
-                          </div>
-                        </div>
-                      ))}
-                    </>
+                            {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Stats: Symptom rows */}
+                  {selectedSymptoms.map((symId, idx) => {
+                    const isPrimary = primarySeriesId === symId;
+                    const sym = activeSymptoms.find(s => s.id === symId);
+                    const st = SYMPTOM_STYLES[idx];
+                    const symLegendItem = legendItems.items.find(it => it.color === st.color);
+                    const val = symLegendItem?.val ?? null;
+                    const pctChange = isPrimary && insightData ? insightData.percentChange : null;
+                    return (
+                      <div key={symId} style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: isPrimary ? '10px 8px' : '8px 0',
+                        background: isPrimary ? `${st.color}14` : 'transparent',
+                        borderRadius: isPrimary ? '8px' : '0',
+                        margin: isPrimary ? '0 -8px' : '0',
+                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        cursor: 'pointer',
+                      }} onClick={() => makePrimary(symId)}>
+                        <span style={{
+                          width: isPrimary ? '7px' : '6px', height: isPrimary ? '7px' : '6px',
+                          borderRadius: '50%', background: st.color, flexShrink: 0,
+                        }} />
+                        <span style={{
+                          color: isPrimary ? st.color : '#9ca3af',
+                          fontSize: isPrimary ? '14px' : '13px',
+                          fontWeight: isPrimary ? '600' : '400', flex: 1,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>{sym?.name}</span>
+                        <span style={{
+                          color: '#e5e7eb',
+                          fontSize: isPrimary ? '22px' : '16px',
+                          fontWeight: isPrimary ? '700' : '600',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}>
+                          {val !== null && val !== undefined && isFinite(val)
+                            ? val.toFixed(1)
+                            : '--'}
+                        </span>
+                        <span style={{ color: '#6b7280', fontSize: isPrimary ? '12px' : '11px', width: '20px' }}>/5</span>
+                        {pctChange !== null && Math.abs(pctChange) >= 2 && (
+                          <span style={{
+                            padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600',
+                            background: getLevelColor(pctChange, true) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+                            color: getLevelColor(pctChange, true),
+                            border: `1px solid ${getLevelColor(pctChange, true)}40`,
+                          }}>
+                            {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Divider + Insight text */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '12px 0' }} />
+                  {insightData && (
+                    <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: '1.6' }}>
+                      {insightData.insightSegments.map((seg, i) => seg.color
+                        ? <span key={i} style={{ color: seg.color, fontWeight: '600' }}>{seg.text}</span>
+                        : seg.text
+                      )}
+                    </div>
                   )}
                 </div>
 
                 {/* SVG chart — right side */}
-                <div style={{ flex: 1, minWidth: 0, touchAction: 'none', paddingLeft: '6px' }}>
-                  {(selectedSupplement || selectedSymptoms.length > 0) ? (
-                    <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
-                      onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
-                      style={{ display: 'block' }}
-                    >
-                      {chartSVGContent}
-                    </svg>
-                  ) : (
-                    <div style={{ padding: '48px 20px', textAlign: 'center' }}>
-                      <div style={{ color: '#6b7280', fontSize: '13px', lineHeight: '1.6' }}>
-                        Select at least one supplement or symptom<br />to visualize trends over time
-                      </div>
-                    </div>
-                  )}
+                <div ref={chartContainerRef} style={{ flex: 1, minWidth: 0, touchAction: 'none', paddingLeft: '6px', height: '100%' }}>
+                  <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}
+                    onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
+                    style={{ display: 'block' }}
+                  >
+                    {chartSVGContent}
+                  </svg>
                 </div>
               </div>
             ) : (
               /* ── Mobile: vertical stack ── */
               <div>
-                {/* Timeframe pills — full width */}
-                <div style={{
-                  display: 'flex', gap: '0',
-                  borderRadius: '7px',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  background: 'rgba(255,255,255,0.04)',
-                  padding: '2px',
-                  marginBottom: '8px',
-                }}>
-                  {TIMEFRAMES.map(tf => (
-                    <button key={tf.days}
-                      onClick={() => { setTimeframe(tf.days); haptic('light'); }}
-                      style={{
-                        padding: '5px 0',
-                        flex: 1,
-                        borderRadius: '5px', border: 'none',
-                        background: timeframe === tf.days ? 'rgba(255,255,255,0.12)' : 'transparent',
-                        color: timeframe === tf.days ? '#fff' : '#6b7280',
-                        fontSize: '11px', fontWeight: '500', cursor: 'pointer',
-                      }}
-                    >
-                      {tf.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Arrow nav row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', gap: '2px' }}>
-                    <button
-                      onClick={() => { setStartOffset(maxOffset); haptic('light'); }}
-                      disabled={startOffset >= maxOffset}
-                      style={{
-                        padding: '4px 7px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
-                        background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '11px',
-                        cursor: startOffset >= maxOffset ? 'default' : 'pointer',
-                        opacity: startOffset >= maxOffset ? 0.3 : 1,
-                      }}
-                    >|&lt;</button>
-                    <button
-                      onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
-                      disabled={startOffset >= maxOffset}
-                      style={{
-                        padding: '4px 7px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
-                        background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '11px',
-                        cursor: startOffset >= maxOffset ? 'default' : 'pointer',
-                        opacity: startOffset >= maxOffset ? 0.3 : 1,
-                      }}
-                    >&lt;</button>
-                  </div>
-                  <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '10px', whiteSpace: 'nowrap' }}>
-                    {dateWindowLabel}
-                  </span>
-                  <div style={{ display: 'flex', gap: '2px' }}>
-                    <button
-                      onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
-                      disabled={startOffset === 0}
-                      style={{
-                        padding: '4px 7px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
-                        background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '11px',
-                        cursor: startOffset === 0 ? 'default' : 'pointer',
-                        opacity: startOffset === 0 ? 0.3 : 1,
-                      }}
-                    >&gt;</button>
-                    <button
-                      onClick={() => { setStartOffset(0); haptic('light'); }}
-                      disabled={startOffset === 0}
-                      style={{
-                        padding: '4px 7px', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.12)',
-                        background: 'rgba(255,255,255,0.08)', color: '#9ca3af', fontSize: '11px',
-                        cursor: startOffset === 0 ? 'default' : 'pointer',
-                        opacity: startOffset === 0 ? 0.3 : 1,
-                      }}
-                    >&gt;|</button>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '10px 0' }} />
-
-                {/* Series chips */}
-                {seriesChips}
-
-                {/* Divider */}
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '10px 0' }} />
-
-                {/* View Mode Selector — moved above chart */}
-                <div style={{ marginBottom: '10px' }}>
-                  {viewModeSelector(true)}
-                </div>
-
                 {/* Full-width SVG chart */}
-                {(selectedSupplement || selectedSymptoms.length > 0) ? (
-                  <div>
-                    <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
-                      onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
-                      style={{ display: 'block' }}
-                    >
-                      {chartSVGContent}
-                    </svg>
-                  </div>
-                ) : (
-                  <div style={{ padding: '48px 20px', textAlign: 'center' }}>
-                    <div style={{ color: '#6b7280', fontSize: '13px', lineHeight: '1.6' }}>
-                      Select at least one supplement or symptom<br />to visualize trends over time
-                    </div>
-                  </div>
-                )}
+                <div style={{ touchAction: 'none' }}>
+                  <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
+                    onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
+                    onTouchStart={e => { e.preventDefault(); const t = e.touches[0]; setTouchX(getSnappedIndex(t.clientX)); }}
+                    onTouchMove={e => { e.preventDefault(); const t = e.touches[0]; setTouchX(getSnappedIndex(t.clientX)); }}
+                    onTouchEnd={() => setTouchX(null)}
+                    style={{ display: 'block' }}
+                  >
+                    {chartSVGContent}
+                  </svg>
+                </div>
 
-                {/* Stats row below chart */}
-                {legendItems.items.length > 0 && (
-                  <div style={{
-                    display: 'flex',
-                    borderTop: '1px solid rgba(255,255,255,0.06)',
-                    marginTop: '8px',
-                    paddingTop: '10px',
-                  }}>
-                    {legendItems.items.map((item, i) => (
-                      <div key={i} style={{
-                        flex: 1,
-                        textAlign: 'center',
-                        ...(i > 0 ? { borderLeft: '1px solid rgba(255,255,255,0.06)' } : {}),
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '2px' }}>
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-                          <span style={{
-                            color: '#9ca3af', fontSize: '10px',
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            maxWidth: '80px',
-                          }}>
-                            {item.name}
+                {/* Mini-insight bars for non-primary series */}
+                {[selectedSupplement, ...selectedSymptoms].filter(id => id && id !== primarySeriesId).map((id, i) => {
+                  const isSymptom = selectedSymptoms.includes(id);
+                  const item = isSymptom ? symptoms.find(s => s.id === id) : stackItems.find(s => s.id === id);
+                  const color = isSymptom ? SYMPTOM_STYLES[selectedSymptoms.indexOf(id)].color : SUPP_COLOR;
+                  const unit = isSymptom ? '/5' : (item?.unit || 'mg');
+                  let avg = null;
+                  if (id === selectedSupplement && suppTransformed) {
+                    const vals = suppTransformed.values.filter(v => v !== null && v !== undefined && v > 0);
+                    avg = vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+                  } else {
+                    const symIdx = selectedSymptoms.indexOf(id);
+                    if (symIdx >= 0 && symptomTransformed[symIdx]) {
+                      const vals = symptomTransformed[symIdx].smoothed.filter(v => v !== null);
+                      avg = vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+                    }
+                  }
+                  const formattedAvg = avg !== null ? (Number.isInteger(avg) ? avg : avg.toFixed(1)) : '--';
+                  const secStat = insightData?.secondaryStats?.find(s => s.name === item?.name);
+                  const pct = secStat && secStat.priorAverage > 0
+                    ? ((secStat.average - secStat.priorAverage) / secStat.priorAverage) * 100
+                    : null;
+                  return (
+                    <div key={id} style={{
+                      marginTop: i === 0 ? '8px' : '4px',
+                      display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px',
+                      background: `${color}0a`, border: `1px solid ${color}26`, borderRadius: '8px',
+                    }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                        {item?.name} avg <span style={{ color, fontWeight: '500' }}>{formattedAvg}{unit === '/5' ? '/5' : ' ' + unit}</span>
+                        {pct !== null && Math.abs(pct) >= 2 && (
+                          <span style={{ color: getLevelColor(pct, isSymptom), fontWeight: '600' }}>
+                            {' · '}{pct > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pct))}% vs prior
                           </span>
-                        </div>
-                        <div style={{
-                          color: '#e5e7eb', fontSize: '15px', fontWeight: '600',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}>
-                          {item.val !== null && item.val !== undefined && isFinite(item.val)
-                            ? item.unit === '/5'
-                              ? `${item.val.toFixed(1)}${item.unit}`
-                              : `${Number.isInteger(item.val) ? item.val : item.val.toFixed(1)} ${item.unit}`
-                            : '--'}
-                        </div>
-                        <div style={{ color: '#6b7280', fontSize: '9px' }}>
-                          {crosshairData ? legendItems.dateLabel : 'avg'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
 
+        </>
+      )}
     </div>
   );
 }
