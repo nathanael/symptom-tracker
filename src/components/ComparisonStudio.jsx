@@ -833,34 +833,57 @@ export default function ComparisonStudio({
     </>
   );
 
-  // ── Series chips (shared between desktop/mobile) ──
+  // ── Series chips with inline stats (shared between desktop/mobile) ──
   const seriesChips = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       {/* Supplement chip or + button */}
       {selectedSupplement ? (() => {
         const supp = allSupplements.find(s => s.id === selectedSupplement);
         const isPrimary = selectedSupplement === primarySeriesId;
+        const suppLegendItem = legendItems.items.find(it => it.color === SUPP_COLOR);
+        const val = suppLegendItem?.val ?? null;
+        const pctChange = isPrimary && insightData ? insightData.percentChange : null;
         return (
           <div
-            onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
+            onClick={() => makePrimary(selectedSupplement)}
             style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '6px 10px', borderRadius: '8px',
-              background: isPrimary ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.12)',
-              border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : '1px solid rgba(139,92,246,0.35)',
-              color: SUPP_COLOR, fontSize: '13px', fontWeight: isPrimary ? '600' : '500',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: isPrimary ? '8px 10px' : '6px 10px', borderRadius: '8px',
+              background: isPrimary ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.08)',
+              border: isPrimary ? '2px solid rgba(139,92,246,0.5)' : '1px solid rgba(139,92,246,0.25)',
               cursor: 'pointer',
             }}
           >
-            <span
-              onClick={(e) => { e.stopPropagation(); makePrimary(selectedSupplement); }}
-              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-            >
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: SUPP_COLOR, flexShrink: 0 }} />
+            <span style={{
+              color: isPrimary ? SUPP_COLOR : '#9ca3af',
+              fontSize: '13px', fontWeight: isPrimary ? '600' : '400', flex: 1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
               {isPrimary ? '\u25C6 ' : ''}{supp?.name}
             </span>
+            <span style={{
+              color: '#e5e7eb', fontSize: isPrimary ? '16px' : '13px',
+              fontWeight: isPrimary ? '700' : '600', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+            }}>
+              {val !== null && val !== undefined && isFinite(val)
+                ? (Number.isInteger(val) ? val : val.toFixed(1))
+                : '--'}
+            </span>
+            <span style={{ color: '#6b7280', fontSize: '11px', flexShrink: 0 }}>{suppUnit}</span>
+            {pctChange !== null && Math.abs(pctChange) >= 2 && (
+              <span style={{
+                padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
+                background: getLevelColor(pctChange, false) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+                color: getLevelColor(pctChange, false),
+                border: `1px solid ${getLevelColor(pctChange, false)}40`,
+              }}>
+                {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
+              </span>
+            )}
             <span
               onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }}
-              style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7, flexShrink: 0, marginLeft: '8px' }}
+              style={{ color: SUPP_COLOR, fontSize: '14px', lineHeight: 1, opacity: 0.5, flexShrink: 0, cursor: 'pointer' }}
             >&times;</span>
           </div>
         );
@@ -880,30 +903,54 @@ export default function ComparisonStudio({
         </div>
       )}
 
-      {/* Symptom chips */}
+      {/* Symptom chips with stats */}
       {selectedSymptoms.map((symId, idx) => {
         const sym = activeSymptoms.find(s => s.id === symId);
         const st = SYMPTOM_STYLES[idx];
         const isPrimary = symId === primarySeriesId;
+        const symLegendItem = legendItems.items.find(it => it.color === st.color);
+        const val = symLegendItem?.val ?? null;
+        const pctChange = isPrimary && insightData ? insightData.percentChange : null;
         return (
           <div
             key={symId}
-            onClick={() => { makePrimary(symId); }}
+            onClick={() => makePrimary(symId)}
             style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '6px 10px', borderRadius: '8px',
-              background: isPrimary ? `${st.color}33` : st.chipBg,
-              border: isPrimary ? `2px solid ${st.color}99` : `1px solid ${st.chipBorder}`,
-              color: st.color, fontSize: '13px', fontWeight: isPrimary ? '600' : '500',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: isPrimary ? '8px 10px' : '6px 10px', borderRadius: '8px',
+              background: isPrimary ? `${st.color}20` : st.chipBg,
+              border: isPrimary ? `2px solid ${st.color}80` : `1px solid ${st.chipBorder}`,
               cursor: 'pointer',
             }}
           >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {isPrimary ? '\u25C6 ' : ''}{sym?.name}{sym?.description ? <span style={{ opacity: 0.6, fontWeight: '400' }}> — {sym?.description}</span> : null}
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: st.color, flexShrink: 0 }} />
+            <span style={{
+              color: isPrimary ? st.color : '#9ca3af',
+              fontSize: '13px', fontWeight: isPrimary ? '600' : '400', flex: 1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {isPrimary ? '\u25C6 ' : ''}{sym?.name}
             </span>
+            <span style={{
+              color: '#e5e7eb', fontSize: isPrimary ? '16px' : '13px',
+              fontWeight: isPrimary ? '700' : '600', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+            }}>
+              {val !== null && val !== undefined && isFinite(val) ? val.toFixed(1) : '--'}
+            </span>
+            <span style={{ color: '#6b7280', fontSize: '11px', flexShrink: 0 }}>/5</span>
+            {pctChange !== null && Math.abs(pctChange) >= 2 && (
+              <span style={{
+                padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
+                background: getLevelColor(pctChange, true) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+                color: getLevelColor(pctChange, true),
+                border: `1px solid ${getLevelColor(pctChange, true)}40`,
+              }}>
+                {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
+              </span>
+            )}
             <span
               onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }}
-              style={{ fontSize: '14px', lineHeight: 1, opacity: 0.7, flexShrink: 0, marginLeft: '8px' }}
+              style={{ color: st.color, fontSize: '14px', lineHeight: 1, opacity: 0.5, flexShrink: 0, cursor: 'pointer' }}
             >&times;</span>
           </div>
         );
@@ -1021,7 +1068,7 @@ export default function ComparisonStudio({
               <div style={{ display: 'flex', gap: '0', height: '100%' }}>
                 {/* Legend panel — left side */}
                 <div style={{
-                  width: '255px', flexShrink: 0,
+                  width: '300px', flexShrink: 0,
                   paddingRight: '14px',
                   display: 'flex', flexDirection: 'column',
                   borderRight: '1px solid rgba(255,255,255,0.04)',
@@ -1083,113 +1130,6 @@ export default function ComparisonStudio({
 
                   {/* Series chips */}
                   {seriesChips}
-
-                  {/* Divider */}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '16px 0' }} />
-
-                  {/* Stats: Supplement row */}
-                  {selectedSupplement && (() => {
-                    const isPrimary = primarySeriesId === selectedSupplement;
-                    const suppLegendItem = legendItems.items.find(it => it.color === SUPP_COLOR);
-                    const val = suppLegendItem?.val ?? null;
-                    const pctChange = isPrimary && insightData ? insightData.percentChange : null;
-                    return (
-                      <div style={{
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        padding: isPrimary ? '10px 8px' : '8px 0',
-                        background: isPrimary ? 'rgba(139,92,246,0.08)' : 'transparent',
-                        borderRadius: isPrimary ? '8px' : '0',
-                        margin: isPrimary ? '0 -8px' : '0',
-                        borderBottom: '1px solid rgba(255,255,255,0.04)',
-                        cursor: 'pointer',
-                      }} onClick={() => makePrimary(selectedSupplement)}>
-                        <span style={{
-                          width: isPrimary ? '7px' : '6px', height: isPrimary ? '7px' : '6px',
-                          borderRadius: '50%', background: SUPP_COLOR, flexShrink: 0,
-                        }} />
-                        <span style={{
-                          color: isPrimary ? SUPP_COLOR : '#9ca3af',
-                          fontSize: isPrimary ? '14px' : '13px',
-                          fontWeight: isPrimary ? '600' : '400', flex: 1,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>{suppItem?.name}</span>
-                        <span style={{
-                          color: '#e5e7eb',
-                          fontSize: isPrimary ? '22px' : '16px',
-                          fontWeight: isPrimary ? '700' : '600',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}>
-                          {val !== null && val !== undefined && isFinite(val)
-                            ? (Number.isInteger(val) ? val : val.toFixed(1))
-                            : '--'}
-                        </span>
-                        <span style={{ color: '#6b7280', fontSize: isPrimary ? '12px' : '11px', width: '24px' }}>{suppUnit}</span>
-                        {pctChange !== null && Math.abs(pctChange) >= 2 && (
-                          <span style={{
-                            padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600',
-                            background: getLevelColor(pctChange, false) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-                            color: getLevelColor(pctChange, false),
-                            border: `1px solid ${getLevelColor(pctChange, false)}40`,
-                          }}>
-                            {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Stats: Symptom rows */}
-                  {selectedSymptoms.map((symId, idx) => {
-                    const isPrimary = primarySeriesId === symId;
-                    const sym = activeSymptoms.find(s => s.id === symId);
-                    const st = SYMPTOM_STYLES[idx];
-                    const symLegendItem = legendItems.items.find(it => it.color === st.color);
-                    const val = symLegendItem?.val ?? null;
-                    const pctChange = isPrimary && insightData ? insightData.percentChange : null;
-                    return (
-                      <div key={symId} style={{
-                        display: 'flex', alignItems: 'center', gap: '8px',
-                        padding: isPrimary ? '10px 8px' : '8px 0',
-                        background: isPrimary ? `${st.color}14` : 'transparent',
-                        borderRadius: isPrimary ? '8px' : '0',
-                        margin: isPrimary ? '0 -8px' : '0',
-                        borderBottom: '1px solid rgba(255,255,255,0.04)',
-                        cursor: 'pointer',
-                      }} onClick={() => makePrimary(symId)}>
-                        <span style={{
-                          width: isPrimary ? '7px' : '6px', height: isPrimary ? '7px' : '6px',
-                          borderRadius: '50%', background: st.color, flexShrink: 0,
-                        }} />
-                        <span style={{
-                          color: isPrimary ? st.color : '#9ca3af',
-                          fontSize: isPrimary ? '14px' : '13px',
-                          fontWeight: isPrimary ? '600' : '400', flex: 1,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>{sym?.name}</span>
-                        <span style={{
-                          color: '#e5e7eb',
-                          fontSize: isPrimary ? '22px' : '16px',
-                          fontWeight: isPrimary ? '700' : '600',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}>
-                          {val !== null && val !== undefined && isFinite(val)
-                            ? val.toFixed(1)
-                            : '--'}
-                        </span>
-                        <span style={{ color: '#6b7280', fontSize: isPrimary ? '12px' : '11px', width: '20px' }}>/5</span>
-                        {pctChange !== null && Math.abs(pctChange) >= 2 && (
-                          <span style={{
-                            padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600',
-                            background: getLevelColor(pctChange, true) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-                            color: getLevelColor(pctChange, true),
-                            border: `1px solid ${getLevelColor(pctChange, true)}40`,
-                          }}>
-                            {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
 
                   {/* Divider + Insight text */}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '12px 0' }} />
