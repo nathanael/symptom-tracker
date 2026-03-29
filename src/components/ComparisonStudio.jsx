@@ -728,18 +728,20 @@ export default function ComparisonStudio({
       {primaryIsSupplement && selectedSupplement ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
-          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.18)"} strokeWidth={0.5 * s} />;
+          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.10)"} strokeWidth={(isDesktop ? 0.5 : 0.4) * s} />;
         })
       ) : (
         [0, 1, 2, 3, 4, 5].map(sev => {
           const y = padTop + chartH - (sev / 5) * chartH;
-          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.18)"} strokeWidth={0.5 * s} />;
+          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.10)"} strokeWidth={(isDesktop ? 0.5 : 0.4) * s} />;
         })
       )}
 
-      {/* Axis lines — left and bottom edges */}
-      <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + chartH} stroke={isDesktop ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.25)"} strokeWidth={0.7 * s} />
-      <line x1={padLeft} y1={padTop + chartH} x2={W - padRight} y2={padTop + chartH} stroke={isDesktop ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.25)"} strokeWidth={0.7 * s} />
+      {/* Axis lines — left and bottom edges (desktop only) */}
+      {isDesktop && <>
+        <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + chartH} stroke="rgba(255,255,255,0.2)" strokeWidth={0.7 * s} />
+        <line x1={padLeft} y1={padTop + chartH} x2={W - padRight} y2={padTop + chartH} stroke="rgba(255,255,255,0.2)" strokeWidth={0.7 * s} />
+      </>}
 
       {/* Left Y-axis — primary series scale */}
       {primaryIsSupplement && selectedSupplement ? (
@@ -747,7 +749,7 @@ export default function ComparisonStudio({
           const y = padTop + chartH - (val / suppYMax) * chartH;
           return (
             <text key={`l-${val}`} x={padLeft - 5 * s} y={y + 2.5 * s} textAnchor="end"
-              fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{val}</text>
+              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={7 * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '500'}>{val}</text>
           );
         })
       ) : (
@@ -755,7 +757,7 @@ export default function ComparisonStudio({
           const y = padTop + chartH - (sev / 5) * chartH;
           return (
             <text key={`l-${sev}`} x={padLeft - 5 * s} y={y + 2.5 * s} textAnchor="end"
-              fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{sev}</text>
+              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={7 * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '500'}>{sev}</text>
           );
         })
       )}
@@ -767,7 +769,7 @@ export default function ComparisonStudio({
             const y = padTop + chartH - (sev / 5) * chartH;
             return (
               <text key={`r-${sev}`} x={W - padRight + 5 * s} y={y + 2.5 * s} textAnchor="start"
-                fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{sev}</text>
+                fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={7 * s} fontFamily="system-ui">{sev}</text>
             );
           })
         ) : (
@@ -775,7 +777,7 @@ export default function ComparisonStudio({
             const y = padTop + chartH - (val / suppYMax) * chartH;
             return (
               <text key={`r-${val}`} x={W - padRight + 5 * s} y={y + 2.5 * s} textAnchor="start"
-                fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{val}</text>
+                fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={7 * s} fontFamily="system-ui">{val}</text>
             );
           })
         )
@@ -784,7 +786,7 @@ export default function ComparisonStudio({
       {/* X-axis */}
       {xLabels.map((lbl, i) => (
         <text key={i} x={lbl.x} y={H - 5 * s} textAnchor="middle"
-          fill="#6b7280" fontSize={7 * s} fontFamily="system-ui">{lbl.label}</text>
+          fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 8) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{lbl.label}</text>
       ))}
 
       {/* Supplement line */}
@@ -822,14 +824,14 @@ export default function ComparisonStudio({
         return (
           <g key={`level-${i}`}>
             <line x1={x1} y1={y} x2={x2} y2={y}
-              stroke={color} strokeWidth={1.6 * s} />
+              stroke={color} strokeWidth={(isDesktop ? 1.6 : 2.5) * s} strokeLinecap="round" />
             <text x={xMid} y={y - 5 * s} textAnchor="middle"
-              fill={color} fontSize={8 * s} fontWeight="600" fontFamily="system-ui">
+              fill={color} fontSize={(isDesktop ? 8 : 9) * s} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
               {avgLabel}
             </text>
             {level.percentChange !== null && Math.abs(level.percentChange) >= 2 && (
               <text x={xMid} y={y + 11 * s} textAnchor="middle"
-                fill={color} fontSize={7 * s} fontFamily="system-ui">
+                fill={color} fontSize={(isDesktop ? 7 : 8) * s} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
                 {level.percentChange > 0 ? '+' : ''}{Math.round(level.percentChange)}%
               </text>
             )}
@@ -1087,12 +1089,16 @@ export default function ComparisonStudio({
 
           {/* ── Chart card ── */}
           <div style={{
-            background: 'rgba(15,17,21,0.6)',
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.06)',
-            padding: '14px 14px 10px',
+            ...(isDesktop ? {
+              background: 'rgba(15,17,21,0.6)',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.06)',
+              padding: '14px 14px 10px',
+              height: 'calc(95vh - 180px)', minHeight: '300px',
+            } : {
+              padding: '0',
+            }),
             marginBottom: '16px',
-            ...(isDesktop ? { height: 'calc(95vh - 180px)', minHeight: '300px' } : {}),
           }}>
             {isDesktop ? (
               /* ── Desktop: Legend (left) + Chart (right) ── */
