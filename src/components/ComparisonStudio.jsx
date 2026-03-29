@@ -836,14 +836,14 @@ export default function ComparisonStudio({
           <g key={`level-${i}`}>
             <line x1={x1} y1={y} x2={x2} y2={y}
               stroke={color} strokeWidth={(isDesktop ? 1.6 : 3.0) * s} strokeLinecap="round" />
-            {!isDesktop && <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs + bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.55)" />}
+            {!isDesktop && <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs + bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.90)" />}
             <text x={xMid} y={y - 6 * s} textAnchor="middle"
               fill={color} fontSize={avgFs} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
               {avgLabel}
             </text>
             {pctText && (
               <>
-                {!isDesktop && <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs + bgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.55)" />}
+                {!isDesktop && <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs + bgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.90)" />}
                 <text x={xMid} y={y + 13 * s} textAnchor="middle"
                   fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
                   {pctText}
