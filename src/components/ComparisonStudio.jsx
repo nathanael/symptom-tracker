@@ -140,7 +140,7 @@ export default function ComparisonStudio({
   const suppUnit = suppItem?.unit || 'mg';
 
   // SVG dimensions
-  const H_MOBILE = 500;
+  const H_MOBILE = 380;
   const chartContainerRef = useRef(null);
   const [desktopChartDims, setDesktopChartDims] = useState({ w: 500, h: 420 });
   useEffect(() => {
@@ -160,7 +160,7 @@ export default function ComparisonStudio({
   const H = isDesktop ? desktopChartDims.h : H_MOBILE;
   // Scale factor for fonts/strokes — designed for 500-unit base
   const s = W / 500;
-  const padLeft = (isDesktop ? 36 : 22) * s, padRight = (isDesktop ? 20 : 12) * s, padTop = 14 * s, padBottom = 22 * s;
+  const padLeft = (isDesktop ? 36 : 32) * s, padRight = (isDesktop ? 20 : 28) * s, padTop = (isDesktop ? 14 : 10) * s, padBottom = (isDesktop ? 22 : 30) * s;
   const chartW = W - padLeft - padRight;
   const chartH = H - padTop - padBottom;
 
@@ -728,12 +728,12 @@ export default function ComparisonStudio({
       {primaryIsSupplement && selectedSupplement ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
-          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.10)"} strokeWidth={(isDesktop ? 0.5 : 0.4) * s} />;
+          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
         })
       ) : (
         [0, 1, 2, 3, 4, 5].map(sev => {
           const y = padTop + chartH - (sev / 5) * chartH;
-          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.10)"} strokeWidth={(isDesktop ? 0.5 : 0.4) * s} />;
+          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
         })
       )}
 
@@ -748,16 +748,16 @@ export default function ComparisonStudio({
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
           return (
-            <text key={`l-${val}`} x={padLeft - 5 * s} y={y + 2.5 * s} textAnchor="end"
-              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={7 * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '500'}>{val}</text>
+            <text key={`l-${val}`} x={padLeft - 6 * s} y={y + 3.5 * s} textAnchor="end"
+              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{val}</text>
           );
         })
       ) : (
         [0, 1, 2, 3, 4, 5].map(sev => {
           const y = padTop + chartH - (sev / 5) * chartH;
           return (
-            <text key={`l-${sev}`} x={padLeft - 5 * s} y={y + 2.5 * s} textAnchor="end"
-              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={7 * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '500'}>{sev}</text>
+            <text key={`l-${sev}`} x={padLeft - 6 * s} y={y + 3.5 * s} textAnchor="end"
+              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{sev}</text>
           );
         })
       )}
@@ -768,16 +768,16 @@ export default function ComparisonStudio({
           [0, 2.5, 5].map(sev => {
             const y = padTop + chartH - (sev / 5) * chartH;
             return (
-              <text key={`r-${sev}`} x={W - padRight + 5 * s} y={y + 2.5 * s} textAnchor="start"
-                fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={7 * s} fontFamily="system-ui">{sev}</text>
+              <text key={`r-${sev}`} x={W - padRight + 6 * s} y={y + 3.5 * s} textAnchor="start"
+                fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '500'}>{sev}</text>
             );
           })
         ) : (
           suppYLabels.map(val => {
             const y = padTop + chartH - (val / suppYMax) * chartH;
             return (
-              <text key={`r-${val}`} x={W - padRight + 5 * s} y={y + 2.5 * s} textAnchor="start"
-                fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={7 * s} fontFamily="system-ui">{val}</text>
+              <text key={`r-${val}`} x={W - padRight + 6 * s} y={y + 3.5 * s} textAnchor="start"
+                fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '500'}>{val}</text>
             );
           })
         )
@@ -785,14 +785,14 @@ export default function ComparisonStudio({
 
       {/* X-axis */}
       {xLabels.map((lbl, i) => (
-        <text key={i} x={lbl.x} y={H - 5 * s} textAnchor="middle"
-          fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 8) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{lbl.label}</text>
+        <text key={i} x={lbl.x} y={H - 6 * s} textAnchor="middle"
+          fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{lbl.label}</text>
       ))}
 
       {/* Supplement line */}
       {suppPoints && (
         <g>
-          <path d={buildPath(suppPoints)} fill="none" stroke={isDesktop ? SUPP_COLOR : '#a78bfa'} strokeWidth={(isDesktop ? 0.9 : 2.0) * s} strokeLinecap="round" strokeLinejoin="round" opacity={primaryIsSupplement ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
+          <path d={buildPath(suppPoints)} fill="none" stroke={isDesktop ? SUPP_COLOR : '#a78bfa'} strokeWidth={(isDesktop ? 0.9 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round" opacity={primaryIsSupplement ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
           {showDots && primaryIsSupplement && suppPoints.map((pt, i) => (
             pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r={1.8 * s} fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth={0.8 * s} />
           ))}
@@ -802,7 +802,7 @@ export default function ComparisonStudio({
       {/* Symptom lines */}
       {symptomPointSets.map((pts, idx) => (
         <g key={`sym-${idx}`}>
-          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.0) * s} strokeLinecap="round" strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
+          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
           {showDots && selectedSymptoms[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={0.7 * s} />
           ))}
@@ -824,14 +824,14 @@ export default function ComparisonStudio({
         return (
           <g key={`level-${i}`}>
             <line x1={x1} y1={y} x2={x2} y2={y}
-              stroke={color} strokeWidth={(isDesktop ? 1.6 : 2.5) * s} strokeLinecap="round" />
-            <text x={xMid} y={y - 5 * s} textAnchor="middle"
-              fill={color} fontSize={(isDesktop ? 8 : 9) * s} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
+              stroke={color} strokeWidth={(isDesktop ? 1.6 : 3.0) * s} strokeLinecap="round" />
+            <text x={xMid} y={y - 6 * s} textAnchor="middle"
+              fill={color} fontSize={(isDesktop ? 8 : 11) * s} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
               {avgLabel}
             </text>
             {level.percentChange !== null && Math.abs(level.percentChange) >= 2 && (
-              <text x={xMid} y={y + 11 * s} textAnchor="middle"
-                fill={color} fontSize={(isDesktop ? 7 : 8) * s} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
+              <text x={xMid} y={y + 13 * s} textAnchor="middle"
+                fill={color} fontSize={(isDesktop ? 7 : 10) * s} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
                 {level.percentChange > 0 ? '+' : ''}{Math.round(level.percentChange)}%
               </text>
             )}
