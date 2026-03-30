@@ -164,7 +164,7 @@ export default function QuickActionsMenu({
     </svg>
   );
 
-  const currentVersion = 'v4.3.1';
+  const currentVersion = 'v4.3.2';
 
   const handleCheckForUpdates = () => {
     if ('serviceWorker' in navigator) {
