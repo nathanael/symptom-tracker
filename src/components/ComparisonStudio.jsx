@@ -361,7 +361,7 @@ export default function ComparisonStudio({
     const symptomVals = symptomTransformed.map((sd, idx) => ({
       val: sd.smoothed[touchX],
       color: SYMPTOM_STYLES[idx].color,
-      name: symptoms.find(s => s.id === selectedSymptoms[idx])?.name,
+      name: (() => { const s = symptoms.find(s => s.id === selectedSymptoms[idx]); return s ? s.name + (s.description ? ` (${s.description})` : '') : undefined; })(),
     }));
 
     const items = [];
@@ -369,8 +369,9 @@ export default function ComparisonStudio({
       items.push({ name: suppItem?.name, color: SUPP_COLOR, val: suppVal, unit: suppUnit });
     }
     selectedSymptoms.forEach((symId, idx) => {
+      const sym = symptoms.find(s => s.id === symId);
       items.push({
-        name: symptoms.find(s => s.id === symId)?.name,
+        name: sym ? sym.name + (sym.description ? ` (${sym.description})` : '') : undefined,
         color: SYMPTOM_STYLES[idx].color,
         val: symptomVals[idx]?.val ?? null,
         unit: '/5',
@@ -396,8 +397,9 @@ export default function ComparisonStudio({
     selectedSymptoms.forEach((symId, idx) => {
       const sd = symptomTransformed[idx];
       if (sd) {
+        const sym = symptoms.find(s => s.id === symId);
         items.push({
-          name: symptoms.find(s => s.id === symId)?.name,
+          name: sym ? sym.name + (sym.description ? ` (${sym.description})` : '') : undefined,
           color: SYMPTOM_STYLES[idx].color,
           val: avg(sd.smoothed),
           unit: '/5',
@@ -647,7 +649,7 @@ export default function ComparisonStudio({
             onKeyDown={(e) => {
               if (e.key === 'Escape') { e.stopPropagation(); if (symSearch) setSymSearch(''); else setShowSymptomPicker(false); }
               if (e.key === 'Enter') {
-                const filtered = activeSymptoms.filter(s => s.name.toLowerCase().includes(symSearch.toLowerCase()));
+                const filtered = activeSymptoms.filter(s => s.name.toLowerCase().includes(symSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(symSearch.toLowerCase()));
                 if (filtered.length === 1) { toggleSymptom(filtered[0].id); setShowSymptomPicker(false); }
               }
             }}
@@ -672,7 +674,7 @@ export default function ComparisonStudio({
             gap: '8px',
           }}>
           {(() => {
-            const filtered = activeSymptoms.filter(s => !symSearch || s.name.toLowerCase().includes(symSearch.toLowerCase()));
+            const filtered = activeSymptoms.filter(s => !symSearch || s.name.toLowerCase().includes(symSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(symSearch.toLowerCase()));
             const autoSelected = filtered.length === 1;
             const autoColor = '#8b5cf6';
             return filtered.map(sym => {
@@ -702,11 +704,25 @@ export default function ComparisonStudio({
                   background: dotColor,
                 }} />
                 <span style={{
-                  flex: 1, color: highlighted ? '#e5e7eb' : '#9ca3af',
-                  fontSize: '13px', fontWeight: highlighted ? '500' : '400',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  flex: 1, minWidth: 0,
+                  display: 'flex', flexDirection: 'column',
                 }}>
-                  {sym.name}
+                  <span style={{
+                    color: highlighted ? '#e5e7eb' : '#9ca3af',
+                    fontSize: '13px', fontWeight: highlighted ? '500' : '400',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {sym.name}
+                  </span>
+                  {sym.description && (
+                    <span style={{
+                      color: highlighted ? '#9ca3af' : '#6b7280',
+                      fontSize: '11px', fontWeight: '400',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {sym.description}
+                    </span>
+                  )}
                 </span>
                 {highlighted && (
                   <span style={{ color: isSelected ? SYMPTOM_STYLES[styleIdx].color : autoColor, fontSize: '14px', flexShrink: 0 }}>✓</span>
@@ -1047,7 +1063,7 @@ export default function ComparisonStudio({
               fontSize: chipText, fontWeight: isPrimary ? '600' : '400', flex: 1,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
-              {sym?.name}
+              {sym?.name}{sym?.description ? ` (${sym.description})` : ''}
             </span>
             <span style={{
               color: '#b0b5be', fontSize: chipText,
