@@ -38,6 +38,9 @@ const WRITE_TIMEOUT_MS = 8000;
 // as a base layer under local changes: { ...cloudData, ...localData }.
 const MAP_DOMAINS = new Set(['entries', 'dailyNotes', 'stackEntries', 'inputEntries']);
 
+// Domains stored as arrays with .id fields. Merged by ID: cloud as base, local-only items preserved.
+const ARRAY_ID_DOMAINS = new Set(['stackItems', 'symptoms', 'inputItems']);
+
 // Domains with large nested maps that must be stored as JSON strings
 // to avoid Firestore's INDEX_ENTRIES_COUNT_LIMIT_EXCEEDED (40k entry limit).
 const STRINGIFIED_DOMAINS = new Set([
@@ -438,28 +441,42 @@ export default class SyncEngine {
   /**
    * Merge cloud data into pending changes for a domain.
    * For map domains (entries, dailyNotes, etc.): cloud as base, local on top.
-   * This preserves cloud keys the user hasn't touched while keeping user's changes.
-   * For non-map domains (arrays, scalars): local wins entirely (can't safely merge).
+   * For array-id domains (stackItems, symptoms, etc.): merge by .id field.
+   * For non-map domains (scalars): local wins entirely (can't safely merge).
    */
   _mergeCloudIntoPending(domain, cloudDomainData) {
     if (!this.pendingChanges.has(domain)) return false;
-    if (!MAP_DOMAINS.has(domain)) return false;
     if (cloudDomainData === undefined) return false;
 
     const localData = this.pendingChanges.get(domain);
-    // Cloud as base, local changes on top — local keys win for conflicts
-    const merged = { ...cloudDomainData, ...localData };
-    this.pendingChanges.set(domain, merged);
 
-    const cloudKeys = Object.keys(cloudDomainData).length;
-    const localKeys = Object.keys(localData).length;
-    const mergedKeys = Object.keys(merged).length;
-    log('  _mergeCloudIntoPending:', domain, `cloud=${cloudKeys} local=${localKeys} merged=${mergedKeys}`);
-    return true;
+    if (MAP_DOMAINS.has(domain)) {
+      // Cloud as base, local changes on top — local keys win for conflicts
+      const merged = { ...cloudDomainData, ...localData };
+      this.pendingChanges.set(domain, merged);
+      const cloudKeys = Object.keys(cloudDomainData).length;
+      const localKeys = Object.keys(localData).length;
+      const mergedKeys = Object.keys(merged).length;
+      log('  _mergeCloudIntoPending:', domain, `cloud=${cloudKeys} local=${localKeys} merged=${mergedKeys}`);
+      return true;
+    }
+
+    if (ARRAY_ID_DOMAINS.has(domain) && Array.isArray(cloudDomainData) && Array.isArray(localData)) {
+      // ID-based merge: local items win for conflicts, cloud-only items preserved
+      const cloudById = new Map(cloudDomainData.map(i => [i.id, i]));
+      const localById = new Map(localData.map(i => [i.id, i]));
+      const merged = new Map(cloudById);
+      localById.forEach((item, id) => merged.set(id, item)); // local wins
+      this.pendingChanges.set(domain, [...merged.values()]);
+      log('  _mergeCloudIntoPending:', domain, `cloud=${cloudDomainData.length} local=${localData.length} merged=${merged.size}`);
+      return true;
+    }
+
+    return false;
   }
 
   /**
-   * Merge cloud data into ALL pending changes (map domains only).
+   * Merge cloud data into ALL pending changes (map + array-id domains).
    * Called during init when server data arrives and some domains have pending changes.
    * Ensures the upcoming flush includes cloud data, not just stale local data.
    */

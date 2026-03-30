@@ -40,7 +40,15 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     const setters = settersRef.current;
 
     if (updates.symptoms && setters.symptoms) {
-      setters.symptoms(() => updates.symptoms);
+      // ID-based merge: cloud as base, local-only items preserved
+      setters.symptoms(prev => {
+        if (!prev || !Array.isArray(prev)) return updates.symptoms;
+        const cloudById = new Map((updates.symptoms || []).map(i => [i.id, i]));
+        const localById = new Map(prev.map(i => [i.id, i]));
+        const merged = new Map(cloudById);
+        localById.forEach((item, id) => { if (!merged.has(id)) merged.set(id, item); });
+        return [...merged.values()];
+      });
     }
 
     if (updates.entries && setters.entries) {
@@ -52,7 +60,19 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     }
 
     if (updates.stackItems && setters.stackItems) {
-      setters.stackItems(() => updates.stackItems);
+      // ID-based merge: cloud as base, local items preserved if not in cloud
+      setters.stackItems(prev => {
+        if (!prev || !Array.isArray(prev)) return updates.stackItems;
+        const cloudById = new Map((updates.stackItems || []).map(i => [i.id, i]));
+        const localById = new Map(prev.map(i => [i.id, i]));
+        // Start with cloud items (cloud wins for items that exist in both)
+        const merged = new Map(cloudById);
+        // Add local-only items that cloud doesn't have (prevent loss of locally-added items)
+        localById.forEach((item, id) => {
+          if (!merged.has(id)) merged.set(id, item);
+        });
+        return [...merged.values()];
+      });
     }
 
     if (updates.stackEntries && setters.stackEntries) {
@@ -68,7 +88,15 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     }
 
     if (updates.inputItems && setters.inputItems) {
-      setters.inputItems(() => updates.inputItems);
+      // ID-based merge: cloud as base, local-only items preserved
+      setters.inputItems(prev => {
+        if (!prev || !Array.isArray(prev)) return updates.inputItems;
+        const cloudById = new Map((updates.inputItems || []).map(i => [i.id, i]));
+        const localById = new Map(prev.map(i => [i.id, i]));
+        const merged = new Map(cloudById);
+        localById.forEach((item, id) => { if (!merged.has(id)) merged.set(id, item); });
+        return [...merged.values()];
+      });
     }
 
     if (updates.inputEntries && setters.inputEntries) {
