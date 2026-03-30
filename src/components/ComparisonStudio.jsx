@@ -466,10 +466,10 @@ export default function ComparisonStudio({
         background: 'rgba(0,0,0,0.92)',
         zIndex: 1000,
         display: 'flex',
-        alignItems: isDesktop ? 'flex-start' : 'flex-end',
+        alignItems: 'flex-start',
         justifyContent: 'center',
         padding: isDesktop ? '20px' : '0',
-        paddingTop: isDesktop ? 'calc(60px + env(safe-area-inset-top))' : '0',
+        paddingTop: isDesktop ? 'calc(60px + env(safe-area-inset-top))' : 'env(safe-area-inset-top)',
       }}
     >
       <div
@@ -477,11 +477,11 @@ export default function ComparisonStudio({
         style={{
           width: '100%', maxWidth: isDesktop ? '820px' : 'none',
           background: 'rgba(15,17,21,0.95)',
-          borderRadius: isDesktop ? '12px' : '16px 16px 0 0',
+          borderRadius: isDesktop ? '12px' : '0 0 16px 16px',
           border: '1px solid rgba(139,92,246,0.3)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           overflow: 'hidden',
-          maxHeight: isDesktop ? 'calc(100vh - 120px)' : '65vh',
+          maxHeight: isDesktop ? 'calc(100vh - 120px)' : 'calc(100dvh - env(safe-area-inset-top))',
           display: 'flex', flexDirection: 'column',
           ...(isDesktop ? {} : { paddingBottom: 'env(safe-area-inset-bottom)' }),
         }}
@@ -505,7 +505,7 @@ export default function ComparisonStudio({
             Done
           </button>
         </div>
-        <div style={{ overflowY: 'auto', padding: '12px 16px' }}>
+        <div style={{ overflowY: 'auto', padding: '12px 16px', paddingBottom: isDesktop ? '12px' : '80px' }}>
           <input
             ref={suppSearchRef}
             value={suppSearch}
@@ -597,10 +597,10 @@ export default function ComparisonStudio({
         background: 'rgba(0,0,0,0.92)',
         zIndex: 1000,
         display: 'flex',
-        alignItems: isDesktop ? 'flex-start' : 'flex-end',
+        alignItems: 'flex-start',
         justifyContent: 'center',
         padding: isDesktop ? '20px' : '0',
-        paddingTop: isDesktop ? 'calc(60px + env(safe-area-inset-top))' : '0',
+        paddingTop: isDesktop ? 'calc(60px + env(safe-area-inset-top))' : 'env(safe-area-inset-top)',
       }}
     >
       <div
@@ -608,11 +608,11 @@ export default function ComparisonStudio({
         style={{
           width: '100%', maxWidth: isDesktop ? '820px' : 'none',
           background: 'rgba(15,17,21,0.95)',
-          borderRadius: isDesktop ? '12px' : '16px 16px 0 0',
+          borderRadius: isDesktop ? '12px' : '0 0 16px 16px',
           border: '1px solid rgba(99,102,241,0.3)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           overflow: 'hidden',
-          maxHeight: isDesktop ? 'calc(100vh - 120px)' : '65vh',
+          maxHeight: isDesktop ? 'calc(100vh - 120px)' : 'calc(100dvh - env(safe-area-inset-top))',
           display: 'flex', flexDirection: 'column',
           ...(isDesktop ? {} : { paddingBottom: 'env(safe-area-inset-bottom)' }),
         }}
@@ -639,7 +639,7 @@ export default function ComparisonStudio({
         </div>
 
         {/* Body */}
-        <div style={{ overflowY: 'auto', padding: '12px 16px' }}>
+        <div style={{ overflowY: 'auto', padding: '12px 16px', paddingBottom: isDesktop ? '12px' : '80px' }}>
           <input
             ref={symSearchRef}
             value={symSearch}
