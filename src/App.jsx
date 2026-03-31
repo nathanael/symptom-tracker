@@ -1453,6 +1453,10 @@ function App() {
           }}
           onEditStack={() => setShowManageStack(true)}
           onEditInputs={() => setShowManageInputs(true)}
+          symptoms={symptoms}
+          entries={entries}
+          trackingMode={trackingMode}
+          selectedDate={selectedDate}
         />
       )}
     </div>

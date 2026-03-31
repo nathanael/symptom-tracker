@@ -1,4 +1,6 @@
 import QuickActionsMenu from './QuickActionsMenu';
+import { useHealthScore } from '../hooks/useHealthScore';
+import { getScoreColor } from '../utils/healthScore';
 
 export default function BottomNav({
   appMode,
@@ -24,8 +26,14 @@ export default function BottomNav({
   onMatchYesterday,
   onEditStack,
   onEditInputs,
+  // Health score
+  symptoms,
+  entries,
+  trackingMode,
+  selectedDate,
 }) {
   const isViewOpen = showInsights || showSettings || showExport;
+  const { score } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
 
   // Mobile: standard bottom navigation
   return (
@@ -102,11 +110,28 @@ export default function BottomNav({
             flexDirection: 'column',
             alignItems: 'center',
             gap: '4px',
+            position: 'relative',
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={appMode === 'symptoms' && !isViewOpen ? '#8b5cf6' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
           </svg>
+          {score !== null && (
+            <div style={{
+              position: 'absolute',
+              top: 2,
+              right: 4,
+              background: getScoreColor(score),
+              color: '#000',
+              fontSize: 8,
+              fontWeight: 700,
+              borderRadius: 8,
+              padding: '1px 4px',
+              lineHeight: '10px',
+            }}>
+              {score}%
+            </div>
+          )}
           <span style={{
             fontSize: '11px',
             color: appMode === 'symptoms' && !isViewOpen ? '#8b5cf6' : '#64748b',
