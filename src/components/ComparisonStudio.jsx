@@ -8,10 +8,9 @@ import {
 import {
   getSymptomDailySeries,
   getSupplementDoseSeries,
+  getHealthScoreSeries,
 } from '../utils/correlationHelpers';
 import { computeLevels, computeInsight, getLevelColor } from '../utils/insightHelpers';
-import { getHealthScoreSeries } from '../utils/correlationHelpers';
-import { getScoreColor } from '../utils/healthScore';
 
 const SYMPTOM_STYLES = [
   { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
@@ -398,7 +397,7 @@ export default function ComparisonStudio({
     });
     if (showHealthScore && healthScoreTransformed) {
       const hsVal = healthScoreTransformed.values[touchX];
-      if (hsVal !== null) {
+      if (hsVal !== null && hsVal !== undefined) {
         items.push({
           name: 'Health Score',
           color: HEALTH_SCORE_COLOR,
@@ -1047,20 +1046,21 @@ export default function ComparisonStudio({
         }}>
           Health Score
         </span>
-        {showHealthScore && legendItems.items.find(it => it.name === 'Health Score') && (
-          <>
-            <span style={{
-              color: '#b0b5be', fontSize: chipText,
-              fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
-            }}>
-              {(() => {
-                const item = legendItems.items.find(it => it.name === 'Health Score');
-                return item?.val !== null && item?.val !== undefined ? Math.round(item.val) : '--';
-              })()}
-            </span>
-            <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>%</span>
-          </>
-        )}
+        {(() => {
+          const hsItem = showHealthScore ? legendItems.items.find(it => it.name === 'Health Score') : null;
+          if (!hsItem) return null;
+          return (
+            <>
+              <span style={{
+                color: '#b0b5be', fontSize: chipText,
+                fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+              }}>
+                {hsItem.val !== null && hsItem.val !== undefined ? Math.round(hsItem.val) : '--'}
+              </span>
+              <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>%</span>
+            </>
+          );
+        })()}
       </div>
       {/* Supplement chip or + button */}
       {selectedSupplement ? (() => {
