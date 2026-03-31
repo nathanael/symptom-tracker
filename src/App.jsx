@@ -625,6 +625,8 @@ function App() {
           quickLogTime={quickLogTime}
           setQuickLogTime={setQuickLogTime}
           trackingMode={trackingMode}
+          symptoms={symptoms}
+          entries={entries}
           flashColumn={flashColumn}
           setFlashColumn={setFlashColumn}
           setCopyToastMessage={setCopyToastMessage}

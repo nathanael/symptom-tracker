@@ -1,5 +1,7 @@
 import { formatDate, getCurrentTimePeriod } from '../utils/helpers';
 import DayNightToggle from './DayNightToggle';
+import HealthScoreBadge from './HealthScoreBadge';
+import { useHealthScore } from '../hooks/useHealthScore';
 
 export default function DesktopToolbar({
   // Date navigation
@@ -22,11 +24,15 @@ export default function DesktopToolbar({
   setCopyToastMessage,
   // Action handlers
   onOpenSettings,
+  symptoms,
+  entries,
 }) {
   const isToday = selectedDate.toDateString() === new Date().toDateString();
 
   // Determine active tab
   const activeTab = showInsights ? 'insights' : appMode;
+
+  const { score, delta } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
 
   const handleTabClick = (tab) => {
     if (tab === 'insights') {
@@ -210,6 +216,7 @@ export default function DesktopToolbar({
           width: '280px',
           justifyContent: 'flex-end',
         }}>
+          <HealthScoreBadge score={score} delta={delta} />
           <button
             onClick={onOpenSettings}
             style={{
