@@ -1,5 +1,6 @@
 import { getDailyValue, generateDateRange, interpolateSmallGaps } from './chartHelpers';
 import { isScheduledForDate } from './helpers';
+import { computeHealthScore } from './healthScore';
 
 /**
  * Extract daily symptom severity series for a date range.
@@ -228,4 +229,16 @@ export function findOptimalLag(crossCorrResults) {
   }
 
   return best;
+}
+
+/**
+ * Generate health score series for chart plotting.
+ * Returns array of numbers (normalized to 0-5 scale) or nulls, aligned to dates array.
+ */
+export function getHealthScoreSeries(symptoms, entries, dates, trackingMode) {
+  return dates.map(dateStr => {
+    const { score } = computeHealthScore(symptoms, entries, dateStr, trackingMode);
+    if (score === null) return null;
+    return score / 20; // Normalize 0-100% to 0-5 scale
+  });
 }

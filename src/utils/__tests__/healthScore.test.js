@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeHealthScore, computeRollingAvg, getScoreColor } from '../healthScore';
+import { getHealthScoreSeries } from '../correlationHelpers';
 
 describe('computeHealthScore', () => {
   const symptoms = [
@@ -113,5 +114,32 @@ describe('getScoreColor', () => {
 
   it('returns gray for null', () => {
     expect(getScoreColor(null)).toBe('#64748b');
+  });
+});
+
+describe('getHealthScoreSeries', () => {
+  const symptoms = [
+    { id: 's1', name: 'Headache', active: true },
+    { id: 's2', name: 'Fatigue', active: true },
+  ];
+
+  it('returns array of scores aligned to dates', () => {
+    const entries = {
+      '2026-03-29-s1-daily': { severity: 2, date: '2026-03-29', symptomId: 's1', time: 'daily' },
+      '2026-03-29-s2-daily': { severity: 4, date: '2026-03-29', symptomId: 's2', time: 'daily' },
+      '2026-03-30-s1-daily': { severity: 1, date: '2026-03-30', symptomId: 's1', time: 'daily' },
+    };
+    const dates = ['2026-03-28', '2026-03-29', '2026-03-30'];
+    const result = getHealthScoreSeries(symptoms, entries, dates, 'simple');
+    // Day 1: no data = null
+    // Day 2: (2+4)/(2*5)*100 = 60, normalized to 0-5: 60/20 = 3
+    // Day 3: 1/(1*5)*100 = 20, normalized: 20/20 = 1
+    expect(result).toEqual([null, 3, 1]);
+  });
+
+  it('returns all nulls when no entries exist', () => {
+    const dates = ['2026-03-28', '2026-03-29'];
+    const result = getHealthScoreSeries(symptoms, {}, dates, 'simple');
+    expect(result).toEqual([null, null]);
   });
 });
