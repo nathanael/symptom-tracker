@@ -10,6 +10,8 @@ import {
   getSupplementDoseSeries,
 } from '../utils/correlationHelpers';
 import { computeLevels, computeInsight, getLevelColor } from '../utils/insightHelpers';
+import { getHealthScoreSeries } from '../utils/correlationHelpers';
+import { getScoreColor } from '../utils/healthScore';
 
 const SYMPTOM_STYLES = [
   { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
@@ -18,6 +20,7 @@ const SYMPTOM_STYLES = [
 ];
 
 const SUPP_COLOR = '#8b5cf6';
+const HEALTH_SCORE_COLOR = '#10b981';
 
 export default function ComparisonStudio({
   entries,
@@ -71,6 +74,7 @@ export default function ComparisonStudio({
   const [startOffset, setStartOffset] = useState(0);
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
+  const [showHealthScore, setShowHealthScore] = useState(false);
 
 
   // Auto-focus search inputs when pickers open
@@ -220,6 +224,13 @@ export default function ComparisonStudio({
     [selectedSymptoms, entries, dates, trackingMode, windowSize]
   );
 
+  const healthScoreTransformed = useMemo(() => {
+    if (!showHealthScore) return null;
+    const raw = getHealthScoreSeries(symptoms, entries, dates, trackingMode);
+    const smoothed = windowSize > 1 ? smooth(raw, windowSize) : [...raw];
+    return { values: smoothed, dates: [...dates], labels: [...dates] };
+  }, [showHealthScore, symptoms, entries, dates, trackingMode, windowSize]);
+
   // ── Level segments & insight data ──
 
   const primaryIsSymptom = selectedSymptoms.includes(primarySeriesId);
@@ -319,6 +330,14 @@ export default function ComparisonStudio({
     [symptomTransformed, dates, chartW, chartH]
   );
 
+  const healthScorePoints = useMemo(() => {
+    if (!healthScoreTransformed) return null;
+    return healthScoreTransformed.values.map((val, i) => ({
+      x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
+      y: val !== null ? padTop + chartH - (val / 5) * chartH : null,
+    }));
+  }, [healthScoreTransformed, padLeft, chartW, chartH, padTop, dates.length]);
+
   const interval = getXLabelInterval(timeframe);
   const xLabels = useMemo(() => {
     const labels = [];
@@ -377,9 +396,20 @@ export default function ComparisonStudio({
         unit: '/5',
       });
     });
+    if (showHealthScore && healthScoreTransformed) {
+      const hsVal = healthScoreTransformed.values[touchX];
+      if (hsVal !== null) {
+        items.push({
+          name: 'Health Score',
+          color: HEALTH_SCORE_COLOR,
+          val: Math.round(hsVal * 20),
+          unit: '%',
+        });
+      }
+    }
     const x = suppX || (suppPoints ? null : padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW);
     return { dateLabel, items, x };
-  }, [touchX, dates, suppDoseDaily, suppPoints, symptomTransformed, symptoms, selectedSymptoms, timeframe, chartW, suppItem, suppUnit]);
+  }, [touchX, dates, suppDoseDaily, suppPoints, symptomTransformed, symptoms, selectedSymptoms, timeframe, chartW, suppItem, suppUnit, showHealthScore, healthScoreTransformed]);
 
   // Legend: show crosshair values when hovering, averages otherwise
   const legendItems = useMemo(() => {
@@ -406,8 +436,18 @@ export default function ComparisonStudio({
         });
       }
     });
+    if (showHealthScore && healthScoreTransformed) {
+      const vals = healthScoreTransformed.values.filter(v => v !== null);
+      const hsAvg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      items.push({
+        name: 'Health Score',
+        color: HEALTH_SCORE_COLOR,
+        val: hsAvg !== null ? Math.round(hsAvg * 20) : null,
+        unit: '%',
+      });
+    }
     return { dateLabel: 'Average', items, x: null };
-  }, [crosshairData, suppTransformed, symptomTransformed, suppItem, suppUnit, symptoms, selectedSymptoms]);
+  }, [crosshairData, suppTransformed, symptomTransformed, suppItem, suppUnit, symptoms, selectedSymptoms, showHealthScore, healthScoreTransformed]);
 
   // Max offset: based on earliest data point across selected symptoms/supplement
   const maxOffset = useMemo(() => {
@@ -825,6 +865,19 @@ export default function ComparisonStudio({
         </g>
       ))}
 
+      {/* Health Score line */}
+      {healthScorePoints && (
+        <path
+          d={buildPath(healthScorePoints)}
+          fill="none"
+          stroke={HEALTH_SCORE_COLOR}
+          strokeWidth={(isDesktop ? 1.0 : 2.5) * s}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={0.8}
+        />
+      )}
+
       {/* Level segments: 4 layers — bg boxes, then trend lines, then text */}
       {/* Layer 1: Dark background boxes (behind everything) */}
       {levels.map((level, i) => {
@@ -967,6 +1020,48 @@ export default function ComparisonStudio({
   const addBtnBorderW = isDesktop ? '1px' : '1.5px';
   const seriesChips = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {/* Health Score toggle */}
+      <div
+        onClick={() => { setShowHealthScore(prev => !prev); haptic('light'); }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: chipPad,
+          borderRadius: chipRadius,
+          border: showHealthScore ? `${chipBorderW} solid rgba(16,185,129,0.5)` : `${chipBorderW} dashed rgba(100,100,100,0.5)`,
+          background: showHealthScore ? 'rgba(16,185,129,0.12)' : 'transparent',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{
+          width: chipDot, height: chipDot, borderRadius: '50%',
+          background: showHealthScore ? HEALTH_SCORE_COLOR : '#555',
+          flexShrink: 0,
+        }} />
+        <span style={{
+          color: showHealthScore ? HEALTH_SCORE_COLOR : '#888',
+          fontSize: chipText,
+          fontWeight: showHealthScore ? '600' : '400',
+          flex: 1,
+        }}>
+          Health Score
+        </span>
+        {showHealthScore && legendItems.items.find(it => it.name === 'Health Score') && (
+          <>
+            <span style={{
+              color: '#b0b5be', fontSize: chipText,
+              fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+            }}>
+              {(() => {
+                const item = legendItems.items.find(it => it.name === 'Health Score');
+                return item?.val !== null && item?.val !== undefined ? Math.round(item.val) : '--';
+              })()}
+            </span>
+            <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>%</span>
+          </>
+        )}
+      </div>
       {/* Supplement chip or + button */}
       {selectedSupplement ? (() => {
         const supp = allSupplements.find(s => s.id === selectedSupplement);
