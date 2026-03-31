@@ -1,5 +1,9 @@
 import { getDailyValue } from './chartHelpers';
 
+/**
+ * Compute health score for a single date.
+ * Returns { score: number|null, loggedCount: number, totalActive: number }
+ */
 export function computeHealthScore(symptoms, entries, dateStr, trackingMode) {
   const active = symptoms.filter(s => s.active);
   const totalActive = active.length;
@@ -20,6 +24,10 @@ export function computeHealthScore(symptoms, entries, dateStr, trackingMode) {
   return { score, loggedCount, totalActive };
 }
 
+/**
+ * Compute rolling average of health score over past N days (excludes current date).
+ * Returns number or null.
+ */
 export function computeRollingAvg(symptoms, entries, dateStr, trackingMode, days = 7) {
   const scores = [];
   const d = new Date(dateStr + 'T00:00:00');

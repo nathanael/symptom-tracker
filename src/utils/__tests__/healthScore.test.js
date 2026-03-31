@@ -76,6 +76,16 @@ describe('computeRollingAvg', () => {
     expect(result).toBeNull();
   });
 
+  it('averages multiple prior days correctly', () => {
+    const entries = {
+      '2026-03-28-s1-daily': { severity: 1, date: '2026-03-28', symptomId: 's1', time: 'daily' },
+      '2026-03-29-s1-daily': { severity: 3, date: '2026-03-29', symptomId: 's1', time: 'daily' },
+    };
+    // Mar 28: 1/5*100=20, Mar 29: 3/5*100=60, avg = 40
+    const result = computeRollingAvg(symptoms, entries, '2026-03-30', 'simple', 7);
+    expect(result).toBe(40);
+  });
+
   it('excludes current date from rolling average', () => {
     const entries = {
       '2026-03-30-s1-daily': { severity: 4, date: '2026-03-30', symptomId: 's1', time: 'daily' },
