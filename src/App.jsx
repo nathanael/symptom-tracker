@@ -739,6 +739,9 @@ function App() {
           canGoForward={canGoForward}
           setShowCalendar={setShowCalendar}
           setCalendarMonth={setCalendarMonth}
+          symptoms={symptoms}
+          entries={entries}
+          trackingMode={trackingMode}
         />
       )}
 

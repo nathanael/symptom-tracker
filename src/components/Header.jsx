@@ -1,4 +1,6 @@
 import { formatDate } from '../utils/helpers';
+import HealthScoreBadge from './HealthScoreBadge';
+import { useHealthScore } from '../hooks/useHealthScore';
 
 export default function Header({
   selectedDate,
@@ -6,7 +8,12 @@ export default function Header({
   canGoForward,
   setShowCalendar,
   setCalendarMonth,
+  symptoms,
+  entries,
+  trackingMode,
 }) {
+  const { score, delta } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
+
   return (
     <div style={{
       flexShrink: 0,
@@ -38,29 +45,31 @@ export default function Header({
         </svg>
       </button>
 
-      <button
-        onClick={() => {
-          setCalendarMonth(new Date(selectedDate));
-          setShowCalendar(true);
-        }}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          textAlign: 'center',
-          padding: '8px 0',
-          flex: 1,
-        }}
-      >
-        <span style={{
-          color: '#f3f4f6',
-          fontSize: '17px',
-          fontWeight: '600',
-          whiteSpace: 'nowrap',
-        }}>
-          {formatDate(selectedDate)}
-        </span>
-      </button>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <button
+          onClick={() => {
+            setCalendarMonth(new Date(selectedDate));
+            setShowCalendar(true);
+          }}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            textAlign: 'center',
+            padding: '8px 0',
+          }}
+        >
+          <span style={{
+            color: '#f3f4f6',
+            fontSize: '17px',
+            fontWeight: '600',
+            whiteSpace: 'nowrap',
+          }}>
+            {formatDate(selectedDate)}
+          </span>
+        </button>
+        <HealthScoreBadge score={score} delta={delta} />
+      </div>
 
       <button
         onClick={() => changeDate(1)}
