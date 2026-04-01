@@ -760,6 +760,11 @@ export default function SymptomList({
         );
       })()}
 
+      {/* Health Score Summary Card */}
+      {isDesktop && (
+        <HealthScoreCard score={score} loggedCount={loggedCount} totalActive={totalActive} rollingAvg={rollingAvg} delta={delta} />
+      )}
+
       {/* Desktop: Card grid layout */}
       {isDesktop ? (
         <div style={{
