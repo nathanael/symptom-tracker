@@ -1245,7 +1245,7 @@ export default function ComparisonStudio({
               <div style={{ display: 'flex', gap: '0', height: '100%' }}>
                 {/* Legend panel — left side */}
                 <div style={{
-                  width: '300px', flexShrink: 0,
+                  width: '330px', flexShrink: 0,
                   paddingRight: '14px',
                   display: 'flex', flexDirection: 'column',
                   borderRight: '1px solid rgba(255,255,255,0.04)',
@@ -1303,7 +1303,7 @@ export default function ComparisonStudio({
                   </div>
 
                   {/* Health Score Card */}
-                  <div style={{ marginTop: 8 }}>
+                  <div style={{ marginTop: 16 }}>
                     <HealthScoreCard
                       score={healthScore.score}
                       rollingAvg={healthScore.rollingAvg}
@@ -1314,12 +1314,12 @@ export default function ComparisonStudio({
                   </div>
 
                   {/* Series chips */}
-                  <div style={{ marginTop: 4 }}>
+                  <div style={{ marginTop: 12 }}>
                     {seriesChips}
                   </div>
 
                   {/* Divider + Insight text */}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '16px 0' }} />
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '20px 0' }} />
                   {insightData && (
                     <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: '1.6' }}>
                       {insightData.insightSegments.map((seg, i) => seg.color
