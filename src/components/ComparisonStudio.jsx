@@ -12,6 +12,7 @@ import {
 } from '../utils/correlationHelpers';
 import { computeLevels, computeInsight, getLevelColor } from '../utils/insightHelpers';
 import HealthScoreCard from './HealthScoreCard';
+import HealthScoreCompact from './HealthScoreCompact';
 import { useHealthScore } from '../hooks/useHealthScore';
 
 const SYMPTOM_STYLES = [
@@ -1205,21 +1206,15 @@ export default function ComparisonStudio({
               style={{ background: 'none', border: 'none', color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#e5e7eb', fontSize: '28px', fontWeight: '300', cursor: startOffset === 0 ? 'default' : 'pointer', padding: '4px 8px' }}>{'\u203A'}</button>
           </div>
 
-          {/* Health Score toggle (mobile only — desktop uses card) */}
-          <div
-            onClick={() => { setShowHealthScore(prev => !prev); haptic('light'); }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: chipPad, borderRadius: chipRadius, marginBottom: '6px',
-              border: showHealthScore ? `${chipBorderW} solid rgba(16,185,129,0.5)` : `${chipBorderW} dashed rgba(100,100,100,0.5)`,
-              background: showHealthScore ? 'rgba(16,185,129,0.12)' : 'transparent',
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: showHealthScore ? HEALTH_SCORE_COLOR : '#555', flexShrink: 0 }} />
-            <span style={{ color: showHealthScore ? HEALTH_SCORE_COLOR : '#888', fontSize: chipText, fontWeight: showHealthScore ? '600' : '400', flex: 1 }}>
-              Health Score
-            </span>
+          {/* Compact Health Score tile (mobile) */}
+          <div style={{ marginBottom: 8 }}>
+            <HealthScoreCompact
+              score={healthScore.score}
+              rollingAvg={healthScore.rollingAvg}
+              delta={healthScore.delta}
+              showOnGraph={showHealthScore}
+              onToggleGraph={() => { setShowHealthScore(prev => !prev); haptic('light'); }}
+            />
           </div>
 
           {/* Series chips */}
