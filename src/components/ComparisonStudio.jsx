@@ -1024,49 +1024,6 @@ export default function ComparisonStudio({
   const addBtnBorderW = isDesktop ? '1px' : '1.5px';
   const seriesChips = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {/* Health Score toggle */}
-      <div
-        onClick={() => { setShowHealthScore(prev => !prev); haptic('light'); }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: chipPad,
-          borderRadius: chipRadius,
-          border: showHealthScore ? `${chipBorderW} solid rgba(16,185,129,0.5)` : `${chipBorderW} dashed rgba(100,100,100,0.5)`,
-          background: showHealthScore ? 'rgba(16,185,129,0.12)' : 'transparent',
-          cursor: 'pointer',
-        }}
-      >
-        <span style={{
-          width: chipDot, height: chipDot, borderRadius: '50%',
-          background: showHealthScore ? HEALTH_SCORE_COLOR : '#555',
-          flexShrink: 0,
-        }} />
-        <span style={{
-          color: showHealthScore ? HEALTH_SCORE_COLOR : '#888',
-          fontSize: chipText,
-          fontWeight: showHealthScore ? '600' : '400',
-          flex: 1,
-        }}>
-          Health Score
-        </span>
-        {(() => {
-          const hsItem = showHealthScore ? legendItems.items.find(it => it.name === 'Health Score') : null;
-          if (!hsItem) return null;
-          return (
-            <>
-              <span style={{
-                color: '#b0b5be', fontSize: chipText,
-                fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
-              }}>
-                {hsItem.val !== null && hsItem.val !== undefined ? Math.round(hsItem.val) : '--'}
-              </span>
-              <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>%</span>
-            </>
-          );
-        })()}
-      </div>
       {/* Supplement chip or + button */}
       {selectedSupplement ? (() => {
         const supp = allSupplements.find(s => s.id === selectedSupplement);
@@ -1248,6 +1205,23 @@ export default function ComparisonStudio({
               style={{ background: 'none', border: 'none', color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#e5e7eb', fontSize: '28px', fontWeight: '300', cursor: startOffset === 0 ? 'default' : 'pointer', padding: '4px 8px' }}>{'\u203A'}</button>
           </div>
 
+          {/* Health Score toggle (mobile only — desktop uses card) */}
+          <div
+            onClick={() => { setShowHealthScore(prev => !prev); haptic('light'); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: chipPad, borderRadius: chipRadius, marginBottom: '6px',
+              border: showHealthScore ? `${chipBorderW} solid rgba(16,185,129,0.5)` : `${chipBorderW} dashed rgba(100,100,100,0.5)`,
+              background: showHealthScore ? 'rgba(16,185,129,0.12)' : 'transparent',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: showHealthScore ? HEALTH_SCORE_COLOR : '#555', flexShrink: 0 }} />
+            <span style={{ color: showHealthScore ? HEALTH_SCORE_COLOR : '#888', fontSize: chipText, fontWeight: showHealthScore ? '600' : '400', flex: 1 }}>
+              Health Score
+            </span>
+          </div>
+
           {/* Series chips */}
           {seriesChips}
         </div>
@@ -1329,19 +1303,23 @@ export default function ComparisonStudio({
                   </div>
 
                   {/* Health Score Card */}
-                  <HealthScoreCard
-                    score={healthScore.score}
-                    loggedCount={healthScore.loggedCount}
-                    totalActive={healthScore.totalActive}
-                    rollingAvg={healthScore.rollingAvg}
-                    delta={healthScore.delta}
-                  />
+                  <div style={{ marginTop: 8 }}>
+                    <HealthScoreCard
+                      score={healthScore.score}
+                      rollingAvg={healthScore.rollingAvg}
+                      delta={healthScore.delta}
+                      showOnGraph={showHealthScore}
+                      onToggleGraph={() => { setShowHealthScore(prev => !prev); haptic('light'); }}
+                    />
+                  </div>
 
                   {/* Series chips */}
-                  {seriesChips}
+                  <div style={{ marginTop: 4 }}>
+                    {seriesChips}
+                  </div>
 
                   {/* Divider + Insight text */}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '12px 0' }} />
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '16px 0' }} />
                   {insightData && (
                     <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: '1.6' }}>
                       {insightData.insightSegments.map((seg, i) => seg.color

@@ -1,7 +1,7 @@
 import React from 'react';
 import { getScoreColor } from '../utils/healthScore';
 
-export default function HealthScoreCard({ score, loggedCount, totalActive, rollingAvg, delta }) {
+export default function HealthScoreCard({ score, rollingAvg, delta, showOnGraph, onToggleGraph }) {
   const displayValue = score !== null ? score : rollingAvg;
   if (displayValue === null) return null;
 
@@ -49,6 +49,32 @@ export default function HealthScoreCard({ score, loggedCount, totalActive, rolli
           borderRadius: 4,
         }} />
       </div>
+      {onToggleGraph && (
+        <div
+          onClick={onToggleGraph}
+          style={{
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            marginTop: 12,
+            paddingTop: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{
+            width: 16, height: 16, borderRadius: 4,
+            border: `2px solid ${showOnGraph ? '#10b981' : '#555'}`,
+            background: showOnGraph ? '#10b98130' : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {showOnGraph && <span style={{ color: '#10b981', fontSize: 11, fontWeight: 'bold', lineHeight: 1 }}>✓</span>}
+          </div>
+          <span style={{ fontSize: 12, color: showOnGraph ? '#10b981' : '#888', fontWeight: 500 }}>
+            Show on graph
+          </span>
+        </div>
+      )}
     </div>
   );
 }
