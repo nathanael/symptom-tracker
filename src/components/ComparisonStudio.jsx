@@ -1015,17 +1015,17 @@ export default function ComparisonStudio({
   );
 
   // ── Series chips with inline stats (shared between desktop/mobile) ──
-  const chipPad = isDesktop ? '10px 12px' : '15px 16px';
-  const chipText = isDesktop ? '13px' : '15px';
-  const chipUnitText = isDesktop ? '11px' : '12px';
-  const chipDot = isDesktop ? '6px' : '8px';
+  const chipPad = isDesktop ? '10px 12px' : '11px 12px';
+  const chipText = isDesktop ? '13px' : '12px';
+  const chipUnitText = isDesktop ? '11px' : '10px';
+  const chipDot = isDesktop ? '6px' : '6px';
   const chipBorderW = isDesktop ? '1px' : '1.5px';
-  const chipRadius = isDesktop ? '8px' : '10px';
+  const chipRadius = isDesktop ? '8px' : '8px';
   const chipCloseOpacity = isDesktop ? 0.5 : 0.85;
-  const chipCloseSize = isDesktop ? '14px' : '18px';
-  const chipCloseMargin = isDesktop ? '0' : '4px';
-  const addBtnPad = isDesktop ? '10px 12px' : '15px 16px';
-  const addBtnText = isDesktop ? '13px' : '14px';
+  const chipCloseSize = isDesktop ? '14px' : '14px';
+  const chipCloseMargin = isDesktop ? '0' : '3px';
+  const addBtnPad = isDesktop ? '10px 12px' : '11px 12px';
+  const addBtnText = isDesktop ? '13px' : '11px';
   const addBtnBorderW = isDesktop ? '1px' : '1.5px';
   const seriesChips = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1182,13 +1182,13 @@ export default function ComparisonStudio({
       {!isDesktop && (
         <div style={{ marginBottom: '12px' }}>
           {/* Centered timeframe pills */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-            <div style={{ display: 'flex', gap: '3px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', padding: '3px' }}>
+          <div style={{ display: 'flex', marginBottom: '7px' }}>
+            <div style={{ display: 'flex', gap: '2px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', padding: '2px', flex: 1 }}>
               {TIMEFRAMES.map(tf => (
                 <button key={tf.days} onClick={() => { setTimeframe(tf.days); haptic('light'); }}
                   style={{
-                    padding: '8px 18px', fontSize: '18px', borderRadius: '6px',
-                    border: 'none', cursor: 'pointer',
+                    padding: '5px 0', fontSize: '13px', borderRadius: '6px',
+                    border: 'none', cursor: 'pointer', flex: 1,
                     color: timeframe === tf.days ? '#fff' : '#9ca3af',
                     background: timeframe === tf.days ? 'rgba(255,255,255,0.15)' : 'transparent',
                     fontWeight: timeframe === tf.days ? '600' : '500',
