@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { severityColors, trackingModes, HOLD_DELAY, DRAG_SENSITIVITY, NA_SEVERITY } from '../utils/constants';
 import { getDateKey, haptic, getSymptomTrend } from '../utils/helpers';
 import SymptomEdit from './SymptomEdit';
-import HealthScoreCard from './HealthScoreCard';
-import { useHealthScore } from '../hooks/useHealthScore';
+
 
 export default function SymptomList({
   symptoms,
@@ -425,8 +424,6 @@ export default function SymptomList({
     setDragReorderY(0);
   };
 
-  const { score, loggedCount, totalActive, rollingAvg, delta } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
-
   return (
     <div
       ref={containerRef}
@@ -760,11 +757,6 @@ export default function SymptomList({
         );
       })()}
 
-      {/* Health Score Summary Card */}
-      {isDesktop && (
-        <HealthScoreCard score={score} loggedCount={loggedCount} totalActive={totalActive} rollingAvg={rollingAvg} delta={delta} />
-      )}
-
       {/* Desktop: Card grid layout */}
       {isDesktop ? (
         <div style={{
@@ -1076,9 +1068,6 @@ export default function SymptomList({
         </div>
       ) : (
       <>
-
-      {/* Health Score Summary Card (mobile only) */}
-      <HealthScoreCard score={score} loggedCount={loggedCount} totalActive={totalActive} rollingAvg={rollingAvg} delta={delta} />
 
       {/* Symptom rows - flat design (mobile) */}
       {activeSymptoms.map((symptom, index) => {

@@ -69,7 +69,7 @@ export default function ComparisonStudio({
   const [symSearch, setSymSearch] = useState('');
   const suppSearchRef = useRef(null);
   const symSearchRef = useRef(null);
-  const [timeframe, setTimeframe] = useState(180);
+  const [timeframe, setTimeframe] = useState(30);
   const [startOffset, setStartOffset] = useState(0);
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
@@ -226,7 +226,8 @@ export default function ComparisonStudio({
   const healthScoreTransformed = useMemo(() => {
     if (!showHealthScore) return null;
     const raw = getHealthScoreSeries(symptoms, entries, dates, trackingMode);
-    const smoothed = windowSize > 1 ? smooth(raw, windowSize) : [...raw];
+    const filled = interpolateSmallGaps(raw);
+    const smoothed = windowSize > 1 ? smooth(filled, windowSize) : [...filled];
     return { values: smoothed, dates: [...dates], labels: [...dates] };
   }, [showHealthScore, symptoms, entries, dates, trackingMode, windowSize]);
 

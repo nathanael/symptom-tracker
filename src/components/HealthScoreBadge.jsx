@@ -2,8 +2,9 @@ import React from 'react';
 import { getScoreColor } from '../utils/healthScore';
 
 export default function HealthScoreBadge({ score, delta }) {
+  if (score === null) return null;
   const color = getScoreColor(score);
-  const displayScore = score !== null ? `${score}%` : '—';
+  const displayScore = `${score}%`;
 
   let arrow = null;
   if (delta !== null && delta !== 0) {
