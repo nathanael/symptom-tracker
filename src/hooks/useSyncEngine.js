@@ -39,68 +39,67 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
 
     const setters = settersRef.current;
 
+    // Bail-out helpers: return prev when merge produces identical data,
+    // avoiding new object references that cascade re-renders.
+    const mergeMap = (prev, cloud) => {
+      const merged = { ...prev, ...cloud };
+      const prevKeys = Object.keys(prev);
+      if (prevKeys.length === Object.keys(merged).length &&
+          prevKeys.every(k => prev[k] === merged[k])) return prev;
+      return merged;
+    };
+
+    const mergeArrayById = (prev, cloud) => {
+      if (!prev || !Array.isArray(prev)) return cloud;
+      const cloudById = new Map(cloud.map(i => [i.id, i]));
+      const localById = new Map(prev.map(i => [i.id, i]));
+      const merged = new Map(cloudById);
+      localById.forEach((item, id) => { if (!merged.has(id)) merged.set(id, item); });
+      const result = [...merged.values()];
+      if (result.length === prev.length &&
+          result.every((item, i) => item === prev[i])) return prev;
+      return result;
+    };
+
     if (updates.symptoms && setters.symptoms) {
-      // ID-based merge: cloud as base, local-only items preserved
-      setters.symptoms(prev => {
-        if (!prev || !Array.isArray(prev)) return updates.symptoms;
-        const cloudById = new Map((updates.symptoms || []).map(i => [i.id, i]));
-        const localById = new Map(prev.map(i => [i.id, i]));
-        const merged = new Map(cloudById);
-        localById.forEach((item, id) => { if (!merged.has(id)) merged.set(id, item); });
-        return [...merged.values()];
-      });
+      setters.symptoms(prev => mergeArrayById(prev, updates.symptoms));
     }
 
     if (updates.entries && setters.entries) {
-      setters.entries(prev => ({ ...prev, ...updates.entries }));
+      setters.entries(prev => mergeMap(prev, updates.entries));
     }
 
     if (updates.dailyNotes && setters.dailyNotes) {
-      setters.dailyNotes(prev => ({ ...prev, ...updates.dailyNotes }));
+      setters.dailyNotes(prev => mergeMap(prev, updates.dailyNotes));
     }
 
     if (updates.stackItems && setters.stackItems) {
-      // ID-based merge: cloud as base, local items preserved if not in cloud
-      setters.stackItems(prev => {
-        if (!prev || !Array.isArray(prev)) return updates.stackItems;
-        const cloudById = new Map((updates.stackItems || []).map(i => [i.id, i]));
-        const localById = new Map(prev.map(i => [i.id, i]));
-        // Start with cloud items (cloud wins for items that exist in both)
-        const merged = new Map(cloudById);
-        // Add local-only items that cloud doesn't have (prevent loss of locally-added items)
-        localById.forEach((item, id) => {
-          if (!merged.has(id)) merged.set(id, item);
-        });
-        return [...merged.values()];
-      });
+      setters.stackItems(prev => mergeArrayById(prev, updates.stackItems));
     }
 
     if (updates.stackEntries && setters.stackEntries) {
-      setters.stackEntries(prev => ({ ...prev, ...updates.stackEntries }));
+      setters.stackEntries(prev => mergeMap(prev, updates.stackEntries));
     }
 
     if (updates.trackingMode && setters.trackingMode) {
-      setters.trackingMode(() => updates.trackingMode);
+      setters.trackingMode(prev => prev === updates.trackingMode ? prev : updates.trackingMode);
     }
 
     if (updates.pinnedSymptoms && setters.pinnedSymptoms) {
-      setters.pinnedSymptoms(() => new Set(updates.pinnedSymptoms));
-    }
-
-    if (updates.inputItems && setters.inputItems) {
-      // ID-based merge: cloud as base, local-only items preserved
-      setters.inputItems(prev => {
-        if (!prev || !Array.isArray(prev)) return updates.inputItems;
-        const cloudById = new Map((updates.inputItems || []).map(i => [i.id, i]));
-        const localById = new Map(prev.map(i => [i.id, i]));
-        const merged = new Map(cloudById);
-        localById.forEach((item, id) => { if (!merged.has(id)) merged.set(id, item); });
-        return [...merged.values()];
+      setters.pinnedSymptoms(prev => {
+        const incoming = updates.pinnedSymptoms;
+        if (prev instanceof Set && prev.size === incoming.length &&
+            incoming.every(id => prev.has(id))) return prev;
+        return new Set(incoming);
       });
     }
 
+    if (updates.inputItems && setters.inputItems) {
+      setters.inputItems(prev => mergeArrayById(prev, updates.inputItems));
+    }
+
     if (updates.inputEntries && setters.inputEntries) {
-      setters.inputEntries(prev => ({ ...prev, ...updates.inputEntries }));
+      setters.inputEntries(prev => mergeMap(prev, updates.inputEntries));
     }
 
     // No timer-based reset here. The ref is reset by a useEffect in App.jsx

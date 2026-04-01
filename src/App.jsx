@@ -255,18 +255,20 @@ function App() {
   }, [symptoms, entries, selectedDate, quickLogTime, trackingMode, pinnedSymptoms]);
 
   // Check for date changes (midnight) - uses local time
-  const currentDateKey = getDateKey(new Date());
-  if (lastCurrentDateRef.current !== null && lastCurrentDateRef.current !== currentDateKey) {
-    const selectedDateKey = getDateKey(selectedDate);
-    if (selectedDateKey === lastCurrentDateRef.current) {
-      lastCurrentDateRef.current = currentDateKey;
-      setTimeout(() => setSelectedDate(new Date()), 0);
-    } else {
+  useEffect(() => {
+    const currentDateKey = getDateKey(new Date());
+    if (lastCurrentDateRef.current !== null && lastCurrentDateRef.current !== currentDateKey) {
+      const selectedDateKey = getDateKey(selectedDate);
+      if (selectedDateKey === lastCurrentDateRef.current) {
+        lastCurrentDateRef.current = currentDateKey;
+        setSelectedDate(new Date());
+      } else {
+        lastCurrentDateRef.current = currentDateKey;
+      }
+    } else if (lastCurrentDateRef.current === null) {
       lastCurrentDateRef.current = currentDateKey;
     }
-  } else if (lastCurrentDateRef.current === null) {
-    lastCurrentDateRef.current = currentDateKey;
-  }
+  });
 
   // Auto-clear lastAction
   useEffect(() => {
@@ -278,6 +280,10 @@ function App() {
 
   // Auto-prefill today's stack from yesterday's checked entries
   const lastPrefillDateRef = useRef(localStorage.getItem('lastStackPrefillDate'));
+  const stackEntriesRef = useRef(stackEntries);
+  stackEntriesRef.current = stackEntries;
+  const stackItemsRef = useRef(stackItems);
+  stackItemsRef.current = stackItems;
   useEffect(() => {
     // Wait for sync engine to be ready before prefilling (prevents pushing stale data)
     if (firebase.user && !sync.isReady) return;
@@ -285,8 +291,10 @@ function App() {
     const todayKey = getDateKey(new Date());
     if (lastPrefillDateRef.current === todayKey) return;
 
+    const currentEntries = stackEntriesRef.current;
+
     // Check if any stack entries already exist for today
-    const hasTodayEntries = Object.keys(stackEntries).some(key => key.startsWith(todayKey));
+    const hasTodayEntries = Object.keys(currentEntries).some(key => key.startsWith(todayKey));
     if (hasTodayEntries) {
       lastPrefillDateRef.current = todayKey;
       localStorage.setItem('lastStackPrefillDate', todayKey);
@@ -297,15 +305,14 @@ function App() {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayKey = getDateKey(yesterday);
-    const yesterdayEntries = Object.entries(stackEntries).filter(([key]) => key.startsWith(yesterdayKey));
+    const yesterdayEntries = Object.entries(currentEntries).filter(([key]) => key.startsWith(yesterdayKey));
     if (yesterdayEntries.length === 0) {
       lastPrefillDateRef.current = todayKey;
       localStorage.setItem('lastStackPrefillDate', todayKey);
       return;
     }
 
-    // Capture stackItems snapshot outside the updater to avoid stale closure
-    const currentStackItems = stackItems;
+    const currentStackItems = stackItemsRef.current;
     setStackEntries(prev => {
       const newEntries = { ...prev };
       yesterdayEntries.forEach(([key, entry]) => {
@@ -324,7 +331,8 @@ function App() {
     });
     lastPrefillDateRef.current = todayKey;
     localStorage.setItem('lastStackPrefillDate', todayKey);
-  }, [stackEntries, stackItems, firebase.user, sync.isReady]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firebase.user, sync.isReady]);
 
   // Desktop keyboard shortcuts
   useEffect(() => {
