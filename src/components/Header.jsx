@@ -12,7 +12,7 @@ export default function Header({
   entries,
   trackingMode,
 }) {
-  const { score, delta } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
+  const { score, delta, rollingAvg } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
 
   return (
     <div style={{
@@ -68,7 +68,7 @@ export default function Header({
             {formatDate(selectedDate)}
           </span>
         </button>
-        <HealthScoreBadge score={score} delta={delta} />
+        <HealthScoreBadge score={score} delta={delta} rollingAvg={rollingAvg} />
       </div>
 
       <button

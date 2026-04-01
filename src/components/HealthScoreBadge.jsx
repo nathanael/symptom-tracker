@@ -1,16 +1,17 @@
 import React from 'react';
 import { getScoreColor } from '../utils/healthScore';
 
-export default function HealthScoreBadge({ score, delta }) {
-  if (score === null) return null;
-  const color = getScoreColor(score);
-  const displayScore = `${score}%`;
+export default function HealthScoreBadge({ score, delta, rollingAvg }) {
+  const displayValue = score !== null ? score : rollingAvg;
+  if (displayValue === null) return null;
+  const color = getScoreColor(displayValue);
+  const displayScore = `${displayValue}%`;
 
   let arrow = null;
   if (delta !== null && delta !== 0) {
-    arrow = delta < 0
-      ? <span style={{ color: '#22c55e', fontSize: '10px', marginLeft: 3 }}>▼{Math.abs(delta)}</span>
-      : <span style={{ color: '#ef4444', fontSize: '10px', marginLeft: 3 }}>▲{Math.abs(delta)}</span>;
+    arrow = delta > 0
+      ? <span style={{ color: '#22c55e', fontSize: '10px', marginLeft: 3 }}>▲{Math.abs(delta)}</span>
+      : <span style={{ color: '#ef4444', fontSize: '10px', marginLeft: 3 }}>▼{Math.abs(delta)}</span>;
   }
 
   return (

@@ -32,7 +32,7 @@ export default function DesktopToolbar({
   // Determine active tab
   const activeTab = showInsights ? 'insights' : appMode;
 
-  const { score, delta } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
+  const { score, delta, rollingAvg } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
 
   const handleTabClick = (tab) => {
     if (tab === 'insights') {
@@ -216,7 +216,7 @@ export default function DesktopToolbar({
           width: '280px',
           justifyContent: 'flex-end',
         }}>
-          <HealthScoreBadge score={score} delta={delta} />
+          <HealthScoreBadge score={score} delta={delta} rollingAvg={rollingAvg} />
           <button
             onClick={onOpenSettings}
             style={{

@@ -8,7 +8,7 @@ export default function HealthScoreCard({ score, loggedCount, totalActive, rolli
 
   let deltaText = null;
   if (delta !== null && delta !== 0) {
-    const improving = delta < 0;
+    const improving = delta > 0;
     deltaText = (
       <span style={{ fontSize: 12, color: improving ? '#22c55e' : '#ef4444' }}>
         {improving ? '▼' : '▲'} {Math.abs(delta)}%

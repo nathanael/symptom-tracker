@@ -20,7 +20,7 @@ export function computeHealthScore(symptoms, entries, dateStr, trackingMode) {
 
   if (loggedCount === 0) return { score: null, loggedCount: 0, totalActive };
 
-  const score = Math.round((sum / (loggedCount * 5)) * 100);
+  const score = 100 - Math.round((sum / (loggedCount * 5)) * 100);
   return { score, loggedCount, totalActive };
 }
 
@@ -50,7 +50,7 @@ export function computeRollingAvg(symptoms, entries, dateStr, trackingMode, days
 
 export function getScoreColor(score) {
   if (score === null) return '#64748b';
-  if (score <= 20) return '#22c55e';
-  if (score <= 50) return '#f59e0b';
+  if (score >= 80) return '#22c55e';
+  if (score >= 50) return '#f59e0b';
   return '#ef4444';
 }

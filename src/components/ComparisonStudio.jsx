@@ -11,6 +11,8 @@ import {
   getHealthScoreSeries,
 } from '../utils/correlationHelpers';
 import { computeLevels, computeInsight, getLevelColor } from '../utils/insightHelpers';
+import HealthScoreCard from './HealthScoreCard';
+import { useHealthScore } from '../hooks/useHealthScore';
 
 const SYMPTOM_STYLES = [
   { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
@@ -30,6 +32,8 @@ export default function ComparisonStudio({
   isDesktop,
   setStackItems,
 }) {
+  const healthScore = useHealthScore(new Date(), { symptoms, entries, trackingMode });
+
   const STORAGE_KEY = 'comparisonStudioSelections';
 
   const allSupplements = useMemo(
@@ -1324,8 +1328,14 @@ export default function ComparisonStudio({
                     >›</button>
                   </div>
 
-                  {/* Divider */}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '16px 0' }} />
+                  {/* Health Score Card */}
+                  <HealthScoreCard
+                    score={healthScore.score}
+                    loggedCount={healthScore.loggedCount}
+                    totalActive={healthScore.totalActive}
+                    rollingAvg={healthScore.rollingAvg}
+                    delta={healthScore.delta}
+                  />
 
                   {/* Series chips */}
                   {seriesChips}

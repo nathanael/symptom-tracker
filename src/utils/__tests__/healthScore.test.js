@@ -14,12 +14,13 @@ describe('computeHealthScore', () => {
     expect(result).toEqual({ score: null, loggedCount: 0, totalActive: 2 });
   });
 
-  it('computes score from logged severities', () => {
+  it('computes score from logged severities (inverted: 100 = healthy)', () => {
     const entries = {
       '2026-03-30-s1-daily': { severity: 2, date: '2026-03-30', symptomId: 's1', time: 'daily' },
       '2026-03-30-s2-daily': { severity: 3, date: '2026-03-30', symptomId: 's2', time: 'daily' },
     };
     const result = computeHealthScore(symptoms, entries, '2026-03-30', 'simple');
+    // 100 - (2+3)/(2*5)*100 = 100 - 50 = 50
     expect(result).toEqual({ score: 50, loggedCount: 2, totalActive: 2 });
   });
 
@@ -29,7 +30,8 @@ describe('computeHealthScore', () => {
       '2026-03-30-s2-daily': { severity: 4, date: '2026-03-30', symptomId: 's2', time: 'daily' },
     };
     const result = computeHealthScore(symptoms, entries, '2026-03-30', 'simple');
-    expect(result).toEqual({ score: 80, loggedCount: 1, totalActive: 2 });
+    // 100 - 4/(1*5)*100 = 100 - 80 = 20
+    expect(result).toEqual({ score: 20, loggedCount: 1, totalActive: 2 });
   });
 
   it('only considers active symptoms', () => {
@@ -46,15 +48,17 @@ describe('computeHealthScore', () => {
       '2026-03-30-s1-evening': { severity: 4, date: '2026-03-30', symptomId: 's1', time: 'evening' },
     };
     const result = computeHealthScore(symptoms, entries, '2026-03-30', 'ampm');
-    expect(result).toEqual({ score: 60, loggedCount: 1, totalActive: 2 });
+    // AM/PM avg: (2+4)/2=3, score: 100 - 3/(1*5)*100 = 100 - 60 = 40
+    expect(result).toEqual({ score: 40, loggedCount: 1, totalActive: 2 });
   });
 
-  it('returns score of 0 when all logged symptoms are severity 0', () => {
+  it('returns score of 100 when all logged symptoms are severity 0', () => {
     const entries = {
       '2026-03-30-s1-daily': { severity: 0, date: '2026-03-30', symptomId: 's1', time: 'daily' },
     };
     const result = computeHealthScore(symptoms, entries, '2026-03-30', 'simple');
-    expect(result).toEqual({ score: 0, loggedCount: 1, totalActive: 2 });
+    // 100 - 0/(1*5)*100 = 100
+    expect(result).toEqual({ score: 100, loggedCount: 1, totalActive: 2 });
   });
 });
 
@@ -68,8 +72,9 @@ describe('computeRollingAvg', () => {
       '2026-03-29-s1-daily': { severity: 2, date: '2026-03-29', symptomId: 's1', time: 'daily' },
       '2026-03-30-s1-daily': { severity: 4, date: '2026-03-30', symptomId: 's1', time: 'daily' },
     };
+    // Mar 29: 100 - 2/5*100 = 60
     const result = computeRollingAvg(symptoms, entries, '2026-03-30', 'simple', 7);
-    expect(result).toBe(40);
+    expect(result).toBe(60);
   });
 
   it('returns null when no prior days have data', () => {
@@ -82,9 +87,9 @@ describe('computeRollingAvg', () => {
       '2026-03-28-s1-daily': { severity: 1, date: '2026-03-28', symptomId: 's1', time: 'daily' },
       '2026-03-29-s1-daily': { severity: 3, date: '2026-03-29', symptomId: 's1', time: 'daily' },
     };
-    // Mar 28: 1/5*100=20, Mar 29: 3/5*100=60, avg = 40
+    // Mar 28: 100-1/5*100=80, Mar 29: 100-3/5*100=40, avg = 60
     const result = computeRollingAvg(symptoms, entries, '2026-03-30', 'simple', 7);
-    expect(result).toBe(40);
+    expect(result).toBe(60);
   });
 
   it('excludes current date from rolling average', () => {
@@ -97,19 +102,19 @@ describe('computeRollingAvg', () => {
 });
 
 describe('getScoreColor', () => {
-  it('returns green for 0-20%', () => {
-    expect(getScoreColor(0)).toBe('#22c55e');
-    expect(getScoreColor(20)).toBe('#22c55e');
+  it('returns green for 80-100%', () => {
+    expect(getScoreColor(80)).toBe('#22c55e');
+    expect(getScoreColor(100)).toBe('#22c55e');
   });
 
-  it('returns amber for 21-50%', () => {
-    expect(getScoreColor(21)).toBe('#f59e0b');
+  it('returns amber for 50-79%', () => {
     expect(getScoreColor(50)).toBe('#f59e0b');
+    expect(getScoreColor(79)).toBe('#f59e0b');
   });
 
-  it('returns red for 51-100%', () => {
-    expect(getScoreColor(51)).toBe('#ef4444');
-    expect(getScoreColor(100)).toBe('#ef4444');
+  it('returns red for 0-49%', () => {
+    expect(getScoreColor(0)).toBe('#ef4444');
+    expect(getScoreColor(49)).toBe('#ef4444');
   });
 
   it('returns gray for null', () => {
@@ -132,9 +137,9 @@ describe('getHealthScoreSeries', () => {
     const dates = ['2026-03-28', '2026-03-29', '2026-03-30'];
     const result = getHealthScoreSeries(symptoms, entries, dates, 'simple');
     // Day 1: no data = null
-    // Day 2: (2+4)/(2*5)*100 = 60, normalized to 0-5: 60/20 = 3
-    // Day 3: 1/(1*5)*100 = 20, normalized: 20/20 = 1
-    expect(result).toEqual([null, 3, 1]);
+    // Day 2: 100-(2+4)/(2*5)*100 = 40, normalized: 40/20 = 2
+    // Day 3: 100-1/(1*5)*100 = 80, normalized: 80/20 = 4
+    expect(result).toEqual([null, 2, 4]);
   });
 
   it('returns all nulls when no entries exist', () => {
