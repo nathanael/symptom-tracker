@@ -137,9 +137,9 @@ describe('getHealthScoreSeries', () => {
     const dates = ['2026-03-28', '2026-03-29', '2026-03-30'];
     const result = getHealthScoreSeries(symptoms, entries, dates, 'simple');
     // Day 1: no data = null
-    // Day 2: 100-(2+4)/(2*5)*100 = 40, normalized: 40/20 = 2
-    // Day 3: 100-1/(1*5)*100 = 80, normalized: 80/20 = 4
-    expect(result).toEqual([null, 2, 4]);
+    // Day 2: 100-(2+4)/(2*5)*100 = 40
+    // Day 3: 100-1/(1*5)*100 = 80
+    expect(result).toEqual([null, 40, 80]);
   });
 
   it('returns all nulls when no entries exist', () => {

@@ -82,7 +82,8 @@ export default function ComparisonStudio({
   const [startOffset, setStartOffset] = useState(0);
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
-  const [showHealthScore, setShowHealthScore] = useState(false);
+  // Health score shows automatically when no other series are selected
+  const showHealthScore = !selectedSupplement && selectedSymptoms.length === 0;
 
 
   // Auto-focus search inputs when pickers open
@@ -240,6 +241,19 @@ export default function ComparisonStudio({
     return { values: smoothed, dates: [...dates], labels: [...dates] };
   }, [showHealthScore, symptoms, entries, dates, trackingMode, windowSize]);
 
+  // Dynamic Y-axis range for health score (rounded to nearest 10)
+  const hsYRange = useMemo(() => {
+    if (!healthScoreTransformed) return null;
+    const valid = healthScoreTransformed.values.filter(v => v !== null);
+    if (valid.length === 0) return { min: 0, max: 100 };
+    const dataMin = Math.min(...valid);
+    const dataMax = Math.max(...valid);
+    const yMin = Math.floor(dataMin / 10) * 10;
+    const yMax = Math.ceil(dataMax / 10) * 10;
+    // Ensure at least 10% range so the chart isn't a flat line
+    return { min: yMin, max: Math.max(yMax, yMin + 10) };
+  }, [healthScoreTransformed]);
+
   // ── Level segments & insight data ──
 
   const primaryIsSymptom = selectedSymptoms.includes(primarySeriesId);
@@ -340,12 +354,14 @@ export default function ComparisonStudio({
   );
 
   const healthScorePoints = useMemo(() => {
-    if (!healthScoreTransformed) return null;
+    if (!healthScoreTransformed || !hsYRange) return null;
+    const { min: yMin, max: yMax } = hsYRange;
+    const range = yMax - yMin;
     return healthScoreTransformed.values.map((val, i) => ({
       x: padLeft + (i / Math.max(1, dates.length - 1)) * chartW,
-      y: val !== null ? padTop + chartH - (val / 5) * chartH : null,
+      y: val !== null ? padTop + chartH - ((val - yMin) / range) * chartH : null,
     }));
-  }, [healthScoreTransformed, padLeft, chartW, chartH, padTop, dates.length]);
+  }, [healthScoreTransformed, hsYRange, padLeft, chartW, chartH, padTop, dates.length]);
 
   const interval = getXLabelInterval(timeframe);
   const xLabels = useMemo(() => {
@@ -411,7 +427,7 @@ export default function ComparisonStudio({
         items.push({
           name: 'Health Score',
           color: HEALTH_SCORE_COLOR,
-          val: Math.round(hsVal * 20),
+          val: Math.round(hsVal),
           unit: '%',
         });
       }
@@ -451,7 +467,7 @@ export default function ComparisonStudio({
       items.push({
         name: 'Health Score',
         color: HEALTH_SCORE_COLOR,
-        val: hsAvg !== null ? Math.round(hsAvg * 20) : null,
+        val: hsAvg !== null ? Math.round(hsAvg) : null,
         unit: '%',
       });
     }
@@ -790,7 +806,18 @@ export default function ComparisonStudio({
   const chartSVGContent = (
     <>
       {/* Grid lines — follow primary series scale */}
-      {primaryIsSupplement && selectedSupplement ? (
+      {showHealthScore && hsYRange ? (
+        (() => {
+          const { min: yMin, max: yMax } = hsYRange;
+          const step = (yMax - yMin) <= 30 ? 5 : 10;
+          const labels = [];
+          for (let v = yMin; v <= yMax; v += step) labels.push(v);
+          return labels.map(val => {
+            const y = padTop + chartH - ((val - yMin) / (yMax - yMin)) * chartH;
+            return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
+          });
+        })()
+      ) : primaryIsSupplement && selectedSupplement ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
           return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
@@ -809,7 +836,21 @@ export default function ComparisonStudio({
       </>}
 
       {/* Left Y-axis — primary series scale */}
-      {primaryIsSupplement && selectedSupplement ? (
+      {showHealthScore && hsYRange ? (
+        (() => {
+          const { min: yMin, max: yMax } = hsYRange;
+          const step = (yMax - yMin) <= 30 ? 5 : 10;
+          const labels = [];
+          for (let v = yMin; v <= yMax; v += step) labels.push(v);
+          return labels.map(val => {
+            const y = padTop + chartH - ((val - yMin) / (yMax - yMin)) * chartH;
+            return (
+              <text key={`l-${val}`} x={padLeft - 6 * s} y={y + 3.5 * s} textAnchor="end"
+                fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{val}%</text>
+            );
+          });
+        })()
+      ) : primaryIsSupplement && selectedSupplement ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
           return (
@@ -1216,8 +1257,6 @@ export default function ComparisonStudio({
               score={healthScore.score}
               rollingAvg={healthScore.rollingAvg}
               delta={healthScore.delta}
-              showOnGraph={showHealthScore}
-              onToggleGraph={() => { setShowHealthScore(prev => !prev); haptic('light'); }}
             />
           </div>
 
@@ -1307,8 +1346,6 @@ export default function ComparisonStudio({
                       score={healthScore.score}
                       rollingAvg={healthScore.rollingAvg}
                       delta={healthScore.delta}
-                      showOnGraph={showHealthScore}
-                      onToggleGraph={() => { setShowHealthScore(prev => !prev); haptic('light'); }}
                     />
                   </div>
 
