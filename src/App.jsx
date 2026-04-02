@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
 import { useLocalStorage, useLocalStorageSet } from './hooks/useLocalStorage';
 import { useFirebase } from './hooks/useFirebase';
 import { useSyncEngine } from './hooks/useSyncEngine';
@@ -191,6 +191,13 @@ function App() {
   // Refs
   const justLoggedRef = useRef(false);
 
+  // Deferred entries: during rapid-fire entry, React defers re-renders of
+  // components that use this value, keeping the main thread free for the
+  // active RapidEntry overlay. Heavy components (SymptomList, Stack, Insights,
+  // health score, tab badges) use deferredEntries instead of entries.
+  const deferredEntries = useDeferredValue(entries);
+  const deferredStackEntries = useDeferredValue(stackEntries);
+
   // Reset scroll when switching views
   useEffect(() => {
     if (scrollContainerRef.current) {
@@ -237,22 +244,22 @@ function App() {
       if (trackingMode === 'ampm') {
         // Auto-N/A: symptom doesn't apply to this period
         if (symptom.applicablePeriods && !symptom.applicablePeriods.includes(timePeriod)) return false;
-        const hasTimePeriodEntry = entries[`${dateKey}-${symptom.id}-${timePeriod}`];
+        const hasTimePeriodEntry = deferredEntries[`${dateKey}-${symptom.id}-${timePeriod}`];
         if (hasTimePeriodEntry) return false;
-        if (timePeriod === 'morning' && entries[`${dateKey}-${symptom.id}-daily`]) {
+        if (timePeriod === 'morning' && deferredEntries[`${dateKey}-${symptom.id}-daily`]) {
           return false;
         }
         return true;
       } else {
-        const hasDailyEntry = entries[`${dateKey}-${symptom.id}-daily`];
+        const hasDailyEntry = deferredEntries[`${dateKey}-${symptom.id}-daily`];
         if (hasDailyEntry) return false;
-        const hasMorningEntry = entries[`${dateKey}-${symptom.id}-morning`];
-        const hasEveningEntry = entries[`${dateKey}-${symptom.id}-evening`];
+        const hasMorningEntry = deferredEntries[`${dateKey}-${symptom.id}-morning`];
+        const hasEveningEntry = deferredEntries[`${dateKey}-${symptom.id}-evening`];
         if (hasMorningEntry || hasEveningEntry) return false;
         return true;
       }
     });
-  }, [symptoms, entries, selectedDate, quickLogTime, trackingMode, pinnedSymptoms]);
+  }, [symptoms, deferredEntries, selectedDate, quickLogTime, trackingMode, pinnedSymptoms]);
 
   // Check for date changes (midnight) - uses local time
   useEffect(() => {
@@ -450,11 +457,11 @@ function App() {
     return tomorrow <= today;
   }, [selectedDate]);
 
-  // Tab badge data
+  // Tab badge data — uses deferred entries to avoid blocking during rapid entry
   const tabBadges = useMemo(() => {
     const dateKey = getDateKey(selectedDate);
-    const todaySymptomEntries = Object.values(entries).filter(e => e.date === dateKey);
-    const todayStackEntries = Object.values(stackEntries).filter(e => e.date === dateKey);
+    const todaySymptomEntries = Object.values(deferredEntries).filter(e => e.date === dateKey);
+    const todayStackEntries = Object.values(deferredStackEntries).filter(e => e.date === dateKey);
     const activeStackCount = stackItems.filter(i => i.active).length;
     const activeSymptomCount = symptoms.filter(s => s.active).length;
 
@@ -467,14 +474,14 @@ function App() {
       symptoms: { count: todaySymptomEntries.length, total: activeSymptomCount, status: symptomStatus },
       stack: { taken: todayStackEntries.length, total: activeStackCount, status: stackStatus },
     };
-  }, [entries, stackEntries, stackItems, symptoms, selectedDate]);
+  }, [deferredEntries, deferredStackEntries, stackItems, symptoms, selectedDate]);
 
   // Get symptom entries for a given symptom
   const getSymptomEntries = useCallback((symptomId) => {
     const dateKey = getDateKey(selectedDate);
     const timeOrder = { night: 0, morning: 1, allday: 2, midday: 3, evening: 4, daily: 2 };
 
-    const allDayEntries = Object.entries(entries)
+    const allDayEntries = Object.entries(deferredEntries)
       .filter(([key]) => key.startsWith(`${dateKey}-${symptomId}`))
       .map(([key, value]) => value);
 
@@ -533,7 +540,7 @@ function App() {
     }
 
     return allDayEntries.sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
-  }, [entries, selectedDate, trackingMode]);
+  }, [deferredEntries, selectedDate, trackingMode]);
 
   // Get most recent entry for a symptom
   const getMostRecentEntry = useCallback((symptomId, currentTimePeriod = null) => {
@@ -541,7 +548,7 @@ function App() {
     const timeOrder = { morning: 0, daily: 1, evening: 2 };
     const currentTimeOrder = timeOrder[currentTimePeriod] ?? 999;
 
-    const allEntries = Object.entries(entries)
+    const allEntries = Object.entries(deferredEntries)
       .filter(([key]) => key.includes(`-${symptomId}-`))
       .map(([key, value]) => ({ key, ...value }))
       .filter(entry => {
@@ -559,7 +566,7 @@ function App() {
       });
 
     return allEntries.length > 0 ? allEntries[0] : null;
-  }, [entries, selectedDate]);
+  }, [deferredEntries, selectedDate]);
 
   // Main render
   return (
@@ -634,7 +641,7 @@ function App() {
           setQuickLogTime={setQuickLogTime}
           trackingMode={trackingMode}
           symptoms={symptoms}
-          entries={entries}
+          entries={deferredEntries}
           flashColumn={flashColumn}
           setFlashColumn={setFlashColumn}
           setCopyToastMessage={setCopyToastMessage}
@@ -748,7 +755,7 @@ function App() {
           setShowCalendar={setShowCalendar}
           setCalendarMonth={setCalendarMonth}
           symptoms={symptoms}
-          entries={entries}
+          entries={deferredEntries}
           trackingMode={trackingMode}
         />
       )}
@@ -769,10 +776,10 @@ function App() {
           }}>
             {showInsights ? (
               <Insights
-                entries={entries}
+                entries={deferredEntries}
                 symptoms={symptoms}
                 stackItems={stackItems}
-                stackEntries={stackEntries}
+                stackEntries={deferredStackEntries}
                 insightsWindow={insightsWindow}
                 setInsightsWindow={setInsightsWindow}
                 onOpenGraph={setShowSymptomGraph}
@@ -786,7 +793,7 @@ function App() {
                 symptoms={symptoms}
                 setSymptoms={setSymptoms}
                 activeSymptoms={activeSymptoms}
-                entries={entries}
+                entries={deferredEntries}
                 setEntries={setEntries}
                 selectedDate={selectedDate}
                 trackingMode={trackingMode}
@@ -973,7 +980,7 @@ function App() {
                     <Stack
                       stackItems={stackItems}
                       setStackItems={setStackItems}
-                      stackEntries={stackEntries}
+                      stackEntries={deferredStackEntries}
                       setStackEntries={setStackEntries}
                       selectedDate={selectedDate}
                       setLastAction={setLastAction}
@@ -1026,7 +1033,7 @@ function App() {
                 symptoms={symptoms}
                 setSymptoms={setSymptoms}
                 activeSymptoms={activeSymptoms}
-                entries={entries}
+                entries={deferredEntries}
                 setEntries={setEntries}
                 selectedDate={selectedDate}
                 trackingMode={trackingMode}
@@ -1058,7 +1065,7 @@ function App() {
                   <Stack
                     stackItems={stackItems}
                     setStackItems={setStackItems}
-                    stackEntries={stackEntries}
+                    stackEntries={deferredStackEntries}
                     setStackEntries={setStackEntries}
                     selectedDate={selectedDate}
                     setLastAction={setLastAction}
@@ -1218,7 +1225,7 @@ function App() {
           selectDate={selectDate}
           calendarMonth={calendarMonth}
           setCalendarMonth={setCalendarMonth}
-          entries={entries}
+          entries={deferredEntries}
           onClose={() => setShowCalendar(false)}
           isDesktop={isDesktop}
         />
@@ -1227,10 +1234,10 @@ function App() {
       {/* Insights - mobile only as overlay (desktop renders inline) */}
       {showInsights && !isDesktop && (
         <Insights
-          entries={entries}
+          entries={deferredEntries}
           symptoms={symptoms}
           stackItems={stackItems}
-          stackEntries={stackEntries}
+          stackEntries={deferredStackEntries}
           insightsWindow={insightsWindow}
           setInsightsWindow={setInsightsWindow}
           onOpenGraph={setShowSymptomGraph}
@@ -1248,7 +1255,7 @@ function App() {
           primarySymptomId={showSymptomGraph}
           symptoms={symptoms}
           activeSymptoms={activeSymptoms}
-          entries={entries}
+          entries={deferredEntries}
           trackingMode={trackingMode}
           onClose={() => setShowSymptomGraph(null)}
           onChangeSymptom={setShowSymptomGraph}
@@ -1261,9 +1268,9 @@ function App() {
         <SupplementGraph
           primaryItemId={showSupplementGraph}
           stackItems={stackItems}
-          stackEntries={stackEntries}
+          stackEntries={deferredStackEntries}
           symptoms={symptoms}
-          entries={entries}
+          entries={deferredEntries}
           trackingMode={trackingMode}
           onClose={() => setShowSupplementGraph(null)}
           onChangeItem={setShowSupplementGraph}
@@ -1290,13 +1297,13 @@ function App() {
           setTrackingMode={setTrackingMode}
           symptoms={symptoms}
           setSymptoms={setSymptoms}
-          entries={entries}
+          entries={deferredEntries}
           setEntries={setEntries}
           dailyNotes={dailyNotes}
           setDailyNotes={setDailyNotes}
           stackItems={stackItems}
           setStackItems={setStackItems}
-          stackEntries={stackEntries}
+          stackEntries={deferredStackEntries}
           setStackEntries={setStackEntries}
           pinnedSymptoms={pinnedSymptoms}
           setPinnedSymptoms={setPinnedSymptoms}
@@ -1330,11 +1337,11 @@ function App() {
       {/* Export */}
       {showExport && (
         <Export
-          entries={entries}
+          entries={deferredEntries}
           symptoms={symptoms}
           dailyNotes={dailyNotes}
           stackItems={stackItems}
-          stackEntries={stackEntries}
+          stackEntries={deferredStackEntries}
           trackingMode={trackingMode}
           inputItems={inputItems}
           inputEntries={inputEntries}
@@ -1462,7 +1469,7 @@ function App() {
           onEditStack={() => setShowManageStack(true)}
           onEditInputs={() => setShowManageInputs(true)}
           symptoms={symptoms}
-          entries={entries}
+          entries={deferredEntries}
           trackingMode={trackingMode}
           selectedDate={selectedDate}
         />
