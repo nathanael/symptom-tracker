@@ -834,4 +834,175 @@ describe('SyncEngine', () => {
       expect(engine._dirtyDomains.has('entries')).toBe(true);
     });
   });
+
+  describe('BUG: Listener death with no recovery', () => {
+    async function initWithServerData(versions = { entries: 10, symptoms: 5 }) {
+      createEngine();
+      const initPromise = engine.initialize();
+      const serverData = makeCloudData({
+        entries: JSON.stringify({ '2026-03-22': { headache: 3 } }),
+        symptoms: JSON.stringify([{ id: 's1', name: 'Headache' }]),
+      }, versions);
+      fireSnapshot(serverData, { fromCache: false });
+      await initPromise;
+      // Simulate what useSyncEngine does after init
+      engine._startPollingIfNeeded();
+      cloudUpdates = [];
+      return engine;
+    }
+
+    it('should detect when listener stops delivering snapshots and restart polling', async () => {
+      await initWithServerData({ entries: 10 });
+
+      // Listener was marked as working during init
+      expect(engine._listenerWorking).toBe(true);
+
+      // Simulate time passing with no snapshots (listener died)
+      vi.advanceTimersByTime(120000); // 2 minutes
+
+      // Engine should detect the listener is dead and restart polling
+      expect(engine._listenerWorking).toBe(false);
+      expect(engine._pollTimer).not.toBeNull();
+    });
+
+    it('should recover data after listener death via polling', async () => {
+      await initWithServerData({ entries: 10 });
+      expect(engine._listenerWorking).toBe(true);
+
+      // Listener dies silently — no more snapshots arrive
+      // Advance time past heartbeat threshold
+      vi.advanceTimersByTime(120000);
+
+      // Polling should have started
+      expect(engine._pollTimer).not.toBeNull();
+      expect(engine._listenerWorking).toBe(false);
+
+      // Mock SDK get() to return fresh cloud data
+      const freshData = makeCloudData(
+        {
+          entries: JSON.stringify({
+            '2026-03-22': { headache: 3 },
+            '2026-03-23': { fatigue: 4 },
+            '2026-03-24': { fatigue: 5 },
+          }),
+        },
+        { entries: 50 }
+      );
+      mockDocRef.get = vi.fn(() => Promise.resolve({
+        exists: true,
+        data: () => freshData,
+      }));
+
+      // Advance to next poll interval and flush microtasks
+      await vi.advanceTimersByTimeAsync(30000);
+
+      // Fresh cloud data should have been applied
+      expect(cloudUpdates.length).toBeGreaterThan(0);
+      const lastUpdate = cloudUpdates[cloudUpdates.length - 1];
+      expect(lastUpdate.updates.entries).toBeDefined();
+      expect(lastUpdate.updates.entries['2026-03-23']).toEqual({ fatigue: 4 });
+    });
+
+    it('should reset heartbeat timer when new snapshot arrives', async () => {
+      await initWithServerData({ entries: 10 });
+
+      // Advance time partway
+      vi.advanceTimersByTime(50000);
+
+      // New snapshot arrives — listener is still alive
+      const newData = makeCloudData(
+        { entries: JSON.stringify({ '2026-03-22': { headache: 4 } }) },
+        { entries: 11 }
+      );
+      fireSnapshot(newData, { fromCache: false });
+
+      // Advance past original heartbeat threshold
+      vi.advanceTimersByTime(80000);
+
+      // Listener should still be marked as working (heartbeat was reset)
+      expect(engine._listenerWorking).toBe(true);
+    });
+  });
+
+  describe('BUG: Flush sends stale data before cloud merge', () => {
+    it('should merge cloud data into flush payload even if cloud arrives during flush', async () => {
+      createEngine();
+      const initPromise = engine.initialize();
+
+      // Init resolves via timeout with no server data
+      mockDocRef.get = vi.fn(() => Promise.reject(new Error('network')));
+      const cacheData = makeCloudData(
+        { entries: JSON.stringify({ '2026-03-22': { headache: 3 } }) },
+        { entries: 5 }
+      );
+      fireSnapshot(cacheData, { fromCache: true });
+
+      vi.advanceTimersByTime(3500);
+      await vi.runAllTimersAsync();
+      await initPromise;
+      cloudUpdates = [];
+
+      // User makes a change — stale data + user's entry
+      engine.notifyLocalChange('entries', {
+        '2026-03-22': { headache: 3 },
+        '2026-03-27': { headache: 8 },
+      });
+
+      // Mock REST API to return fresh cloud data for pre-flush read
+      global.fetch = vi.fn(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          fields: {
+            entries: { stringValue: JSON.stringify({
+              '2026-03-22': { headache: 3 },
+              '2026-03-23': { fatigue: 4 },
+              '2026-03-24': { fatigue: 5 },
+              '2026-03-25': { headache: 2 },
+              '2026-03-26': { fatigue: 3 },
+              '2026-03-27': { headache: 6 },
+            })},
+            _v_entries: { integerValue: '50' },
+          },
+        }),
+      }));
+
+      // Flush should do a pre-flush read and merge
+      await engine.flush();
+
+      expect(mockSetFn).toHaveBeenCalled();
+      const payload = mockSetFn.mock.calls[0][0];
+      const flushedEntries = JSON.parse(payload.entries);
+
+      // Cloud entries must be preserved
+      expect(flushedEntries['2026-03-23']).toEqual({ fatigue: 4 });
+      expect(flushedEntries['2026-03-24']).toEqual({ fatigue: 5 });
+      expect(flushedEntries['2026-03-25']).toEqual({ headache: 2 });
+      expect(flushedEntries['2026-03-26']).toEqual({ fatigue: 3 });
+
+      // User's local change should win for conflicting key
+      expect(flushedEntries['2026-03-27']).toEqual({ headache: 8 });
+
+      // Clean up
+      delete global.fetch;
+    });
+
+    it('should still flush if pre-flush cloud read fails', async () => {
+      createEngine();
+      const initPromise = engine.initialize();
+      const serverData = makeCloudData({}, { entries: 10 });
+      fireSnapshot(serverData, { fromCache: false });
+      await initPromise;
+
+      engine.notifyLocalChange('entries', { '2026-03-27': { headache: 8 } });
+
+      // REST API fails
+      global.fetch = vi.fn(() => Promise.reject(new Error('network')));
+
+      // Flush should still succeed (just without pre-merge)
+      await engine.flush();
+      expect(mockSetFn).toHaveBeenCalled();
+
+      delete global.fetch;
+    });
+  });
 });

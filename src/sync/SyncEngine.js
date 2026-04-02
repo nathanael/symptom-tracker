@@ -28,6 +28,8 @@ const DOMAIN_STORAGE_KEYS = {
 const DEBOUNCE_MS = 500;
 const INIT_TIMEOUT_MS = 3000;
 const DIRTY_EXPIRY_MS = 300000; // Dirty flags older than 5min are likely stale
+const HEARTBEAT_INTERVAL_MS = 60000; // Check listener health every 60s
+const HEARTBEAT_DEAD_MS = 120000; // Listener considered dead after 2min of silence
 
 const LOG_PREFIX = '[Sync]';
 const log = (...args) => console.log(LOG_PREFIX, ...args);
@@ -186,6 +188,10 @@ export default class SyncEngine {
     this._pollTimer = null;
     this._listenerWorking = false; // true once onSnapshot delivers server data
 
+    // Heartbeat: detect when listener dies silently
+    this._lastSnapshotTime = null; // timestamp of last received snapshot
+    this._heartbeatTimer = null;
+
     // Status change callback (for React to pick up syncing/lastSynced/syncError)
     this.onStatusChange = null;
   }
@@ -301,6 +307,7 @@ export default class SyncEngine {
               resolved = true;
               this._hasServerData = true;
               this._listenerWorking = true;
+              this._touchHeartbeat();
               this._seedVersions(data);
               this._ready = true;
               this._initializing = false;
@@ -315,6 +322,7 @@ export default class SyncEngine {
             log('Snapshot (REALTIME): versions=', versionInfo, 'fromCache=', isFromCache, 'hasPending=', hasPending, 'writeId=', data._lastWriteId);
             if (!isFromCache && !hasPending) {
               this._listenerWorking = true;
+              this._touchHeartbeat();
               this._stopPolling();
             }
             this._handleSnapshot(data, metadata);
@@ -609,6 +617,12 @@ export default class SyncEngine {
     const changes = new Map(this.pendingChanges);
     this.pendingChanges.clear();
 
+    // Safety: if we haven't received recent server data, do a pre-flush read
+    // to merge cloud data into our changes, preventing stale overwrites.
+    if (!this._hasServerData || !this._listenerWorking) {
+      await this._preFlushMerge(changes);
+    }
+
     // Build the Firestore update payload
     const payload = {};
     changes.forEach((data, domain) => {
@@ -679,6 +693,49 @@ export default class SyncEngine {
       if (this.pendingChanges.size > 0) {
         this._scheduleFlush();
       }
+    }
+  }
+
+  /**
+   * Pre-flush safety read: fetch the latest cloud data and merge into the
+   * changes we're about to flush. Prevents stale local data from overwriting
+   * fresh cloud data when the streaming listener isn't delivering updates.
+   */
+  async _preFlushMerge(changes) {
+    try {
+      const cloudData = await this._restApiGet();
+      if (!cloudData) return;
+
+      log('Pre-flush merge: got cloud data, merging into', [...changes.keys()]);
+
+      changes.forEach((localData, domain) => {
+        if (cloudData[domain] === undefined) return;
+        const decoded = decodeDomain(domain, cloudData[domain]);
+
+        if (MAP_DOMAINS.has(domain) && typeof decoded === 'object' && decoded !== null) {
+          // Cloud as base, local on top
+          changes.set(domain, { ...decoded, ...localData });
+        } else if (ARRAY_ID_DOMAINS.has(domain) && Array.isArray(decoded) && Array.isArray(localData)) {
+          // ID-based merge: cloud as base, local items win for conflicts
+          const cloudById = new Map(decoded.map(i => [i.id, i]));
+          const localById = new Map(localData.map(i => [i.id, i]));
+          const merged = new Map(cloudById);
+          localById.forEach((item, id) => merged.set(id, item));
+          changes.set(domain, [...merged.values()]);
+        }
+        // For other domains (scalars), local wins entirely — no merge needed
+
+        // Also update version to at least match cloud
+        const cloudVersion = (typeof cloudData[`_v_${domain}`] === 'number')
+          ? cloudData[`_v_${domain}`] : 0;
+        if (cloudVersion >= this.versions[domain]) {
+          this.versions[domain] = cloudVersion + 1;
+        }
+      });
+    } catch (e) {
+      log('Pre-flush merge failed (continuing with local data):', e.message);
+      // If the read fails, flush proceeds with local data only.
+      // This is acceptable — better to flush potentially stale data than lose the user's changes.
     }
   }
 
@@ -800,6 +857,9 @@ export default class SyncEngine {
    * Called after initialization completes.
    */
   _startPollingIfNeeded() {
+    // Always start heartbeat monitoring to detect listener death
+    this._startHeartbeat();
+
     if (this._listenerWorking || this._pollTimer || this._destroyed) return;
 
     const POLL_INTERVAL_MS = 30000;
@@ -850,6 +910,48 @@ export default class SyncEngine {
   }
 
   /**
+   * Start a heartbeat timer that monitors whether the streaming listener
+   * is still delivering snapshots. If no snapshot arrives within
+   * HEARTBEAT_DEAD_MS, assume the listener has died and restart polling.
+   */
+  _startHeartbeat() {
+    if (this._heartbeatTimer || this._destroyed) return;
+    this._lastSnapshotTime = Date.now();
+
+    this._heartbeatTimer = setInterval(() => {
+      if (this._destroyed) {
+        this._stopHeartbeat();
+        return;
+      }
+      if (!this._listenerWorking) return; // already polling
+
+      const elapsed = Date.now() - (this._lastSnapshotTime || 0);
+      if (elapsed >= HEARTBEAT_DEAD_MS) {
+        logWarn('Listener appears dead (no snapshot in', Math.round(elapsed / 1000), 's) — restarting polling');
+        this._listenerWorking = false;
+        this._startPollingIfNeeded();
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  /**
+   * Stop the heartbeat timer.
+   */
+  _stopHeartbeat() {
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
+  }
+
+  /**
+   * Record that a snapshot was received, resetting the heartbeat timer.
+   */
+  _touchHeartbeat() {
+    this._lastSnapshotTime = Date.now();
+  }
+
+  /**
    * Whether initialization is complete and writes are accepted.
    */
   isReady() {
@@ -870,6 +972,7 @@ export default class SyncEngine {
       this._flushTimer = null;
     }
     this._stopPolling();
+    this._stopHeartbeat();
     this.pendingChanges.clear();
   }
 }
