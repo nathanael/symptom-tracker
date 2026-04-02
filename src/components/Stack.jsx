@@ -284,8 +284,11 @@ export default function Stack({
       .filter(item => !protocolIds.has(item.id) && stackEntries[`${dateKey}-${item.id}`])
       .map(item => ({ ...item, _adHoc: true }));
 
-    return [...protocol, ...adHoc];
-  })().sort((a, b) => (a.order || 0) - (b.order || 0)).filter(item => {
+    return [
+      ...protocol.sort((a, b) => (a.order || 0) - (b.order || 0)),
+      ...adHoc.sort((a, b) => (a.order || 0) - (b.order || 0)),
+    ];
+  })().filter(item => {
     if (!searchFilter) return true;
     const s = searchFilter.toLowerCase();
     return item.name.toLowerCase().includes(s) || (item.description || '').toLowerCase().includes(s);
