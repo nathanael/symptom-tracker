@@ -1,7 +1,7 @@
 import React from 'react';
 import { getScoreColor } from '../utils/healthScore';
 
-export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGraph, onToggleGraph }) {
+export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGraph, onToggleGraph, rollingDays = 7 }) {
   const displayValue = score !== null ? score : rollingAvg;
   if (displayValue === null) return null;
 
@@ -26,7 +26,7 @@ export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGra
           <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: '#888' }}>
             Health Score
           </span>
-          <span style={{ fontSize: 10, color: '#888' }}>7d avg</span>
+          <span style={{ fontSize: 10, color: '#888' }}>{rollingDays}d avg</span>
         </div>
         <div style={{ background: '#1f2937', borderRadius: 3, height: 5, overflow: 'hidden' }}>
           <div style={{

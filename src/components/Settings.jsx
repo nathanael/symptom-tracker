@@ -77,7 +77,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '4.5.3',
+      version: '4.5.4',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -747,7 +747,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v4.5.3
+              v4.5.4
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

@@ -58,13 +58,6 @@ import SymptomGraph from './components/SymptomGraph';
 import SupplementGraph from './components/SupplementGraph';
 
 function App() {
-  // ── Performance monitor (temporary) ──
-  const _appRenderCount = useRef(0);
-  _appRenderCount.current++;
-  if (_appRenderCount.current > 3) {
-    console.warn(`[PerfMon] App render #${_appRenderCount.current}`);
-  }
-
   // App mode: 'symptoms' or 'stack'
   const [appMode, setAppMode] = useState('symptoms');
   // Protocol sub-view: 'stack' or 'inputs'
