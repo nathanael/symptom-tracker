@@ -474,7 +474,7 @@ export default function ComparisonStudio({
     return { dateLabel: 'Average', items, x: null };
   }, [crosshairData, suppTransformed, symptomTransformed, suppItem, suppUnit, symptoms, selectedSymptoms, showHealthScore, healthScoreTransformed]);
 
-  // Max offset: based on earliest data point across selected symptoms/supplement
+  // Max offset: based on earliest data point across selected symptoms/supplement/health score
   const maxOffset = useMemo(() => {
     const today = new Date();
     today.setHours(12, 0, 0, 0);
@@ -501,11 +501,19 @@ export default function ComparisonStudio({
       }
     }
 
+    // When only health score is visible, use all entry dates for navigation range
+    if (showHealthScore) {
+      for (const key of Object.keys(entries || {})) {
+        const e = entries[key];
+        if (e?.date && (!earliest || e.date < earliest)) earliest = e.date;
+      }
+    }
+
     if (!earliest) return 0;
     const earliestDate = new Date(earliest + 'T12:00:00');
     const totalDays = Math.round((today - earliestDate) / (1000 * 60 * 60 * 24));
     return Math.max(0, totalDays - timeframe);
-  }, [selectedSymptoms, selectedSupplement, entries, stackEntries, timeframe]);
+  }, [selectedSymptoms, selectedSupplement, showHealthScore, entries, stackEntries, timeframe]);
 
   // Clamp startOffset when maxOffset shrinks
   useEffect(() => { setStartOffset(prev => Math.min(prev, maxOffset)); }, [maxOffset]);
@@ -1254,9 +1262,9 @@ export default function ComparisonStudio({
           {/* Compact Health Score tile (mobile) */}
           <div style={{ marginBottom: 8 }}>
             <HealthScoreCompact
-              score={healthScore.score}
+              score={null}
               rollingAvg={healthScore.rollingAvg}
-              delta={healthScore.delta}
+              delta={null}
               rollingDays={timeframe}
             />
           </div>
@@ -1344,9 +1352,9 @@ export default function ComparisonStudio({
                   {/* Health Score Card */}
                   <div style={{ marginTop: 16 }}>
                     <HealthScoreCard
-                      score={healthScore.score}
+                      score={null}
                       rollingAvg={healthScore.rollingAvg}
-                      delta={healthScore.delta}
+                      delta={null}
                       rollingDays={timeframe}
                     />
                   </div>
