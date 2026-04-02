@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect, useReducer } from 'react';
 import { haptic } from '../utils/helpers';
 import {
   TIMEFRAMES, SMOOTH_WINDOWS,
@@ -33,6 +33,26 @@ export default function ComparisonStudio({
   isDesktop,
   setStackItems,
 }) {
+  // ── Performance monitor (temporary) ──
+  const renderCountRef = useRef(0);
+  const renderTimesRef = useRef([]);
+  const effectLogRef = useRef([]);
+  const [, forceRender] = useReducer(x => x + 1, 0);
+  const renderStart = performance.now();
+  renderCountRef.current++;
+
+  useEffect(() => {
+    const elapsed = performance.now() - renderStart;
+    renderTimesRef.current.push(elapsed);
+    if (renderTimesRef.current.length > 20) renderTimesRef.current.shift();
+    effectLogRef.current.push(`render #${renderCountRef.current}: ${elapsed.toFixed(0)}ms`);
+    if (effectLogRef.current.length > 10) effectLogRef.current.shift();
+    // If renders are happening too fast, log a warning
+    if (renderCountRef.current > 5 && renderCountRef.current % 5 === 0) {
+      console.warn(`[PerfMon] ComparisonStudio render #${renderCountRef.current}, last: ${elapsed.toFixed(0)}ms`);
+    }
+  });
+
   const todayStr = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -1405,6 +1425,21 @@ export default function ComparisonStudio({
             )}
           </div>
 
+      {/* Performance monitor overlay (temporary) */}
+      <div style={{
+        position: 'fixed', bottom: 60, right: 8, zIndex: 99999,
+        background: 'rgba(0,0,0,0.85)', color: '#0f0', fontSize: 10,
+        fontFamily: 'monospace', padding: '6px 8px', borderRadius: 6,
+        maxWidth: 220, pointerEvents: 'none', lineHeight: 1.4,
+      }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 2 }}>ComparisonStudio perf</div>
+        <div>renders: {renderCountRef.current}</div>
+        <div>last: {renderTimesRef.current.length > 0 ? renderTimesRef.current[renderTimesRef.current.length - 1].toFixed(0) : '?'}ms</div>
+        <div>avg: {renderTimesRef.current.length > 0 ? (renderTimesRef.current.reduce((a,b) => a+b, 0) / renderTimesRef.current.length).toFixed(0) : '?'}ms</div>
+        {effectLogRef.current.slice(-5).map((msg, i) => (
+          <div key={i} style={{ color: '#8f8', fontSize: 9 }}>{msg}</div>
+        ))}
+      </div>
     </div>
   );
 }

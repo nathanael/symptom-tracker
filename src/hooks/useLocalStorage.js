@@ -29,6 +29,8 @@ export function useLocalStorage(key, initialValue, onChange, isApplyingCloudRef)
       return;
     }
 
+    console.debug(`[LS] change: ${key}`);
+
     // Notify sync engine immediately (skip if this was a cloud-apply).
     // Sync engine has its own 500ms debounce for Firestore writes.
     if (onChangeRef.current && !cloudRefRef.current?.current) {
