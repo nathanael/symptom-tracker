@@ -84,8 +84,6 @@ export default function ComparisonStudio({
   // Health score shows automatically when no other series are selected
   const showHealthScore = !selectedSupplement && selectedSymptoms.length === 0;
 
-  const healthScore = useHealthScore(todayStr, { symptoms, entries, trackingMode, rollingDays: timeframe });
-
   // Auto-focus search inputs when pickers open
   useEffect(() => { if (showSupplementPicker) { setSuppSearch(''); setTimeout(() => suppSearchRef.current?.focus(), 50); } }, [showSupplementPicker]);
   useEffect(() => { if (showSymptomPicker) { setSymSearch(''); setTimeout(() => symSearchRef.current?.focus(), 50); } }, [showSymptomPicker]);
@@ -145,6 +143,10 @@ export default function ComparisonStudio({
     }
     return result;
   }, [timeframe, startOffset]);
+
+  // Use the end date of the visible window so score updates when navigating
+  const windowEndDate = dates.length > 0 ? dates[dates.length - 1] : todayStr;
+  const healthScore = useHealthScore(windowEndDate, { symptoms, entries, trackingMode, rollingDays: timeframe });
 
   const suppItem = useMemo(
     () => stackItems.find(i => i.id === selectedSupplement),
