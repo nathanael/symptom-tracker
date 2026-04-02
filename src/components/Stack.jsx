@@ -273,21 +273,11 @@ export default function Stack({
     // Unified path: reconstruct historical state first, then filter
     const withHistory = stackItems.map(item => applyHistoricalState(item, selectedDate));
 
-    // Protocol items: active on this date AND scheduled for this date
-    const protocol = withHistory
+    // Items active on this date AND scheduled for this date
+    return withHistory
       .filter(item => item.active !== false)
-      .filter(item => isScheduledForDate(item.schedule, selectedDate));
-
-    // Ad-hoc items: not in protocol but have entries for this date
-    const protocolIds = new Set(protocol.map(i => i.id));
-    const adHoc = withHistory
-      .filter(item => !protocolIds.has(item.id) && stackEntries[`${dateKey}-${item.id}`])
-      .map(item => ({ ...item, _adHoc: true }));
-
-    return [
-      ...protocol.sort((a, b) => (a.order || 0) - (b.order || 0)),
-      ...adHoc.sort((a, b) => (a.order || 0) - (b.order || 0)),
-    ];
+      .filter(item => isScheduledForDate(item.schedule, selectedDate))
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
   })().filter(item => {
     if (!searchFilter) return true;
     const s = searchFilter.toLowerCase();
@@ -295,7 +285,7 @@ export default function Stack({
   });
 
   const availableToLog = (() => {
-    // Items available for ad-hoc logging: not already displayed
+    // Items not already displayed, available for quick-logging
     // On historical days, show all supplements (including hidden) so user can log any
     const displayedIds = new Set(displayItems.map(i => i.id));
     return stackItems.filter(i => {
@@ -470,22 +460,9 @@ export default function Stack({
         const entry = getStackEntry(item.id);
         const isTaken = !!entry;
         const isEditing = editingStackItem === item.id;
-        const isFirstAdHoc = item._adHoc && (index === 0 || !displayItems[index - 1]._adHoc);
 
         return (
           <Fragment key={item.id}>
-            {isFirstAdHoc && (
-              <div style={{
-                padding: '8px 20px 4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-              }}>
-                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
-                <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.35)', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ad-hoc</span>
-                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
-              </div>
-            )}
           <div
             style={{
               background: 'transparent',
@@ -496,7 +473,7 @@ export default function Stack({
               justifyContent: 'space-between',
               gap: '16px',
               cursor: 'pointer',
-              opacity: item._adHoc ? 0.7 : 1,
+              opacity: 1,
               transition: isDesktop ? 'background 0.15s ease' : 'none',
             }}
             onMouseEnter={isDesktop ? (e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; } : undefined}
