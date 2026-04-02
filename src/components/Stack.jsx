@@ -274,9 +274,17 @@ export default function Stack({
     const withHistory = stackItems.map(item => applyHistoricalState(item, selectedDate));
 
     // Items active on this date AND scheduled for this date
-    return withHistory
+    const scheduled = withHistory
       .filter(item => item.active !== false)
-      .filter(item => isScheduledForDate(item.schedule, selectedDate))
+      .filter(item => isScheduledForDate(item.schedule, selectedDate));
+
+    // On past dates, also show items that have logged entries
+    const scheduledIds = new Set(scheduled.map(i => i.id));
+    const withEntries = !isToday
+      ? withHistory.filter(item => !scheduledIds.has(item.id) && stackEntries[`${dateKey}-${item.id}`])
+      : [];
+
+    return [...scheduled, ...withEntries]
       .sort((a, b) => (a.order || 0) - (b.order || 0));
   })().filter(item => {
     if (!searchFilter) return true;
