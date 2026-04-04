@@ -243,6 +243,24 @@ export default function ComparisonStudio({
     return { values: smoothed, dates: [...dates], labels: [...dates] };
   }, [showHealthScore, symptoms, entries, dates, trackingMode, windowSize]);
 
+  // Health score values for touch-inspect (always computed, independent of showHealthScore toggle)
+  const hsInspectValues = useMemo(() => {
+    const raw = getHealthScoreSeries(symptoms, entries, dates, trackingMode);
+    const filled = interpolateSmallGaps(raw);
+    return windowSize > 1 ? smooth(filled, windowSize) : [...filled];
+  }, [symptoms, entries, dates, trackingMode, windowSize]);
+
+  const hsInspectValue = useMemo(() => {
+    if (touchX === null || !hsInspectValues) return null;
+    const v = hsInspectValues[touchX];
+    return v !== null && v !== undefined ? Math.round(v) : null;
+  }, [touchX, hsInspectValues]);
+
+  const hsInspectLabel = useMemo(() => {
+    if (touchX === null || !dates[touchX]) return null;
+    return formatXLabel(dates[touchX], timeframe);
+  }, [touchX, dates, timeframe]);
+
   // Dynamic Y-axis range for health score (rounded to nearest 10)
   const hsYRange = useMemo(() => {
     if (!healthScoreTransformed) return null;
@@ -1268,6 +1286,8 @@ export default function ComparisonStudio({
               rollingAvg={healthScore.rollingAvg}
               delta={null}
               rollingDays={timeframe}
+              inspectValue={hsInspectValue}
+              inspectLabel={hsInspectLabel}
             />
           </div>
 

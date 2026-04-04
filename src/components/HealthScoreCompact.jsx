@@ -1,8 +1,9 @@
 import React from 'react';
 import { getScoreColor } from '../utils/healthScore';
 
-export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGraph, onToggleGraph, rollingDays = 7 }) {
-  const displayValue = score !== null ? score : rollingAvg;
+export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGraph, onToggleGraph, rollingDays = 7, inspectValue, inspectLabel }) {
+  const isInspecting = inspectValue !== undefined && inspectValue !== null;
+  const displayValue = isInspecting ? inspectValue : (score !== null ? score : rollingAvg);
   if (displayValue === null) return null;
 
   const color = getScoreColor(displayValue);
@@ -18,7 +19,7 @@ export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGra
         gap: 12,
       }}
     >
-      <span style={{ fontSize: 24, fontWeight: 700, color, flexShrink: 0 }}>
+      <span style={{ fontSize: 24, fontWeight: 700, color, flexShrink: 0, transition: 'color 0.15s ease' }}>
         {displayValue}%
       </span>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -26,7 +27,9 @@ export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGra
           <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: '#888' }}>
             Health Score
           </span>
-          <span style={{ fontSize: 10, color: '#888' }}>{rollingDays}d avg</span>
+          <span style={{ fontSize: 10, color: isInspecting ? '#bbb' : '#888', transition: 'color 0.15s ease' }}>
+            {isInspecting ? inspectLabel : `${rollingDays}d avg`}
+          </span>
         </div>
         <div style={{ background: '#1f2937', borderRadius: 3, height: 5, overflow: 'hidden' }}>
           <div style={{
