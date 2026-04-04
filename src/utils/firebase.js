@@ -62,15 +62,10 @@ export const initFirebase = async () => {
 
     await firebaseAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
-    try {
-      await firebaseDb.enablePersistence({ synchronizeTabs: true });
-    } catch (err) {
-      if (err.code === 'failed-precondition') {
-        console.log('Firestore persistence failed: multiple tabs open');
-      } else if (err.code === 'unimplemented') {
-        console.log('Firestore persistence not supported in this browser');
-      }
-    }
+    // Firestore persistence (IndexedDB) intentionally disabled.
+    // The app uses localStorage for all local persistence.
+    // Firestore's IndexedDB operations block iOS Safari's main thread
+    // for 10-30+ seconds, causing the app to freeze.
 
     return { auth: firebaseAuth, db: firebaseDb, provider: googleProvider };
   } catch (error) {

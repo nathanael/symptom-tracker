@@ -41,24 +41,40 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
 
     // Bail-out helpers: return prev when merge produces identical data,
     // avoiding new object references that cascade re-renders.
+    // Uses JSON.stringify (native C++) for fast deep comparison.
+    const jsonEqual = (a, b) => {
+      if (a === b) return true;
+      return JSON.stringify(a) === JSON.stringify(b);
+    };
+
     const mergeMap = (prev, cloud) => {
-      const merged = { ...prev, ...cloud };
+      // Quick check: if cloud adds no new keys and all values match, bail out
+      const cloudKeys = Object.keys(cloud);
       const prevKeys = Object.keys(prev);
-      if (prevKeys.length === Object.keys(merged).length &&
-          prevKeys.every(k => prev[k] === merged[k])) return prev;
+      // If cloud is a subset of prev with same values, no change
+      if (cloudKeys.every(k => k in prev) && prevKeys.length >= cloudKeys.length) {
+        // Only deep-compare cloud keys (not all prev keys)
+        if (cloudKeys.every(k => jsonEqual(prev[k], cloud[k]))) return prev;
+      }
+      const merged = { ...prev, ...cloud };
       return merged;
     };
 
     const mergeArrayById = (prev, cloud) => {
       if (!prev || !Array.isArray(prev)) return cloud;
+      // Quick length + id check before expensive merge
+      if (prev.length === cloud.length) {
+        const prevById = new Map(prev.map(i => [i.id, i]));
+        if (cloud.every(item => {
+          const existing = prevById.get(item.id);
+          return existing && jsonEqual(existing, item);
+        })) return prev;
+      }
       const cloudById = new Map(cloud.map(i => [i.id, i]));
       const localById = new Map(prev.map(i => [i.id, i]));
       const merged = new Map(cloudById);
       localById.forEach((item, id) => { if (!merged.has(id)) merged.set(id, item); });
-      const result = [...merged.values()];
-      if (result.length === prev.length &&
-          result.every((item, i) => item === prev[i])) return prev;
-      return result;
+      return [...merged.values()];
     };
 
     if (updates.symptoms && setters.symptoms) {
