@@ -239,14 +239,14 @@ export default function ComparisonStudio({
     if (!showHealthScore) return null;
     const raw = getHealthScoreSeries(symptoms, entries, dates, trackingMode);
     const filled = interpolateSmallGaps(raw);
-    const smoothed = windowSize > 1 ? smooth(filled, windowSize) : [...filled];
-    return { values: smoothed, dates: [...dates], labels: [...dates] };
-  }, [showHealthScore, symptoms, entries, dates, trackingMode, windowSize]);
+    return { values: filled, dates: [...dates], labels: [...dates] };
+  }, [showHealthScore, symptoms, entries, dates, trackingMode]);
 
-  // Raw (unsmoothed) health score values for touch-inspect — shows actual day's score
+  // Raw (unsmoothed) health score values for touch-inspect — actual day's score
   const hsInspectValues = useMemo(() => {
+    if (!showHealthScore) return null;
     return getHealthScoreSeries(symptoms, entries, dates, trackingMode);
-  }, [symptoms, entries, dates, trackingMode]);
+  }, [showHealthScore, symptoms, entries, dates, trackingMode]);
 
   const hsInspectValue = useMemo(() => {
     if (touchX === null || !hsInspectValues) return null;
@@ -439,8 +439,8 @@ export default function ComparisonStudio({
         unit: '/5',
       });
     });
-    if (showHealthScore && healthScoreTransformed) {
-      const hsVal = healthScoreTransformed.values[touchX];
+    if (showHealthScore && hsInspectValues) {
+      const hsVal = hsInspectValues[touchX];
       if (hsVal !== null && hsVal !== undefined) {
         items.push({
           name: 'Health Score',
@@ -452,7 +452,7 @@ export default function ComparisonStudio({
     }
     const x = suppX || (suppPoints ? null : padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW);
     return { dateLabel, items, x };
-  }, [touchX, dates, suppDoseDaily, suppPoints, symptomTransformed, symptoms, selectedSymptoms, timeframe, chartW, suppItem, suppUnit, showHealthScore, healthScoreTransformed]);
+  }, [touchX, dates, suppDoseDaily, suppPoints, symptomTransformed, symptoms, selectedSymptoms, timeframe, chartW, suppItem, suppUnit, showHealthScore, hsInspectValues]);
 
   // Legend: show crosshair values when hovering, averages otherwise
   const legendItems = useMemo(() => {
@@ -1376,6 +1376,8 @@ export default function ComparisonStudio({
                       rollingAvg={healthScore.rollingAvg}
                       delta={null}
                       rollingDays={timeframe}
+                      inspectValue={hsInspectValue}
+                      inspectLabel={hsInspectLabel}
                     />
                   </div>
 

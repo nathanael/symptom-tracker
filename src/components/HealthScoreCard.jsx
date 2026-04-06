@@ -1,12 +1,13 @@
 import React from 'react';
 import { getScoreColor } from '../utils/healthScore';
 
-export default function HealthScoreCard({ score, rollingAvg, delta, showOnGraph, onToggleGraph, rollingDays = 7 }) {
-  const displayValue = score !== null ? score : rollingAvg;
+export default function HealthScoreCard({ score, rollingAvg, delta, showOnGraph, onToggleGraph, rollingDays = 7, inspectValue, inspectLabel }) {
+  const isInspecting = inspectValue !== undefined && inspectValue !== null;
+  const displayValue = isInspecting ? inspectValue : (score !== null ? score : rollingAvg);
   if (displayValue === null) return null;
 
   const color = getScoreColor(displayValue);
-  const isUsingAvg = score === null;
+  const isUsingAvg = score === null && !isInspecting;
 
   return (
     <div style={{
@@ -29,7 +30,10 @@ export default function HealthScoreCard({ score, rollingAvg, delta, showOnGraph,
             )}
           </div>
         </div>
-        {!isUsingAvg && rollingAvg !== null && (
+        {isInspecting && (
+          <div style={{ fontSize: 11, color: '#bbb' }}>{inspectLabel}</div>
+        )}
+        {!isInspecting && !isUsingAvg && rollingAvg !== null && (
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 11, color: '#888' }}>{rollingDays}d avg</div>
             <div style={{ fontSize: 18, fontWeight: 600, color: '#94a3b8', marginTop: 2 }}>
@@ -37,7 +41,7 @@ export default function HealthScoreCard({ score, rollingAvg, delta, showOnGraph,
             </div>
           </div>
         )}
-        {isUsingAvg && (
+        {!isInspecting && isUsingAvg && (
           <div style={{ fontSize: 11, color: '#666' }}>{rollingDays}d avg</div>
         )}
       </div>

@@ -45,7 +45,7 @@ export function getDailyValue(entries, dateKey, symptomId, trackingMode) {
   }
 }
 
-export const SMOOTH_WINDOWS = { 7: 2, 30: 3, 90: 5, 180: 10 };
+export const SMOOTH_WINDOWS = { 7: 2, 30: 5, 90: 10, 180: 14 };
 
 export function generateDateRange(days) {
   const dates = [];
@@ -117,12 +117,67 @@ export function getXLabelInterval(timeframe) {
 
 // Build SVG path that breaks on null gaps
 export function buildPath(points) {
-  let d = '';
-  let drawing = false;
+  // Split into contiguous segments (break on null y)
+  const segments = [];
+  let seg = [];
   for (const pt of points) {
-    if (pt.y === null) { drawing = false; continue; }
-    if (!drawing) { d += `M${pt.x},${pt.y}`; drawing = true; }
-    else { d += `L${pt.x},${pt.y}`; }
+    if (pt.y === null) {
+      if (seg.length) { segments.push(seg); seg = []; }
+    } else {
+      seg.push(pt);
+    }
+  }
+  if (seg.length) segments.push(seg);
+
+  let d = '';
+  for (const pts of segments) {
+    if (pts.length === 0) continue;
+    d += `M${pts[0].x},${pts[0].y}`;
+    if (pts.length === 1) continue;
+    if (pts.length === 2) {
+      d += `L${pts[1].x},${pts[1].y}`;
+      continue;
+    }
+    // Monotone cubic Hermite spline (Fritsch–Carlson)
+    const n = pts.length;
+    const dx = [], dy = [], m = [];
+    for (let i = 0; i < n - 1; i++) {
+      dx.push(pts[i + 1].x - pts[i].x);
+      dy.push(pts[i + 1].y - pts[i].y);
+      m.push(dy[i] / dx[i]);
+    }
+    const tangents = [m[0]];
+    for (let i = 1; i < n - 1; i++) {
+      if (m[i - 1] * m[i] <= 0) {
+        tangents.push(0);
+      } else {
+        tangents.push((m[i - 1] + m[i]) / 2);
+      }
+    }
+    tangents.push(m[n - 2]);
+    // Fritsch–Carlson monotonicity correction
+    for (let i = 0; i < n - 1; i++) {
+      if (Math.abs(m[i]) < 1e-10) {
+        tangents[i] = 0;
+        tangents[i + 1] = 0;
+      } else {
+        const a = tangents[i] / m[i];
+        const b = tangents[i + 1] / m[i];
+        const s = a * a + b * b;
+        if (s > 9) {
+          const t = 3 / Math.sqrt(s);
+          tangents[i] = t * a * m[i];
+          tangents[i + 1] = t * b * m[i];
+        }
+      }
+    }
+    for (let i = 0; i < n - 1; i++) {
+      const c1x = pts[i].x + dx[i] / 3;
+      const c1y = pts[i].y + tangents[i] * dx[i] / 3;
+      const c2x = pts[i + 1].x - dx[i] / 3;
+      const c2y = pts[i + 1].y - tangents[i + 1] * dx[i] / 3;
+      d += `C${c1x},${c1y},${c2x},${c2y},${pts[i + 1].x},${pts[i + 1].y}`;
+    }
   }
   return d;
 }
