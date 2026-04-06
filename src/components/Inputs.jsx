@@ -850,7 +850,7 @@ export default function Inputs({
             textTransform: 'uppercase',
             letterSpacing: '1px',
           }}>
-            Other Inputs
+            Other Factors
           </span>
         </div>
       )}

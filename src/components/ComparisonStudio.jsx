@@ -243,12 +243,10 @@ export default function ComparisonStudio({
     return { values: smoothed, dates: [...dates], labels: [...dates] };
   }, [showHealthScore, symptoms, entries, dates, trackingMode, windowSize]);
 
-  // Health score values for touch-inspect (always computed, independent of showHealthScore toggle)
+  // Raw (unsmoothed) health score values for touch-inspect — shows actual day's score
   const hsInspectValues = useMemo(() => {
-    const raw = getHealthScoreSeries(symptoms, entries, dates, trackingMode);
-    const filled = interpolateSmallGaps(raw);
-    return windowSize > 1 ? smooth(filled, windowSize) : [...filled];
-  }, [symptoms, entries, dates, trackingMode, windowSize]);
+    return getHealthScoreSeries(symptoms, entries, dates, trackingMode);
+  }, [symptoms, entries, dates, trackingMode]);
 
   const hsInspectValue = useMemo(() => {
     if (touchX === null || !hsInspectValues) return null;
@@ -304,7 +302,7 @@ export default function ComparisonStudio({
   }, [timeframe, startOffset]);
 
   const insightData = useMemo(() => {
-    if (!primarySeriesId) return null;
+    if (!primarySeriesId || showHealthScore) return null;
 
     const buildStats = (id, isSymptom) => {
       let extSeries;
@@ -333,7 +331,7 @@ export default function ComparisonStudio({
     return insight ? { ...insight, secondaryStats } : null;
   }, [primarySeriesId, primaryIsSymptom, selectedSupplement, selectedSymptoms,
       stackEntries, stackItems, entries, symptoms, trackingMode,
-      extendedDates, timeframe, windowSize]);
+      extendedDates, timeframe, windowSize, showHealthScore]);
 
   // ── Chart points ──
 

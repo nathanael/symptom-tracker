@@ -45,7 +45,7 @@ export function getDailyValue(entries, dateKey, symptomId, trackingMode) {
   }
 }
 
-export const SMOOTH_WINDOWS = { 7: 2, 30: 5, 90: 10, 180: 14 };
+export const SMOOTH_WINDOWS = { 7: 2, 30: 3, 90: 5, 180: 10 };
 
 export function generateDateRange(days) {
   const dates = [];
