@@ -309,14 +309,15 @@ export default function ComparisonStudio({
   // ── Level segments & insight data ──
 
   const primaryIsSymptom = selectedSymptoms.includes(primarySeriesId);
-  const primaryIsSupplement = primarySeriesId === selectedSupplement;
+  const primaryIsSupplement = selectedSupplements.includes(primarySeriesId);
 
   const primaryDailyValues = useMemo(() => {
-    if (primaryIsSupplement && suppDoseDaily) return suppDoseDaily;
+    const suppIdx = selectedSupplements.indexOf(primarySeriesId);
+    if (suppIdx >= 0 && suppDoseSeries[suppIdx]) return suppDoseSeries[suppIdx];
     const symIdx = selectedSymptoms.indexOf(primarySeriesId);
     if (symIdx >= 0 && symptomTransformed[symIdx]) return symptomTransformed[symIdx].smoothed;
     return null;
-  }, [primarySeriesId, primaryIsSupplement, suppDoseDaily, selectedSymptoms, symptomTransformed]);
+  }, [primarySeriesId, selectedSupplements, suppDoseSeries, selectedSymptoms, symptomTransformed]);
 
   const levels = useMemo(() => {
     if (!primaryDailyValues) return [];
@@ -340,7 +341,7 @@ export default function ComparisonStudio({
 
     const buildStats = (id, isSymptom) => {
       let extSeries;
-      if (id === selectedSupplement) {
+      if (selectedSupplements.includes(id)) {
         extSeries = getSupplementDoseSeries(stackEntries, stackItems, id, extendedDates).map(v => v === null ? 0 : v);
       } else {
         extSeries = interpolateSmallGaps(getSymptomDailySeries(entries, id, extendedDates, trackingMode));
@@ -357,13 +358,13 @@ export default function ComparisonStudio({
     };
 
     const primaryStats = buildStats(primarySeriesId, primaryIsSymptom);
-    const secondaryIds = [selectedSupplement, ...selectedSymptoms].filter(id => id && id !== primarySeriesId);
+    const secondaryIds = [...selectedSupplements, ...selectedSymptoms].filter(id => id && id !== primarySeriesId);
     const secondaryStats = secondaryIds.map(id => buildStats(id, selectedSymptoms.includes(id)));
 
     const tfLabel = timeframe <= 7 ? 'week' : timeframe <= 30 ? 'month' : '6 months';
     const insight = computeInsight(primaryStats, secondaryStats, { timeframeLabel: tfLabel });
     return insight ? { ...insight, secondaryStats } : null;
-  }, [primarySeriesId, primaryIsSymptom, selectedSupplement, selectedSymptoms,
+  }, [primarySeriesId, primaryIsSymptom, selectedSupplements, selectedSymptoms,
       stackEntries, stackItems, entries, symptoms, trackingMode,
       extendedDates, timeframe, windowSize, showHealthScore]);
 
@@ -541,9 +542,9 @@ export default function ComparisonStudio({
       }
     }
 
-    if (selectedSupplement) {
+    for (const suppId of selectedSupplements) {
       for (const key of Object.keys(stackEntries || {})) {
-        if (key.endsWith(`-${selectedSupplement}`)) {
+        if (key.endsWith(`-${suppId}`)) {
           const e = stackEntries[key];
           if (e?.taken) {
             const dateStr = key.slice(0, 10);
@@ -565,7 +566,7 @@ export default function ComparisonStudio({
     const earliestDate = new Date(earliest + 'T12:00:00');
     const totalDays = Math.round((today - earliestDate) / (1000 * 60 * 60 * 24));
     return Math.max(0, totalDays - timeframe);
-  }, [selectedSymptoms, selectedSupplement, showHealthScore, entries, stackEntries, timeframe]);
+  }, [selectedSymptoms, selectedSupplements, showHealthScore, entries, stackEntries, timeframe]);
 
   // Clamp startOffset when maxOffset shrinks
   useEffect(() => { setStartOffset(prev => Math.min(prev, maxOffset)); }, [maxOffset]);
