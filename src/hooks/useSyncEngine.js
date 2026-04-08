@@ -38,6 +38,14 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     }
 
     const setters = settersRef.current;
+    const engine = engineRef.current;
+
+    // Check if a domain has pending local changes that haven't been flushed yet.
+    // When NO pending changes exist, cloud data is authoritative (replacement) —
+    // this allows deletions (merged supplements, deleted items) to propagate.
+    // When pending changes DO exist, use additive merge to preserve local edits.
+    const hasPending = (domain) =>
+      engine && (engine.pendingChanges.has(domain) || engine._dirtyDomains.has(domain));
 
     // Bail-out helpers: return prev when merge produces identical data,
     // avoiding new object references that cascade re-renders.
@@ -47,22 +55,28 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       return JSON.stringify(a) === JSON.stringify(b);
     };
 
-    const mergeMap = (prev, cloud) => {
-      // Quick check: if cloud adds no new keys and all values match, bail out
+    const mergeMap = (prev, cloud, pending) => {
+      if (!pending) {
+        // Cloud-authoritative: replace entirely (allows key deletions to propagate)
+        return jsonEqual(prev, cloud) ? prev : cloud;
+      }
+      // Additive merge: preserve local keys, cloud overlays
       const cloudKeys = Object.keys(cloud);
       const prevKeys = Object.keys(prev);
-      // If cloud is a subset of prev with same values, no change
       if (cloudKeys.every(k => k in prev) && prevKeys.length >= cloudKeys.length) {
-        // Only deep-compare cloud keys (not all prev keys)
         if (cloudKeys.every(k => jsonEqual(prev[k], cloud[k]))) return prev;
       }
       const merged = { ...prev, ...cloud };
       return merged;
     };
 
-    const mergeArrayById = (prev, cloud) => {
+    const mergeArrayById = (prev, cloud, pending) => {
       if (!prev || !Array.isArray(prev)) return cloud;
-      // Quick length + id check before expensive merge
+      if (!pending) {
+        // Cloud-authoritative: replace entirely (allows item deletions to propagate)
+        return jsonEqual(prev, cloud) ? prev : cloud;
+      }
+      // Additive merge: cloud base + local-only items preserved
       if (prev.length === cloud.length) {
         const prevById = new Map(prev.map(i => [i.id, i]));
         if (cloud.every(item => {
@@ -78,23 +92,23 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     };
 
     if (updates.symptoms && setters.symptoms) {
-      setters.symptoms(prev => mergeArrayById(prev, updates.symptoms));
+      setters.symptoms(prev => mergeArrayById(prev, updates.symptoms, hasPending('symptoms')));
     }
 
     if (updates.entries && setters.entries) {
-      setters.entries(prev => mergeMap(prev, updates.entries));
+      setters.entries(prev => mergeMap(prev, updates.entries, hasPending('entries')));
     }
 
     if (updates.dailyNotes && setters.dailyNotes) {
-      setters.dailyNotes(prev => mergeMap(prev, updates.dailyNotes));
+      setters.dailyNotes(prev => mergeMap(prev, updates.dailyNotes, hasPending('dailyNotes')));
     }
 
     if (updates.stackItems && setters.stackItems) {
-      setters.stackItems(prev => mergeArrayById(prev, updates.stackItems));
+      setters.stackItems(prev => mergeArrayById(prev, updates.stackItems, hasPending('stackItems')));
     }
 
     if (updates.stackEntries && setters.stackEntries) {
-      setters.stackEntries(prev => mergeMap(prev, updates.stackEntries));
+      setters.stackEntries(prev => mergeMap(prev, updates.stackEntries, hasPending('stackEntries')));
     }
 
     if (updates.trackingMode && setters.trackingMode) {
@@ -111,11 +125,11 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     }
 
     if (updates.inputItems && setters.inputItems) {
-      setters.inputItems(prev => mergeArrayById(prev, updates.inputItems));
+      setters.inputItems(prev => mergeArrayById(prev, updates.inputItems, hasPending('inputItems')));
     }
 
     if (updates.inputEntries && setters.inputEntries) {
-      setters.inputEntries(prev => mergeMap(prev, updates.inputEntries));
+      setters.inputEntries(prev => mergeMap(prev, updates.inputEntries, hasPending('inputEntries')));
     }
 
     // No timer-based reset here. The ref is reset by a useEffect in App.jsx
@@ -156,7 +170,7 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
         if (Object.keys(domains).length > 0) {
           applyCloudData(domains, true);
         }
-        const ts = serverData.updatedAt?.toDate();
+        const ts = (typeof serverData.updatedAt?.toDate === 'function') ? serverData.updatedAt.toDate() : null;
         if (ts) {
           setSyncStatus(prev => ({ ...prev, lastSynced: ts }));
         }
