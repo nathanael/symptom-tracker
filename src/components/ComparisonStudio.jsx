@@ -609,11 +609,6 @@ export default function ComparisonStudio({
   const showDots = timeframe <= 7;
 
   // ── Supplement picker panel ──
-  const selectSupplement = (suppId) => {
-    setSelectedSupplement(prev => prev === suppId ? '' : suppId);
-    haptic('light');
-  };
-
   const supplementPickerPanel = showSupplementPicker ? (
     <div
       onClick={() => setShowSupplementPicker(false)}
@@ -649,7 +644,7 @@ export default function ComparisonStudio({
           flexShrink: 0,
         }}>
           <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
-            Select Supplement
+            Select Supplements
           </h3>
           <button
             onClick={() => setShowSupplementPicker(false)}
@@ -670,7 +665,7 @@ export default function ComparisonStudio({
               if (e.key === 'Escape') { e.stopPropagation(); if (suppSearch) setSuppSearch(''); else setShowSupplementPicker(false); }
               if (e.key === 'Enter') {
                 const filtered = allSupplements.filter(s => s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
-                if (filtered.length === 1) { selectSupplement(filtered[0].id); setShowSupplementPicker(false); }
+                if (filtered.length === 1) { toggleSupplement(filtered[0].id); }
               }
             }}
             placeholder="Search supplements..."
@@ -681,6 +676,13 @@ export default function ComparisonStudio({
               boxSizing: 'border-box',
             }}
           />
+          {selectedSupplements.length >= 3 && (
+            <div style={{
+              padding: '0 0 10px', color: '#6b7280', fontSize: '12px', textAlign: 'center',
+            }}>
+              Max 3 supplements selected
+            </div>
+          )}
           <div style={{
             display: 'grid',
             gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : '1fr',
@@ -690,53 +692,58 @@ export default function ComparisonStudio({
               const filtered = allSupplements.filter(s => !suppSearch || s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
               const autoSelected = filtered.length === 1;
               return filtered.map(supp => {
-              const isSelected = selectedSupplement === supp.id;
-              const highlighted = isSelected || autoSelected;
-              return (
-                <button
-                  key={supp.id}
-                  onClick={() => { selectSupplement(supp.id); setShowSupplementPicker(false); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '10px 12px', minWidth: 0,
-                    borderRadius: '8px',
-                    background: highlighted ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
-                    border: highlighted ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.06)',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <span style={{
-                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                    background: highlighted ? SUPP_COLOR : '#4b5563',
-                  }} />
-                  <span style={{
-                    flex: 1, minWidth: 0,
-                    display: 'flex', flexDirection: 'column',
-                  }}>
+                const isSelected = selectedSupplements.includes(supp.id);
+                const styleIdx = selectedSupplements.indexOf(supp.id);
+                const atMax = selectedSupplements.length >= 3 && !isSelected;
+                const highlighted = isSelected || autoSelected;
+                const dotColor = isSelected ? SUPPLEMENT_STYLES[styleIdx].color : autoSelected ? SUPP_COLOR : '#4b5563';
+                const borderColor = isSelected ? SUPPLEMENT_STYLES[styleIdx].chipBorder : autoSelected ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.06)';
+                return (
+                  <button
+                    key={supp.id}
+                    onClick={() => toggleSupplement(supp.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '10px 12px', minWidth: 0,
+                      borderRadius: '8px',
+                      background: highlighted ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${borderColor}`,
+                      cursor: atMax ? 'default' : 'pointer',
+                      opacity: atMax ? 0.35 : 1,
+                      textAlign: 'left',
+                    }}
+                  >
                     <span style={{
-                      color: highlighted ? '#e5e7eb' : '#9ca3af',
-                      fontSize: '13px', fontWeight: highlighted ? '500' : '400',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                      background: dotColor,
+                    }} />
+                    <span style={{
+                      flex: 1, minWidth: 0,
+                      display: 'flex', flexDirection: 'column',
                     }}>
-                      {supp.name}
-                    </span>
-                    {supp.description && (
                       <span style={{
-                        color: highlighted ? '#9ca3af' : '#6b7280',
-                        fontSize: '11px', fontWeight: '400',
+                        color: highlighted ? '#e5e7eb' : '#9ca3af',
+                        fontSize: '13px', fontWeight: highlighted ? '500' : '400',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
-                        {supp.description}
+                        {supp.name}
                       </span>
+                      {supp.description && (
+                        <span style={{
+                          color: highlighted ? '#9ca3af' : '#6b7280',
+                          fontSize: '11px', fontWeight: '400',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {supp.description}
+                        </span>
+                      )}
+                    </span>
+                    {highlighted && (
+                      <span style={{ color: isSelected ? SUPPLEMENT_STYLES[styleIdx].color : SUPP_COLOR, fontSize: '14px', flexShrink: 0 }}>✓</span>
                     )}
-                  </span>
-                  {highlighted && (
-                    <span style={{ color: SUPP_COLOR, fontSize: '14px', flexShrink: 0 }}>✓</span>
-                  )}
-                </button>
-              );
-            });
+                  </button>
+                );
+              });
             })()}
           </div>
         </div>
