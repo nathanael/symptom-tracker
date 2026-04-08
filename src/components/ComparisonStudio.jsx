@@ -466,8 +466,6 @@ export default function ComparisonStudio({
     if (touchX === null) return null;
 
     const dateLabel = formatXLabel(dates[touchX], timeframe);
-    const suppVal = suppDoseDaily ? suppDoseDaily[touchX] : null;
-    const suppX = suppPoints ? suppPoints[touchX]?.x : null;
     const symptomVals = symptomTransformed.map((sd, idx) => ({
       val: sd.smoothed[touchX],
       color: SYMPTOM_STYLES[idx].color,
@@ -475,9 +473,19 @@ export default function ComparisonStudio({
     }));
 
     const items = [];
-    if (suppPoints) {
-      items.push({ name: suppItem?.name, color: SUPP_COLOR, val: suppVal, unit: suppUnit });
-    }
+    // Add all selected supplements
+    selectedSupplements.forEach((suppId, idx) => {
+      const item = suppItems[idx];
+      const daily = suppDoseSeries[idx];
+      const val = daily ? daily[touchX] : null;
+      items.push({
+        name: item?.name,
+        color: SUPPLEMENT_STYLES[idx].color,
+        val,
+        unit: item?.unit || 'mg',
+      });
+    });
+    // Add all selected symptoms
     selectedSymptoms.forEach((symId, idx) => {
       const sym = symptoms.find(s => s.id === symId);
       items.push({
@@ -498,9 +506,10 @@ export default function ComparisonStudio({
         });
       }
     }
-    const x = suppX || (suppPoints ? null : padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW);
+    const firstSuppPts = suppPointSets[0];
+    const x = firstSuppPts ? firstSuppPts[touchX]?.x : padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW;
     return { dateLabel, items, x };
-  }, [touchX, dates, suppDoseDaily, suppPoints, symptomTransformed, symptoms, selectedSymptoms, timeframe, chartW, suppItem, suppUnit, showHealthScore, hsInspectValues]);
+  }, [touchX, dates, suppDoseSeries, suppPointSets, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, timeframe, chartW, showHealthScore, hsInspectValues, padLeft]);
 
   // Legend: show crosshair values when hovering, averages otherwise
   const legendItems = useMemo(() => {
@@ -510,11 +519,17 @@ export default function ComparisonStudio({
       return valid.length > 0 ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
     };
     const items = [];
-    if (suppTransformed) {
-      const vals = suppTransformed.values.filter(v => v !== null && v > 0);
-      const suppAvg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-      items.push({ name: suppItem?.name, color: SUPP_COLOR, val: suppAvg, unit: suppUnit });
-    }
+    // All selected supplements
+    selectedSupplements.forEach((suppId, idx) => {
+      const st = suppTransformedSeries[idx];
+      const item = suppItems[idx];
+      if (st) {
+        const vals = st.values.filter(v => v !== null && v > 0);
+        const suppAvg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+        items.push({ name: item?.name, color: SUPPLEMENT_STYLES[idx].color, val: suppAvg, unit: item?.unit || 'mg' });
+      }
+    });
+    // All selected symptoms
     selectedSymptoms.forEach((symId, idx) => {
       const sd = symptomTransformed[idx];
       if (sd) {
@@ -538,7 +553,7 @@ export default function ComparisonStudio({
       });
     }
     return { dateLabel: 'Average', items, x: null };
-  }, [crosshairData, suppTransformed, symptomTransformed, suppItem, suppUnit, symptoms, selectedSymptoms, showHealthScore, healthScoreTransformed]);
+  }, [crosshairData, suppTransformedSeries, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, showHealthScore, healthScoreTransformed]);
 
   // Max offset: based on earliest data point across selected symptoms/supplement/health score
   const maxOffset = useMemo(() => {
