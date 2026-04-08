@@ -63,6 +63,10 @@ Same pattern as `toggleSymptom()` / `removeSymptom()`.
 
 **`showHealthScore` condition**: Changes from `!selectedSupplement && ...` to `selectedSupplements.length === 0 && ...`.
 
+**`suppYMax`**: Derived from the primary supplement's data only. Secondary supplements are scaled to the primary's range.
+
+**Tooltip values**: Secondary supplements display their original (un-scaled) dose values in the tooltip, not the scaled overlay values.
+
 ### 5. Y-Axis Scaling
 
 When a supplement is primary:
@@ -105,7 +109,7 @@ Existing supplement picker changes from radio-style (click replaces selection) t
 
 localStorage key `comparisonStudioSelections` changes:
 - `supplement` (string) → `supplements` (string array)
-- Migration: if old `supplement` key found on load, convert to `[supplement]`
+- Migration: if old `supplement` key found on load, convert to `[supplement]` (guard against null/empty string → `[]`)
 - Validation on load filters out supplements that no longer exist in `stackItems`
 
 ### 10. Primary Series
