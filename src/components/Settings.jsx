@@ -57,9 +57,19 @@ export default function Settings({
   const [mergeStrategy, setMergeStrategy] = useState('sum');
   const [confirmMerge, setConfirmMerge] = useState(false);
 
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameTarget, setRenameTarget] = useState('');
+  const [renameValue, setRenameValue] = useState('');
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const mergePreview = (mergeTarget && mergeSource && mergeTarget !== mergeSource)
     ? previewMerge(stackEntries, mergeTarget, mergeSource)
     : null;
+
+  const deletePreview = deleteTarget ? previewDelete(stackEntries, deleteTarget) : null;
 
   const fileInputRef = useRef(null);
 
@@ -858,6 +868,7 @@ export default function Settings({
               width: '100%',
               background: 'transparent',
               border: 'none',
+              borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
               padding: '14px 16px',
               color: '#a5b4fc',
               fontSize: '15px',
@@ -867,6 +878,39 @@ export default function Settings({
           >
             <div>Merge Supplements</div>
             <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Combine duplicate supplements into one</div>
+          </button>
+          <button
+            onClick={() => { setShowRenameModal(true); setRenameTarget(''); setRenameValue(''); haptic('light'); }}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
+              padding: '14px 16px',
+              color: '#a5b4fc',
+              fontSize: '15px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <div>Rename Supplement</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Change a supplement's display name</div>
+          </button>
+          <button
+            onClick={() => { setShowDeleteModal(true); setDeleteTarget(''); setConfirmDelete(false); haptic('light'); }}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              padding: '14px 16px',
+              color: '#fca5a5',
+              fontSize: '15px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <div>Delete Supplement</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Permanently remove a supplement and all its entries</div>
           </button>
         </div>
 
@@ -1007,8 +1051,8 @@ export default function Settings({
                     const sourceName = (stackItems || []).find(i => i.id === mergeSource)?.name;
                     const targetName = (stackItems || []).find(i => i.id === mergeTarget)?.name;
                     const result = mergeSupplements(stackItems, stackEntries, mergeTarget, mergeSource, mergeStrategy);
-                    setStackItems(result.stackItems);
-                    setStackEntries(result.stackEntries);
+                    setStackItems(() => result.stackItems);
+                    setStackEntries(() => result.stackEntries);
                     setShowMergeModal(false);
                     setLastAction(`Merged "${sourceName}" into "${targetName}" (${mergePreview?.sourceEntryCount || 0} entries moved)`);
                     haptic('success');
@@ -1024,6 +1068,211 @@ export default function Settings({
                   }}
                 >
                   {confirmMerge ? 'Confirm Merge' : 'Merge'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showRenameModal && (
+          <div
+            onClick={() => setShowRenameModal(false)}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.85)',
+              zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '20px',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: '400px',
+                background: 'rgba(15,17,21,0.95)',
+                borderRadius: '12px',
+                border: '1px solid rgba(139,92,246,0.3)',
+                padding: '20px',
+              }}
+            >
+              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
+                Rename Supplement
+              </h3>
+
+              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+                Supplement
+              </label>
+              <select
+                value={renameTarget}
+                onChange={(e) => {
+                  setRenameTarget(e.target.value);
+                  const item = (stackItems || []).find(i => i.id === e.target.value);
+                  setRenameValue(item ? item.name : '');
+                }}
+                style={{
+                  width: '100%', padding: '10px 12px', marginBottom: '12px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
+                }}
+              >
+                <option value="">Select supplement...</option>
+                {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).map(item => (
+                  <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
+                ))}
+              </select>
+
+              {renameTarget && (
+                <>
+                  <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+                    New name
+                  </label>
+                  <input
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 12px', marginBottom: '16px',
+                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => setShowRenameModal(false)}
+                  style={{
+                    flex: 1, padding: '10px',
+                    background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '8px',
+                    color: '#a5b4fc', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (!renameTarget || !renameValue.trim()) return;
+                    const oldName = (stackItems || []).find(i => i.id === renameTarget)?.name;
+                    const newItems = renameSupplement(stackItems, renameTarget, renameValue.trim());
+                    setStackItems(() => newItems);
+                    setShowRenameModal(false);
+                    setLastAction(`Renamed "${oldName}" to "${renameValue.trim()}"`);
+                    haptic('success');
+                  }}
+                  disabled={!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name}
+                  style={{
+                    flex: 1, padding: '10px',
+                    background: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.4)',
+                    border: 'none', borderRadius: '8px',
+                    color: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? '#6b7280' : '#e9d5ff',
+                    fontSize: '14px', fontWeight: '600',
+                    cursor: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? 'default' : 'pointer',
+                    opacity: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? 0.5 : 1,
+                  }}
+                >
+                  Rename
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showDeleteModal && (
+          <div
+            onClick={() => setShowDeleteModal(false)}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.85)',
+              zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '20px',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: '400px',
+                background: 'rgba(15,17,21,0.95)',
+                borderRadius: '12px',
+                border: '1px solid rgba(239,68,68,0.3)',
+                padding: '20px',
+              }}
+            >
+              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
+                Delete Supplement
+              </h3>
+
+              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+                Supplement
+              </label>
+              <select
+                value={deleteTarget}
+                onChange={(e) => { setDeleteTarget(e.target.value); setConfirmDelete(false); }}
+                style={{
+                  width: '100%', padding: '10px 12px', marginBottom: '12px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
+                }}
+              >
+                <option value="">Select supplement...</option>
+                {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).map(item => (
+                  <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
+                ))}
+              </select>
+
+              {deleteTarget && deletePreview && (
+                <div style={{
+                  background: 'rgba(239,68,68,0.08)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '16px',
+                  fontSize: '13px',
+                  color: '#fca5a5',
+                  lineHeight: '1.6',
+                }}>
+                  <div>{deletePreview.entryCount} historical entries will be permanently deleted</div>
+                  <div style={{ marginTop: '4px' }}>
+                    &quot;{(stackItems || []).find(i => i.id === deleteTarget)?.name}&quot; cannot be recovered
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  style={{
+                    flex: 1, padding: '10px',
+                    background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '8px',
+                    color: '#a5b4fc', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (!deleteTarget) return;
+                    if (!confirmDelete) { setConfirmDelete(true); return; }
+                    const itemName = (stackItems || []).find(i => i.id === deleteTarget)?.name;
+                    const result = deleteSupplement(stackItems, stackEntries, deleteTarget);
+                    setStackItems(() => result.stackItems);
+                    setStackEntries(() => result.stackEntries);
+                    setShowDeleteModal(false);
+                    setLastAction(`Deleted "${itemName}" (${result.deletedCount} entries removed)`);
+                    haptic('success');
+                  }}
+                  disabled={!deleteTarget}
+                  style={{
+                    flex: 1, padding: '10px',
+                    background: !deleteTarget ? 'rgba(239,68,68,0.1)' : confirmDelete ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.3)',
+                    border: 'none', borderRadius: '8px',
+                    color: !deleteTarget ? '#6b7280' : '#fca5a5',
+                    fontSize: '14px', fontWeight: '600',
+                    cursor: !deleteTarget ? 'default' : 'pointer',
+                    opacity: !deleteTarget ? 0.5 : 1,
+                  }}
+                >
+                  {confirmDelete ? 'Confirm Delete' : 'Delete'}
                 </button>
               </div>
             </div>
