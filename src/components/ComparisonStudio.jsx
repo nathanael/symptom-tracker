@@ -1170,27 +1170,30 @@ export default function ComparisonStudio({
   const addBtnBorderW = isDesktop ? '1px' : '1.5px';
   const seriesChips = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {/* Supplement chip or + button */}
-      {selectedSupplement ? (() => {
-        const supp = allSupplements.find(s => s.id === selectedSupplement);
-        const isPrimary = selectedSupplement === primarySeriesId;
-        const suppLegendItem = legendItems.items.find(it => it.color === SUPP_COLOR);
+      {/* Supplement chips */}
+      {selectedSupplements.map((suppId, idx) => {
+        const supp = allSupplements.find(s => s.id === suppId);
+        const st = SUPPLEMENT_STYLES[idx];
+        const isPrimary = suppId === primarySeriesId;
+        const suppLegendItem = legendItems.items.find(it => it.color === st.color);
         const val = suppLegendItem?.val ?? null;
+        const suppUnit = suppItems[idx]?.unit || 'mg';
         const pctChange = isPrimary && insightData ? insightData.percentChange : null;
         return (
           <div
-            onClick={() => makePrimary(selectedSupplement)}
+            key={suppId}
+            onClick={() => makePrimary(suppId)}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: chipPad, borderRadius: chipRadius,
-              background: isPrimary ? 'rgba(139,92,246,0.28)' : 'rgba(139,92,246,0.08)',
-              border: isPrimary ? '2px solid rgba(139,92,246,0.6)' : `${chipBorderW} solid rgba(139,92,246,0.35)`,
+              background: isPrimary ? `${st.color}45` : st.chipBg,
+              border: isPrimary ? `2px solid ${st.color}90` : `${chipBorderW} solid ${st.chipBorder}`,
               cursor: 'pointer',
             }}
           >
-            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: SUPP_COLOR, flexShrink: 0 }} />
+            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: st.color, flexShrink: 0 }} />
             <span style={{
-              color: isPrimary ? SUPP_COLOR : '#9ca3af',
+              color: isPrimary ? st.color : '#9ca3af',
               fontSize: chipText, fontWeight: isPrimary ? '600' : '400', flex: 1,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
@@ -1216,12 +1219,15 @@ export default function ComparisonStudio({
               </span>
             )}
             <span
-              onClick={(e) => { e.stopPropagation(); setSelectedSupplement(''); haptic('light'); }}
-              style={{ color: SUPP_COLOR, fontSize: chipCloseSize, lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer', marginLeft: chipCloseMargin, padding: '4px' }}
+              onClick={(e) => { e.stopPropagation(); removeSupplement(suppId); }}
+              style={{ color: st.color, fontSize: chipCloseSize, lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer', marginLeft: chipCloseMargin, padding: '4px' }}
             >&times;</span>
           </div>
         );
-      })() : (
+      })}
+
+      {/* + Supplement button (if room) */}
+      {selectedSupplements.length < 3 ? (
         <div
           onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
           style={{
@@ -1235,7 +1241,7 @@ export default function ComparisonStudio({
         >
           + Supplement
         </div>
-      )}
+      ) : null}
 
       {/* Spacer between supplements and symptoms */}
       <div style={{ height: '4px' }} />
