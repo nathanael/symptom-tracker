@@ -22,6 +22,13 @@ const SYMPTOM_STYLES = [
 ];
 
 const SUPP_COLOR = '#8b5cf6';
+
+const SUPPLEMENT_STYLES = [
+  { color: '#8b5cf6', chipBg: 'rgba(139,92,246,0.12)', chipBorder: 'rgba(139,92,246,0.35)' },
+  { color: '#7c3aed', chipBg: 'rgba(124,58,237,0.12)', chipBorder: 'rgba(124,58,237,0.35)' },
+  { color: '#a78bfa', chipBg: 'rgba(167,139,250,0.12)', chipBorder: 'rgba(167,139,250,0.35)' },
+];
+
 const HEALTH_SCORE_COLOR = '#10b981';
 
 export default function ComparisonStudio({
@@ -53,22 +60,28 @@ export default function ComparisonStudio({
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
       if (saved) {
-        const suppValid = saved.supplement && (stackItems || []).some(i => i.id === saved.supplement);
+        // Migration: old format stored `supplement` as string, new format uses `supplements` array
+        let supplements = [];
+        if (Array.isArray(saved.supplements)) {
+          supplements = saved.supplements.filter(id => id && (stackItems || []).some(i => i.id === id));
+        } else if (saved.supplement && (stackItems || []).some(i => i.id === saved.supplement)) {
+          supplements = [saved.supplement];
+        }
         const validSymptoms = (saved.symptoms || []).filter(
           id => (symptoms || []).some(s => s.id === id && s.active)
         );
         return {
-          supplement: suppValid ? saved.supplement : '',
+          supplements,
           symptoms: validSymptoms,
           primarySeriesId: saved.primarySeriesId || '',
         };
       }
     } catch {}
-    return { supplement: '', symptoms: [], primarySeriesId: '' };
+    return { supplements: [], symptoms: [], primarySeriesId: '' };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount only
 
-  const [selectedSupplement, setSelectedSupplement] = useState(initialSelections.supplement);
+  const [selectedSupplements, setSelectedSupplements] = useState(initialSelections.supplements);
   const [selectedSymptoms, setSelectedSymptoms] = useState(initialSelections.symptoms);
   const [primarySeriesId, setPrimarySeriesId] = useState(initialSelections.primarySeriesId || '');
   const [showSupplementPicker, setShowSupplementPicker] = useState(false);
@@ -82,7 +95,7 @@ export default function ComparisonStudio({
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
   // Health score shows automatically when no other series are selected
-  const showHealthScore = !selectedSupplement && selectedSymptoms.length === 0;
+  const showHealthScore = selectedSupplements.length === 0 && selectedSymptoms.length === 0;
 
   // Auto-focus search inputs when pickers open
   useEffect(() => { if (showSupplementPicker) { setSuppSearch(''); setTimeout(() => suppSearchRef.current?.focus(), 50); } }, [showSupplementPicker]);
@@ -92,20 +105,20 @@ export default function ComparisonStudio({
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        supplement: selectedSupplement,
+        supplements: selectedSupplements,
         symptoms: selectedSymptoms,
         primarySeriesId,
       }));
     } catch {}
-  }, [selectedSupplement, selectedSymptoms, primarySeriesId]);
+  }, [selectedSupplements, selectedSymptoms, primarySeriesId]);
 
   // Auto-set primary to first available series when current primary is removed
   useEffect(() => {
-    const allIds = [selectedSupplement, ...selectedSymptoms].filter(Boolean);
+    const allIds = [...selectedSupplements, ...selectedSymptoms].filter(Boolean);
     if (!allIds.includes(primarySeriesId) && allIds.length > 0) {
       setPrimarySeriesId(allIds[0]);
     }
-  }, [selectedSupplement, selectedSymptoms, primarySeriesId]);
+  }, [selectedSupplements, selectedSymptoms, primarySeriesId]);
 
   // Symptom selection
   const toggleSymptom = (symId) => {
@@ -118,6 +131,19 @@ export default function ComparisonStudio({
   };
   const removeSymptom = (symId) => {
     setSelectedSymptoms(prev => prev.filter(id => id !== symId));
+    haptic('light');
+  };
+
+  const toggleSupplement = (suppId) => {
+    setSelectedSupplements(prev => {
+      if (prev.includes(suppId)) return prev.filter(id => id !== suppId);
+      if (prev.length >= 3) return prev;
+      return [...prev, suppId];
+    });
+    haptic('light');
+  };
+  const removeSupplement = (suppId) => {
+    setSelectedSupplements(prev => prev.filter(id => id !== suppId));
     haptic('light');
   };
 
