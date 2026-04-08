@@ -174,11 +174,10 @@ export default function ComparisonStudio({
   const windowEndDate = dates.length > 0 ? dates[dates.length - 1] : todayStr;
   const healthScore = useHealthScore(windowEndDate, { symptoms, entries, trackingMode, rollingDays: timeframe });
 
-  const suppItem = useMemo(
-    () => stackItems.find(i => i.id === selectedSupplement),
-    [stackItems, selectedSupplement]
+  const suppItems = useMemo(
+    () => selectedSupplements.map(id => stackItems.find(i => i.id === id)),
+    [stackItems, selectedSupplements]
   );
-  const suppUnit = suppItem?.unit || 'mg';
 
   // SVG dimensions
   const H_MOBILE = 380;
@@ -209,35 +208,44 @@ export default function ComparisonStudio({
 
   const windowSize = SMOOTH_WINDOWS[timeframe] || 5;
 
-  // Supplement: raw dose series with outlier capping
-  const suppDoseDaily = useMemo(() => {
-    if (!selectedSupplement) return null;
-    const raw = getSupplementDoseSeries(stackEntries, stackItems, selectedSupplement, dates);
-    const valid = raw.filter(v => v !== null && v > 0).sort((a, b) => a - b);
-    let capped = raw;
-    if (valid.length > 2) {
-      const p95 = valid[Math.floor(valid.length * 0.95)];
-      const cap = p95 * 3;
-      capped = raw.map(v => (v !== null && v > cap) ? cap : v);
-    }
-    return capped.map(v => v === null ? 0 : v);
-  }, [selectedSupplement, stackEntries, stackItems, dates]);
+  // Supplement: raw dose series with outlier capping (one per selected supplement)
+  const suppDoseSeries = useMemo(() =>
+    selectedSupplements.map(suppId => {
+      const raw = getSupplementDoseSeries(stackEntries, stackItems, suppId, dates);
+      const valid = raw.filter(v => v !== null && v > 0).sort((a, b) => a - b);
+      let capped = raw;
+      if (valid.length > 2) {
+        const p95 = valid[Math.floor(valid.length * 0.95)];
+        const cap = p95 * 3;
+        capped = raw.map(v => (v !== null && v > cap) ? cap : v);
+      }
+      return capped.map(v => v === null ? 0 : v);
+    }),
+    [selectedSupplements, stackEntries, stackItems, dates]
+  );
 
-  // Transformed supplement data (smoothed for display, raw kept for level computation)
-  const suppTransformed = useMemo(() => {
-    if (!suppDoseDaily) return null;
-    const smoothed = windowSize > 1 ? smooth(suppDoseDaily, windowSize) : [...suppDoseDaily];
-    return { values: smoothed, dates: [...dates], labels: [...dates] };
-  }, [suppDoseDaily, dates, windowSize]);
+  // Transformed supplement data (smoothed for display, one series per selected supplement)
+  const suppTransformedSeries = useMemo(() =>
+    suppDoseSeries.map(daily => {
+      const smoothed = windowSize > 1 ? smooth(daily, windowSize) : [...daily];
+      return { values: smoothed, dates: [...dates], labels: [...dates] };
+    }),
+    [suppDoseSeries, dates, windowSize]
+  );
 
-  // Y-axis range (from transformed data)
+  // Primary supplement index and derived data (used for Y-axis scaling)
+  const primarySuppIdx = selectedSupplements.indexOf(primarySeriesId);
+  const primarySuppTransformed = primarySuppIdx >= 0 ? suppTransformedSeries[primarySuppIdx] : (suppTransformedSeries[0] || null);
+  const primarySuppItem = primarySuppIdx >= 0 ? suppItems[primarySuppIdx] : (suppItems[0] || null);
+
+  // Y-axis range (from primary supplement only)
   const suppYMax = useMemo(() => {
-    if (!suppTransformed) return 100;
-    const max = Math.max(...suppTransformed.values.filter(v => v !== null && v !== undefined));
-    if (!isFinite(max) || max <= 0) return suppItem?.defaultDose || 100;
+    if (!primarySuppTransformed) return 100;
+    const max = Math.max(...primarySuppTransformed.values.filter(v => v !== null && v !== undefined));
+    if (!isFinite(max) || max <= 0) return primarySuppItem?.defaultDose || 100;
     const ceiling = Math.ceil(max * 1.1);
-    return Math.max(ceiling, suppItem?.defaultDose || 100);
-  }, [suppTransformed, suppItem]);
+    return Math.max(ceiling, primarySuppItem?.defaultDose || 100);
+  }, [primarySuppTransformed, primarySuppItem]);
 
   // Nice-number Y-axis labels
   const suppYLabels = useMemo(() => {
