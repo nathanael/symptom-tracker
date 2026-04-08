@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { trackingModes } from '../utils/constants';
 import { isStandalone, getDateKey, haptic, generateAIDataExport } from '../utils/helpers';
-import { mergeSupplements, previewMerge } from '../utils/supplementMerge';
+import { mergeSupplements, previewMerge, renameSupplement, deleteSupplement, previewDelete } from '../utils/supplementTools';
 
 export default function Settings({
   user,

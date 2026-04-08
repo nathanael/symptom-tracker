@@ -53,3 +53,41 @@ export function mergeSupplements(stackItems, stackEntries, targetId, sourceId, s
 
   return { stackItems: newStackItems, stackEntries: otherEntries };
 }
+
+export function previewDelete(stackEntries, targetId) {
+  let entryCount = 0;
+  for (const key of Object.keys(stackEntries)) {
+    if (key.endsWith(`-${targetId}`)) entryCount++;
+  }
+  return { entryCount };
+}
+
+export function deleteSupplement(stackItems, stackEntries, targetId) {
+  const newEntries = {};
+  let deletedCount = 0;
+  for (const [key, entry] of Object.entries(stackEntries)) {
+    if (key.endsWith(`-${targetId}`)) {
+      deletedCount++;
+    } else {
+      newEntries[key] = entry;
+    }
+  }
+  const newStackItems = stackItems.filter(i => i.id !== targetId);
+  return { stackItems: newStackItems, stackEntries: newEntries, deletedCount };
+}
+
+export function renameSupplement(stackItems, targetId, newName) {
+  return stackItems.map(item => {
+    if (item.id !== targetId) return item;
+    const historyEntry = {
+      timestamp: new Date().toISOString(),
+      type: 'updated',
+      changes: { name: { from: item.name, to: newName } },
+    };
+    return {
+      ...item,
+      name: newName,
+      history: [...(item.history || []), historyEntry],
+    };
+  });
+}
