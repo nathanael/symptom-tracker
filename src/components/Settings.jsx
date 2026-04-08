@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { trackingModes } from '../utils/constants';
 import { isStandalone, getDateKey, haptic, generateAIDataExport } from '../utils/helpers';
+import { mergeSupplements, previewMerge } from '../utils/supplementMerge';
 
 export default function Settings({
   user,
@@ -50,6 +51,15 @@ export default function Settings({
   const [authPassword, setAuthPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [checkingForUpdates, setCheckingForUpdates] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergeTarget, setMergeTarget] = useState('');
+  const [mergeSource, setMergeSource] = useState('');
+  const [mergeStrategy, setMergeStrategy] = useState('sum');
+  const [confirmMerge, setConfirmMerge] = useState(false);
+
+  const mergePreview = (mergeTarget && mergeSource && mergeTarget !== mergeSource)
+    ? previewMerge(stackEntries, mergeTarget, mergeSource)
+    : null;
 
   const fileInputRef = useRef(null);
 
@@ -335,6 +345,33 @@ export default function Settings({
                 }}
               >
                 Force Push to Cloud
+              </button>
+
+              <button
+                onClick={() => {
+                  if (confirm('This will clear local data and reload from the cloud. Continue?')) {
+                    const keys = Object.keys(localStorage).filter(k => k.startsWith('symptomTracker_') || k.startsWith('syncDirty_'));
+                    keys.forEach(k => localStorage.removeItem(k));
+                    setLastAction('Local data cleared, reloading...');
+                    setTimeout(() => location.reload(), 500);
+                  }
+                }}
+                disabled={syncing}
+                style={{
+                  marginTop: '8px',
+                  width: '100%',
+                  padding: '10px',
+                  background: 'rgba(34, 197, 94, 0.15)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  borderRadius: '8px',
+                  color: '#86efac',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: syncing ? 'not-allowed' : 'pointer',
+                  opacity: syncing ? 0.5 : 1,
+                }}
+              >
+                Force Pull from Cloud
               </button>
             </>
           ) : (
@@ -804,6 +841,194 @@ export default function Settings({
             )}
           </button>
         </div>
+
+        {/* Merge Supplements */}
+        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
+          DATA TOOLS
+        </div>
+        <div style={{
+          background: 'rgba(15, 17, 21, 0.5)',
+          borderRadius: '12px',
+          marginBottom: '12px',
+          overflow: 'hidden',
+        }}>
+          <button
+            onClick={() => { setShowMergeModal(true); setMergeTarget(''); setMergeSource(''); setMergeStrategy('sum'); setConfirmMerge(false); haptic('light'); }}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              padding: '14px 16px',
+              color: '#a5b4fc',
+              fontSize: '15px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <div>Merge Supplements</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Combine duplicate supplements into one</div>
+          </button>
+        </div>
+
+        {showMergeModal && (
+          <div
+            onClick={() => setShowMergeModal(false)}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.85)',
+              zIndex: 1000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '20px',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: '400px',
+                background: 'rgba(15,17,21,0.95)',
+                borderRadius: '12px',
+                border: '1px solid rgba(139,92,246,0.3)',
+                padding: '20px',
+              }}
+            >
+              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
+                Merge Supplements
+              </h3>
+
+              {/* Target dropdown */}
+              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+                Keep (target)
+              </label>
+              <select
+                value={mergeTarget}
+                onChange={(e) => { setMergeTarget(e.target.value); if (e.target.value === mergeSource) setMergeSource(''); setConfirmMerge(false); }}
+                style={{
+                  width: '100%', padding: '10px 12px', marginBottom: '12px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
+                }}
+              >
+                <option value="">Select supplement to keep...</option>
+                {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).map(item => (
+                  <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
+                ))}
+              </select>
+
+              {/* Source dropdown */}
+              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+                Merge & delete (source)
+              </label>
+              <select
+                value={mergeSource}
+                onChange={(e) => { setMergeSource(e.target.value); setConfirmMerge(false); }}
+                style={{
+                  width: '100%', padding: '10px 12px', marginBottom: '12px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
+                }}
+              >
+                <option value="">Select supplement to merge...</option>
+                {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).filter(i => i.id !== mergeTarget).map(item => (
+                  <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
+                ))}
+              </select>
+
+              {/* Strategy toggle */}
+              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '6px' }}>
+                When both have entries on the same day
+              </label>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                {['sum', 'higher'].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setMergeStrategy(s)}
+                    style={{
+                      flex: 1, padding: '8px',
+                      borderRadius: '6px', border: 'none',
+                      background: mergeStrategy === s ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.04)',
+                      color: mergeStrategy === s ? '#c4b5fd' : '#6b7280',
+                      fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+                    }}
+                  >
+                    {s === 'sum' ? 'Sum doses' : 'Keep higher'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Preview */}
+              {mergePreview && (() => {
+                const targetItem = (stackItems || []).find(i => i.id === mergeTarget);
+                const sourceItem = (stackItems || []).find(i => i.id === mergeSource);
+                const unitMismatch = targetItem && sourceItem && (targetItem.unit || 'mg') !== (sourceItem.unit || 'mg');
+                return (
+                  <div style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    marginBottom: '16px',
+                    fontSize: '13px',
+                    color: '#9ca3af',
+                    lineHeight: '1.6',
+                  }}>
+                    <div>{mergePreview.sourceEntryCount} entries will be moved</div>
+                    {mergePreview.conflictCount > 0 && (
+                      <div style={{ color: '#fbbf24' }}>
+                        {mergePreview.conflictCount} date conflict{mergePreview.conflictCount > 1 ? 's' : ''} ({mergeStrategy === 'sum' ? 'doses will be summed' : 'higher dose kept'})
+                      </div>
+                    )}
+                    {unitMismatch && (
+                      <div style={{ color: '#fb923c' }}>
+                        Warning: different units ({targetItem.unit || 'mg'} vs {sourceItem.unit || 'mg'})
+                      </div>
+                    )}
+                    <div style={{ color: '#fca5a5', marginTop: '4px' }}>
+                      &quot;{sourceItem?.name}&quot; will be permanently deleted
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => setShowMergeModal(false)}
+                  style={{
+                    flex: 1, padding: '10px',
+                    background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '8px',
+                    color: '#a5b4fc', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (!mergeTarget || !mergeSource || mergeTarget === mergeSource) return;
+                    if (!confirmMerge) { setConfirmMerge(true); return; }
+                    const sourceName = (stackItems || []).find(i => i.id === mergeSource)?.name;
+                    const targetName = (stackItems || []).find(i => i.id === mergeTarget)?.name;
+                    const result = mergeSupplements(stackItems, stackEntries, mergeTarget, mergeSource, mergeStrategy);
+                    setStackItems(result.stackItems);
+                    setStackEntries(result.stackEntries);
+                    setShowMergeModal(false);
+                    setLastAction(`Merged "${sourceName}" into "${targetName}" (${mergePreview?.sourceEntryCount || 0} entries moved)`);
+                    haptic('success');
+                  }}
+                  disabled={!mergeTarget || !mergeSource || mergeTarget === mergeSource}
+                  style={{
+                    flex: 1, padding: '10px',
+                    background: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? 'rgba(139,92,246,0.1)' : confirmMerge ? 'rgba(239,68,68,0.4)' : 'rgba(139,92,246,0.4)',
+                    border: 'none', borderRadius: '8px',
+                    color: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? '#6b7280' : confirmMerge ? '#fca5a5' : '#e9d5ff',
+                    fontSize: '14px', fontWeight: '600', cursor: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? 'default' : 'pointer',
+                    opacity: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? 0.5 : 1,
+                  }}
+                >
+                  {confirmMerge ? 'Confirm Merge' : 'Merge'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Danger Zone */}
         <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
