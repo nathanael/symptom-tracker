@@ -370,22 +370,35 @@ export default function ComparisonStudio({
 
   // ── Chart points ──
 
-  const suppPoints = useMemo(() => {
-    if (!suppTransformed) return null;
-    const { values, dates: txDates } = suppTransformed;
-    const maxIdx = Math.max(1, txDates.length - 1);
-    return values.map((val, i) => {
-      const dateIdx = dates.indexOf(txDates[i]);
-      const x = dateIdx >= 0
-        ? padLeft + (dateIdx / Math.max(1, dates.length - 1)) * chartW
-        : padLeft + (i / maxIdx) * chartW;
-      return {
-        x,
-        y: val === null ? null : padTop + chartH - (val / suppYMax) * chartH,
-        val,
-      };
-    });
-  }, [suppTransformed, dates, chartW, chartH, suppYMax]);
+  const suppPointSets = useMemo(() =>
+    suppTransformedSeries.map((st, sIdx) => {
+      const { values, dates: txDates } = st;
+      const maxIdx = Math.max(1, txDates.length - 1);
+      // For the primary supplement, use suppYMax directly
+      // For secondary supplements, scale proportionally to primary's range
+      const isPrimary = selectedSupplements[sIdx] === primarySeriesId;
+      const ownMax = (() => {
+        const max = Math.max(...values.filter(v => v !== null && v !== undefined));
+        if (!isFinite(max) || max <= 0) return suppItems[sIdx]?.defaultDose || 100;
+        return Math.ceil(max * 1.1);
+      })();
+      const scale = isPrimary ? 1 : (ownMax > 0 ? suppYMax / ownMax : 1);
+
+      return values.map((val, i) => {
+        const dateIdx = dates.indexOf(txDates[i]);
+        const x = dateIdx >= 0
+          ? padLeft + (dateIdx / Math.max(1, dates.length - 1)) * chartW
+          : padLeft + (i / maxIdx) * chartW;
+        const scaledVal = val !== null ? val * scale : null;
+        return {
+          x,
+          y: scaledVal === null ? null : padTop + chartH - (scaledVal / suppYMax) * chartH,
+          val, // Keep original value for tooltip
+        };
+      });
+    }),
+    [suppTransformedSeries, selectedSupplements, primarySeriesId, suppYMax, suppItems, dates, chartW, chartH, padLeft, padTop]
+  );
 
   const symptomPointSets = useMemo(() =>
     symptomTransformed.map(sd => {
@@ -878,7 +891,7 @@ export default function ComparisonStudio({
             return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
           });
         })()
-      ) : primaryIsSupplement && selectedSupplement ? (
+      ) : primaryIsSupplement && selectedSupplements.length > 0 ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
           return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
@@ -911,7 +924,7 @@ export default function ComparisonStudio({
             );
           });
         })()
-      ) : primaryIsSupplement && selectedSupplement ? (
+      ) : primaryIsSupplement && selectedSupplements.length > 0 ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
           return (
@@ -930,7 +943,7 @@ export default function ComparisonStudio({
       )}
 
       {/* Right Y-axis: secondary scale (only when dual-axis mode) */}
-      {selectedSupplement && selectedSymptoms.length > 0 && (
+      {selectedSupplements.length > 0 && selectedSymptoms.length > 0 && (
         primaryIsSupplement ? (
           [0, 2.5, 5].map(sev => {
             const y = padTop + chartH - (sev / 5) * chartH;
@@ -956,15 +969,19 @@ export default function ComparisonStudio({
           fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{lbl.label}</text>
       ))}
 
-      {/* Supplement line */}
-      {suppPoints && (
-        <g>
-          <path d={buildPath(suppPoints)} fill="none" stroke={isDesktop ? SUPP_COLOR : '#a78bfa'} strokeWidth={(isDesktop ? 0.9 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round" opacity={primaryIsSupplement ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
-          {showDots && primaryIsSupplement && suppPoints.map((pt, i) => (
-            pt.y !== null && <circle key={`sd-${i}`} cx={pt.x} cy={pt.y} r={1.8 * s} fill="rgb(15,17,21)" stroke={SUPP_COLOR} strokeWidth={0.8 * s} />
+      {/* Supplement lines */}
+      {suppPointSets.map((pts, idx) => (
+        <g key={`supp-${idx}`}>
+          <path d={buildPath(pts)} fill="none"
+            stroke={SUPPLEMENT_STYLES[idx].color}
+            strokeWidth={(isDesktop ? 0.9 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round"
+            opacity={selectedSupplements[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
+          {showDots && selectedSupplements[idx] === primarySeriesId && pts.map((pt, i) => (
+            pt.y !== null && <circle key={`sd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.8 * s}
+              fill="rgb(15,17,21)" stroke={SUPPLEMENT_STYLES[idx].color} strokeWidth={0.8 * s} />
           ))}
         </g>
-      )}
+      ))}
 
       {/* Symptom lines */}
       {symptomPointSets.map((pts, idx) => (
