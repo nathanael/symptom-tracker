@@ -34,9 +34,9 @@ Add `SUPPLEMENT_STYLES` array mirroring `SYMPTOM_STYLES`:
 
 ```js
 const SUPPLEMENT_STYLES = [
-  { color: '#8b5cf6' },  // purple (current)
-  { color: '#7c3aed' },  // violet
-  { color: '#a78bfa' },  // light purple
+  { color: '#8b5cf6', chipBg: 'rgba(139,92,246,0.15)', chipBorder: '#8b5cf6' },  // purple (current)
+  { color: '#7c3aed', chipBg: 'rgba(124,58,237,0.15)', chipBorder: '#7c3aed' },  // violet
+  { color: '#a78bfa', chipBg: 'rgba(167,139,250,0.15)', chipBorder: '#a78bfa' },  // light purple
 ];
 ```
 
@@ -57,11 +57,17 @@ Same pattern as `toggleSymptom()` / `removeSymptom()`.
 
 `suppPoints` (single point set) becomes `suppPointSets` (array of point sets), mirroring `symptomPointSets`.
 
+**Crosshair/tooltip** (`crosshairData` memo): Currently reads singular `suppDoseDaily`, `suppPoints`, and `suppItem`. Must iterate over all selected supplements to display each one's value, color, and name. The `legendItems` memo depends on this and needs the same treatment.
+
+**`maxOffset` calculation**: Currently iterates over singular `selectedSupplement` to find earliest data point for the timeframe navigator. Must loop over all `selectedSupplements`.
+
+**`showHealthScore` condition**: Changes from `!selectedSupplement && ...` to `selectedSupplements.length === 0 && ...`.
+
 ### 5. Y-Axis Scaling
 
 When a supplement is primary:
 - Its dose scale determines the Y-axis labels and range
-- Other selected supplements are normalized to the primary's scale for overlay
+- Other selected supplements are scaled proportionally: map each supplement's value range [0, itsMax] into the primary's range [0, primaryMax] so the lines overlay meaningfully. This is simple proportional scaling (value * primaryMax / itsMax).
 - This is consistent with how symptoms overlay against the supplement axis today
 
 ### 6. Chart Rendering
