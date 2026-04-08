@@ -234,9 +234,14 @@ export default function ComparisonStudio({
   );
 
   // Primary supplement index and derived data (used for Y-axis scaling)
-  const primarySuppIdx = selectedSupplements.indexOf(primarySeriesId);
-  const primarySuppTransformed = primarySuppIdx >= 0 ? suppTransformedSeries[primarySuppIdx] : (suppTransformedSeries[0] || null);
-  const primarySuppItem = primarySuppIdx >= 0 ? suppItems[primarySuppIdx] : (suppItems[0] || null);
+  const primarySuppTransformed = useMemo(() => {
+    const idx = selectedSupplements.indexOf(primarySeriesId);
+    return idx >= 0 ? suppTransformedSeries[idx] : (suppTransformedSeries[0] || null);
+  }, [selectedSupplements, primarySeriesId, suppTransformedSeries]);
+  const primarySuppItem = useMemo(() => {
+    const idx = selectedSupplements.indexOf(primarySeriesId);
+    return idx >= 0 ? suppItems[idx] : (suppItems[0] || null);
+  }, [selectedSupplements, primarySeriesId, suppItems]);
 
   // Y-axis range (from primary supplement only)
   const suppYMax = useMemo(() => {
