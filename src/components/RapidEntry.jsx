@@ -42,6 +42,8 @@ export default function RapidEntry({
     return !entries[entryKey];
   });
 
+  const [pulsePrev, setPulsePrev] = useState(false);
+
   // Current symptom comes from full list (allows navigating back to tracked items)
   const currentSymptom = activeSymptomsList[rapidEntryIndex];
 
@@ -630,47 +632,135 @@ export default function RapidEntry({
         </button>
 
         {/* Navigation buttons */}
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '12px',
+          width: '100%',
+          maxWidth: '400px',
+        }}>
+          {/* << Prev unfilled */}
+          <button
+            onClick={() => {
+              const prevUnfilled = findPrevUnfilledIndex(rapidEntryIndex);
+              if (prevUnfilled !== -1) {
+                setRapidEntryIndex(prevUnfilled);
+              } else {
+                setPulsePrev(true);
+                setTimeout(() => setPulsePrev(false), 400);
+              }
+            }}
+            style={{
+              padding: '16px 0',
+              background: 'rgba(100, 116, 139, 0.1)',
+              border: pulsePrev
+                ? '1px solid rgba(239, 68, 68, 0.5)'
+                : '1px solid rgba(100, 116, 139, 0.3)',
+              borderRadius: '5px',
+              color: pulsePrev ? '#f87171' : '#94a3b8',
+              cursor: 'pointer',
+              transition: 'border-color 0.3s ease, color 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="11 17 6 12 11 7" />
+              <polyline points="18 17 13 12 18 7" />
+            </svg>
+          </button>
+
+          {/* < Back one */}
           <button
             onClick={() => {
               setRapidEntryIndex(prev => prev > 0 ? prev - 1 : activeSymptomsList.length - 1);
             }}
             style={{
-              padding: '12px 24px',
+              padding: '16px 0',
               background: 'rgba(100, 116, 139, 0.1)',
               border: '1px solid rgba(100, 116, 139, 0.3)',
               borderRadius: '5px',
               color: '#94a3b8',
-              fontSize: '14px',
-              fontWeight: '600',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            Back
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
           </button>
 
+          {/* > Forward one */}
           <button
             onClick={() => {
-              // Forward: skip to next unmarked symptom
+              setRapidEntryIndex(prev => prev < activeSymptomsList.length - 1 ? prev + 1 : 0);
+            }}
+            style={{
+              padding: '16px 0',
+              background: 'rgba(100, 116, 139, 0.1)',
+              border: '1px solid rgba(100, 116, 139, 0.3)',
+              borderRadius: '5px',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+
+          {/* >> Next unmarked */}
+          <button
+            onClick={() => {
               const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
               if (nextUnmarked !== -1) {
                 setRapidEntryIndex(nextUnmarked);
               } else {
-                handleClose();
+                // All marked — trigger completion
+                if (trackingMode === 'ampm') {
+                  const oppositePeriod = logTime === 'morning' ? 'evening' : 'morning';
+                  const oppApplicable = symptoms.filter(s => s.active).filter(s => {
+                    if (!s.applicablePeriods) return true;
+                    return s.applicablePeriods.includes(oppositePeriod);
+                  });
+                  const oppositeIncomplete = oppApplicable.filter(symptom => {
+                    const ek = `${dateKey}-${symptom.id}-${oppositePeriod}`;
+                    return !entries[ek];
+                  });
+                  if (oppositeIncomplete.length > 0) {
+                    setRapidEntryConfirm(true);
+                    return;
+                  }
+                }
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                setRapidEntryMode(false);
+                setRapidEntryIndex(0);
+                setCopyToastMessage('✓ All symptoms logged!');
+                setTimeout(() => setCopyToastMessage(''), 3000);
               }
             }}
             style={{
-              padding: '12px 24px',
+              padding: '16px 0',
               background: 'rgba(100, 116, 139, 0.1)',
               border: '1px solid rgba(100, 116, 139, 0.3)',
               borderRadius: '5px',
               color: '#94a3b8',
-              fontSize: '14px',
-              fontWeight: '600',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            {findNextUnmarkedIndex(rapidEntryIndex) !== -1 ? 'Next' : 'Done'}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="13 17 18 12 13 7" />
+              <polyline points="6 17 11 12 6 7" />
+            </svg>
           </button>
         </div>
       </div>
