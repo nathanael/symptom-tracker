@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { severityColors, NA_SEVERITY } from '../utils/constants';
 import { isMobile, getDateKey, haptic } from '../utils/helpers';
@@ -61,6 +61,18 @@ export default function RapidEntry({
       }
     }
     return -1; // All symptoms are marked
+  };
+
+  // Search backward from fromIndex-1 down to 0 (no wrap)
+  const findPrevUnfilledIndex = (fromIndex) => {
+    for (let i = fromIndex - 1; i >= 0; i--) {
+      const sym = activeSymptomsList[i];
+      const entryKey = `${dateKey}-${sym.id}-${timeKey}`;
+      if (!entries[entryKey]) {
+        return i;
+      }
+    }
+    return -1; // No unfilled symptom before current position
   };
 
   const handleClose = () => {
