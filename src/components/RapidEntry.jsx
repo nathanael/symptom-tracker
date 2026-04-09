@@ -641,6 +641,7 @@ export default function RapidEntry({
         }}>
           {/* << Prev unfilled */}
           <button
+            aria-label="Previous unfilled symptom"
             onClick={() => {
               const prevUnfilled = findPrevUnfilledIndex(rapidEntryIndex);
               if (prevUnfilled !== -1) {
@@ -673,6 +674,7 @@ export default function RapidEntry({
 
           {/* < Back one */}
           <button
+            aria-label="Previous symptom"
             onClick={() => {
               setRapidEntryIndex(prev => prev > 0 ? prev - 1 : activeSymptomsList.length - 1);
             }}
@@ -695,6 +697,7 @@ export default function RapidEntry({
 
           {/* > Forward one */}
           <button
+            aria-label="Next symptom"
             onClick={() => {
               setRapidEntryIndex(prev => prev < activeSymptomsList.length - 1 ? prev + 1 : 0);
             }}
@@ -717,6 +720,7 @@ export default function RapidEntry({
 
           {/* >> Next unmarked */}
           <button
+            aria-label="Next unfilled symptom"
             onClick={() => {
               const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
               if (nextUnmarked !== -1) {
