@@ -88,13 +88,8 @@ export default function RapidEntry({
         // Back: go to previous symptom in full list (wraps around)
         setRapidEntryIndex(prev => prev > 0 ? prev - 1 : activeSymptomsList.length - 1);
       } else if (e.key === 'ArrowRight') {
-        // Forward: skip to next unmarked symptom
-        const nextUnmarked = findNextUnmarkedIndex(rapidEntryIndex);
-        if (nextUnmarked !== -1) {
-          setRapidEntryIndex(nextUnmarked);
-        } else {
-          handleClose();
-        }
+        // Forward: step to next symptom in full list (wraps around)
+        setRapidEntryIndex(prev => prev < activeSymptomsList.length - 1 ? prev + 1 : 0);
       } else if (e.key === 'Escape') {
         handleClose();
       } else if ((e.key >= '0' && e.key <= '5' || e.key === 'n' || e.key === 'N') && currentSymptom) {
