@@ -612,8 +612,7 @@ function App() {
           trackingMode={trackingMode}
           quickLogTime={quickLogTime}
           setQuickLogTime={setQuickLogTime}
-          rapidEntryIndex={rapidEntryIndex}
-          setRapidEntryIndex={setRapidEntryIndex}
+          initialRapidEntryIndex={rapidEntryIndex}
           rapidEntryConfirm={rapidEntryConfirm}
           setRapidEntryConfirm={setRapidEntryConfirm}
           setRapidEntryMode={setRapidEntryMode}

@@ -10,8 +10,7 @@ export default function RapidEntry({
   trackingMode,
   quickLogTime,
   setQuickLogTime,
-  rapidEntryIndex,
-  setRapidEntryIndex,
+  initialRapidEntryIndex,
   rapidEntryConfirm,
   setRapidEntryConfirm,
   setRapidEntryMode,
@@ -21,6 +20,8 @@ export default function RapidEntry({
   setCopyToastMessage,
   isDesktop,
 }) {
+  const [rapidEntryIndex, setRapidEntryIndex] = useState(initialRapidEntryIndex);
+
   const getCurrentTimePeriod = () => {
     if (trackingMode !== 'ampm') return 'daily';
     const hour = new Date().getHours();
