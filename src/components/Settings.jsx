@@ -232,8 +232,6 @@ export default function Settings({
           display: 'flex',
           flexDirection: 'column',
           animation: 'slideInRight 0.2s ease-out',
-          overflowY: 'auto',
-          padding: '16px 20px',
         } : {
           maxWidth: '700px',
           margin: '0 auto',
@@ -242,10 +240,11 @@ export default function Settings({
       >
         {isDesktop && (
           <div style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '24px',
             flexShrink: 0,
           }}>
             <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
@@ -268,6 +267,12 @@ export default function Settings({
             </button>
           </div>
         )}
+        <div style={isDesktop ? {
+          flex: 1,
+          overflowY: 'auto',
+          padding: '16px 20px',
+        } : {}}>
+
         {/* Cloud Sync Section */}
         <div style={{ marginBottom: '8px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           CLOUD SYNC
@@ -1446,6 +1451,7 @@ export default function Settings({
             Symptom Tracker
           </span>
         </div>
+      </div>
       </div>
     </div>
   );
