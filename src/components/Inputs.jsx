@@ -418,7 +418,7 @@ export default function Inputs({
                   marginBottom: '12px',
                   display: 'block',
                 }}>Active ({activeItems.length})</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {activeItems.map((item, index) => {
                     const catInfo = getCategoryInfo(item.category);
                     const isDragging = dragReorderId === item.id;
@@ -438,7 +438,7 @@ export default function Inputs({
                           background: isDragging ? 'rgba(99, 102, 241, 0.3)' : isDesktop ? 'rgba(15, 17, 21, 0.6)' : 'rgba(255, 255, 255, 0.02)',
                           borderRadius: '8px',
                           border: isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
-                          padding: '10px 12px 10px 0',
+                          padding: '10px 12px',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '10px',

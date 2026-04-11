@@ -1571,7 +1571,7 @@ export default function Stack({
                   marginBottom: '12px',
                   display: 'block',
                 }}>Active ({activeItems.length})</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {activeItems.map((item, index) => {
                     const isDraggingThis = dragReorderId === item.id;
                     // Calculate offset for non-dragged items to show drop position
@@ -1590,7 +1590,7 @@ export default function Stack({
                         background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.02)',
                         borderRadius: '8px',
                         border: '1px solid rgba(255, 255, 255, 0.06)',
-                        padding: '10px 12px 10px 0',
+                        padding: '10px 12px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',

@@ -1869,7 +1869,7 @@ export default function SymptomList({
                   marginBottom: '12px',
                   display: 'block',
                 }}>Active Symptoms ({activeList.length})</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {activeList.map((symptom, index) => {
                     const isDraggingThis = dragReorderId === symptom.id;
                     // Calculate offset for non-dragged items to show drop position
@@ -1888,7 +1888,7 @@ export default function SymptomList({
                         background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.02)',
                         borderRadius: '8px',
                         border: '1px solid rgba(255, 255, 255, 0.06)',
-                        padding: '10px 12px 10px 0',
+                        padding: '10px 12px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '10px',
