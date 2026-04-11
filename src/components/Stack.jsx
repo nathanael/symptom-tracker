@@ -759,7 +759,7 @@ export default function Stack({
             >
               {/* Header */}
               <div style={{
-                padding: '24px',
+                padding: '16px 20px',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -797,7 +797,7 @@ export default function Stack({
               paddingBottom: '20px',
             }}
           >
-            <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+            <div style={{ maxWidth: '100%', margin: '0 auto' }}>
 
             {/* Add Form (at top, when expanded) */}
             {showAddForm && (
@@ -1990,7 +1990,7 @@ export default function Stack({
             >
               {/* Header */}
               <div style={{
-                padding: '24px',
+                padding: '16px 20px',
                 borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                 display: 'flex',
                 justifyContent: 'space-between',

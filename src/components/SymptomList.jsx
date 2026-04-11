@@ -1646,7 +1646,7 @@ export default function SymptomList({
             }}
           >
           <div style={{
-            padding: isDesktop ? '24px' : '16px 20px',
+            padding: '16px 20px',
             borderBottom: isDesktop ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(100, 116, 139, 0.2)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -1697,7 +1697,7 @@ export default function SymptomList({
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
-              padding: isDesktop ? '24px 32px' : '12px 16px',
+              padding: '12px 16px',
               paddingBottom: isDesktop ? '20px' : '80px',
             }}
           >

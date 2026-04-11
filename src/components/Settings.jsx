@@ -233,7 +233,7 @@ export default function Settings({
           flexDirection: 'column',
           animation: 'slideInRight 0.2s ease-out',
           overflowY: 'auto',
-          padding: '24px',
+          padding: '16px 20px',
         } : {
           maxWidth: '700px',
           margin: '0 auto',

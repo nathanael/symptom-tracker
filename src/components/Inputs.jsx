@@ -272,7 +272,7 @@ export default function Inputs({
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
-            padding: isDesktop ? '24px' : '12px 16px',
+            padding: '12px 16px',
             paddingBottom: isDesktop ? '20px' : '80px',
           }}
         >
@@ -677,7 +677,7 @@ export default function Inputs({
           onClick={(e) => e.stopPropagation()}
         >
           <div style={{
-            padding: '24px',
+            padding: '16px 20px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
             justifyContent: 'space-between',
