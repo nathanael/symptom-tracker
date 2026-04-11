@@ -24,6 +24,8 @@ export default function DesktopToolbar({
   setCopyToastMessage,
   // Action handlers
   onOpenSettings,
+  onCopyData,
+  copyDays,
   symptoms,
   entries,
 }) {
@@ -168,13 +170,15 @@ export default function DesktopToolbar({
           )}
         </div>
 
-        {/* Center: View tabs — fixed in center */}
+        {/* Center: Health score + View tabs — fixed in center */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flex: 1,
+          gap: '8px',
         }}>
+          <HealthScoreBadge score={score} delta={delta} rollingAvg={rollingAvg} />
           {[
             { id: 'symptoms', label: 'Symptoms' },
             { id: 'stack', label: 'Protocol' },
@@ -207,7 +211,7 @@ export default function DesktopToolbar({
           })}
         </div>
 
-        {/* Right: Settings only — fixed width to balance left */}
+        {/* Right: Copy + Settings — fixed width to balance left */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -216,7 +220,37 @@ export default function DesktopToolbar({
           width: '280px',
           justifyContent: 'flex-end',
         }}>
-          <HealthScoreBadge score={score} delta={delta} rollingAvg={rollingAvg} />
+          <button
+            onClick={onCopyData}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '6px 10px',
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '6px',
+              color: '#9ca3af',
+              fontSize: '12px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+              e.currentTarget.style.color = '#e5e7eb';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = '#9ca3af';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy {copyDays}d
+          </button>
           <button
             onClick={onOpenSettings}
             style={{
