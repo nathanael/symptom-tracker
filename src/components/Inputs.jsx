@@ -435,9 +435,9 @@ export default function Inputs({
                       <div
                         key={item.id}
                         style={{
-                          background: isDragging ? 'rgba(99, 102, 241, 0.3)' : isDesktop ? 'rgba(15, 17, 21, 0.6)' : 'rgba(255, 255, 255, 0.02)',
+                          background: isDragging ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.02)',
                           borderRadius: '8px',
-                          border: isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
+                          border: '1px solid rgba(255, 255, 255, 0.06)',
                           padding: '10px 12px',
                           display: 'flex',
                           alignItems: 'center',
@@ -587,9 +587,9 @@ export default function Inputs({
                       <div
                         key={item.id}
                         style={{
-                          background: isDesktop ? 'rgba(15, 17, 21, 0.3)' : 'rgba(255, 255, 255, 0.02)',
+                          background: 'rgba(255, 255, 255, 0.02)',
                           borderRadius: '8px',
-                          border: isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
+                          border: '1px solid rgba(255, 255, 255, 0.06)',
                           padding: '12px 16px',
                           display: 'flex',
                           alignItems: 'center',
