@@ -1019,7 +1019,7 @@ function App() {
         /* Mobile: tab-switching layout */
         <div ref={scrollContainerRef} style={{
           flex: 1,
-          overflowY: 'auto',
+          overflowY: (showManageStack || showAddSymptom || showManageInputs) ? 'hidden' : 'auto',
           overflowX: 'hidden',
           paddingBottom: '155px',
           WebkitOverflowScrolling: 'touch',
