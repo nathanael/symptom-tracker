@@ -1293,24 +1293,35 @@ export default function Stack({
             </div>
           </div>
         ) : (
-          <div
-            style={{
+          <div style={{
               position: 'fixed',
               inset: 0,
-              background: '#08090A',
+              background: 'rgba(0, 0, 0, 0.92)',
               zIndex: 1000,
               display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'center',
+              paddingTop: 'env(safe-area-inset-top)',
+          }}>
+          <div style={{
+              width: '100%',
+              background: 'rgba(15, 17, 21, 0.95)',
+              borderRadius: '0 0 16px 16px',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+              overflow: 'hidden',
+              maxHeight: 'calc(100dvh - env(safe-area-inset-top))',
+              display: 'flex',
               flexDirection: 'column',
-              animation: 'modalIn 0.2s ease-out',
-            }}
-          >
+              paddingBottom: 'env(safe-area-inset-bottom)',
+          }}>
           {/* Mobile header */}
           <div style={{
-            padding: '16px 20px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            padding: '16px 20px',
+            borderBottom: '1px solid rgba(100, 116, 139, 0.2)',
             flexShrink: 0,
           }}>
             <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
@@ -1319,15 +1330,16 @@ export default function Stack({
             <button
               onClick={() => setShowManageStack(false)}
               style={{
-                background: 'transparent',
+                background: 'none',
                 border: 'none',
-                color: '#9ca3af',
+                color: '#8b5cf6',
                 fontSize: '16px',
+                fontWeight: '600',
                 cursor: 'pointer',
-                padding: '6px 10px',
+                padding: '4px 8px',
               }}
             >
-              ✕
+              Done
             </button>
           </div>
           {/* Scrollable Content */}
@@ -1339,7 +1351,7 @@ export default function Stack({
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
               padding: '12px 16px',
-              paddingBottom: '20px',
+              paddingBottom: '80px',
             }}
           >
             <div style={{ maxWidth: '500px', margin: '0 auto' }}>
@@ -1575,8 +1587,9 @@ export default function Stack({
                     <div
                       key={item.id}
                       style={{
-                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
-                        borderRadius: '3px',
+                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.02)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
                         padding: '10px 12px 10px 0',
                         display: 'flex',
                         alignItems: 'center',
@@ -1636,7 +1649,7 @@ export default function Stack({
                         style={{
                           background: 'rgba(239, 68, 68, 0.15)',
                           border: '1px solid rgba(239, 68, 68, 0.3)',
-                          borderRadius: '3px',
+                          borderRadius: '8px',
                           padding: '6px 12px',
                           color: '#f87171',
                           fontSize: '12px',
@@ -1709,8 +1722,9 @@ export default function Stack({
                       <div key={item.id}>
                         <div
                           style={{
-                            background: 'rgba(15, 17, 21, 0.3)',
-                            borderRadius: '3px',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            borderRadius: '8px',
+                            border: '1px solid rgba(255, 255, 255, 0.06)',
                             padding: '12px 16px',
                             display: 'flex',
                             alignItems: 'center',
@@ -1726,7 +1740,7 @@ export default function Stack({
                             style={{
                               background: 'rgba(34, 197, 94, 0.15)',
                               border: '1px solid rgba(34, 197, 94, 0.3)',
-                              borderRadius: '3px',
+                              borderRadius: '8px',
                               padding: '6px 12px',
                               color: '#4ade80',
                               fontSize: '12px',
@@ -1741,7 +1755,7 @@ export default function Stack({
                             style={{
                               background: 'rgba(239, 68, 68, 0.15)',
                               border: '1px solid rgba(239, 68, 68, 0.3)',
-                              borderRadius: '3px',
+                              borderRadius: '8px',
                               padding: '6px 10px',
                               color: '#f87171',
                               fontSize: '12px',
@@ -1756,7 +1770,7 @@ export default function Stack({
                           <div style={{
                             background: 'rgba(239, 68, 68, 0.08)',
                             border: '1px solid rgba(239, 68, 68, 0.2)',
-                            borderRadius: '3px',
+                            borderRadius: '8px',
                             padding: '12px 16px',
                             marginTop: '4px',
                             animation: 'slideDown 0.15s ease-out',
@@ -1772,7 +1786,7 @@ export default function Stack({
                                 style={{
                                   background: 'rgba(239, 68, 68, 0.3)',
                                   border: '1px solid rgba(239, 68, 68, 0.5)',
-                                  borderRadius: '3px',
+                                  borderRadius: '8px',
                                   padding: '8px 16px',
                                   color: '#fca5a5',
                                   fontSize: '13px',
@@ -1787,7 +1801,7 @@ export default function Stack({
                                 style={{
                                   background: 'rgba(255, 255, 255, 0.05)',
                                   border: '1px solid rgba(255, 255, 255, 0.1)',
-                                  borderRadius: '3px',
+                                  borderRadius: '8px',
                                   padding: '8px 16px',
                                   color: '#9ca3af',
                                   fontSize: '13px',
@@ -1834,6 +1848,7 @@ export default function Stack({
               </button>
             )}
             </div>
+          </div>
           </div>
           </div>
         )

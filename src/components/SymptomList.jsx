@@ -1612,10 +1612,12 @@ export default function SymptomList({
           } : {
             position: 'fixed',
             inset: 0,
-            background: '#08090A',
+            background: 'rgba(0, 0, 0, 0.92)',
             zIndex: 1000,
             display: 'flex',
-            flexDirection: 'column',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: 'env(safe-area-inset-top)',
           }}
           onClick={isDesktop ? () => setShowAddSymptom(false) : undefined}
         >
@@ -1631,12 +1633,21 @@ export default function SymptomList({
               animation: 'slideInRight 0.2s ease-out',
               position: 'relative',
             } : {
-              display: 'contents',
+              width: '100%',
+              background: 'rgba(15, 17, 21, 0.95)',
+              borderRadius: '0 0 16px 16px',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+              overflow: 'hidden',
+              maxHeight: 'calc(100dvh - env(safe-area-inset-top))',
+              display: 'flex',
+              flexDirection: 'column',
+              paddingBottom: 'env(safe-area-inset-bottom)',
             }}
           >
           <div style={{
             padding: isDesktop ? '24px' : '16px 20px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            borderBottom: isDesktop ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(100, 116, 139, 0.2)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -1645,9 +1656,10 @@ export default function SymptomList({
             <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
               Manage symptoms
             </h3>
+            {isDesktop ? (
             <button
               onClick={() => setShowAddSymptom(false)}
-              style={isDesktop ? {
+              style={{
                 background: 'rgba(255,255,255,0.05)',
                 border: '1px solid rgba(255,255,255,0.1)',
                 color: '#9ca3af',
@@ -1656,17 +1668,26 @@ export default function SymptomList({
                 padding: '6px 10px',
                 borderRadius: '6px',
                 lineHeight: 1,
-              } : {
-                background: 'transparent',
-                border: 'none',
-                color: '#9ca3af',
-                fontSize: '16px',
-                cursor: 'pointer',
-                padding: '6px 10px',
               }}
             >
               ✕
             </button>
+            ) : (
+            <button
+              onClick={() => setShowAddSymptom(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#8b5cf6',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: '4px 8px',
+              }}
+            >
+              Done
+            </button>
+            )}
           </div>
           {/* Scrollable Content */}
           <div
@@ -1677,7 +1698,7 @@ export default function SymptomList({
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
               padding: isDesktop ? '24px 32px' : '12px 16px',
-              paddingBottom: '20px',
+              paddingBottom: isDesktop ? '20px' : '80px',
             }}
           >
             <div style={{ maxWidth: isDesktop ? '100%' : '500px', margin: '0 auto' }}>
@@ -1864,8 +1885,9 @@ export default function SymptomList({
                     <div
                       key={symptom.id}
                       style={{
-                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
-                        borderRadius: '3px',
+                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.02)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
                         padding: '10px 12px 10px 0',
                         display: 'flex',
                         alignItems: 'center',
@@ -1919,7 +1941,7 @@ export default function SymptomList({
                         style={{
                           background: 'rgba(239, 68, 68, 0.15)',
                           border: '1px solid rgba(239, 68, 68, 0.3)',
-                          borderRadius: '3px',
+                          borderRadius: '8px',
                           padding: '6px 12px',
                           color: '#f87171',
                           fontSize: '12px',
@@ -1988,8 +2010,9 @@ export default function SymptomList({
                       <div
                         key={symptom.id}
                         style={{
-                          background: 'rgba(15, 17, 21, 0.3)',
-                          borderRadius: '3px',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255, 255, 255, 0.06)',
                           padding: '12px 16px',
                           display: 'flex',
                           alignItems: 'center',
@@ -2009,7 +2032,7 @@ export default function SymptomList({
                           style={{
                             background: 'rgba(34, 197, 94, 0.15)',
                             border: '1px solid rgba(34, 197, 94, 0.3)',
-                            borderRadius: '3px',
+                            borderRadius: '8px',
                             padding: '6px 12px',
                             color: '#4ade80',
                             fontSize: '12px',

@@ -273,7 +273,7 @@ export default function Inputs({
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
             padding: isDesktop ? '24px' : '12px 16px',
-            paddingBottom: '20px',
+            paddingBottom: isDesktop ? '20px' : '80px',
           }}
         >
           <div style={{ maxWidth: isDesktop ? '100%' : '500px', margin: '0 auto' }}>
@@ -435,8 +435,9 @@ export default function Inputs({
                       <div
                         key={item.id}
                         style={{
-                          background: isDragging ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
-                          borderRadius: '3px',
+                          background: isDragging ? 'rgba(99, 102, 241, 0.3)' : isDesktop ? 'rgba(15, 17, 21, 0.6)' : 'rgba(255, 255, 255, 0.02)',
+                          borderRadius: '8px',
+                          border: isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
                           padding: '10px 12px 10px 0',
                           display: 'flex',
                           alignItems: 'center',
@@ -505,7 +506,7 @@ export default function Inputs({
                           style={{
                             background: 'rgba(239, 68, 68, 0.15)',
                             border: '1px solid rgba(239, 68, 68, 0.3)',
-                            borderRadius: '3px',
+                            borderRadius: '8px',
                             padding: '6px 12px',
                             color: '#f87171',
                             fontSize: '12px',
@@ -586,8 +587,9 @@ export default function Inputs({
                       <div
                         key={item.id}
                         style={{
-                          background: 'rgba(15, 17, 21, 0.3)',
-                          borderRadius: '3px',
+                          background: isDesktop ? 'rgba(15, 17, 21, 0.3)' : 'rgba(255, 255, 255, 0.02)',
+                          borderRadius: '8px',
+                          border: isDesktop ? 'none' : '1px solid rgba(255, 255, 255, 0.06)',
                           padding: '12px 16px',
                           display: 'flex',
                           alignItems: 'center',
@@ -603,7 +605,7 @@ export default function Inputs({
                           style={{
                             background: 'rgba(34, 197, 94, 0.15)',
                             border: '1px solid rgba(34, 197, 94, 0.3)',
-                            borderRadius: '3px',
+                            borderRadius: '8px',
                             padding: '6px 12px',
                             color: '#4ade80',
                             fontSize: '12px',
@@ -708,38 +710,53 @@ export default function Inputs({
       <div style={{
         position: 'fixed',
         inset: 0,
-        background: '#08090A',
+        background: 'rgba(0, 0, 0, 0.92)',
         zIndex: 1000,
         display: 'flex',
-        flexDirection: 'column',
-        animation: 'modalIn 0.2s ease-out',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        paddingTop: 'env(safe-area-inset-top)',
       }}>
         <div style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          width: '100%',
+          background: 'rgba(15, 17, 21, 0.95)',
+          borderRadius: '0 0 16px 16px',
+          border: '1px solid rgba(139, 92, 246, 0.3)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+          overflow: 'hidden',
+          maxHeight: 'calc(100dvh - env(safe-area-inset-top))',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexShrink: 0,
+          flexDirection: 'column',
+          paddingBottom: 'env(safe-area-inset-bottom)',
         }}>
-          <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
-            Manage inputs
-          </h3>
-          <button
-            onClick={() => setShowManageInputs(false)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#9ca3af',
-              fontSize: '16px',
-              cursor: 'pointer',
-              padding: '6px 10px',
-            }}
-          >
-            ✕
-          </button>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 20px',
+            borderBottom: '1px solid rgba(100, 116, 139, 0.2)',
+            flexShrink: 0,
+          }}>
+            <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+              Manage inputs
+            </h3>
+            <button
+              onClick={() => setShowManageInputs(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#8b5cf6',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: '4px 8px',
+              }}
+            >
+              Done
+            </button>
+          </div>
+          {manageScrollContent}
         </div>
-        {manageScrollContent}
       </div>
     );
   }
