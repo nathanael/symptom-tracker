@@ -23,6 +23,7 @@ export default function Stack({
   const [showLogPicker, setShowLogPicker] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showHiddenItems, setShowHiddenItems] = useState(false);
+  const [showHiddenInPicker, setShowHiddenInPicker] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const manageScrollRef = useRef(null);
@@ -293,12 +294,11 @@ export default function Stack({
   });
 
   const availableToLog = (() => {
-    // Items not already displayed, available for quick-logging
-    // On historical days, show all supplements (including hidden) so user can log any
     const displayedIds = new Set(displayItems.map(i => i.id));
     return stackItems.filter(i => {
       if (displayedIds.has(i.id)) return false;
       if (isToday && !i.active) return false;
+      if (!isToday && !i.active && !showHiddenInPicker) return false;
       return true;
     }).sort((a, b) => (a.order || 0) - (b.order || 0));
   })();
@@ -705,9 +705,9 @@ export default function Stack({
           Manage stack
         </button>
       )}
-      {!showManageStack && availableToLog.length > 0 && (
+      {!showManageStack && !isToday && availableToLog.length > 0 && (
         <button
-          onClick={() => setShowLogPicker(true)}
+          onClick={() => { setShowHiddenInPicker(false); setShowLogPicker(true); }}
           style={{
             width: '100%',
             padding: '16px 20px',
@@ -725,24 +725,66 @@ export default function Stack({
           }}
         >
           <span style={{ fontSize: '14px' }}>+</span>
-          Add supplement
+          Log supplement
         </button>
       )}
 
 
       {/* Manage Stack Modal */}
       {showManageStack && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: '#08090A',
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-            animation: 'modalIn 0.2s ease-out',
-          }}
-        >
+        isDesktop ? (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1000,
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}
+            onClick={() => setShowManageStack(false)}
+          >
+            <div
+              style={{
+                width: '420px',
+                height: '100%',
+                background: '#1a1b1e',
+                borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                animation: 'slideInRight 0.2s ease-out',
+                position: 'relative',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '24px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexShrink: 0,
+              }}>
+                <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+                  Manage stack
+                </h3>
+                <button
+                  onClick={() => setShowManageStack(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#9ca3af',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
           {/* Scrollable Content */}
           <div
             ref={manageScrollRef}
@@ -752,7 +794,7 @@ export default function Stack({
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
               padding: '12px 16px',
-              paddingBottom: '180px',
+              paddingBottom: '20px',
             }}
           >
             <div style={{ maxWidth: '500px', margin: '0 auto' }}>
@@ -925,6 +967,24 @@ export default function Stack({
                     }}
                   >
                     Add Supplement
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
+                    }}
+                    style={{
+                      marginTop: '6px',
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '10px',
+                      color: '#6b7280',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
                   </button>
                 </div>
               </div>
@@ -1201,23 +1261,6 @@ export default function Stack({
                 )}
               </div>
             )}
-            </div>
-          </div>
-
-          {/* Fixed Bottom Bar */}
-          <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            padding: '16px 16px 30px',
-            background: 'linear-gradient(transparent, #08090A 25%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '12px',
-            zIndex: 10,
-          }}>
             {!showAddForm && (
               <button
                 onClick={() => {
@@ -1225,157 +1268,6 @@ export default function Stack({
                   if (manageScrollRef.current) {
                     manageScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
                   }
-                }}
-                style={{
-                  width: '100%',
-                  maxWidth: '500px',
-                  padding: '14px',
-                  background: 'rgba(139, 92, 246, 0.06)',
-                  border: '2px dashed rgba(139, 92, 246, 0.3)',
-                  borderRadius: '12px',
-                  color: '#a78bfa',
-                  fontSize: '15px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                }}
-              >
-                + Add Supplement
-              </button>
-            )}
-            <button
-              onClick={() => setShowManageStack(false)}
-              style={{
-                background: '#8b5cf6',
-                border: 'none',
-                borderRadius: '25px',
-                color: '#fff',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                padding: '14px 40px',
-                boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
-              }}
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Log Picker Modal (for past dates) */}
-      {showLogPicker && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            zIndex: 1000,
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'center',
-            paddingBottom: '76px', // Account for bottom nav height
-          }}
-          onClick={() => setShowLogPicker(false)}
-        >
-          <div
-            style={{
-              background: '#1a1b1e',
-              borderRadius: '16px',
-              width: 'calc(100% - 32px)',
-              maxWidth: '500px',
-              maxHeight: '50vh',
-              display: 'flex',
-              flexDirection: 'column',
-              animation: 'modalIn 0.2s ease-out',
-              marginBottom: '8px',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div style={{
-              padding: '20px',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}>
-              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
-                Add supplement
-              </h3>
-              <button
-                onClick={() => setShowLogPicker(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#6b7280',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  padding: '8px 12px',
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-
-            {/* Supplement list */}
-            <div style={{
-              overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              flex: 1,
-            }}>
-              {availableToLog.length === 0 ? (
-                <div style={{
-                  padding: '40px 20px',
-                  textAlign: 'center',
-                  color: '#6b7280',
-                  fontSize: '14px',
-                }}>
-                  All supplements have been logged for this day.
-                </div>
-              ) : availableToLog.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    haptic('light');
-                    toggleStackItem(item.id);
-                    setShowLogPicker(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '16px 20px',
-                    background: 'transparent',
-                    border: 'none',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                    color: '#e5e7eb',
-                    fontSize: '15px',
-                    fontWeight: '400',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    textAlign: 'left',
-                  }}
-                >
-                  <div>
-                    <span>{item.name}</span>
-                    {item.description && (
-                      <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: '8px' }}>
-                        {item.description}
-                      </span>
-                    )}
-                  </div>
-                  <span style={{ color: '#6b7280', fontSize: '14px' }}>
-                    {item.defaultDose} {item.unit}
-                  </span>
-                </button>
-              ))}
-              {/* Add new supplement option */}
-              <button
-                onClick={() => {
-                  pendingLogAfterAdd.current = true;
-                  setShowLogPicker(false);
-                  setShowManageStack(true);
-                  setShowAddForm(true);
                 }}
                 style={{
                   width: '100%',
@@ -1395,10 +1287,754 @@ export default function Stack({
                 <span style={{ fontSize: '18px', color: '#6b7280' }}>+</span>
                 Add new supplement
               </button>
+            )}
             </div>
           </div>
-        </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: '#08090A',
+              zIndex: 1000,
+              display: 'flex',
+              flexDirection: 'column',
+              animation: 'modalIn 0.2s ease-out',
+            }}
+          >
+          {/* Scrollable Content */}
+          <div
+            ref={manageScrollRef}
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+              padding: '12px 16px',
+              paddingBottom: '20px',
+            }}
+          >
+            <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+
+            {/* Add Form (at top, when expanded) */}
+            {showAddForm && (
+              <div style={{
+                background: 'rgba(15, 17, 21, 0.6)',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '20px',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                animation: 'slideDown 0.2s ease-out',
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      placeholder="Supplement name"
+                      value={newStackItem.name}
+                      onChange={(e) => setNewStackItem({...newStackItem, name: e.target.value})}
+                      onFocus={() => setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                      autoFocus
+                      style={{
+                        width: '100%',
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '2px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '5px',
+                        padding: '12px 14px',
+                        color: '#f8fafc',
+                        fontSize: '15px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: 'rgba(15, 17, 21, 0.98)',
+                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '5px',
+                        marginTop: '4px',
+                        maxHeight: '150px',
+                        overflowY: 'auto',
+                        zIndex: 10,
+                      }}>
+                        {suggestions.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              toggleStackItemActive(item.id);
+                              setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
+                              setShowSuggestions(false);
+                              setShowAddForm(false);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '12px 14px',
+                              background: 'transparent',
+                              border: 'none',
+                              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                              color: '#e5e7eb',
+                              fontSize: '14px',
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <span>{item.name}</span>
+                            <span style={{ color: '#6b7280', fontSize: '12px' }}>Restore</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Description (optional)"
+                    value={newStackItem.description}
+                    onChange={(e) => setNewStackItem({...newStackItem, description: e.target.value})}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      border: '2px solid rgba(99, 102, 241, 0.3)',
+                      borderRadius: '5px',
+                      padding: '12px 14px',
+                      color: '#f8fafc',
+                      fontSize: '15px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Dose"
+                      value={newStackItem.defaultDose}
+                      onChange={(e) => setNewStackItem({...newStackItem, defaultDose: e.target.value})}
+                      style={{
+                        width: '80px',
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '2px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '5px',
+                        padding: '12px 14px',
+                        color: '#f8fafc',
+                        fontSize: '15px',
+                        textAlign: 'center',
+                        outline: 'none',
+                      }}
+                    />
+                    <select
+                      value={newStackItem.unit}
+                      onChange={(e) => setNewStackItem({...newStackItem, unit: e.target.value})}
+                      style={{
+                        width: '80px',
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '2px solid rgba(99, 102, 241, 0.3)',
+                        borderRadius: '5px',
+                        padding: '12px 10px',
+                        color: '#f8fafc',
+                        fontSize: '15px',
+                      }}
+                    >
+                      <option value="mg">mg</option>
+                      <option value="mcg">mcg</option>
+                      <option value="g">g</option>
+                      <option value="IU">IU</option>
+                      <option value="ml">ml</option>
+                      <option value="drops">drops</option>
+                      <option value="caps">caps</option>
+                    </select>
+                  </div>
+                  <div style={{ marginTop: '4px' }}>
+                    <label style={{
+                      color: '#64748b',
+                      fontSize: '11px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      marginBottom: '8px',
+                      display: 'block',
+                    }}>Schedule</label>
+                    <SchedulePicker
+                      schedule={newStackItem.schedule}
+                      onChange={(schedule) => setNewStackItem({...newStackItem, schedule})}
+                    />
+                  </div>
+                  <button
+                    onClick={addStackItem}
+                    disabled={!newStackItem.name.trim() || !newStackItem.defaultDose}
+                    style={{
+                      marginTop: '10px',
+                      width: '100%',
+                      background: (!newStackItem.name.trim() || !newStackItem.defaultDose)
+                        ? 'rgba(99, 102, 241, 0.3)'
+                        : '#6366f1',
+                      border: 'none',
+                      borderRadius: '5px',
+                      padding: '12px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: (!newStackItem.name.trim() || !newStackItem.defaultDose) ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Add Supplement
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setNewStackItem({ name: '', unit: 'mg', defaultDose: '', description: '', schedule: { type: 'daily' } });
+                    }}
+                    style={{
+                      marginTop: '6px',
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '10px',
+                      color: '#6b7280',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Active Items */}
+            {activeItems.length > 0 && (() => {
+              const dragCurrentIndex = dragReorderId ? activeItems.findIndex(i => i.id === dragReorderId) : -1;
+              const itemHeight = 52;
+              const dragTargetIndex = dragReorderId ? Math.max(0, Math.min(activeItems.length - 1, dragCurrentIndex + Math.round(dragReorderY / itemHeight))) : -1;
+
+              return (
+              <div
+                style={{ marginBottom: '20px' }}
+                onTouchMove={handleDragMove}
+                onTouchEnd={handleDragEnd}
+                onTouchCancel={handleDragEnd}
+                onMouseMove={handleDragMove}
+                onMouseUp={handleDragEnd}
+                onMouseLeave={handleDragEnd}
+              >
+                <label style={{
+                  color: '#94a3b8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  marginBottom: '12px',
+                  display: 'block',
+                }}>Active ({activeItems.length})</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {activeItems.map((item, index) => {
+                    const isDraggingThis = dragReorderId === item.id;
+                    // Calculate offset for non-dragged items to show drop position
+                    let offsetY = 0;
+                    if (dragReorderId && !isDraggingThis) {
+                      if (index > dragCurrentIndex && index <= dragTargetIndex) {
+                        offsetY = -itemHeight - 6; // Move up
+                      } else if (index < dragCurrentIndex && index >= dragTargetIndex) {
+                        offsetY = itemHeight + 6; // Move down
+                      }
+                    }
+                    return (
+                    <div
+                      key={item.id}
+                      style={{
+                        background: isDraggingThis ? 'rgba(99, 102, 241, 0.3)' : 'rgba(15, 17, 21, 0.6)',
+                        borderRadius: '3px',
+                        padding: '10px 12px 10px 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        transform: isDraggingThis ? `translateY(${dragReorderY}px)` : `translateY(${offsetY}px)`,
+                        zIndex: isDraggingThis ? 10 : 1,
+                        position: 'relative',
+                        transition: isDraggingThis ? 'none' : 'transform 0.15s ease',
+                        boxShadow: isDraggingThis ? '0 4px 12px rgba(0,0,0,0.3)' : 'none',
+                      }}
+                    >
+                      {/* Drag handle (hamburger) */}
+                      <div
+                        onTouchStart={(e) => handleDragStart(e, item.id)}
+                        onMouseDown={(e) => handleDragStart(e, item.id)}
+                        style={{
+                          padding: '8px 4px',
+                          cursor: dragReorderId ? 'grabbing' : 'grab',
+                          touchAction: 'none',
+                          userSelect: 'none',
+                          color: '#64748b',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '3px',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                        <div style={{ width: '16px', height: '2px', background: '#64748b', borderRadius: '1px' }} />
+                      </div>
+
+                      <div
+                        onClick={() => setEditingSupplementId(item.id)}
+                        style={{
+                          cursor: 'pointer',
+                          flex: 1,
+                        }}
+                      >
+                        <span style={{ color: '#e2e8f0', fontSize: '15px' }}>
+                          {item.name}
+                          {formatSchedule(item.schedule) && (
+                            <span style={{ color: '#9ca3af', fontSize: '13px', marginLeft: '6px' }}>{formatSchedule(item.schedule)}</span>
+                          )}
+                        </span>
+                        <span style={{ color: '#64748b', fontSize: '12px', marginLeft: '8px' }}>
+                          {item.defaultDose}{item.unit}
+                        </span>
+                        {item.description && (
+                          <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
+                            {item.description}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => toggleStackItemActive(item.id)}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.15)',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          borderRadius: '3px',
+                          padding: '6px 12px',
+                          color: '#f87171',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        Hide
+                      </button>
+                    </div>
+                  );
+                  })}
+                </div>
+              </div>
+              );
+            })()}
+
+            {/* Inactive Items - Collapsible */}
+            {inactiveItems.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setShowHiddenItems(!showHiddenItems)}
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: showHiddenItems ? '12px' : '0',
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#94a3b8"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{
+                      transition: 'transform 0.2s ease',
+                      transform: showHiddenItems ? 'rotate(90deg)' : 'rotate(0deg)',
+                    }}
+                  >
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                  <label style={{
+                    color: '#94a3b8',
+                    fontSize: '12px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    cursor: 'pointer',
+                  }}>Hidden ({inactiveItems.length})</label>
+                </button>
+                {showHiddenItems && (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    animation: 'slideDown 0.2s ease-out',
+                  }}>
+                    {inactiveItems.map((item) => {
+                      const isConfirming = confirmingDeleteId === item.id;
+                      const entryCount = isConfirming ? getEntryCountForItem(item.id) : 0;
+                      return (
+                      <div key={item.id}>
+                        <div
+                          style={{
+                            background: 'rgba(15, 17, 21, 0.3)',
+                            borderRadius: '3px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                          }}
+                        >
+                          <span style={{ color: '#64748b', fontSize: '15px', flex: 1 }}>
+                            {item.name}
+                          </span>
+                          <button
+                            onClick={() => toggleStackItemActive(item.id)}
+                            style={{
+                              background: 'rgba(34, 197, 94, 0.15)',
+                              border: '1px solid rgba(34, 197, 94, 0.3)',
+                              borderRadius: '3px',
+                              padding: '6px 12px',
+                              color: '#4ade80',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          >
+                            Restore
+                          </button>
+                          <button
+                            onClick={() => setConfirmingDeleteId(isConfirming ? null : item.id)}
+                            style={{
+                              background: 'rgba(239, 68, 68, 0.15)',
+                              border: '1px solid rgba(239, 68, 68, 0.3)',
+                              borderRadius: '3px',
+                              padding: '6px 10px',
+                              color: '#f87171',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                        {isConfirming && (
+                          <div style={{
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            borderRadius: '3px',
+                            padding: '12px 16px',
+                            marginTop: '4px',
+                            animation: 'slideDown 0.15s ease-out',
+                          }}>
+                            <div style={{ color: '#fca5a5', fontSize: '13px', marginBottom: '10px' }}>
+                              {entryCount > 0
+                                ? `Permanently delete "${item.name}" and ${entryCount} historical record${entryCount === 1 ? '' : 's'}?`
+                                : `Permanently delete "${item.name}"?`}
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => deleteStackItem(item.id)}
+                                style={{
+                                  background: 'rgba(239, 68, 68, 0.3)',
+                                  border: '1px solid rgba(239, 68, 68, 0.5)',
+                                  borderRadius: '3px',
+                                  padding: '8px 16px',
+                                  color: '#fca5a5',
+                                  fontSize: '13px',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Delete forever
+                              </button>
+                              <button
+                                onClick={() => setConfirmingDeleteId(null)}
+                                style={{
+                                  background: 'rgba(255, 255, 255, 0.05)',
+                                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                                  borderRadius: '3px',
+                                  padding: '8px 16px',
+                                  color: '#9ca3af',
+                                  fontSize: '13px',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            {!showAddForm && (
+              <button
+                onClick={() => {
+                  setShowAddForm(true);
+                  if (manageScrollRef.current) {
+                    manageScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '16px 20px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                  color: '#9ca3af',
+                  fontSize: '14px',
+                  fontWeight: '400',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <span style={{ fontSize: '18px', color: '#6b7280' }}>+</span>
+                Add new supplement
+              </button>
+            )}
+            </div>
+          </div>
+          </div>
+        )
       )}
+
+      {/* Log Picker */}
+      {showLogPicker && (() => {
+        const logPickerList = (
+          <div style={{
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            flex: 1,
+          }}>
+            {availableToLog.length === 0 ? (
+              <div style={{
+                padding: '40px 20px',
+                textAlign: 'center',
+                color: '#6b7280',
+                fontSize: '14px',
+              }}>
+                All supplements have been logged for this day.
+              </div>
+            ) : availableToLog.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  haptic('light');
+                  toggleStackItem(item.id);
+                  setShowLogPicker(false);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '16px 20px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                  color: '#e5e7eb',
+                  fontSize: '15px',
+                  fontWeight: '400',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  textAlign: 'left',
+                }}
+              >
+                <div>
+                  <span>{item.name}</span>
+                  {!item.active && (
+                    <span style={{ color: '#6b7280', fontSize: '11px', marginLeft: '4px' }}>(hidden)</span>
+                  )}
+                  {item.description && (
+                    <span style={{ color: '#6b7280', fontSize: '13px', marginLeft: '8px' }}>
+                      {item.description}
+                    </span>
+                  )}
+                </div>
+                <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                  {item.defaultDose} {item.unit}
+                </span>
+              </button>
+            ))}
+            {/* Show hidden toggle */}
+            <button
+              onClick={() => setShowHiddenInPicker(prev => !prev)}
+              style={{
+                width: '100%',
+                padding: '12px 20px',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                color: showHiddenInPicker ? '#a78bfa' : '#6b7280',
+                fontSize: '13px',
+                fontWeight: '400',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <span style={{ fontSize: '14px' }}>{showHiddenInPicker ? '◉' : '○'}</span>
+              Show hidden
+            </button>
+            {/* Add new supplement option */}
+            <button
+              onClick={() => {
+                pendingLogAfterAdd.current = true;
+                setShowLogPicker(false);
+                setShowManageStack(true);
+                setShowAddForm(true);
+              }}
+              style={{
+                width: '100%',
+                padding: '16px 20px',
+                background: 'transparent',
+                border: 'none',
+                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                color: '#9ca3af',
+                fontSize: '14px',
+                fontWeight: '400',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
+              <span style={{ fontSize: '18px', color: '#6b7280' }}>+</span>
+              Add new supplement
+            </button>
+          </div>
+        );
+
+        return isDesktop ? (
+          /* Desktop: side panel */
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1000,
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}
+            onClick={() => setShowLogPicker(false)}
+          >
+            <div
+              style={{
+                width: '380px',
+                height: '100%',
+                background: '#1a1b1e',
+                borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                animation: 'slideInRight 0.2s ease-out',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '24px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexShrink: 0,
+              }}>
+                <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+                  Log supplement
+                </h3>
+                <button
+                  onClick={() => setShowLogPicker(false)}
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#9ca3af',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              {logPickerList}
+            </div>
+          </div>
+        ) : (
+          /* Mobile: bottom sheet */
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.7)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              paddingBottom: '76px',
+            }}
+            onClick={() => setShowLogPicker(false)}
+          >
+            <div
+              style={{
+                background: '#1a1b1e',
+                borderRadius: '16px',
+                width: 'calc(100% - 32px)',
+                maxWidth: '500px',
+                maxHeight: '50vh',
+                display: 'flex',
+                flexDirection: 'column',
+                animation: 'modalIn 0.2s ease-out',
+                marginBottom: '8px',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '20px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+                <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+                  Log supplement
+                </h3>
+                <button
+                  onClick={() => setShowLogPicker(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#6b7280',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    padding: '8px 12px',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+              {logPickerList}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Full-screen Supplement Edit */}
       {editingSupplementId && (

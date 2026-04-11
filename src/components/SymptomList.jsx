@@ -781,30 +781,6 @@ export default function SymptomList({
 
             const hasAnyEntry = trackingMode === 'ampm' ? (amEntry || pmEntry) : maxEntry;
 
-            // Sparkline data
-            const days = 7;
-            const today = new Date();
-            const vals = [];
-            for (let d = days - 1; d >= 0; d--) {
-              const dt = new Date(today);
-              dt.setDate(dt.getDate() - d);
-              const dk = getDateKey(dt);
-              const am = entries[`${dk}-${symptom.id}-morning`];
-              const pm = entries[`${dk}-${symptom.id}-evening`];
-              const daily = entries[`${dk}-${symptom.id}-daily`];
-              const sevs = [];
-              if (am && am.severity !== NA_SEVERITY) sevs.push(am.severity);
-              if (pm && pm.severity !== NA_SEVERITY) sevs.push(pm.severity);
-              if (sevs.length === 0 && daily && daily.severity !== NA_SEVERITY) sevs.push(daily.severity);
-              vals.push(sevs.length > 0 ? sevs.reduce((a, b) => a + b, 0) / sevs.length : null);
-            }
-            const hasSparkData = vals.some(v => v !== null);
-            const sparkW = 200, sparkH = 40;
-            const nonNullPts = [];
-            vals.forEach((v, i) => {
-              if (v !== null) nonNullPts.push({ x: (i / (vals.length - 1)) * sparkW, y: sparkH - (v / 5) * sparkH });
-            });
-            const pathD = nonNullPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join('');
 
             return (
               <div
@@ -992,20 +968,6 @@ export default function SymptomList({
                   </div>
                 </div>
 
-                {/* Sparkline — full tile width */}
-                {hasSparkData && (
-                  <div
-                    style={{ cursor: 'pointer', margin: '0 -10px -6px 0' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (onOpenGraph) onOpenGraph(symptom.id);
-                    }}
-                  >
-                    <svg width="100%" height={sparkH} viewBox={`0 0 ${sparkW} ${sparkH}`} preserveAspectRatio="none" style={{ display: 'block' }}>
-                      <path d={pathD} fill="none" stroke="rgba(139, 92, 246, 0.5)" strokeWidth="1.5" />
-                    </svg>
-                  </div>
-                )}
 
                 {/* Quick log popup for this card */}
                 {quickLogSymptom === symptom.id && popupPosition && (() => {
@@ -1178,53 +1140,6 @@ export default function SymptomList({
                 </div>
               </div>
 
-              {/* Desktop: mini sparkline + recent avg */}
-              {isDesktop && (() => {
-                const days = 7;
-                const today = new Date();
-                const vals = [];
-                for (let d = days - 1; d >= 0; d--) {
-                  const dt = new Date(today);
-                  dt.setDate(dt.getDate() - d);
-                  const dk = getDateKey(dt);
-                  // Get daily value
-                  const am = entries[`${dk}-${symptom.id}-morning`];
-                  const pm = entries[`${dk}-${symptom.id}-evening`];
-                  const daily = entries[`${dk}-${symptom.id}-daily`];
-                  const sevs = [];
-                  if (am && am.severity !== NA_SEVERITY) sevs.push(am.severity);
-                  if (pm && pm.severity !== NA_SEVERITY) sevs.push(pm.severity);
-                  if (sevs.length === 0 && daily && daily.severity !== NA_SEVERITY) sevs.push(daily.severity);
-                  vals.push(sevs.length > 0 ? sevs.reduce((a, b) => a + b, 0) / sevs.length : null);
-                }
-                const hasData = vals.some(v => v !== null);
-                if (!hasData) return null;
-                const validVals = vals.filter(v => v !== null);
-                const avg = validVals.length > 0 ? (validVals.reduce((a, b) => a + b, 0) / validVals.length).toFixed(1) : '--';
-                // Mini sparkline as inline SVG
-                const w = 50, h = 20;
-                const nonNullPts = [];
-                vals.forEach((v, i) => {
-                  if (v !== null) nonNullPts.push({ x: (i / (vals.length - 1)) * w, y: h - (v / 5) * h });
-                });
-                const pathD = nonNullPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join('');
-                return (
-                  <div
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginRight: '4px', cursor: 'pointer' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (onOpenGraph) onOpenGraph(symptom.id);
-                    }}
-                  >
-                    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
-                      <path d={pathD} fill="none" stroke="rgba(139, 92, 246, 0.5)" strokeWidth="1.5" />
-                    </svg>
-                    <span style={{ color: '#6b7280', fontSize: '12px', fontWeight: '500', minWidth: '24px', textAlign: 'right' }}>
-                      {avg}
-                    </span>
-                  </div>
-                );
-              })()}
 
               {/* Right side: AM/PM badges - minus circle for unentered */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -1690,12 +1605,10 @@ export default function SymptomList({
           style={isDesktop ? {
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.6)',
+            background: 'rgba(0, 0, 0, 0.5)',
             zIndex: 1000,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '40px',
+            justifyContent: 'flex-end',
           } : {
             position: 'fixed',
             inset: 0,
@@ -1709,19 +1622,47 @@ export default function SymptomList({
           <div
             onClick={isDesktop ? (e) => e.stopPropagation() : undefined}
             style={isDesktop ? {
-              width: '100%',
-              maxWidth: '900px',
-              maxHeight: '80vh',
-              background: '#08090A',
-              borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.1)',
+              width: '420px',
+              height: '100%',
+              background: '#1a1b1e',
+              borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
               display: 'flex',
               flexDirection: 'column',
-              overflow: 'hidden',
+              animation: 'slideInRight 0.2s ease-out',
+              position: 'relative',
             } : {
               display: 'contents',
             }}
           >
+          {isDesktop && (
+            <div style={{
+              padding: '24px',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexShrink: 0,
+            }}>
+              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+                Manage symptoms
+              </h3>
+              <button
+                onClick={() => setShowAddSymptom(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#9ca3af',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
           {/* Scrollable Content */}
           <div
             ref={manageScrollRef}
@@ -1731,7 +1672,7 @@ export default function SymptomList({
               WebkitOverflowScrolling: 'touch',
               overscrollBehavior: 'contain',
               padding: isDesktop ? '24px 32px' : '12px 16px',
-              paddingBottom: '180px',
+              paddingBottom: '20px',
             }}
           >
             <div style={{ maxWidth: isDesktop ? '100%' : '500px', margin: '0 auto' }}>
@@ -1855,6 +1796,24 @@ export default function SymptomList({
                   }}
                 >
                   Add Symptom
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setNewSymptomName('');
+                  }}
+                  style={{
+                    marginTop: '6px',
+                    width: '100%',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '10px',
+                    color: '#6b7280',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
                 </button>
               </div>
             )}
@@ -2060,23 +2019,6 @@ export default function SymptomList({
                 )}
               </div>
             )}
-            </div>
-          </div>
-
-          {/* Fixed Bottom Bar */}
-          <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            padding: '16px 16px 30px',
-            background: 'linear-gradient(transparent, #08090A 25%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '12px',
-            zIndex: 10,
-          }}>
             {!showAddForm && (
               <button
                 onClick={() => {
@@ -2087,37 +2029,26 @@ export default function SymptomList({
                 }}
                 style={{
                   width: '100%',
-                  maxWidth: '500px',
-                  padding: '14px',
-                  background: 'rgba(139, 92, 246, 0.06)',
-                  border: '2px dashed rgba(139, 92, 246, 0.3)',
-                  borderRadius: '12px',
-                  color: '#a78bfa',
-                  fontSize: '15px',
-                  fontWeight: '500',
+                  padding: '16px 20px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                  color: '#9ca3af',
+                  fontSize: '14px',
+                  fontWeight: '400',
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
                 }}
               >
-                + Add Symptom
+                <span style={{ fontSize: '18px', color: '#6b7280' }}>+</span>
+                Add new symptom
               </button>
             )}
-            <button
-              onClick={() => setShowAddSymptom(false)}
-              style={{
-                background: '#8b5cf6',
-                border: 'none',
-                borderRadius: '25px',
-                color: '#fff',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                padding: '14px 40px',
-                boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
-              }}
-            >
-              Done
-            </button>
+            </div>
           </div>
+
           </div>
         </div>
       )}

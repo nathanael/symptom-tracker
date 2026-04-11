@@ -205,12 +205,10 @@ export default function Settings({
       style={isDesktop ? {
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.6)',
+        background: 'rgba(0, 0, 0, 0.5)',
         zIndex: 100,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px',
+        justifyContent: 'flex-end',
       } : {
         position: 'fixed',
         top: 0,
@@ -227,13 +225,14 @@ export default function Settings({
     >
       <div
         style={isDesktop ? {
-          maxWidth: '600px',
-          width: '100%',
-          maxHeight: '80vh',
+          width: '420px',
+          height: '100%',
+          background: '#1a1b1e',
+          borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          flexDirection: 'column',
+          animation: 'slideInRight 0.2s ease-out',
           overflowY: 'auto',
-          background: '#08090A',
-          borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.1)',
           padding: '24px',
         } : {
           maxWidth: '700px',
@@ -241,6 +240,34 @@ export default function Settings({
         }}
         onClick={isDesktop ? (e) => e.stopPropagation() : undefined}
       >
+        {isDesktop && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '24px',
+            flexShrink: 0,
+          }}>
+            <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+              Settings
+            </h3>
+            <button
+              onClick={() => setShowSettings(false)}
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#9ca3af',
+                fontSize: '14px',
+                cursor: 'pointer',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
         {/* Cloud Sync Section */}
         <div style={{ marginBottom: '8px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
           CLOUD SYNC

@@ -83,6 +83,11 @@ body.no-scroll {
   }
 }
 
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 @keyframes revertFlash {
   0% { background: rgba(139, 92, 246, 0.3); }
   100% { background: rgba(15, 23, 42, 0.6); }
