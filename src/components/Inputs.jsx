@@ -264,17 +264,7 @@ export default function Inputs({
 
   // Manage modal
   if (showManageInputs) {
-    return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        background: '#08090A',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        animation: 'modalIn 0.2s ease-out',
-      }}>
-        {/* Scrollable Content */}
+    const manageScrollContent = (
         <div
           ref={manageScrollRef}
           style={{
@@ -282,11 +272,11 @@ export default function Inputs({
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior: 'contain',
-            padding: '12px 16px',
-            paddingBottom: '180px',
+            padding: isDesktop ? '24px' : '12px 16px',
+            paddingBottom: '20px',
           }}
         >
-          <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+          <div style={{ maxWidth: isDesktop ? '100%' : '500px', margin: '0 auto' }}>
 
             {/* Add Input Form (at top, when expanded) */}
             {showAddForm && (
@@ -381,6 +371,24 @@ export default function Inputs({
                     }}
                   >
                     Add Input
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setNewInput({ name: '', description: '', category: 'food' });
+                    }}
+                    style={{
+                      marginTop: '6px',
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '10px',
+                      color: '#6b7280',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
                   </button>
                 </div>
               </div>
@@ -610,64 +618,128 @@ export default function Inputs({
                 )}
               </div>
             )}
+            {!showAddForm && (
+              <button
+                onClick={() => {
+                  setShowAddForm(true);
+                  if (manageScrollRef.current) {
+                    manageScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '16px 20px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                  color: '#9ca3af',
+                  fontSize: '14px',
+                  fontWeight: '400',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                }}
+              >
+                <span style={{ fontSize: '18px', color: '#6b7280' }}>+</span>
+                Add new input
+              </button>
+            )}
           </div>
         </div>
+    );
 
-        {/* Fixed Bottom Bar */}
-        <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: '16px 16px 30px',
-          background: 'linear-gradient(transparent, #08090A 25%)',
+    return isDesktop ? (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          zIndex: 1000,
           display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '12px',
-          zIndex: 10,
-        }}>
-          {!showAddForm && (
+          justifyContent: 'flex-end',
+        }}
+        onClick={() => setShowManageInputs(false)}
+      >
+        <div
+          style={{
+            width: '420px',
+            height: '100%',
+            background: '#1a1b1e',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            animation: 'slideInRight 0.2s ease-out',
+            position: 'relative',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{
+            padding: '24px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexShrink: 0,
+          }}>
+            <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+              Manage inputs
+            </h3>
             <button
-              onClick={() => {
-                setShowAddForm(true);
-                if (manageScrollRef.current) {
-                  manageScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-              }}
+              onClick={() => setShowManageInputs(false)}
               style={{
-                width: '100%',
-                maxWidth: '500px',
-                padding: '14px',
-                background: 'rgba(139, 92, 246, 0.06)',
-                border: '2px dashed rgba(139, 92, 246, 0.3)',
-                borderRadius: '12px',
-                color: '#a78bfa',
-                fontSize: '15px',
-                fontWeight: '500',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#9ca3af',
+                fontSize: '14px',
                 cursor: 'pointer',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                lineHeight: 1,
               }}
             >
-              + Add Input
+              ✕
             </button>
-          )}
+          </div>
+          {manageScrollContent}
+        </div>
+      </div>
+    ) : (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: '#08090A',
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        animation: 'modalIn 0.2s ease-out',
+      }}>
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0,
+        }}>
+          <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+            Manage inputs
+          </h3>
           <button
             onClick={() => setShowManageInputs(false)}
             style={{
-              background: '#8b5cf6',
+              background: 'transparent',
               border: 'none',
-              borderRadius: '25px',
-              color: '#fff',
+              color: '#9ca3af',
               fontSize: '16px',
-              fontWeight: '600',
               cursor: 'pointer',
-              padding: '14px 40px',
-              boxShadow: '0 4px 20px rgba(139, 92, 246, 0.4)',
+              padding: '6px 10px',
             }}
           >
-            Done
+            ✕
           </button>
         </div>
+        {manageScrollContent}
       </div>
     );
   }

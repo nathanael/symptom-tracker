@@ -1304,6 +1304,32 @@ export default function Stack({
               animation: 'modalIn 0.2s ease-out',
             }}
           >
+          {/* Mobile header */}
+          <div style={{
+            padding: '16px 20px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexShrink: 0,
+          }}>
+            <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+              Manage stack
+            </h3>
+            <button
+              onClick={() => setShowManageStack(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#9ca3af',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '6px 10px',
+              }}
+            >
+              ✕
+            </button>
+          </div>
           {/* Scrollable Content */}
           <div
             ref={manageScrollRef}

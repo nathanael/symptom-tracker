@@ -1634,35 +1634,40 @@ export default function SymptomList({
               display: 'contents',
             }}
           >
-          {isDesktop && (
-            <div style={{
-              padding: '24px',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexShrink: 0,
-            }}>
-              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
-                Manage symptoms
-              </h3>
-              <button
-                onClick={() => setShowAddSymptom(false)}
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#9ca3af',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  lineHeight: 1,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-          )}
+          <div style={{
+            padding: isDesktop ? '24px' : '16px 20px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexShrink: 0,
+          }}>
+            <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+              Manage symptoms
+            </h3>
+            <button
+              onClick={() => setShowAddSymptom(false)}
+              style={isDesktop ? {
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#9ca3af',
+                fontSize: '14px',
+                cursor: 'pointer',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                lineHeight: 1,
+              } : {
+                background: 'transparent',
+                border: 'none',
+                color: '#9ca3af',
+                fontSize: '16px',
+                cursor: 'pointer',
+                padding: '6px 10px',
+              }}
+            >
+              ✕
+            </button>
+          </div>
           {/* Scrollable Content */}
           <div
             ref={manageScrollRef}
