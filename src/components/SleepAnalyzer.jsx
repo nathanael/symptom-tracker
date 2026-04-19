@@ -18,10 +18,38 @@ const MODES = [
   { key: 'months', label: 'Months' },
 ];
 
+export const METRICS = [
+  { key: 'sleepScore',       label: 'Score',  unit: '' },
+  { key: 'duration',         label: 'Time',   unit: 'min',
+    compute: d => {
+      const total = (d.deepSleepSeconds || 0) + (d.lightSleepSeconds || 0) + (d.remSleepSeconds || 0);
+      return total ? Math.round(total / 60) : null;
+    } },
+  { key: 'remSleepSeconds',  label: 'REM',    unit: 'min',
+    transform: v => Math.round(v / 60),
+    refs: [{ y: 60, color: '#ef4444' }, { y: 90, color: '#10b981' }] },
+  { key: 'deepSleepSeconds', label: 'Deep',   unit: 'min',
+    transform: v => Math.round(v / 60),
+    refs: [{ y: 60, color: '#f59e0b' }] },
+  { key: 'averageRespiration', label: 'Resp', unit: 'brpm' },
+  { key: 'lowestSpo2',       label: 'SpO2',   unit: '%' },
+  { key: 'avgSleepStress',   label: 'Stress', unit: '' },
+  { key: 'hrvOvernight',     label: 'HRV',    unit: 'ms' },
+];
+
+export function valueForRow(metric, row) {
+  if (!row) return null;
+  if (metric.compute) return metric.compute(row);
+  const raw = row[metric.key];
+  if (raw == null) return null;
+  return metric.transform ? metric.transform(raw) : raw;
+}
+
 export default function SleepAnalyzer({ user, isDesktop }) {
   const { days, loading, error } = useGarminSleep(user);
   const [preset, setPreset] = useState('3mo');
   const [viewMode, setViewMode] = useState('weeks');
+  const [activeMetric, setActiveMetric] = useState('sleepScore');
 
   const availableMin = days.length ? days[0].date : null;
   const availableMax = days.length ? days[days.length - 1].date : null;
@@ -32,6 +60,11 @@ export default function SleepAnalyzer({ user, isDesktop }) {
     const sliced = days.filter(d => d.date >= range.start && d.date <= range.end);
     return aggregate(sliced, viewMode);
   }, [days, preset, viewMode, availableMin, availableMax]);
+
+  const activeMetricDef = useMemo(
+    () => METRICS.find(m => m.key === activeMetric),
+    [activeMetric]
+  );
 
   if (!user) {
     return <div style={styles.empty}>Sign in with Google in Settings to view Garmin sleep data.</div>;
@@ -51,14 +84,24 @@ export default function SleepAnalyzer({ user, isDesktop }) {
     );
   }
 
+  const firstValue = visible.length ? valueForRow(activeMetricDef, visible[0]) : null;
+  const lastValue = visible.length ? valueForRow(activeMetricDef, visible[visible.length - 1]) : null;
+
   return (
     <div style={styles.root}>
+      <SegmentedToggle options={METRICS.map(m => ({ key: m.key, label: m.label }))}
+                       value={activeMetric} onChange={setActiveMetric} />
+      <div style={{ height: 8 }} />
       <SegmentedToggle options={PRESETS} value={preset} onChange={setPreset} />
       <div style={{ height: 8 }} />
       <SegmentedToggle options={MODES} value={viewMode} onChange={setViewMode} />
       <div style={styles.stub}>
-        Visible: {visible.length} {viewMode === 'days' ? 'day' : viewMode.slice(0, -1)}
-        {visible.length === 1 ? '' : 's'} ({availableMin} to {availableMax}, {days.length} total)
+        <div style={{ fontWeight: 600, color: '#e5e7eb', marginBottom: 4 }}>
+          {activeMetricDef.label} {activeMetricDef.unit && `(${activeMetricDef.unit})`}
+        </div>
+        <div style={{ fontSize: 12 }}>
+          {visible.length} bucket(s). First: {firstValue}, Last: {lastValue}
+        </div>
       </div>
     </div>
   );
