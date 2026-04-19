@@ -775,6 +775,7 @@ function App() {
           }}>
             {showInsights ? (
               <Insights
+                user={firebase.user}
                 entries={deferredEntries}
                 symptoms={symptoms}
                 stackItems={stackItems}
@@ -1233,6 +1234,7 @@ function App() {
       {/* Insights - mobile only as overlay (desktop renders inline) */}
       {showInsights && !isDesktop && (
         <Insights
+          user={firebase.user}
           entries={deferredEntries}
           symptoms={symptoms}
           stackItems={stackItems}
