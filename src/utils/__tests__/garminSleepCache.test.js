@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mergeDays } from '../garminSleepCache';
+import { mergeDays, aggregate } from '../garminSleepCache';
 
 describe('mergeDays', () => {
   it('returns incoming sorted when cache is empty', () => {
@@ -20,5 +20,35 @@ describe('mergeDays', () => {
       { date: '2026-04-01', sleepScore: 70 },
       { date: '2026-04-02', sleepScore: 75 },
     ]);
+  });
+});
+
+describe('aggregate', () => {
+  const days = [
+    { date: '2026-04-06', sleepScore: 80, remSleepSeconds: 3600 }, // Mon
+    { date: '2026-04-07', sleepScore: 82, remSleepSeconds: 3900 },
+    { date: '2026-04-08', sleepScore: 84, remSleepSeconds: 4200 },
+    { date: '2026-04-13', sleepScore: 70, remSleepSeconds: 3000 }, // next Mon
+  ];
+
+  it('passes through in days mode', () => {
+    expect(aggregate(days, 'days')).toEqual(days);
+  });
+
+  it('buckets by ISO week and averages numeric fields', () => {
+    const weeks = aggregate(days, 'weeks');
+    expect(weeks).toHaveLength(2);
+    expect(weeks[0].date).toBe('2026-04-06');
+    expect(weeks[0].sleepScore).toBe(82);       // (80+82+84)/3
+    expect(weeks[0].remSleepSeconds).toBe(3900);
+    expect(weeks[1].date).toBe('2026-04-13');
+    expect(weeks[1].sleepScore).toBe(70);
+  });
+
+  it('buckets by month', () => {
+    const months = aggregate(days, 'months');
+    expect(months).toHaveLength(1);
+    expect(months[0].date).toBe('2026-04-01');
+    expect(months[0].sleepScore).toBe(79);      // (80+82+84+70)/4 rounded
   });
 });
