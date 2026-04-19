@@ -146,7 +146,7 @@ export default function SleepAnalyzer({ user, isDesktop }) {
   }
 
   return (
-    <div style={styles.root}>
+    <div style={{ ...styles.root, ...styles.card }}>
       <div style={{ display: 'flex', marginBottom: 8 }}>
         <button
           onClick={() => setCompareMode(m => !m)}
@@ -176,8 +176,56 @@ export default function SleepAnalyzer({ user, isDesktop }) {
           </div>
         )}
       </div>
-      <SegmentedToggle options={METRICS.map(m => ({ key: m.key, label: m.label }))}
-                       value={activeMetric} onChange={setActiveMetric} />
+      {compareMode && compareType === 'custom' && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, fontSize: 12, color: '#9ca3af' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ marginBottom: 2 }}>Period A</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <input type="date" value={period1.start} min={availableMin} max={availableMax}
+                     onChange={e => setPeriod1({ ...period1, start: e.target.value })}
+                     style={styles.dateInputStyle} />
+              <input type="date" value={period1.end} min={availableMin} max={availableMax}
+                     onChange={e => setPeriod1({ ...period1, end: e.target.value })}
+                     style={styles.dateInputStyle} />
+            </div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ marginBottom: 2 }}>Period B</div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <input type="date" value={period2.start} min={availableMin} max={availableMax}
+                     onChange={e => setPeriod2({ ...period2, start: e.target.value })}
+                     style={styles.dateInputStyle} />
+              <input type="date" value={period2.end} min={availableMin} max={availableMax}
+                     onChange={e => setPeriod2({ ...period2, end: e.target.value })}
+                     style={styles.dateInputStyle} />
+            </div>
+          </div>
+        </div>
+      )}
+      <div style={{
+        display: 'flex', overflowX: 'auto', WebkitOverflowScrolling: 'touch',
+        gap: 4, borderRadius: 8, background: 'rgba(255,255,255,0.06)', padding: 2,
+      }}>
+        {METRICS.map(m => {
+          const active = m.key === activeMetric;
+          return (
+            <button
+              key={m.key}
+              onClick={() => setActiveMetric(m.key)}
+              style={{
+                flex: '0 0 auto', minWidth: 64,
+                padding: '6px 10px', fontSize: 13, borderRadius: 6,
+                border: 'none', cursor: 'pointer',
+                color: active ? '#fff' : '#9ca3af',
+                background: active ? 'rgba(255,255,255,0.15)' : 'transparent',
+                fontWeight: active ? 600 : 500,
+              }}
+            >
+              {m.label}
+            </button>
+          );
+        })}
+      </div>
       <div style={{ height: 8 }} />
       <SegmentedToggle options={PRESETS} value={preset} onChange={setPreset} />
       <div style={{ height: 8 }} />
@@ -309,9 +357,24 @@ function PeriodStat({ label, period, value, unit, better }) {
 
 const styles = {
   root: { color: '#e5e7eb' },
+  card: {
+    background: 'rgba(15,17,21,0.6)',
+    border: '1px solid rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 16,
+  },
   empty: { color: '#9ca3af', padding: '24px', textAlign: 'center' },
   chartWrap: { marginTop: 16 },
   metricHeader: {
     fontSize: 13, fontWeight: 600, color: '#e5e7eb', marginBottom: 8,
+  },
+  dateInputStyle: {
+    flex: 1, minWidth: 0,
+    padding: '4px 6px', fontSize: 11,
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 4,
+    color: '#e5e7eb',
+    colorScheme: 'dark',
   },
 };
