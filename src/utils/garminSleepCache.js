@@ -86,3 +86,85 @@ export function applyFirestoreSnapshot(cache, lastPushedAt, docs) {
   }
   return { merged: mergeDays(cache, incoming), newestTs };
 }
+
+// Compute {avgA, avgB, delta, pctChange, betterSide} for a metric across two row sets.
+// valueFn extracts the numeric value from a row (typically the caller wraps valueForRow).
+// betterSide is 'a', 'b', or 'equal' based on higherIsBetter.
+export function computeCompareStats(rowsA, rowsB, valueFn, higherIsBetter) {
+  const avg = (rows) => {
+    const vals = rows.map(valueFn).filter(v => typeof v === 'number');
+    if (!vals.length) return null;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  };
+  const avgA = avg(rowsA);
+  const avgB = avg(rowsB);
+  if (avgA == null || avgB == null) {
+    return { avgA, avgB, delta: null, pctChange: null, betterSide: 'equal' };
+  }
+  const delta = avgB - avgA;
+  const pctChange = avgA === 0 ? null : (delta / avgA) * 100;
+  let betterSide = 'equal';
+  if (avgB > avgA) betterSide = higherIsBetter ? 'b' : 'a';
+  else if (avgB < avgA) betterSide = higherIsBetter ? 'a' : 'b';
+  return { avgA, avgB, delta, pctChange, betterSide };
+}
+
+// Given sorted-ascending days and a "now" date (ISO string), return default
+// period2 = last 14 days of data, period1 = the 14 days before that.
+// Uses calendar arithmetic, not array slicing (data may be sparse).
+export function defaultComparePeriods(days) {
+  if (!days.length) {
+    return { period1: { start: '', end: '' }, period2: { start: '', end: '' } };
+  }
+  const max = days[days.length - 1].date;
+  const maxDate = new Date(max + 'T00:00:00Z');
+  const p2Start = new Date(maxDate);
+  p2Start.setUTCDate(p2Start.getUTCDate() - 13);
+  const p1End = new Date(p2Start);
+  p1End.setUTCDate(p1End.getUTCDate() - 1);
+  const p1Start = new Date(p1End);
+  p1Start.setUTCDate(p1Start.getUTCDate() - 13);
+  const iso = (d) => d.toISOString().slice(0, 10);
+  return {
+    period1: { start: iso(p1Start), end: iso(p1End) },
+    period2: { start: iso(p2Start), end: max },
+  };
+}
+
+// Shift period1 to be the "previous period" of period2 (same length, immediately before).
+export function previousPeriodOf(period2) {
+  const start2 = new Date(period2.start + 'T00:00:00Z');
+  const end2 = new Date(period2.end + 'T00:00:00Z');
+  const lengthDays = Math.round((end2 - start2) / 86400000) + 1;
+  const end1 = new Date(start2);
+  end1.setUTCDate(end1.getUTCDate() - 1);
+  const start1 = new Date(end1);
+  start1.setUTCDate(start1.getUTCDate() - (lengthDays - 1));
+  const iso = (d) => d.toISOString().slice(0, 10);
+  return { start: iso(start1), end: iso(end1) };
+}
+
+// Shift period1 to be "same period last year" of period2.
+export function priorYearPeriodOf(period2) {
+  const shift = (iso) => {
+    const d = new Date(iso + 'T00:00:00Z');
+    d.setUTCFullYear(d.getUTCFullYear() - 1);
+    return d.toISOString().slice(0, 10);
+  };
+  return { start: shift(period2.start), end: shift(period2.end) };
+}
+
+// Align two sequential row sets by relative index for a shared X chart.
+// Each output entry: { i, aValue, bValue }.
+export function alignByIndex(rowsA, rowsB, valueFn) {
+  const n = Math.max(rowsA.length, rowsB.length);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({
+      i,
+      aValue: i < rowsA.length ? valueFn(rowsA[i]) : null,
+      bValue: i < rowsB.length ? valueFn(rowsB[i]) : null,
+    });
+  }
+  return out;
+}

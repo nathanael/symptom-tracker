@@ -141,3 +141,85 @@ describe('applyFirestoreSnapshot', () => {
     expect(merged[0].syncedAt).toBe('2026-04-19T01:00:00.000Z');
   });
 });
+
+import {
+  computeCompareStats,
+  defaultComparePeriods,
+  previousPeriodOf,
+  priorYearPeriodOf,
+  alignByIndex,
+} from '../garminSleepCache';
+
+describe('computeCompareStats', () => {
+  const rowsA = [{ v: 70 }, { v: 72 }, { v: 74 }];  // avg 72
+  const rowsB = [{ v: 80 }, { v: 82 }];              // avg 81
+  const getV = r => r.v;
+
+  it('higherIsBetter: b wins when avgB > avgA', () => {
+    const r = computeCompareStats(rowsA, rowsB, getV, true);
+    expect(r.avgA).toBe(72); expect(r.avgB).toBe(81);
+    expect(r.delta).toBe(9); expect(r.pctChange).toBeCloseTo(12.5, 1);
+    expect(r.betterSide).toBe('b');
+  });
+
+  it('lowerIsBetter: a wins when avgB > avgA', () => {
+    const r = computeCompareStats(rowsA, rowsB, getV, false);
+    expect(r.betterSide).toBe('a');
+  });
+
+  it('empty input returns equal with null stats', () => {
+    const r = computeCompareStats([], rowsB, getV, true);
+    expect(r.avgA).toBe(null); expect(r.delta).toBe(null);
+    expect(r.betterSide).toBe('equal');
+  });
+
+  it('equal averages return equal', () => {
+    const r = computeCompareStats([{ v: 70 }], [{ v: 70 }], getV, true);
+    expect(r.betterSide).toBe('equal');
+  });
+});
+
+describe('defaultComparePeriods', () => {
+  it('derives 14-day windows ending on last day of data', () => {
+    const days = [
+      { date: '2026-01-01' },
+      { date: '2026-04-19' },  // only max matters; sparse is OK
+    ];
+    const { period1, period2 } = defaultComparePeriods(days);
+    expect(period2).toEqual({ start: '2026-04-06', end: '2026-04-19' });
+    expect(period1).toEqual({ start: '2026-03-23', end: '2026-04-05' });
+  });
+
+  it('returns empty ranges when days empty', () => {
+    expect(defaultComparePeriods([])).toEqual({
+      period1: { start: '', end: '' },
+      period2: { start: '', end: '' },
+    });
+  });
+});
+
+describe('previousPeriodOf', () => {
+  it('returns the immediately-preceding same-length window', () => {
+    expect(previousPeriodOf({ start: '2026-04-06', end: '2026-04-19' }))
+      .toEqual({ start: '2026-03-23', end: '2026-04-05' });
+  });
+});
+
+describe('priorYearPeriodOf', () => {
+  it('shifts both endpoints back by one year', () => {
+    expect(priorYearPeriodOf({ start: '2026-04-06', end: '2026-04-19' }))
+      .toEqual({ start: '2025-04-06', end: '2025-04-19' });
+  });
+});
+
+describe('alignByIndex', () => {
+  it('pairs by index, padding shorter side with null', () => {
+    const a = [{ v: 1 }, { v: 2 }, { v: 3 }];
+    const b = [{ v: 10 }, { v: 20 }];
+    expect(alignByIndex(a, b, r => r.v)).toEqual([
+      { i: 0, aValue: 1,  bValue: 10 },
+      { i: 1, aValue: 2,  bValue: 20 },
+      { i: 2, aValue: 3,  bValue: null },
+    ]);
+  });
+});
