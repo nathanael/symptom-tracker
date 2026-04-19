@@ -1,4 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine,
+} from 'recharts';
 import { useGarminSleep } from '../hooks/useGarminSleep';
 import { aggregate, rangeForPreset } from '../utils/garminSleepCache';
 
@@ -66,6 +70,14 @@ export default function SleepAnalyzer({ user, isDesktop }) {
     [activeMetric]
   );
 
+  const chartData = useMemo(
+    () => visible.map(row => ({
+      date: row.date,
+      value: valueForRow(activeMetricDef, row),
+    })),
+    [visible, activeMetricDef]
+  );
+
   if (!user) {
     return <div style={styles.empty}>Sign in with Google in Settings to view Garmin sleep data.</div>;
   }
@@ -84,9 +96,6 @@ export default function SleepAnalyzer({ user, isDesktop }) {
     );
   }
 
-  const firstValue = visible.length ? valueForRow(activeMetricDef, visible[0]) : null;
-  const lastValue = visible.length ? valueForRow(activeMetricDef, visible[visible.length - 1]) : null;
-
   return (
     <div style={styles.root}>
       <SegmentedToggle options={METRICS.map(m => ({ key: m.key, label: m.label }))}
@@ -95,13 +104,57 @@ export default function SleepAnalyzer({ user, isDesktop }) {
       <SegmentedToggle options={PRESETS} value={preset} onChange={setPreset} />
       <div style={{ height: 8 }} />
       <SegmentedToggle options={MODES} value={viewMode} onChange={setViewMode} />
-      <div style={styles.stub}>
-        <div style={{ fontWeight: 600, color: '#e5e7eb', marginBottom: 4 }}>
-          {activeMetricDef.label} {activeMetricDef.unit && `(${activeMetricDef.unit})`}
+      <div style={styles.chartWrap}>
+        <div style={styles.metricHeader}>
+          {activeMetricDef.label}{activeMetricDef.unit && ` (${activeMetricDef.unit})`}
         </div>
-        <div style={{ fontSize: 12 }}>
-          {visible.length} bucket(s). First: {firstValue}, Last: {lastValue}
-        </div>
+        <ResponsiveContainer width="100%" height={isDesktop ? 360 : 280}>
+          <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 4, left: -12 }}>
+            <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+            <XAxis
+              dataKey="date"
+              tick={{ fill: '#6b7280', fontSize: 11 }}
+              axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+              tickLine={false}
+              minTickGap={24}
+            />
+            <YAxis
+              tick={{ fill: '#6b7280', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              width={36}
+            />
+            <Tooltip
+              contentStyle={{
+                background: 'rgba(15,17,21,0.95)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 6,
+                color: '#e5e7eb',
+                fontSize: 12,
+              }}
+              labelStyle={{ color: '#9ca3af' }}
+            />
+            {(activeMetricDef.refs || []).map((ref, i) => (
+              <ReferenceLine
+                key={i}
+                y={ref.y}
+                stroke={ref.color}
+                strokeDasharray="4 4"
+                strokeOpacity={0.6}
+              />
+            ))}
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke="#60a5fa"
+              strokeWidth={2}
+              dot={{ r: 2.5, fill: '#60a5fa' }}
+              activeDot={{ r: 4 }}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
@@ -138,5 +191,8 @@ function SegmentedToggle({ options, value, onChange }) {
 const styles = {
   root: { color: '#e5e7eb' },
   empty: { color: '#9ca3af', padding: '24px', textAlign: 'center' },
-  stub: { marginTop: 16, color: '#9ca3af', fontSize: 13 },
+  chartWrap: { marginTop: 16 },
+  metricHeader: {
+    fontSize: 13, fontWeight: 600, color: '#e5e7eb', marginBottom: 8,
+  },
 };
