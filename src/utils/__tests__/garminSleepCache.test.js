@@ -79,3 +79,65 @@ describe('rangeForPreset', () => {
       .toEqual({ start: '2026-03-01', end: '2026-04-19' });
   });
 });
+
+import { extractSyncedAtIso, applyFirestoreSnapshot } from '../garminSleepCache';
+
+describe('extractSyncedAtIso', () => {
+  it('returns null when syncedAt missing', () => {
+    expect(extractSyncedAtIso({ date: '2026-04-18' })).toBe(null);
+  });
+
+  it('handles Firestore Timestamp with toDate()', () => {
+    const ts = { toDate: () => new Date('2026-04-18T12:00:00.000Z') };
+    expect(extractSyncedAtIso({ syncedAt: ts })).toBe('2026-04-18T12:00:00.000Z');
+  });
+
+  it('handles serialized {seconds, nanoseconds} shape', () => {
+    const ts = { seconds: 1776470400, nanoseconds: 0 };  // 2026-04-18T00:00:00Z
+    expect(extractSyncedAtIso({ syncedAt: ts })).toBe('2026-04-18T00:00:00.000Z');
+  });
+
+  it('passes through ISO string', () => {
+    expect(extractSyncedAtIso({ syncedAt: '2026-04-18T12:00:00.000Z' }))
+      .toBe('2026-04-18T12:00:00.000Z');
+  });
+});
+
+describe('applyFirestoreSnapshot', () => {
+  it('first load: merges all docs and picks newest syncedAt', () => {
+    const docs = [
+      { date: '2026-04-17', sleepScore: 80, syncedAt: { toDate: () => new Date('2026-04-18T01:00:00Z') } },
+      { date: '2026-04-18', sleepScore: 82, syncedAt: { toDate: () => new Date('2026-04-19T02:00:00Z') } },
+    ];
+    const { merged, newestTs } = applyFirestoreSnapshot([], null, docs);
+    expect(merged.map(d => d.date)).toEqual(['2026-04-17', '2026-04-18']);
+    expect(merged[1].sleepScore).toBe(82);
+    expect(newestTs).toBe('2026-04-19T02:00:00.000Z');
+  });
+
+  it('delta load: incoming overrides existing cache entry by date', () => {
+    const cache = [{ date: '2026-04-18', sleepScore: 70, syncedAt: '2026-04-18T12:00:00.000Z' }];
+    const docs = [
+      { date: '2026-04-18', sleepScore: 82, syncedAt: { toDate: () => new Date('2026-04-19T01:00:00Z') } },
+    ];
+    const { merged, newestTs } = applyFirestoreSnapshot(cache, '2026-04-18T12:00:00.000Z', docs);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].sleepScore).toBe(82);
+    expect(newestTs).toBe('2026-04-19T01:00:00.000Z');
+  });
+
+  it('no incoming docs: returns cache + existing lastPushedAt', () => {
+    const cache = [{ date: '2026-04-18', sleepScore: 70, syncedAt: '2026-04-18T12:00:00.000Z' }];
+    const { merged, newestTs } = applyFirestoreSnapshot(cache, '2026-04-18T12:00:00.000Z', []);
+    expect(merged).toEqual(cache);
+    expect(newestTs).toBe('2026-04-18T12:00:00.000Z');
+  });
+
+  it('normalizes syncedAt on incoming docs to ISO string', () => {
+    const docs = [
+      { date: '2026-04-18', syncedAt: { toDate: () => new Date('2026-04-19T01:00:00Z') } },
+    ];
+    const { merged } = applyFirestoreSnapshot([], null, docs);
+    expect(merged[0].syncedAt).toBe('2026-04-19T01:00:00.000Z');
+  });
+});

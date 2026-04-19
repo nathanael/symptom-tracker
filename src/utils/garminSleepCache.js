@@ -65,3 +65,24 @@ export function rangeForPreset(preset, availableMin, availableMax) {
     end: availableMax,
   };
 }
+
+export function extractSyncedAtIso(data) {
+  const ts = data && data.syncedAt;
+  if (!ts) return null;
+  if (typeof ts === 'string') return ts;
+  if (typeof ts.toDate === 'function') return ts.toDate().toISOString();
+  if (typeof ts.seconds === 'number') return new Date(ts.seconds * 1000).toISOString();
+  return null;
+}
+
+export function applyFirestoreSnapshot(cache, lastPushedAt, docs) {
+  const incoming = docs.map(raw => {
+    const { syncedAt: _omit, ...rest } = raw;
+    return { ...rest, syncedAt: extractSyncedAtIso(raw) };
+  });
+  let newestTs = lastPushedAt;
+  for (const d of incoming) {
+    if (d.syncedAt && (!newestTs || d.syncedAt > newestTs)) newestTs = d.syncedAt;
+  }
+  return { merged: mergeDays(cache, incoming), newestTs };
+}
