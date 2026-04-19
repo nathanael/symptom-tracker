@@ -49,3 +49,19 @@ export function aggregate(days, mode) {
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
+
+const PRESET_DAYS = { '7d': 7, '14d': 14, '30d': 30, '3mo': 90, '6mo': 180, '1y': 365 };
+
+export function rangeForPreset(preset, availableMin, availableMax) {
+  if (preset === 'all') return { start: availableMin, end: availableMax };
+  const days = PRESET_DAYS[preset];
+  if (!days) throw new Error(`Unknown preset: ${preset}`);
+  const end = new Date(availableMax + 'T00:00:00Z');
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  const startStr = start.toISOString().slice(0, 10);
+  return {
+    start: startStr < availableMin ? availableMin : startStr,
+    end: availableMax,
+  };
+}

@@ -52,3 +52,30 @@ describe('aggregate', () => {
     expect(months[0].sleepScore).toBe(79);      // (80+82+84+70)/4 rounded
   });
 });
+
+import { rangeForPreset } from '../garminSleepCache';
+
+describe('rangeForPreset', () => {
+  const availableMax = '2026-04-19';
+  const availableMin = '2024-01-01';
+
+  it('7d returns last 7 days', () => {
+    expect(rangeForPreset('7d', availableMin, availableMax))
+      .toEqual({ start: '2026-04-13', end: '2026-04-19' });
+  });
+
+  it('1y returns last year', () => {
+    expect(rangeForPreset('1y', availableMin, availableMax))
+      .toEqual({ start: '2025-04-20', end: '2026-04-19' });
+  });
+
+  it('all returns full available range', () => {
+    expect(rangeForPreset('all', availableMin, availableMax))
+      .toEqual({ start: '2024-01-01', end: '2026-04-19' });
+  });
+
+  it('clamps start to availableMin', () => {
+    expect(rangeForPreset('1y', '2026-03-01', '2026-04-19'))
+      .toEqual({ start: '2026-03-01', end: '2026-04-19' });
+  });
+});
