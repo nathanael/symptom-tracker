@@ -156,4 +156,9 @@ describe('buildCSVText — Health Score', () => {
     // 100 - (4/5)*100 = 20
     expect(csv).toMatch(new RegExp(`${dateKey},"Health Score",daily,20`));
   });
+
+  it('omits Health Score row when no symptoms logged that day', () => {
+    const csv = buildCSVText(7, {}, symptoms, 'simple');
+    expect(csv).not.toMatch(/Health Score/);
+  });
 });

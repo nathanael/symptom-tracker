@@ -797,7 +797,10 @@ export const buildCSVText = (days, entries, symptoms, trackingMode) => {
     });
 
   // Health score rows
-  for (let i = 0; i < days; i++) {
+  // NOTE: Health Score rows reuse the existing Symptom/Severity columns with Symptom="Health Score".
+  // Score scale is 0-100 (not 0-5 like severity). Consumers averaging the Severity column should filter
+  // out rows where Symptom="Health Score". The leading "# health_score:" comment documents this for humans.
+  for (let i = 0; i <= days; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     const dateKey = getDateKey(d);
