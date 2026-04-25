@@ -11,8 +11,6 @@ import {
 } from '../utils/garminSleepCache';
 import { METRICS, valueForRow } from '../utils/sleepMetrics';
 
-export { METRICS, valueForRow };  // keep existing import sites working
-
 const PRESETS = [
   { key: '7d',  label: '7D'  },
   { key: '14d', label: '14D' },

@@ -82,27 +82,27 @@ function getMonthKey(dateStr) {
 
 /**
  * Color for a level segment based on whether the change is favorable.
- * Supplements: up = green, down = yellow.
- * Symptoms: down = green, up = yellow.
+ * higherIsBetter=true (Score, supplement adherence): up = green, down = yellow.
+ * higherIsBetter=false (symptom severity, Stress, Resp): down = green, up = yellow.
  * < 2% or null = grey.
  */
-export function getLevelColor(percentChange, isSymptom) {
+export function getLevelColor(percentChange, higherIsBetter) {
   if (percentChange === null || percentChange === undefined || Math.abs(percentChange) < 2) {
     return '#9ca3af';
   }
-  const favorable = isSymptom ? percentChange < 0 : percentChange > 0;
+  const favorable = higherIsBetter ? percentChange > 0 : percentChange < 0;
   return favorable ? '#34d399' : '#d4a017';
 }
 
 /**
  * Generate insight stats and natural language text.
- * primaryStats: { name, average, priorAverage, unit, isSymptom }
+ * primaryStats: { name, average, priorAverage, unit, higherIsBetter }
  * secondaryStats: array of same shape
  * options: { timeframeLabel }
  * Returns { average, unit, percentChange, priorAverage, insightText }
  */
 export function computeInsight(primaryStats, secondaryStats, options) {
-  const { name, average, priorAverage, unit, isSymptom } = primaryStats;
+  const { name, average, priorAverage, unit, higherIsBetter } = primaryStats;
   const { timeframeLabel } = options;
 
   let percentChange = null;
@@ -119,7 +119,7 @@ export function computeInsight(primaryStats, secondaryStats, options) {
     const direction = percentChange > 0 ? 'above' : 'below';
     const pct = Math.abs(Math.round(percentChange));
     const formattedPrior = Number.isInteger(priorAverage) ? priorAverage : priorAverage.toFixed(1);
-    const color = getLevelColor(percentChange, isSymptom);
+    const color = getLevelColor(percentChange, higherIsBetter);
     insightSegments.push(
       { text: `Your average ${name} (${formattedAvg}${unitStr}) was ` },
       { text: `${pct}% ${direction}`, color },
@@ -143,11 +143,8 @@ export function computeInsight(primaryStats, secondaryStats, options) {
     const favorablePairs = significantSecondaries.filter(s => {
       const secPct = ((s.average - s.priorAverage) / Math.abs(s.priorAverage)) * 100;
       const secUp = secPct > 0;
-      if (isSymptom !== s.isSymptom) {
-        return primaryUp !== secUp;
-      }
-      const primaryGood = isSymptom ? !primaryUp : primaryUp;
-      const secGood = s.isSymptom ? !secUp : secUp;
+      const primaryGood = higherIsBetter ? primaryUp : !primaryUp;
+      const secGood = s.higherIsBetter ? secUp : !secUp;
       return primaryGood && secGood;
     });
 
@@ -155,10 +152,8 @@ export function computeInsight(primaryStats, secondaryStats, options) {
       insightSegments.push({ text: ' ' });
       favorablePairs.forEach((s, i) => {
         const pct = Math.abs(Math.round(((s.average - s.priorAverage) / Math.abs(s.priorAverage)) * 100));
-        const dir = s.isSymptom
-          ? (s.average < s.priorAverage ? 'down' : 'up')
-          : (s.average > s.priorAverage ? 'up' : 'down');
-        const sColor = getLevelColor(((s.average - s.priorAverage) / Math.abs(s.priorAverage)) * 100, s.isSymptom);
+        const dir = s.average > s.priorAverage ? 'up' : 'down';
+        const sColor = getLevelColor(((s.average - s.priorAverage) / Math.abs(s.priorAverage)) * 100, s.higherIsBetter);
         if (i > 0) insightSegments.push({ text: ', ' });
         insightSegments.push(
           { text: `${s.name} ` },

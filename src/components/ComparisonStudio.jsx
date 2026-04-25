@@ -364,6 +364,13 @@ export default function ComparisonStudio({
   const primaryIsSymptom = selectedSymptoms.includes(primarySeriesId);
   const primaryIsSupplement = selectedSupplements.includes(primarySeriesId);
   const primaryIsSleep = selectedSleepMetrics.includes(primarySeriesId);
+  const primarySleepMetric = primaryIsSleep ? SLEEP_METRICS.find(m => m.key === primarySeriesId) : null;
+  // higherIsBetter semantics for primary series: symptom→false, supplement→true, sleep→metric.higherIsBetter
+  const primaryHigherIsBetter = primaryIsSymptom
+    ? false
+    : primaryIsSleep
+      ? (primarySleepMetric?.higherIsBetter ?? true)
+      : true;
 
   // Sleep primary Y-axis range
   const primarySleepIdx = selectedSleepMetrics.indexOf(primarySeriesId);
@@ -386,6 +393,9 @@ export default function ComparisonStudio({
     for (let v = 0; v <= sleepYMax; v += niceStep) labels.push(Math.round(v));
     return labels;
   }, [primaryIsSleep, sleepYMax]);
+
+  // Y-axis max for the primary series (used by level-segment overlays)
+  const primaryYMax = primaryIsSleep ? sleepYMax : (primaryIsSupplement ? suppYMax : 5);
 
   const primaryDailyValues = useMemo(() => {
     const suppIdx = selectedSupplements.indexOf(primarySeriesId);
@@ -418,10 +428,12 @@ export default function ComparisonStudio({
     if (!primarySeriesId || showHealthScore) return null;
 
     const buildStats = (id, isSymptom) => {
+      const isSleep = selectedSleepMetrics.includes(id);
+      const sleepMetric = isSleep ? SLEEP_METRICS.find(m => m.key === id) : null;
       let extSeries;
       if (selectedSupplements.includes(id)) {
         extSeries = getSupplementDoseSeries(stackEntries, stackItems, id, extendedDates).map(v => v === null ? 0 : v);
-      } else if (selectedSleepMetrics.includes(id)) {
+      } else if (isSleep) {
         extSeries = interpolateSmallGaps(getSleepDailySeries(sleepDays, id, extendedDates));
         extSeries = smooth(extSeries, windowSize);
       } else {
@@ -433,19 +445,16 @@ export default function ComparisonStudio({
       const current = extSeries.slice(mid).filter(v => v !== null && v !== undefined);
       const priorAvg = prior.length > 0 ? prior.reduce((s, v) => s + v, 0) / prior.length : 0;
       const currentAvg = current.length > 0 ? current.reduce((s, v) => s + v, 0) / current.length : 0;
-      const isSleep = selectedSleepMetrics.includes(id);
       const item = isSymptom
         ? symptoms.find(s => s.id === id)
-        : (isSleep
-          ? SLEEP_METRICS.find(m => m.key === id)
-          : stackItems.find(i => i.id === id));
+        : (isSleep ? sleepMetric : stackItems.find(i => i.id === id));
       const unit = isSymptom
         ? '/5'
-        : (isSleep
-          ? (SLEEP_METRICS.find(m => m.key === id)?.unit || '')
-          : (item?.unit || 'mg'));
-      const name = isSleep ? (SLEEP_METRICS.find(m => m.key === id)?.label || '') : (item?.name || '');
-      return { name, average: currentAvg, priorAverage: priorAvg, unit, isSymptom };
+        : (isSleep ? (sleepMetric?.unit || '') : (item?.unit || 'mg'));
+      const name = isSleep ? (sleepMetric?.label || '') : (item?.name || '');
+      // higherIsBetter semantics: symptom→false, sleep→metric.higherIsBetter, supplement→true
+      const higherIsBetter = isSymptom ? false : (isSleep ? (sleepMetric?.higherIsBetter ?? true) : true);
+      return { name, average: currentAvg, priorAverage: priorAvg, unit, higherIsBetter };
     };
 
     const primaryStats = buildStats(primarySeriesId, primaryIsSymptom);
@@ -1365,8 +1374,7 @@ export default function ComparisonStudio({
       {levels.map((level, i) => {
         if (level.average === null) return null;
         if (isDesktop) return null;
-        const yMax = primaryIsSleep ? sleepYMax : (primaryIsSupplement ? suppYMax : 5);
-        const y = padTop + chartH - (level.average / yMax) * chartH;
+        const y = padTop + chartH - (level.average / primaryYMax) * chartH;
         const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
         const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
         const xMid = (x1 + x2) / 2;
@@ -1396,11 +1404,10 @@ export default function ComparisonStudio({
       {/* Layer 2: Trend lines (on top of bg boxes) */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
-        const yMax = primaryIsSleep ? sleepYMax : (primaryIsSupplement ? suppYMax : 5);
-        const y = padTop + chartH - (level.average / yMax) * chartH;
+        const y = padTop + chartH - (level.average / primaryYMax) * chartH;
         const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
         const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
-        const color = getLevelColor(level.percentChange, primaryIsSymptom);
+        const color = getLevelColor(level.percentChange, primaryHigherIsBetter);
         return (
           <line key={`level-line-${i}`} x1={x1} y1={y} x2={x2} y2={y}
             stroke={color} strokeWidth={(isDesktop ? 1.6 : 3.0) * s} strokeLinecap="round" />
@@ -1410,12 +1417,11 @@ export default function ComparisonStudio({
       {/* Layer 3: Text labels only (on top of trend lines) */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
-        const yMax = primaryIsSleep ? sleepYMax : (primaryIsSupplement ? suppYMax : 5);
-        const y = padTop + chartH - (level.average / yMax) * chartH;
+        const y = padTop + chartH - (level.average / primaryYMax) * chartH;
         const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
         const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
         const xMid = (x1 + x2) / 2;
-        const color = getLevelColor(level.percentChange, primaryIsSymptom);
+        const color = getLevelColor(level.percentChange, primaryHigherIsBetter);
         const avgLabel = primaryIsSymptom
           ? level.average.toFixed(1)
           : (Number.isInteger(level.average) ? level.average : Math.round(level.average));
@@ -1543,9 +1549,9 @@ export default function ComparisonStudio({
             {pctChange !== null && Math.abs(pctChange) >= 2 && (
               <span style={{
                 padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
-                background: getLevelColor(pctChange, false) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-                color: getLevelColor(pctChange, false),
-                border: `1px solid ${getLevelColor(pctChange, false)}40`,
+                background: getLevelColor(pctChange, true) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+                color: getLevelColor(pctChange, true),
+                border: `1px solid ${getLevelColor(pctChange, true)}40`,
               }}>
                 {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
               </span>
@@ -1616,9 +1622,9 @@ export default function ComparisonStudio({
             {pctChange !== null && Math.abs(pctChange) >= 2 && (
               <span style={{
                 padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
-                background: getLevelColor(pctChange, true) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-                color: getLevelColor(pctChange, true),
-                border: `1px solid ${getLevelColor(pctChange, true)}40`,
+                background: getLevelColor(pctChange, false) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+                color: getLevelColor(pctChange, false),
+                border: `1px solid ${getLevelColor(pctChange, false)}40`,
               }}>
                 {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
               </span>
@@ -1692,9 +1698,9 @@ export default function ComparisonStudio({
             {pctChange !== null && Math.abs(pctChange) >= 2 && (
               <span style={{
                 padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
-                background: getLevelColor(pctChange, false) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-                color: getLevelColor(pctChange, false),
-                border: `1px solid ${getLevelColor(pctChange, false)}40`,
+                background: getLevelColor(pctChange, metric?.higherIsBetter ?? true) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+                color: getLevelColor(pctChange, metric?.higherIsBetter ?? true),
+                border: `1px solid ${getLevelColor(pctChange, metric?.higherIsBetter ?? true)}40`,
               }}>
                 {pctChange > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctChange))}%
               </span>

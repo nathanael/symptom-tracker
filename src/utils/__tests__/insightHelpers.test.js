@@ -74,32 +74,34 @@ describe('computeLevels', () => {
 });
 
 describe('getLevelColor', () => {
-  it('returns green for favorable supplement increase', () => {
-    expect(getLevelColor(10, false)).toBe('#34d399');
+  // Higher-is-better metric (e.g. Score, supplement adherence): up = green, down = yellow
+  it('returns green for favorable higher-is-better increase', () => {
+    expect(getLevelColor(15, true)).toBe('#34d399');
   });
-  it('returns yellow for unfavorable supplement decrease', () => {
-    expect(getLevelColor(-10, false)).toBe('#d4a017');
+  it('returns yellow for unfavorable higher-is-better decrease', () => {
+    expect(getLevelColor(-15, true)).toBe('#d4a017');
   });
-  it('returns green for favorable symptom decrease', () => {
-    expect(getLevelColor(-10, true)).toBe('#34d399');
+  // Lower-is-better metric (e.g. symptom severity, Stress, Resp): up = yellow, down = green
+  it('returns yellow for unfavorable lower-is-better increase', () => {
+    expect(getLevelColor(15, false)).toBe('#d4a017');
   });
-  it('returns yellow for unfavorable symptom increase', () => {
-    expect(getLevelColor(10, true)).toBe('#d4a017');
+  it('returns green for favorable lower-is-better decrease', () => {
+    expect(getLevelColor(-15, false)).toBe('#34d399');
   });
   it('returns grey for near-zero change (< 2%)', () => {
-    expect(getLevelColor(1.5, false)).toBe('#9ca3af');
-    expect(getLevelColor(-0.5, true)).toBe('#9ca3af');
+    expect(getLevelColor(1.5, true)).toBe('#9ca3af');
+    expect(getLevelColor(-0.5, false)).toBe('#9ca3af');
   });
   it('returns grey for null', () => {
-    expect(getLevelColor(null, false)).toBe('#9ca3af');
+    expect(getLevelColor(null, true)).toBe('#9ca3af');
   });
 });
 
 describe('computeInsight', () => {
   it('generates insight text for supplement primary', () => {
     const result = computeInsight(
-      { name: 'Vitamin D', average: 2000, priorAverage: 1800, unit: 'IU', isSymptom: false },
-      [{ name: 'Fatigue', average: 3.2, priorAverage: 3.5, unit: '/5', isSymptom: true }],
+      { name: 'Vitamin D', average: 2000, priorAverage: 1800, unit: 'IU', higherIsBetter: true },
+      [{ name: 'Fatigue', average: 3.2, priorAverage: 3.5, unit: '/5', higherIsBetter: false }],
       { timeframeLabel: '6 months' }
     );
     expect(result.percentChange).toBeCloseTo(11.1, 0);
@@ -111,8 +113,8 @@ describe('computeInsight', () => {
 
   it('generates insight text for symptom primary', () => {
     const result = computeInsight(
-      { name: 'Fatigue', average: 3.2, priorAverage: 3.5, unit: '/5', isSymptom: true },
-      [{ name: 'Vitamin D', average: 2000, priorAverage: 1800, unit: 'IU', isSymptom: false }],
+      { name: 'Fatigue', average: 3.2, priorAverage: 3.5, unit: '/5', higherIsBetter: false },
+      [{ name: 'Vitamin D', average: 2000, priorAverage: 1800, unit: 'IU', higherIsBetter: true }],
       { timeframeLabel: '6 months' }
     );
     expect(result.percentChange).toBeCloseTo(-8.6, 0);
@@ -122,8 +124,8 @@ describe('computeInsight', () => {
 
   it('omits correlation when change is < 2%', () => {
     const result = computeInsight(
-      { name: 'Vitamin D', average: 2000, priorAverage: 1990, unit: 'IU', isSymptom: false },
-      [{ name: 'Fatigue', average: 3.2, priorAverage: 3.19, unit: '/5', isSymptom: true }],
+      { name: 'Vitamin D', average: 2000, priorAverage: 1990, unit: 'IU', higherIsBetter: true },
+      [{ name: 'Fatigue', average: 3.2, priorAverage: 3.19, unit: '/5', higherIsBetter: false }],
       { timeframeLabel: '6 months' }
     );
     expect(result.insightText).not.toContain('favorable');
@@ -131,7 +133,7 @@ describe('computeInsight', () => {
 
   it('handles no secondary series', () => {
     const result = computeInsight(
-      { name: 'Vitamin D', average: 2000, priorAverage: 1800, unit: 'IU', isSymptom: false },
+      { name: 'Vitamin D', average: 2000, priorAverage: 1800, unit: 'IU', higherIsBetter: true },
       [],
       { timeframeLabel: '6 months' }
     );
@@ -141,8 +143,8 @@ describe('computeInsight', () => {
 
   it('does not mark two symptoms both increasing as favorable', () => {
     const result = computeInsight(
-      { name: 'Fatigue', average: 4.0, priorAverage: 3.0, unit: '/5', isSymptom: true },
-      [{ name: 'Brain Fog', average: 3.5, priorAverage: 2.5, unit: '/5', isSymptom: true }],
+      { name: 'Fatigue', average: 4.0, priorAverage: 3.0, unit: '/5', higherIsBetter: false },
+      [{ name: 'Brain Fog', average: 3.5, priorAverage: 2.5, unit: '/5', higherIsBetter: false }],
       { timeframeLabel: '6 months' }
     );
     expect(result.insightText).not.toContain('favorable');
@@ -150,7 +152,7 @@ describe('computeInsight', () => {
 
   it('handles zero priorAverage gracefully', () => {
     const result = computeInsight(
-      { name: 'Vitamin D', average: 2000, priorAverage: 0, unit: 'IU', isSymptom: false },
+      { name: 'Vitamin D', average: 2000, priorAverage: 0, unit: 'IU', higherIsBetter: true },
       [],
       { timeframeLabel: '6 months' }
     );
