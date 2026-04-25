@@ -182,10 +182,14 @@ export function buildPath(points) {
   return d;
 }
 
-// Build a step-before SVG path with rounded corners at every dose change.
-// Holds the previous y until reaching the new x, then jumps to the new y.
-// Corners are rounded with quadratic Béziers; radius is clamped per-segment so
-// it never overshoots when adjacent segments are short.
+// Build a step-mid SVG path with rounded transitions at every dose change.
+// Each data point sits on a flat plateau; transitions happen at the midpoint
+// between adjacent points so the rounding lives between data, not on it.
+// Transitions render as two quadratic-Bézier elbows when the vertical span has
+// room (>= 2 × radius), or as a single cubic-Bézier S-curve when it doesn't —
+// guaranteeing consistent visual rounding regardless of step size.
+// Horizontal radius is clamped to half the adjacent segment so the corners
+// never overshoot when consecutive points are close together.
 export function buildStepPath(points, radius) {
   const segments = [];
   let seg = [];
@@ -211,18 +215,22 @@ export function buildStepPath(points, radius) {
       }
       const dx = cur.x - prev.x;
       const dyAbs = Math.abs(cur.y - prev.y);
-      const next = pts[i + 1];
-      const dxNext = next ? next.x - cur.x : Infinity;
-      const rPre = Math.min(radius, dx / 2, dyAbs / 2);
-      const rPost = Math.min(radius, dxNext / 2, dyAbs / 2);
       const dir = cur.y > prev.y ? 1 : -1;
+      const midX = (prev.x + cur.x) / 2;
+      const r = Math.min(radius, dx / 2);
 
-      d += `L${cur.x - rPre},${prev.y}`;
-      d += `Q${cur.x},${prev.y},${cur.x},${prev.y + dir * rPre}`;
-      if (next && next.y === cur.y) {
-        d += `L${cur.x},${cur.y - dir * rPost}`;
-        d += `Q${cur.x},${cur.y},${cur.x + rPost},${cur.y}`;
+      if (dyAbs >= 2 * radius) {
+        // Two-elbow case: horizontal at prev.y, pre-corner, vertical at midX,
+        // post-corner, horizontal at cur.y to cur.x.
+        d += `L${midX - r},${prev.y}`;
+        d += `Q${midX},${prev.y},${midX},${prev.y + dir * radius}`;
+        d += `L${midX},${cur.y - dir * radius}`;
+        d += `Q${midX},${cur.y},${midX + r},${cur.y}`;
+        d += `L${cur.x},${cur.y}`;
       } else {
+        // Small step: single smooth S-curve centered at midX.
+        d += `L${midX - r},${prev.y}`;
+        d += `C${midX},${prev.y},${midX},${cur.y},${midX + r},${cur.y}`;
         d += `L${cur.x},${cur.y}`;
       }
     }

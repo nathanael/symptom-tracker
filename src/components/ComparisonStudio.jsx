@@ -408,9 +408,9 @@ export default function ComparisonStudio({
   }, [primarySeriesId, selectedSupplements, suppDoseSeries, selectedSymptoms, symptomTransformed, selectedSleepMetrics, sleepTransformed]);
 
   const levels = useMemo(() => {
-    if (!primaryDailyValues) return [];
+    if (!primaryDailyValues || primaryIsSupplement) return [];
     return computeLevels(primaryDailyValues, dates, timeframe);
-  }, [primaryDailyValues, dates, timeframe]);
+  }, [primaryDailyValues, primaryIsSupplement, dates, timeframe]);
 
   const extendedDates = useMemo(() => {
     const result = [];
@@ -1325,7 +1325,7 @@ export default function ComparisonStudio({
       {/* Supplement lines */}
       {suppPointSets.map((pts, idx) => (
         <g key={`supp-${idx}`}>
-          <path d={buildStepPath(pts, 12 * s)} fill="none"
+          <path d={buildStepPath(pts, 8.4 * s)} fill="none"
             stroke={SUPPLEMENT_STYLES[idx].color}
             strokeWidth={(isDesktop ? 0.9 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round"
             opacity={selectedSupplements[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
