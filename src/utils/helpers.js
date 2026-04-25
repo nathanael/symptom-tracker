@@ -1,4 +1,5 @@
 import { trackingModes, severityColors, NA_SEVERITY } from './constants';
+import { computeHealthScore } from './healthScore';
 
 // Schedule Helpers
 export const isScheduledForDate = (schedule, date) => {
@@ -276,6 +277,20 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
   // Header
   output.push(`## Symptom Tracking (last ${days} days)`);
   output.push(`Generated: ${today.toLocaleDateString()}\n`);
+
+  // Health Score section
+  output.push('## Health Score');
+  output.push('Daily score (0-100, higher is better) computed as 100 − (avg severity / 5 × 100) across logged active symptoms. Days with no logged symptoms are blank.\n');
+  output.push('| Date | Score |');
+  output.push('| ---- | ----- |');
+  for (let i = 0; i < days; i++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dateKey = getDateKey(date);
+    const { score } = computeHealthScore(symptoms, entries, dateKey, trackingMode);
+    output.push(`| ${dateKey} | ${score == null ? '' : score} |`);
+  }
+  output.push('');
 
   // Symptoms table
   output.push('### Symptoms');
@@ -758,12 +773,15 @@ export const getSymptomTrend = (symptomId, entries, windowDays = 7) => {
 };
 
 // CSV Export
-export const exportCSV = (days, entries, symptoms, trackingMode) => {
+export const buildCSVText = (days, entries, symptoms, trackingMode) => {
   const today = new Date();
   const timePeriods = trackingModes[trackingMode].periods;
 
-  let csv = 'Date,Symptom,Time Period,Severity\n';
+  const lines = [];
+  lines.push('# health_score: 0-100, higher is better. Computed as 100 - (avg severity / 5 * 100) across logged active symptoms; blank if no symptoms logged that day.');
+  lines.push('Date,Symptom,Time Period,Severity');
 
+  // Existing entries
   Object.values(entries)
     .filter(e => {
       const entryDate = new Date(e.date);
@@ -775,9 +793,25 @@ export const exportCSV = (days, entries, symptoms, trackingMode) => {
       const symptom = symptoms.find(s => s.id === entry.symptomId);
       const period = timePeriods.find(p => p.id === entry.time);
       const severityVal = entry.severity === NA_SEVERITY ? 'N/A' : entry.severity;
-      csv += `${entry.date},"${symptom?.name || entry.symptomId}",${period?.label || entry.time},${severityVal}\n`;
+      lines.push(`${entry.date},"${symptom?.name || entry.symptomId}",${period?.label || entry.time},${severityVal}`);
     });
 
+  // Health score rows
+  for (let i = 0; i < days; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateKey = getDateKey(d);
+    const { score } = computeHealthScore(symptoms, entries, dateKey, trackingMode);
+    if (score != null) {
+      lines.push(`${dateKey},"Health Score",daily,${score}`);
+    }
+  }
+
+  return lines.join('\n') + '\n';
+};
+
+export const exportCSV = (days, entries, symptoms, trackingMode) => {
+  const csv = buildCSVText(days, entries, symptoms, trackingMode);
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyHistoricalState } from '../helpers';
+import { applyHistoricalState, generateAIDataExport, buildCSVText } from '../helpers';
 
 describe('applyHistoricalState', () => {
   const today = new Date();
@@ -108,5 +108,52 @@ describe('applyHistoricalState', () => {
     const legacy = { ...baseItem, history: undefined };
     const result = applyHistoricalState(legacy, new Date('2026-03-10'));
     expect(result).toEqual(legacy);
+  });
+});
+
+describe('generateAIDataExport — Health Score section', () => {
+  const symptoms = [
+    { id: 's1', name: 'Headache', active: true, applicablePeriods: ['daily'] },
+  ];
+  const today = new Date();
+  const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const entries = {
+    [`${dateKey}-s1-daily`]: { severity: 2, date: dateKey, symptomId: 's1', time: 'daily' },
+  };
+
+  it('includes a Health Score section with explainer and per-day score', () => {
+    const out = generateAIDataExport(7, entries, symptoms, [], {}, {}, 'simple');
+    expect(out).toMatch(/## Health Score/);
+    expect(out).toMatch(/0-100/);
+    expect(out).toMatch(/100 . \(avg severity \/ 5/); // explainer line — handles ASCII '-' or '−' Unicode minus
+    // 100 - (2/5)*100 = 60
+    expect(out).toMatch(new RegExp(`\\| ${dateKey} \\| 60 \\|`));
+  });
+
+  it('shows blank when no symptoms logged that day', () => {
+    const out = generateAIDataExport(2, {}, symptoms, [], {}, {}, 'simple');
+    expect(out).toMatch(/## Health Score/);
+    // Row exists with empty score
+    expect(out).toMatch(/\|\s*\|\s*$/m);
+  });
+});
+
+describe('buildCSVText — Health Score', () => {
+  const symptoms = [{ id: 's1', name: 'Headache', active: true, applicablePeriods: ['daily'] }];
+  const today = new Date();
+  const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const entries = {
+    [`${dateKey}-s1-daily`]: { severity: 4, date: dateKey, symptomId: 's1', time: 'daily' },
+  };
+
+  it('starts with a comment line explaining health_score', () => {
+    const csv = buildCSVText(7, entries, symptoms, 'simple');
+    expect(csv.split('\n')[0]).toMatch(/^# health_score:/);
+  });
+
+  it('appends Health Score rows per date', () => {
+    const csv = buildCSVText(7, entries, symptoms, 'simple');
+    // 100 - (4/5)*100 = 20
+    expect(csv).toMatch(new RegExp(`${dateKey},"Health Score",daily,20`));
   });
 });
