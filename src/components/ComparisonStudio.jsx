@@ -3,7 +3,7 @@ import { haptic } from '../utils/helpers';
 import {
   TIMEFRAMES, SMOOTH_WINDOWS,
   interpolateSmallGaps, smooth,
-  formatXLabel, getXLabelInterval, buildPath,
+  formatXLabel, getXLabelInterval, buildPath, buildStepPath,
 } from '../utils/chartHelpers';
 import {
   getSymptomDailySeries,
@@ -224,13 +224,12 @@ export default function ComparisonStudio({
     [selectedSupplements, stackEntries, stackItems, dates]
   );
 
-  // Transformed supplement data (smoothed for display, one series per selected supplement)
+  // Transformed supplement data (stepped doses, no smoothing — one series per selected supplement)
   const suppTransformedSeries = useMemo(() =>
-    suppDoseSeries.map(daily => {
-      const smoothed = windowSize > 1 ? smooth(daily, windowSize) : [...daily];
-      return { values: smoothed, dates: [...dates], labels: [...dates] };
-    }),
-    [suppDoseSeries, dates, windowSize]
+    suppDoseSeries.map(daily => ({
+      values: [...daily], dates: [...dates], labels: [...dates],
+    })),
+    [suppDoseSeries, dates]
   );
 
   // Primary supplement index and derived data (used for Y-axis scaling)
@@ -999,7 +998,7 @@ export default function ComparisonStudio({
       {/* Supplement lines */}
       {suppPointSets.map((pts, idx) => (
         <g key={`supp-${idx}`}>
-          <path d={buildPath(pts)} fill="none"
+          <path d={buildStepPath(pts, 12 * s)} fill="none"
             stroke={SUPPLEMENT_STYLES[idx].color}
             strokeWidth={(isDesktop ? 0.9 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round"
             opacity={selectedSupplements[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />

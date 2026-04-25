@@ -181,3 +181,51 @@ export function buildPath(points) {
   }
   return d;
 }
+
+// Build a step-before SVG path with rounded corners at every dose change.
+// Holds the previous y until reaching the new x, then jumps to the new y.
+// Corners are rounded with quadratic Béziers; radius is clamped per-segment so
+// it never overshoots when adjacent segments are short.
+export function buildStepPath(points, radius) {
+  const segments = [];
+  let seg = [];
+  for (const pt of points) {
+    if (pt.y === null) {
+      if (seg.length) { segments.push(seg); seg = []; }
+    } else {
+      seg.push(pt);
+    }
+  }
+  if (seg.length) segments.push(seg);
+
+  let d = '';
+  for (const pts of segments) {
+    if (pts.length === 0) continue;
+    d += `M${pts[0].x},${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) {
+      const prev = pts[i - 1];
+      const cur = pts[i];
+      if (cur.y === prev.y) {
+        d += `L${cur.x},${cur.y}`;
+        continue;
+      }
+      const dx = cur.x - prev.x;
+      const dyAbs = Math.abs(cur.y - prev.y);
+      const next = pts[i + 1];
+      const dxNext = next ? next.x - cur.x : Infinity;
+      const rPre = Math.min(radius, dx / 2, dyAbs / 2);
+      const rPost = Math.min(radius, dxNext / 2, dyAbs / 2);
+      const dir = cur.y > prev.y ? 1 : -1;
+
+      d += `L${cur.x - rPre},${prev.y}`;
+      d += `Q${cur.x},${prev.y},${cur.x},${prev.y + dir * rPre}`;
+      if (next && next.y === cur.y) {
+        d += `L${cur.x},${cur.y - dir * rPost}`;
+        d += `Q${cur.x},${cur.y},${cur.x + rPost},${cur.y}`;
+      } else {
+        d += `L${cur.x},${cur.y}`;
+      }
+    }
+  }
+  return d;
+}
