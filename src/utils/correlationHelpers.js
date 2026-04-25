@@ -1,6 +1,7 @@
 import { getDailyValue, generateDateRange, interpolateSmallGaps } from './chartHelpers';
 import { isScheduledForDate } from './helpers';
 import { computeHealthScore } from './healthScore';
+import { METRICS as SLEEP_METRICS, valueForRow } from './sleepMetrics';
 
 /**
  * Extract daily symptom severity series for a date range.
@@ -239,5 +240,22 @@ export function getHealthScoreSeries(symptoms, entries, dates, trackingMode) {
   return dates.map(dateStr => {
     const { score } = computeHealthScore(symptoms, entries, dateStr, trackingMode);
     return score;
+  });
+}
+
+/**
+ * Extract a daily numeric series for one Garmin sleep metric across a range of dates.
+ * Returns numbers/nulls aligned to `dates`. Honors the metric's transform/compute.
+ */
+export function getSleepDailySeries(days, metricKey, dates) {
+  const metric = SLEEP_METRICS.find(m => m.key === metricKey);
+  if (!metric) return dates.map(() => null);
+  const byDate = new Map();
+  for (const d of (days || [])) byDate.set(d.date, d);
+  return dates.map(date => {
+    const row = byDate.get(date);
+    if (!row) return null;
+    const v = valueForRow(metric, row);
+    return v == null ? null : v;
   });
 }

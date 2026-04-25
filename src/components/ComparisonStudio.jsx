@@ -9,11 +9,14 @@ import {
   getSymptomDailySeries,
   getSupplementDoseSeries,
   getHealthScoreSeries,
+  getSleepDailySeries,
 } from '../utils/correlationHelpers';
 import { computeLevels, computeInsight, getLevelColor } from '../utils/insightHelpers';
 import HealthScoreCard from './HealthScoreCard';
 import HealthScoreCompact from './HealthScoreCompact';
 import { useHealthScore } from '../hooks/useHealthScore';
+import { useGarminSleep } from '../hooks/useGarminSleep';
+import { METRICS as SLEEP_METRICS } from '../utils/sleepMetrics';
 
 const SYMPTOM_STYLES = [
   { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
@@ -29,6 +32,14 @@ const SUPPLEMENT_STYLES = [
   { color: '#a78bfa', chipBg: 'rgba(167,139,250,0.12)', chipBorder: 'rgba(167,139,250,0.35)' },
 ];
 
+const SLEEP_STYLES = [
+  { color: '#22d3ee', chipBg: 'rgba(34,211,238,0.12)', chipBorder: 'rgba(34,211,238,0.35)' },
+  { color: '#06b6d4', chipBg: 'rgba(6,182,212,0.12)', chipBorder: 'rgba(6,182,212,0.35)' },
+  { color: '#0ea5e9', chipBg: 'rgba(14,165,233,0.12)', chipBorder: 'rgba(14,165,233,0.35)' },
+];
+const SLEEP_BORDER_RGBA = 'rgba(34,211,238,0.4)';
+const SLEEP_PRIMARY = '#22d3ee';
+
 const HEALTH_SCORE_COLOR = '#10b981';
 
 export default function ComparisonStudio({
@@ -39,7 +50,9 @@ export default function ComparisonStudio({
   trackingMode,
   isDesktop,
   setStackItems,
+  user,
 }) {
+  const { days: sleepDays } = useGarminSleep(user);
   const todayStr = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -70,36 +83,43 @@ export default function ComparisonStudio({
         const validSymptoms = (saved.symptoms || []).filter(
           id => (symptoms || []).some(s => s.id === id && s.active)
         );
+        const validSleep = (saved.sleepMetrics || []).filter(k => SLEEP_METRICS.some(m => m.key === k));
         return {
           supplements,
           symptoms: validSymptoms,
+          sleepMetrics: validSleep,
           primarySeriesId: saved.primarySeriesId || '',
         };
       }
     } catch {}
-    return { supplements: [], symptoms: [], primarySeriesId: '' };
+    return { supplements: [], symptoms: [], sleepMetrics: [], primarySeriesId: '' };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount only
 
   const [selectedSupplements, setSelectedSupplements] = useState(initialSelections.supplements);
   const [selectedSymptoms, setSelectedSymptoms] = useState(initialSelections.symptoms);
+  const [selectedSleepMetrics, setSelectedSleepMetrics] = useState(initialSelections.sleepMetrics);
   const [primarySeriesId, setPrimarySeriesId] = useState(initialSelections.primarySeriesId || '');
   const [showSupplementPicker, setShowSupplementPicker] = useState(false);
   const [showSymptomPicker, setShowSymptomPicker] = useState(false);
+  const [showSleepPicker, setShowSleepPicker] = useState(false);
   const [suppSearch, setSuppSearch] = useState('');
   const [symSearch, setSymSearch] = useState('');
+  const [sleepSearch, setSleepSearch] = useState('');
   const suppSearchRef = useRef(null);
   const symSearchRef = useRef(null);
+  const sleepSearchRef = useRef(null);
   const [timeframe, setTimeframe] = useState(30);
   const [startOffset, setStartOffset] = useState(0);
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
   // Health score shows automatically when no other series are selected
-  const showHealthScore = selectedSupplements.length === 0 && selectedSymptoms.length === 0;
+  const showHealthScore = selectedSupplements.length === 0 && selectedSymptoms.length === 0 && selectedSleepMetrics.length === 0;
 
   // Auto-focus search inputs when pickers open
   useEffect(() => { if (showSupplementPicker) { setSuppSearch(''); setTimeout(() => suppSearchRef.current?.focus(), 50); } }, [showSupplementPicker]);
   useEffect(() => { if (showSymptomPicker) { setSymSearch(''); setTimeout(() => symSearchRef.current?.focus(), 50); } }, [showSymptomPicker]);
+  useEffect(() => { if (showSleepPicker) { setSleepSearch(''); setTimeout(() => sleepSearchRef.current?.focus(), 50); } }, [showSleepPicker]);
 
   // Persist selections to localStorage
   useEffect(() => {
@@ -107,18 +127,19 @@ export default function ComparisonStudio({
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         supplements: selectedSupplements,
         symptoms: selectedSymptoms,
+        sleepMetrics: selectedSleepMetrics,
         primarySeriesId,
       }));
     } catch {}
-  }, [selectedSupplements, selectedSymptoms, primarySeriesId]);
+  }, [selectedSupplements, selectedSymptoms, selectedSleepMetrics, primarySeriesId]);
 
   // Auto-set primary to first available series when current primary is removed
   useEffect(() => {
-    const allIds = [...selectedSupplements, ...selectedSymptoms].filter(Boolean);
+    const allIds = [...selectedSupplements, ...selectedSymptoms, ...selectedSleepMetrics].filter(Boolean);
     if (!allIds.includes(primarySeriesId) && allIds.length > 0) {
       setPrimarySeriesId(allIds[0]);
     }
-  }, [selectedSupplements, selectedSymptoms, primarySeriesId]);
+  }, [selectedSupplements, selectedSymptoms, selectedSleepMetrics, primarySeriesId]);
 
   // Symptom selection
   const toggleSymptom = (symId) => {
@@ -144,6 +165,19 @@ export default function ComparisonStudio({
   };
   const removeSupplement = (suppId) => {
     setSelectedSupplements(prev => prev.filter(id => id !== suppId));
+    haptic('light');
+  };
+
+  const toggleSleep = (key) => {
+    setSelectedSleepMetrics(prev => {
+      if (prev.includes(key)) return prev.filter(k => k !== key);
+      if (prev.length >= 3) return prev;
+      return [...prev, key];
+    });
+    haptic('light');
+  };
+  const removeSleep = (key) => {
+    setSelectedSleepMetrics(prev => prev.filter(k => k !== key));
     haptic('light');
   };
 
@@ -273,6 +307,21 @@ export default function ComparisonStudio({
     [selectedSymptoms, entries, dates, trackingMode, windowSize]
   );
 
+  // Sleep series — daily values for each selected metric
+  const sleepDailySeries = useMemo(() =>
+    selectedSleepMetrics.map(key => getSleepDailySeries(sleepDays, key, dates)),
+    [selectedSleepMetrics, sleepDays, dates]
+  );
+
+  const sleepTransformed = useMemo(() =>
+    sleepDailySeries.map(daily => {
+      const filled = interpolateSmallGaps(daily);
+      const smoothed = smooth(filled, windowSize);
+      return { raw: filled, smoothed, transformed: { values: smoothed, dates, labels: dates } };
+    }),
+    [sleepDailySeries, dates, windowSize]
+  );
+
   const healthScoreTransformed = useMemo(() => {
     if (!showHealthScore) return null;
     const raw = getHealthScoreSeries(symptoms, entries, dates, trackingMode);
@@ -314,14 +363,39 @@ export default function ComparisonStudio({
 
   const primaryIsSymptom = selectedSymptoms.includes(primarySeriesId);
   const primaryIsSupplement = selectedSupplements.includes(primarySeriesId);
+  const primaryIsSleep = selectedSleepMetrics.includes(primarySeriesId);
+
+  // Sleep primary Y-axis range
+  const primarySleepIdx = selectedSleepMetrics.indexOf(primarySeriesId);
+  const primarySleepValues = primarySleepIdx >= 0 ? sleepTransformed[primarySleepIdx]?.transformed.values : null;
+  const sleepYMax = useMemo(() => {
+    if (!primaryIsSleep || !primarySleepValues) return 100;
+    const valid = primarySleepValues.filter(v => v !== null && v !== undefined);
+    if (valid.length === 0) return 100;
+    const max = Math.max(...valid);
+    return Math.ceil(max * 1.1) || 100;
+  }, [primaryIsSleep, primarySleepValues]);
+  const sleepYLabels = useMemo(() => {
+    if (!primaryIsSleep) return [];
+    const range = sleepYMax;
+    const roughStep = range / 5;
+    const mag = Math.pow(10, Math.floor(Math.log10(roughStep || 1)));
+    const residual = roughStep / mag;
+    const niceStep = residual <= 1.5 ? mag : residual <= 3 ? 2 * mag : residual <= 7 ? 5 * mag : 10 * mag;
+    const labels = [];
+    for (let v = 0; v <= sleepYMax; v += niceStep) labels.push(Math.round(v));
+    return labels;
+  }, [primaryIsSleep, sleepYMax]);
 
   const primaryDailyValues = useMemo(() => {
     const suppIdx = selectedSupplements.indexOf(primarySeriesId);
     if (suppIdx >= 0 && suppDoseSeries[suppIdx]) return suppDoseSeries[suppIdx];
     const symIdx = selectedSymptoms.indexOf(primarySeriesId);
     if (symIdx >= 0 && symptomTransformed[symIdx]) return symptomTransformed[symIdx].smoothed;
+    const sleepIdx = selectedSleepMetrics.indexOf(primarySeriesId);
+    if (sleepIdx >= 0 && sleepTransformed[sleepIdx]) return sleepTransformed[sleepIdx].smoothed;
     return null;
-  }, [primarySeriesId, selectedSupplements, suppDoseSeries, selectedSymptoms, symptomTransformed]);
+  }, [primarySeriesId, selectedSupplements, suppDoseSeries, selectedSymptoms, symptomTransformed, selectedSleepMetrics, sleepTransformed]);
 
   const levels = useMemo(() => {
     if (!primaryDailyValues) return [];
@@ -347,6 +421,9 @@ export default function ComparisonStudio({
       let extSeries;
       if (selectedSupplements.includes(id)) {
         extSeries = getSupplementDoseSeries(stackEntries, stackItems, id, extendedDates).map(v => v === null ? 0 : v);
+      } else if (selectedSleepMetrics.includes(id)) {
+        extSeries = interpolateSmallGaps(getSleepDailySeries(sleepDays, id, extendedDates));
+        extSeries = smooth(extSeries, windowSize);
       } else {
         extSeries = interpolateSmallGaps(getSymptomDailySeries(entries, id, extendedDates, trackingMode));
         extSeries = smooth(extSeries, windowSize);
@@ -356,20 +433,30 @@ export default function ComparisonStudio({
       const current = extSeries.slice(mid).filter(v => v !== null && v !== undefined);
       const priorAvg = prior.length > 0 ? prior.reduce((s, v) => s + v, 0) / prior.length : 0;
       const currentAvg = current.length > 0 ? current.reduce((s, v) => s + v, 0) / current.length : 0;
-      const item = isSymptom ? symptoms.find(s => s.id === id) : stackItems.find(i => i.id === id);
-      const unit = isSymptom ? '/5' : (item?.unit || 'mg');
-      return { name: item?.name || '', average: currentAvg, priorAverage: priorAvg, unit, isSymptom };
+      const isSleep = selectedSleepMetrics.includes(id);
+      const item = isSymptom
+        ? symptoms.find(s => s.id === id)
+        : (isSleep
+          ? SLEEP_METRICS.find(m => m.key === id)
+          : stackItems.find(i => i.id === id));
+      const unit = isSymptom
+        ? '/5'
+        : (isSleep
+          ? (SLEEP_METRICS.find(m => m.key === id)?.unit || '')
+          : (item?.unit || 'mg'));
+      const name = isSleep ? (SLEEP_METRICS.find(m => m.key === id)?.label || '') : (item?.name || '');
+      return { name, average: currentAvg, priorAverage: priorAvg, unit, isSymptom };
     };
 
     const primaryStats = buildStats(primarySeriesId, primaryIsSymptom);
-    const secondaryIds = [...selectedSupplements, ...selectedSymptoms].filter(id => id && id !== primarySeriesId);
+    const secondaryIds = [...selectedSupplements, ...selectedSymptoms, ...selectedSleepMetrics].filter(id => id && id !== primarySeriesId);
     const secondaryStats = secondaryIds.map(id => buildStats(id, selectedSymptoms.includes(id)));
 
     const tfLabel = timeframe <= 7 ? 'week' : timeframe <= 30 ? 'month' : '6 months';
     const insight = computeInsight(primaryStats, secondaryStats, { timeframeLabel: tfLabel });
     return insight ? { ...insight, secondaryStats } : null;
-  }, [primarySeriesId, primaryIsSymptom, selectedSupplements, selectedSymptoms,
-      stackEntries, stackItems, entries, symptoms, trackingMode,
+  }, [primarySeriesId, primaryIsSymptom, selectedSupplements, selectedSymptoms, selectedSleepMetrics,
+      stackEntries, stackItems, entries, symptoms, trackingMode, sleepDays,
       extendedDates, timeframe, windowSize, showHealthScore]);
 
   // ── Chart points ──
@@ -421,6 +508,35 @@ export default function ComparisonStudio({
       });
     }),
     [symptomTransformed, dates, chartW, chartH]
+  );
+
+  const sleepPointSets = useMemo(() =>
+    sleepTransformed.map((sd, sIdx) => {
+      const { values, dates: txDates } = sd.transformed;
+      const maxIdx = Math.max(1, txDates.length - 1);
+      const isPrimary = selectedSleepMetrics[sIdx] === primarySeriesId;
+      const ownMax = (() => {
+        const valid = values.filter(v => v !== null && v !== undefined);
+        if (valid.length === 0) return 1;
+        const max = Math.max(...valid);
+        return max > 0 ? Math.ceil(max * 1.1) : 1;
+      })();
+      const targetMax = primaryIsSleep ? sleepYMax : (primaryIsSupplement ? suppYMax : 5);
+      const scale = isPrimary ? 1 : (ownMax > 0 ? targetMax / ownMax : 1);
+      return values.map((val, i) => {
+        const dateIdx = dates.indexOf(txDates[i]);
+        const x = dateIdx >= 0
+          ? padLeft + (dateIdx / Math.max(1, dates.length - 1)) * chartW
+          : padLeft + (i / maxIdx) * chartW;
+        const scaledVal = val !== null ? val * scale : null;
+        return {
+          x,
+          y: scaledVal === null ? null : padTop + chartH - (scaledVal / targetMax) * chartH,
+          val,
+        };
+      });
+    }),
+    [sleepTransformed, selectedSleepMetrics, primarySeriesId, primaryIsSleep, primaryIsSupplement, sleepYMax, suppYMax, dates, chartW, chartH, padLeft, padTop]
   );
 
   const healthScorePoints = useMemo(() => {
@@ -499,6 +615,18 @@ export default function ComparisonStudio({
         unit: '/5',
       });
     });
+    // Add all selected sleep metrics
+    selectedSleepMetrics.forEach((key, idx) => {
+      const m = SLEEP_METRICS.find(mm => mm.key === key);
+      const sd = sleepTransformed[idx];
+      const val = sd?.transformed.values[touchX];
+      items.push({
+        name: m?.label,
+        color: SLEEP_STYLES[idx].color,
+        val: val ?? null,
+        unit: m?.unit || '',
+      });
+    });
     if (showHealthScore && hsInspectValues) {
       const hsVal = hsInspectValues[touchX];
       if (hsVal !== null && hsVal !== undefined) {
@@ -513,7 +641,7 @@ export default function ComparisonStudio({
     const firstSuppPts = suppPointSets[0];
     const x = firstSuppPts ? firstSuppPts[touchX]?.x : padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW;
     return { dateLabel, items, x };
-  }, [touchX, dates, suppDoseSeries, suppPointSets, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, timeframe, chartW, showHealthScore, hsInspectValues, padLeft]);
+  }, [touchX, dates, suppDoseSeries, suppPointSets, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, selectedSleepMetrics, sleepTransformed, timeframe, chartW, showHealthScore, hsInspectValues, padLeft]);
 
   // Legend: show crosshair values when hovering, averages otherwise
   const legendItems = useMemo(() => {
@@ -546,6 +674,19 @@ export default function ComparisonStudio({
         });
       }
     });
+    // All selected sleep metrics
+    selectedSleepMetrics.forEach((key, idx) => {
+      const m = SLEEP_METRICS.find(mm => mm.key === key);
+      const sd = sleepTransformed[idx];
+      if (sd) {
+        items.push({
+          name: m?.label,
+          color: SLEEP_STYLES[idx].color,
+          val: avg(sd.smoothed),
+          unit: m?.unit || '',
+        });
+      }
+    });
     if (showHealthScore && healthScoreTransformed) {
       const vals = healthScoreTransformed.values.filter(v => v !== null);
       const hsAvg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
@@ -557,7 +698,7 @@ export default function ComparisonStudio({
       });
     }
     return { dateLabel: 'Average', items, x: null };
-  }, [crosshairData, suppTransformedSeries, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, showHealthScore, healthScoreTransformed]);
+  }, [crosshairData, suppTransformedSeries, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, selectedSleepMetrics, sleepTransformed, showHealthScore, healthScoreTransformed]);
 
   // Max offset: based on earliest data point across selected symptoms/supplement/health score
   const maxOffset = useMemo(() => {
@@ -586,6 +727,12 @@ export default function ComparisonStudio({
       }
     }
 
+    if (sleepDays.length > 0 && selectedSleepMetrics.length > 0) {
+      for (const d of sleepDays) {
+        if (d.date && (!earliest || d.date < earliest)) earliest = d.date;
+      }
+    }
+
     // When only health score is visible, use all entry dates for navigation range
     if (showHealthScore) {
       for (const key of Object.keys(entries || {})) {
@@ -598,7 +745,7 @@ export default function ComparisonStudio({
     const earliestDate = new Date(earliest + 'T12:00:00');
     const totalDays = Math.round((today - earliestDate) / (1000 * 60 * 60 * 24));
     return Math.max(0, totalDays - timeframe);
-  }, [selectedSymptoms, selectedSupplements, showHealthScore, entries, stackEntries, timeframe]);
+  }, [selectedSymptoms, selectedSupplements, selectedSleepMetrics, sleepDays, showHealthScore, entries, stackEntries, timeframe]);
 
   // Clamp startOffset when maxOffset shrinks
   useEffect(() => { setStartOffset(prev => Math.min(prev, maxOffset)); }, [maxOffset]);
@@ -902,6 +1049,164 @@ export default function ComparisonStudio({
     </div>
   ) : null;
 
+  // ── Sleep picker panel ──
+  const sleepPickerPanel = showSleepPicker ? (
+    <div
+      onClick={() => setShowSleepPicker(false)}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,0.92)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        padding: isDesktop ? '20px' : '0',
+        paddingTop: isDesktop ? 'calc(60px + env(safe-area-inset-top))' : 'env(safe-area-inset-top)',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: isDesktop ? '820px' : 'none',
+          background: 'rgba(15,17,21,0.95)',
+          borderRadius: isDesktop ? '12px' : '0 0 16px 16px',
+          border: `1px solid ${SLEEP_BORDER_RGBA}`,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          overflow: 'hidden',
+          maxHeight: isDesktop ? 'calc(100vh - 120px)' : 'calc(100dvh - env(safe-area-inset-top))',
+          display: 'flex', flexDirection: 'column',
+          ...(isDesktop ? {} : { paddingBottom: 'env(safe-area-inset-bottom)' }),
+        }}
+      >
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '16px 20px',
+          borderBottom: '1px solid rgba(100,116,139,0.2)',
+          flexShrink: 0,
+        }}>
+          <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+            Select Sleep Metrics
+          </h3>
+          <button
+            onClick={() => setShowSleepPicker(false)}
+            style={{
+              background: 'none', border: 'none', color: SLEEP_PRIMARY,
+              fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '4px 8px',
+            }}
+          >
+            Done
+          </button>
+        </div>
+
+        <div style={{ overflowY: 'auto', padding: '12px 16px', paddingBottom: isDesktop ? '12px' : '80px' }}>
+          {sleepDays.length === 0 ? (
+            <div style={{
+              padding: '40px 20px', textAlign: 'center',
+              color: '#9ca3af', fontSize: '14px', lineHeight: 1.6,
+            }}>
+              No Garmin sleep data connected.
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+                Connect Garmin in Settings to see sleep metrics here.
+              </div>
+            </div>
+          ) : (
+            <>
+              <input
+                ref={sleepSearchRef}
+                value={sleepSearch}
+                onChange={(e) => setSleepSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') { e.stopPropagation(); if (sleepSearch) setSleepSearch(''); else setShowSleepPicker(false); }
+                  if (e.key === 'Enter') {
+                    const filtered = SLEEP_METRICS.filter(m => m.label.toLowerCase().includes(sleepSearch.toLowerCase()));
+                    if (filtered.length === 1) { toggleSleep(filtered[0].key); }
+                  }
+                }}
+                placeholder="Search sleep metrics..."
+                style={{
+                  width: '100%', padding: '8px 12px', marginBottom: '10px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              {selectedSleepMetrics.length >= 3 && (
+                <div style={{
+                  padding: '0 0 10px', color: '#6b7280', fontSize: '12px', textAlign: 'center',
+                }}>
+                  Max 3 sleep metrics selected
+                </div>
+              )}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : '1fr',
+                gap: '8px',
+              }}>
+                {(() => {
+                  const filtered = SLEEP_METRICS.filter(m => !sleepSearch || m.label.toLowerCase().includes(sleepSearch.toLowerCase()));
+                  const autoSelected = filtered.length === 1;
+                  return filtered.map(metric => {
+                    const isSelected = selectedSleepMetrics.includes(metric.key);
+                    const styleIdx = selectedSleepMetrics.indexOf(metric.key);
+                    const atMax = selectedSleepMetrics.length >= 3 && !isSelected;
+                    const highlighted = isSelected || autoSelected;
+                    const dotColor = isSelected ? SLEEP_STYLES[styleIdx].color : autoSelected ? SLEEP_PRIMARY : '#4b5563';
+                    const borderColor = isSelected ? SLEEP_STYLES[styleIdx].chipBorder : autoSelected ? SLEEP_BORDER_RGBA : 'rgba(255,255,255,0.06)';
+                    return (
+                      <button
+                        key={metric.key}
+                        onClick={() => toggleSleep(metric.key)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '8px',
+                          padding: '10px 12px', minWidth: 0,
+                          borderRadius: '8px',
+                          background: highlighted ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${borderColor}`,
+                          cursor: atMax ? 'default' : 'pointer',
+                          opacity: atMax ? 0.35 : 1,
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span style={{
+                          width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                          background: dotColor,
+                        }} />
+                        <span style={{
+                          flex: 1, minWidth: 0,
+                          display: 'flex', flexDirection: 'column',
+                        }}>
+                          <span style={{
+                            color: highlighted ? '#e5e7eb' : '#9ca3af',
+                            fontSize: '13px', fontWeight: highlighted ? '500' : '400',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {metric.label}
+                          </span>
+                          {metric.unit && (
+                            <span style={{
+                              color: highlighted ? '#9ca3af' : '#6b7280',
+                              fontSize: '11px', fontWeight: '400',
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            }}>
+                              {metric.unit}
+                            </span>
+                          )}
+                        </span>
+                        {highlighted && (
+                          <span style={{ color: isSelected ? SLEEP_STYLES[styleIdx].color : SLEEP_PRIMARY, fontSize: '14px', flexShrink: 0 }}>✓</span>
+                        )}
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // ── SVG chart content (shared between desktop/mobile) ──
   const chartSVGContent = (
     <>
@@ -917,6 +1222,11 @@ export default function ComparisonStudio({
             return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
           });
         })()
+      ) : primaryIsSleep && selectedSleepMetrics.length > 0 ? (
+        sleepYLabels.map(val => {
+          const y = padTop + chartH - (val / sleepYMax) * chartH;
+          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
+        })
       ) : primaryIsSupplement && selectedSupplements.length > 0 ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
@@ -950,6 +1260,14 @@ export default function ComparisonStudio({
             );
           });
         })()
+      ) : primaryIsSleep && selectedSleepMetrics.length > 0 ? (
+        sleepYLabels.map(val => {
+          const y = padTop + chartH - (val / sleepYMax) * chartH;
+          return (
+            <text key={`l-${val}`} x={padLeft - 6 * s} y={y + 3.5 * s} textAnchor="end"
+              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{val}</text>
+          );
+        })
       ) : primaryIsSupplement && selectedSupplements.length > 0 ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
@@ -1019,6 +1337,16 @@ export default function ComparisonStudio({
         </g>
       ))}
 
+      {/* Sleep lines */}
+      {sleepPointSets.map((pts, idx) => (
+        <g key={`sleep-${idx}`}>
+          <path d={buildPath(pts)} fill="none" stroke={SLEEP_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round" opacity={selectedSleepMetrics[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
+          {showDots && selectedSleepMetrics[idx] === primarySeriesId && pts.map((pt, i) => (
+            pt.y !== null && <circle key={`sld-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SLEEP_STYLES[idx].color} strokeWidth={0.7 * s} />
+          ))}
+        </g>
+      ))}
+
       {/* Health Score line */}
       {healthScorePoints && (
         <path
@@ -1037,7 +1365,7 @@ export default function ComparisonStudio({
       {levels.map((level, i) => {
         if (level.average === null) return null;
         if (isDesktop) return null;
-        const yMax = primaryIsSupplement ? suppYMax : 5;
+        const yMax = primaryIsSleep ? sleepYMax : (primaryIsSupplement ? suppYMax : 5);
         const y = padTop + chartH - (level.average / yMax) * chartH;
         const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
         const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
@@ -1068,7 +1396,7 @@ export default function ComparisonStudio({
       {/* Layer 2: Trend lines (on top of bg boxes) */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
-        const yMax = primaryIsSupplement ? suppYMax : 5;
+        const yMax = primaryIsSleep ? sleepYMax : (primaryIsSupplement ? suppYMax : 5);
         const y = padTop + chartH - (level.average / yMax) * chartH;
         const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
         const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
@@ -1082,7 +1410,7 @@ export default function ComparisonStudio({
       {/* Layer 3: Text labels only (on top of trend lines) */}
       {levels.map((level, i) => {
         if (level.average === null) return null;
-        const yMax = primaryIsSupplement ? suppYMax : 5;
+        const yMax = primaryIsSleep ? sleepYMax : (primaryIsSupplement ? suppYMax : 5);
         const y = padTop + chartH - (level.average / yMax) * chartH;
         const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
         const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
@@ -1319,6 +1647,82 @@ export default function ComparisonStudio({
           + Symptom
         </div>
       )}
+
+      {/* Spacer between symptoms and sleep */}
+      <div style={{ height: '4px' }} />
+
+      {/* Sleep chips with stats */}
+      {selectedSleepMetrics.map((metricKey, idx) => {
+        const metric = SLEEP_METRICS.find(m => m.key === metricKey);
+        const st = SLEEP_STYLES[idx];
+        const isPrimary = metricKey === primarySeriesId;
+        const sleepLegendItem = legendItems.items.find(it => it.color === st.color);
+        const val = sleepLegendItem?.val ?? null;
+        const unit = metric?.unit || '';
+        const pctChange = isPrimary && insightData ? insightData.percentChange : null;
+        return (
+          <div
+            key={metricKey}
+            onClick={() => makePrimary(metricKey)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: chipPad, borderRadius: chipRadius,
+              background: isPrimary ? `${st.color}45` : st.chipBg,
+              border: isPrimary ? `2px solid ${st.color}90` : `${chipBorderW} solid ${st.chipBorder}`,
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: st.color, flexShrink: 0 }} />
+            <span style={{
+              color: isPrimary ? st.color : '#9ca3af',
+              fontSize: chipText, fontWeight: isPrimary ? '600' : '400', flex: 1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {metric?.label}
+            </span>
+            <span style={{
+              color: '#b0b5be', fontSize: chipText,
+              fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
+            }}>
+              {val !== null && val !== undefined && isFinite(val)
+                ? (Number.isInteger(val) ? val : val.toFixed(1))
+                : '--'}
+            </span>
+            {unit && <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>{unit}</span>}
+            {pctChange !== null && Math.abs(pctChange) >= 2 && (
+              <span style={{
+                padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
+                background: getLevelColor(pctChange, false) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
+                color: getLevelColor(pctChange, false),
+                border: `1px solid ${getLevelColor(pctChange, false)}40`,
+              }}>
+                {pctChange > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctChange))}%
+              </span>
+            )}
+            <span
+              onClick={(e) => { e.stopPropagation(); removeSleep(metricKey); }}
+              style={{ color: st.color, fontSize: chipCloseSize, lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer', marginLeft: chipCloseMargin, padding: '4px' }}
+            >&times;</span>
+          </div>
+        );
+      })}
+
+      {/* + Sleep button (if room) */}
+      {selectedSleepMetrics.length < 3 && (
+        <div
+          onClick={() => { setShowSleepPicker(true); haptic('light'); }}
+          style={{
+            display: 'flex', alignItems: 'center',
+            padding: addBtnPad, borderRadius: chipRadius,
+            border: `${addBtnBorderW} dashed ${SLEEP_BORDER_RGBA}`,
+            background: 'transparent',
+            color: 'rgba(34,211,238,0.7)', fontSize: addBtnText, fontWeight: '500',
+            cursor: 'pointer',
+          }}
+        >
+          + Sleep
+        </div>
+      )}
     </div>
   );
 
@@ -1328,6 +1732,7 @@ export default function ComparisonStudio({
     <div>
       {supplementPickerPanel}
       {symptomPickerPanel}
+      {sleepPickerPanel}
 
       {/* ── Mobile header (above chart card) ── */}
       {!isDesktop && (

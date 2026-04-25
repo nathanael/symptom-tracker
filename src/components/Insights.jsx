@@ -56,6 +56,7 @@ export default function Insights({
             trackingMode={trackingMode}
             isDesktop={isDesktop}
             setStackItems={setStackItems}
+            user={user}
           />
         ) : (
           <SleepAnalyzer user={user} isDesktop={isDesktop} />
