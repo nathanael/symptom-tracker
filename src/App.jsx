@@ -1117,6 +1117,88 @@ function App() {
           gap: '8px',
           zIndex: 200,
         }}>
+          {/* Note Button */}
+          <button
+            onClick={() => setShowNoteModal(true)}
+            style={{
+              width: '44px',
+              height: '44px',
+              background: 'rgba(15, 17, 21, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+              flexShrink: 0,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+          </button>
+          {/* AM/PM Toggle */}
+          {(() => {
+            const current = quickLogTime || getCurrentTimePeriod(trackingMode);
+            const isAM = current === 'morning';
+            return (
+              <div style={{
+                display: 'flex',
+                background: 'rgba(15, 17, 21, 0.95)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '22px',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+                padding: '4px',
+                gap: '2px',
+              }}>
+                <button
+                  onClick={() => {
+                    if (!isAM) {
+                      setQuickLogTime('morning');
+                      setFlashColumn('morning');
+                      setTimeout(() => setFlashColumn(null), 400);
+                      setCopyToastMessage('..AM..');
+                      setTimeout(() => setCopyToastMessage(''), 2000);
+                    }
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '18px',
+                    border: 'none',
+                    background: isAM ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
+                    color: isAM ? '#a5b4fc' : '#6b7280',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >AM</button>
+                <button
+                  onClick={() => {
+                    if (isAM) {
+                      setQuickLogTime('evening');
+                      setFlashColumn('evening');
+                      setTimeout(() => setFlashColumn(null), 400);
+                      setCopyToastMessage('..PM..');
+                      setTimeout(() => setCopyToastMessage(''), 2000);
+                    }
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '18px',
+                    border: 'none',
+                    background: !isAM ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
+                    color: !isAM ? '#a5b4fc' : '#6b7280',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                >PM</button>
+              </div>
+            );
+          })()}
           {/* Rapid Entry Button */}
           <button
             onClick={() => {
@@ -1159,42 +1241,6 @@ function App() {
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            </svg>
-          </button>
-          {/* Day/Night Toggle */}
-          <DayNightToggle
-            isNight={(quickLogTime || getCurrentTimePeriod(trackingMode)) === 'evening'}
-            onToggle={() => {
-              const current = quickLogTime || getCurrentTimePeriod(trackingMode);
-              const next = current === 'morning' ? 'evening' : 'morning';
-              setQuickLogTime(next);
-              setFlashColumn(next);
-              setTimeout(() => setFlashColumn(null), 400);
-              setCopyToastMessage(next === 'morning' ? '..AM..' : '..PM..');
-              setTimeout(() => setCopyToastMessage(''), 2000);
-            }}
-          />
-          {/* Note Button */}
-          <button
-            onClick={() => setShowNoteModal(true)}
-            style={{
-              width: '44px',
-              height: '44px',
-              background: 'rgba(15, 17, 21, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '50%',
-              color: '#9ca3af',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
-              flexShrink: 0,
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9"/>
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
             </svg>
           </button>
         </div>

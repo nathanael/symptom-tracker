@@ -1352,7 +1352,9 @@ export default function ComparisonStudio({
       {/* Sleep lines */}
       {sleepPointSets.map((pts, idx) => (
         <g key={`sleep-${idx}`}>
-          <path d={buildPath(pts)} fill="none" stroke={SLEEP_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round" opacity={selectedSleepMetrics[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
+          <path d={buildPath(pts)} fill="none" stroke={SLEEP_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round"
+            strokeDasharray={selectedSleepMetrics[idx] === primarySeriesId ? 'none' : `${6 * s},${4 * s}`}
+            opacity={selectedSleepMetrics[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
           {showDots && selectedSleepMetrics[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`sld-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SLEEP_STYLES[idx].color} strokeWidth={0.7 * s} />
           ))}

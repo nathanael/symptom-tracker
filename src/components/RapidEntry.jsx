@@ -502,6 +502,17 @@ export default function RapidEntry({
               <button
                 key={severity}
                 onClick={() => {
+                  // Deselect if tapping the already-selected value
+                  if (isCurrentValue) {
+                    const entryKey = `${dateKey}-${currentSymptom.id}-${timeKey}`;
+                    setEntries(prev => {
+                      const next = { ...prev };
+                      delete next[entryKey];
+                      return next;
+                    });
+                    return;
+                  }
+
                   // Set value
                   quickLog(currentSymptom.id, severity, logTime);
 
@@ -581,6 +592,17 @@ export default function RapidEntry({
         {/* N/A Button */}
         <button
           onClick={() => {
+            // Deselect if tapping the already-selected N/A
+            const naEntryKey = `${dateKey}-${currentSymptom.id}-${timeKey}`;
+            if (entries[naEntryKey]?.severity === NA_SEVERITY) {
+              setEntries(prev => {
+                const next = { ...prev };
+                delete next[naEntryKey];
+                return next;
+              });
+              return;
+            }
+
             quickLog(currentSymptom.id, NA_SEVERITY, logTime);
 
             const remainingUnmarked = unmarkedSymptoms.filter(s => s.id !== currentSymptom.id);
@@ -635,44 +657,11 @@ export default function RapidEntry({
         {/* Navigation buttons */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: '1fr 1fr auto',
           gap: '12px',
           width: '100%',
           maxWidth: '400px',
         }}>
-          {/* << Prev unfilled */}
-          <button
-            aria-label="Previous unfilled symptom"
-            onClick={() => {
-              const prevUnfilled = findPrevUnfilledIndex(rapidEntryIndex);
-              if (prevUnfilled !== -1) {
-                setRapidEntryIndex(prevUnfilled);
-              } else {
-                setPulsePrev(true);
-                setTimeout(() => setPulsePrev(false), 400);
-              }
-            }}
-            style={{
-              padding: '16px 0',
-              background: 'rgba(100, 116, 139, 0.1)',
-              border: pulsePrev
-                ? '1px solid rgba(239, 68, 68, 0.5)'
-                : '1px solid rgba(100, 116, 139, 0.3)',
-              borderRadius: '5px',
-              color: pulsePrev ? '#f87171' : '#94a3b8',
-              cursor: 'pointer',
-              transition: 'border-color 0.3s ease, color 0.3s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="11 17 6 12 11 7" />
-              <polyline points="18 17 13 12 18 7" />
-            </svg>
-          </button>
-
           {/* < Back one */}
           <button
             aria-label="Previous symptom"
