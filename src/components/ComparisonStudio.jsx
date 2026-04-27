@@ -1325,9 +1325,10 @@ export default function ComparisonStudio({
       {/* Supplement lines */}
       {suppPointSets.map((pts, idx) => (
         <g key={`supp-${idx}`}>
-          <path d={buildStepPath(pts, 8.4 * s)} fill="none"
+          <path d={buildStepPath(pts, 4 * s)} fill="none"
             stroke={SUPPLEMENT_STYLES[idx].color}
             strokeWidth={(isDesktop ? 0.9 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round"
+            strokeDasharray={selectedSupplements[idx] === primarySeriesId ? 'none' : `${6 * s},${4 * s}`}
             opacity={selectedSupplements[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
           {showDots && selectedSupplements[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`sd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.8 * s}
@@ -1339,7 +1340,9 @@ export default function ComparisonStudio({
       {/* Symptom lines */}
       {symptomPointSets.map((pts, idx) => (
         <g key={`sym-${idx}`}>
-          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round" opacity={selectedSymptoms[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
+          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round"
+            strokeDasharray={selectedSymptoms[idx] === primarySeriesId ? 'none' : `${6 * s},${4 * s}`}
+            opacity={selectedSymptoms[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
           {showDots && selectedSymptoms[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={0.7 * s} />
           ))}

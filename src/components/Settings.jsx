@@ -43,10 +43,14 @@ export default function Settings({
   setShowExport,
   setShowSettings,
   isDesktop,
+  garminSync,
   onForcePush,
 }) {
   const [confirmClearData, setConfirmClearData] = useState(false);
   const [confirmFullReset, setConfirmFullReset] = useState(false);
+  const [garminEmail, setGarminEmail] = useState('');
+  const [garminPassword, setGarminPassword] = useState('');
+  const [garminMfaCode, setGarminMfaCode] = useState('');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -574,6 +578,157 @@ export default function Settings({
                 </div>
               )}
             </>
+          )}
+        </div>
+
+        {/* Garmin Section */}
+        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
+          GARMIN
+        </div>
+        <div style={{
+          background: 'rgba(15, 17, 21, 0.5)',
+          borderRadius: '12px',
+          padding: '16px',
+          marginBottom: '12px',
+        }}>
+          {!garminSync.serverAvailable ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#6b7280' }} />
+                <span style={{ color: '#9ca3af', fontSize: '14px', fontWeight: '600' }}>Garmin server not detected</span>
+              </div>
+              <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                Start the garmy server on this machine to sync sleep data.
+              </div>
+            </>
+          ) : !garminSync.authenticated && !garminSync.mfaRequired ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308' }} />
+                <span style={{ color: '#d1d5db', fontSize: '14px', fontWeight: '600' }}>Server detected</span>
+              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                await garminSync.login(garminEmail, garminPassword);
+                setGarminPassword('');
+              }}>
+                <input
+                  type="email"
+                  placeholder="Garmin email"
+                  value={garminEmail}
+                  onChange={e => setGarminEmail(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px 12px', marginBottom: '8px',
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
+                  }}
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={garminPassword}
+                  onChange={e => setGarminPassword(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px 12px', marginBottom: '12px',
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
+                  }}
+                />
+                <button type="submit" style={{
+                  width: '100%', padding: '10px', borderRadius: '8px', border: 'none',
+                  background: 'rgba(99, 102, 241, 0.3)', color: '#a5b4fc', fontSize: '14px',
+                  fontWeight: '600', cursor: 'pointer',
+                }}>
+                  Log In
+                </button>
+              </form>
+            </>
+          ) : garminSync.mfaRequired ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#eab308' }} />
+                <span style={{ color: '#d1d5db', fontSize: '14px', fontWeight: '600' }}>MFA code required</span>
+              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                await garminSync.submitMfa(garminMfaCode);
+                setGarminMfaCode('');
+              }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Enter MFA code"
+                  value={garminMfaCode}
+                  onChange={e => setGarminMfaCode(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: '100%', padding: '10px 12px', marginBottom: '12px',
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{
+                    flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
+                    background: 'rgba(99, 102, 241, 0.3)', color: '#a5b4fc', fontSize: '14px',
+                    fontWeight: '600', cursor: 'pointer',
+                  }}>
+                    Submit
+                  </button>
+                  <button type="button" onClick={() => { garminSync.logout(); setGarminMfaCode(''); }} style={{
+                    flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'transparent', color: '#9ca3af', fontSize: '14px', cursor: 'pointer',
+                  }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+                <span style={{ color: '#d1d5db', fontSize: '14px', fontWeight: '600' }}>Connected</span>
+              </div>
+              {garminSync.lastSync && (
+                <div style={{ color: '#6b7280', fontSize: '12px', marginBottom: '12px' }}>
+                  Last synced: {(() => {
+                    const diff = Math.round((Date.now() - new Date(garminSync.lastSync).getTime()) / 60000);
+                    if (diff < 1) return 'just now';
+                    if (diff < 60) return `${diff} min ago`;
+                    return `${Math.round(diff / 60)}h ago`;
+                  })()}
+                </div>
+              )}
+              {garminSync.syncing ? (
+                <div style={{ color: '#9ca3af', fontSize: '13px', padding: '10px 0' }}>Syncing...</div>
+              ) : (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => garminSync.syncNow()} style={{
+                    flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
+                    background: 'rgba(99, 102, 241, 0.3)', color: '#a5b4fc', fontSize: '14px',
+                    fontWeight: '600', cursor: 'pointer',
+                  }}>
+                    Sync Now
+                  </button>
+                  <button onClick={() => garminSync.logout()} style={{
+                    padding: '10px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'transparent', color: '#9ca3af', fontSize: '14px', cursor: 'pointer',
+                  }}>
+                    Disconnect
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+          {garminSync.error && (
+            <div style={{
+              marginTop: '8px', color: '#f87171', fontSize: '12px',
+              background: 'rgba(248, 113, 113, 0.1)', padding: '8px', borderRadius: '6px',
+            }}>
+              {garminSync.error}
+            </div>
           )}
         </div>
 

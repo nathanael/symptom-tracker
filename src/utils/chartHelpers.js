@@ -183,13 +183,6 @@ export function buildPath(points) {
 }
 
 // Build a step-mid SVG path with rounded transitions at every dose change.
-// Each data point sits on a flat plateau; transitions happen at the midpoint
-// between adjacent points so the rounding lives between data, not on it.
-// Transitions render as two quadratic-Bézier elbows when the vertical span has
-// room (>= 2 × radius), or as a single cubic-Bézier S-curve when it doesn't —
-// guaranteeing consistent visual rounding regardless of step size.
-// Horizontal radius is clamped to half the adjacent segment so the corners
-// never overshoot when consecutive points are close together.
 export function buildStepPath(points, radius) {
   const segments = [];
   let seg = [];
@@ -220,8 +213,6 @@ export function buildStepPath(points, radius) {
       const r = Math.min(radius, dx / 2);
 
       if (dyAbs >= 2 * radius) {
-        // Two-elbow case: horizontal at prev.y, pre-corner, vertical at midX,
-        // post-corner, horizontal at cur.y to cur.x.
         d += `L${midX - r},${prev.y}`;
         d += `Q${midX},${prev.y},${midX},${prev.y + dir * radius}`;
         d += `L${midX},${cur.y - dir * radius}`;

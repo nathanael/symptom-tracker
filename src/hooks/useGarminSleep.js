@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getFirebaseDb } from '../utils/firebase';
 import { applyFirestoreSnapshot } from '../utils/garminSleepCache';
 
@@ -29,6 +29,12 @@ export function useGarminSleep(user) {
   const [lastPushedAt, setLastPushedAt] = useState(initial.lastPushedAt);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const daysRef = useRef(days);
+  const lastPushedAtRef = useRef(lastPushedAt);
+
+  // Keep refs in sync with state
+  daysRef.current = days;
+  lastPushedAtRef.current = lastPushedAt;
 
   const refetch = useCallback(async () => {
     if (!user || !user.uid) return;
@@ -38,17 +44,19 @@ export function useGarminSleep(user) {
     setError(null);
     try {
       const base = db.collection('users').doc(user.uid).collection('garminSleep');
+      const curLastPushedAt = lastPushedAtRef.current;
+      const curDays = daysRef.current;
       let snap;
-      if (lastPushedAt) {
+      if (curLastPushedAt) {
         snap = await base
-          .where('syncedAt', '>', new Date(lastPushedAt))
+          .where('syncedAt', '>', new Date(curLastPushedAt))
           .orderBy('syncedAt')
           .get();
       } else {
         snap = await base.get();
       }
       const docs = snap.docs.map(d => d.data());
-      const { merged, newestTs } = applyFirestoreSnapshot(days, lastPushedAt, docs);
+      const { merged, newestTs } = applyFirestoreSnapshot(curDays, curLastPushedAt, docs);
       setDays(merged);
       setLastPushedAt(newestTs);
       writeCache(merged, newestTs);
@@ -58,11 +66,23 @@ export function useGarminSleep(user) {
     } finally {
       setLoading(false);
     }
-  // Only refetch when the signed-in user changes; `days`/`lastPushedAt` read from state are intentional captures.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user && user.uid]);
 
   useEffect(() => { refetch(); }, [refetch]);
+
+  useEffect(() => {
+    const handler = () => {
+      // Reset state so refetch does a full query instead of incremental
+      setDays([]);
+      setLastPushedAt(null);
+      daysRef.current = [];
+      lastPushedAtRef.current = null;
+      refetch();
+    };
+    window.addEventListener('garmin-sleep-synced', handler);
+    return () => window.removeEventListener('garmin-sleep-synced', handler);
+  }, [refetch]);
 
   return { days, loading, error, refetch };
 }

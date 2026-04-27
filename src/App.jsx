@@ -3,6 +3,7 @@ import { useLocalStorage, useLocalStorageSet } from './hooks/useLocalStorage';
 import { useFirebase } from './hooks/useFirebase';
 import { useSyncEngine } from './hooks/useSyncEngine';
 import { useDesktopMode } from './hooks/useMediaQuery';
+import { useGarminSync } from './hooks/useGarminSync';
 import {
   STORAGE_KEY_SYMPTOMS,
   STORAGE_KEY_ENTRIES,
@@ -187,6 +188,8 @@ function App() {
 
   // Desktop mode
   const isDesktop = useDesktopMode();
+
+  const garminSync = useGarminSync(firebase.user);
 
   // Refs
   const justLoggedRef = useRef(false);
@@ -1321,6 +1324,7 @@ function App() {
           setShowExport={setShowExport}
           setShowSettings={setShowSettings}
           isDesktop={isDesktop}
+          garminSync={garminSync}
           onForcePush={() => sync.forcePush({
             symptoms,
             entries,

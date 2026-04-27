@@ -534,7 +534,7 @@ export default class SyncEngine {
     log('  _applySnapshot: applying=', Object.keys(updates), 'skipped=', skipped);
 
     if (hasUpdates) {
-      this.lastSynced = data.updatedAt?.toDate() || new Date();
+      this.lastSynced = (typeof data.updatedAt?.toDate === 'function') ? data.updatedAt.toDate() : new Date();
       this._notifyStatus();
       this.onCloudUpdate(updates, false);
     }
