@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
 import { computeHealthScore, computeRollingAvg, getScoreColor } from '../healthScore';
 import { getHealthScoreSeries } from '../correlationHelpers';
 
@@ -59,6 +59,49 @@ describe('computeHealthScore', () => {
     const result = computeHealthScore(symptoms, entries, '2026-03-30', 'simple');
     // 100 - 0/(1*5)*100 = 100
     expect(result).toEqual({ score: 100, loggedCount: 1, totalActive: 2 });
+  });
+
+  describe('with sleep score blending', () => {
+    const store = {};
+    beforeAll(() => {
+      globalThis.localStorage = {
+        getItem: (key) => store[key] ?? null,
+        setItem: (key, val) => { store[key] = val; },
+        removeItem: (key) => { delete store[key]; },
+      };
+    });
+    afterEach(() => {
+      delete store.garminSleepCache;
+    });
+    afterAll(() => {
+      delete globalThis.localStorage;
+    });
+
+    it('blends 90% symptom + 10% sleep when sleep data available', () => {
+      localStorage.setItem('garminSleepCache', JSON.stringify({
+        days: [{ date: '2026-03-30', sleepScore: 80 }],
+      }));
+      const entries = {
+        '2026-03-30-s1-daily': { severity: 2, date: '2026-03-30', symptomId: 's1', time: 'daily' },
+        '2026-03-30-s2-daily': { severity: 3, date: '2026-03-30', symptomId: 's2', time: 'daily' },
+      };
+      const result = computeHealthScore(symptoms, entries, '2026-03-30', 'simple');
+      // symptom: 100 - (2+3)/(2*5)*100 = 50
+      // blended: 50*0.9 + 80*0.1 = 45 + 8 = 53
+      expect(result).toEqual({ score: 53, loggedCount: 2, totalActive: 2 });
+    });
+
+    it('uses pure symptom score when no sleep data for date', () => {
+      localStorage.setItem('garminSleepCache', JSON.stringify({
+        days: [{ date: '2026-03-29', sleepScore: 80 }],
+      }));
+      const entries = {
+        '2026-03-30-s1-daily': { severity: 2, date: '2026-03-30', symptomId: 's1', time: 'daily' },
+      };
+      const result = computeHealthScore(symptoms, entries, '2026-03-30', 'simple');
+      // 100 - 2/(1*5)*100 = 60, no sleep data for this date
+      expect(result).toEqual({ score: 60, loggedCount: 1, totalActive: 2 });
+    });
   });
 });
 

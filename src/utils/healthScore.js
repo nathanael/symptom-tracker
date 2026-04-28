@@ -1,7 +1,25 @@
 import { getDailyValue } from './chartHelpers';
 
+const SLEEP_WEIGHT = 0.10; // sleep score is 10% of health score when available
+
+function getSleepScoreForDate(dateStr) {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem('garminSleepCache');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const days = parsed.days;
+    if (!Array.isArray(days)) return null;
+    const day = days.find(d => d.date === dateStr);
+    return day?.sleepScore ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Compute health score for a single date.
+ * When Garmin sleep data is available, blends 90% symptom score + 10% sleep score.
  * Returns { score: number|null, loggedCount: number, totalActive: number }
  */
 export function computeHealthScore(symptoms, entries, dateStr, trackingMode) {
@@ -20,7 +38,16 @@ export function computeHealthScore(symptoms, entries, dateStr, trackingMode) {
 
   if (loggedCount === 0) return { score: null, loggedCount: 0, totalActive };
 
-  const score = 100 - Math.round((sum / (loggedCount * 5)) * 100);
+  const symptomScore = 100 - (sum / (loggedCount * 5)) * 100;
+  const sleepScore = getSleepScoreForDate(dateStr);
+
+  let score;
+  if (sleepScore != null) {
+    score = Math.round(symptomScore * (1 - SLEEP_WEIGHT) + sleepScore * SLEEP_WEIGHT);
+  } else {
+    score = Math.round(symptomScore);
+  }
+
   return { score, loggedCount, totalActive };
 }
 

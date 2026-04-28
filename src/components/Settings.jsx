@@ -101,7 +101,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '5.2.1',
+      version: '5.2.2',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -204,6 +204,30 @@ export default function Settings({
     }
   };
 
+  // Shared styles
+  const sectionHeader = (color = '#8b5cf6') => ({
+    marginBottom: '10px', marginTop: '28px', paddingLeft: '4px',
+    display: 'flex', alignItems: 'center', gap: '8px',
+  });
+  const sectionLabel = (color = '#8b5cf6') => ({
+    color, fontSize: '12px', fontWeight: '600', letterSpacing: '1px',
+  });
+  const card = {
+    background: 'rgba(15, 17, 21, 0.5)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    borderRadius: '12px',
+    marginBottom: '12px',
+    overflow: 'hidden',
+  };
+  const iconCircle = (bg = 'rgba(99, 102, 241, 0.15)') => ({
+    width: '36px', height: '36px', borderRadius: '10px',
+    background: bg,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  });
+  const svgProps = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+  const svgPropsSmall = { ...svgProps, width: 14, height: 14 };
+
   return (
     <div
       style={isDesktop ? {
@@ -229,7 +253,7 @@ export default function Settings({
     >
       <div
         style={isDesktop ? {
-          width: '420px',
+          width: '520px',
           height: '100%',
           background: '#1a1b1e',
           borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
@@ -277,16 +301,48 @@ export default function Settings({
           padding: '16px 20px',
         } : {}}>
 
-        {/* Cloud Sync Section */}
-        <div style={{ marginBottom: '8px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          CLOUD SYNC
-        </div>
-        <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          padding: '16px',
-          marginBottom: '12px',
-        }}>
+        {/* Mobile Header */}
+        {!isDesktop && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            position: 'relative',
+            marginBottom: '24px',
+          }}>
+            <h2 style={{ color: '#f8fafc', fontSize: '24px', fontWeight: '700', margin: 0 }}>
+              Settings
+            </h2>
+            <button
+              onClick={() => {
+                setShowSettings(false);
+                setShowExport(true);
+              }}
+              style={{
+                position: 'absolute',
+                right: 0,
+                background: 'none',
+                border: '1.5px solid rgba(255,255,255,0.2)',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#94a3b8',
+                fontSize: '15px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              ?
+            </button>
+          </div>
+        )}
+
+        {/* User Account Card */}
+        <div style={{ ...card, padding: '20px' }}>
           {firebaseError ? (
             <div style={{
               color: '#f87171',
@@ -302,61 +358,109 @@ export default function Settings({
             </div>
           ) : user ? (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={{
-                  width: '40px',
-                  height: '40px',
+                  width: '60px',
+                  height: '60px',
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#fff',
-                  fontSize: '16px',
+                  fontSize: '24px',
                   fontWeight: '600',
                   overflow: 'hidden',
+                  flexShrink: 0,
+                  position: 'relative',
                 }}>
                   {user.photoURL ? (
                     <img src={user.photoURL} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     (user.displayName || user.email || 'U')[0].toUpperCase()
                   )}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '1px',
+                    left: '1px',
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    background: '#22c55e',
+                    border: '2px solid #0f1115',
+                  }} />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '600' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: '#f8fafc', fontSize: '17px', fontWeight: '600' }}>
                     {user.displayName || user.email?.split('@')[0] || 'User'}
                   </div>
-                  <div style={{ color: '#64748b', fontSize: '12px' }}>
+                  <div style={{ color: '#64748b', fontSize: '13px', marginTop: '2px' }}>
                     {user.email}
                   </div>
                 </div>
-                <button
-                  onClick={signOut}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    padding: '8px 12px',
-                    color: '#ef4444',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Sign Out
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
+                  <button
+                    onClick={async () => {
+                      if (onForcePush) {
+                        await onForcePush();
+                        setLastAction('Data pushed to cloud');
+                      }
+                    }}
+                    disabled={syncing}
+                    style={{
+                      background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '10px 20px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: syncing ? 'not-allowed' : 'pointer',
+                      opacity: syncing ? 0.6 : 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <svg {...svgPropsSmall} stroke="#fff">
+                      <polyline points="1 4 1 10 7 10"/>
+                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                    </svg>
+                    {syncing ? 'Syncing...' : 'Sync Now'}
+                  </button>
+                  <button
+                    onClick={signOut}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      color: '#8b5cf6',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Sign out
+                  </button>
+                </div>
               </div>
 
               <div style={{
-                marginTop: '12px',
-                paddingTop: '12px',
-                borderTop: '1px solid rgba(100, 116, 139, 0.2)',
+                marginTop: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
                 color: '#64748b',
                 fontSize: '13px',
               }}>
+                <svg {...svgPropsSmall} stroke="#64748b" strokeWidth={1.5}>
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
                 {syncing ? (
                   <span>Syncing...</span>
                 ) : lastSynced ? (
-                  <span>Last synced {lastSynced.toLocaleTimeString()}</span>
+                  <span>Last synced {lastSynced.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
                 ) : (
                   <span>Auto-sync enabled</span>
                 )}
@@ -369,31 +473,6 @@ export default function Settings({
               )}
 
               <button
-                onClick={async () => {
-                  if (onForcePush) {
-                    await onForcePush();
-                    setLastAction('Data pushed to cloud');
-                  }
-                }}
-                disabled={syncing}
-                style={{
-                  marginTop: '12px',
-                  width: '100%',
-                  padding: '10px',
-                  background: 'rgba(99, 102, 241, 0.15)',
-                  border: '1px solid rgba(99, 102, 241, 0.3)',
-                  borderRadius: '8px',
-                  color: '#a5b4fc',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  cursor: syncing ? 'not-allowed' : 'pointer',
-                  opacity: syncing ? 0.5 : 1,
-                }}
-              >
-                Force Push to Cloud
-              </button>
-
-              <button
                 onClick={() => {
                   if (confirm('This will clear local data and reload from the cloud. Continue?')) {
                     const keys = Object.keys(localStorage).filter(k => k.startsWith('symptomTracker_') || k.startsWith('syncDirty_'));
@@ -404,20 +483,17 @@ export default function Settings({
                 }}
                 disabled={syncing}
                 style={{
-                  marginTop: '8px',
-                  width: '100%',
-                  padding: '10px',
-                  background: 'rgba(34, 197, 94, 0.15)',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
-                  borderRadius: '8px',
-                  color: '#86efac',
-                  fontSize: '13px',
-                  fontWeight: '500',
+                  marginTop: '10px',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  color: '#64748b',
+                  fontSize: '12px',
                   cursor: syncing ? 'not-allowed' : 'pointer',
                   opacity: syncing ? 0.5 : 1,
                 }}
               >
-                Force Pull from Cloud
+                Force pull from cloud
               </button>
             </>
           ) : (
@@ -582,15 +658,13 @@ export default function Settings({
         </div>
 
         {/* Garmin Section */}
-        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          GARMIN
+        <div style={sectionHeader()}>
+          <svg {...svgProps} stroke="#8b5cf6">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          <span style={sectionLabel()}>GARMIN</span>
         </div>
-        <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          padding: '16px',
-          marginBottom: '12px',
-        }}>
+        <div style={{ ...card, padding: '16px' }}>
           {!garminSync.serverAvailable ? (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -732,67 +806,75 @@ export default function Settings({
           )}
         </div>
 
-        {/* Tracking Mode Selection */}
-        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          TRACKING MODE
+        {/* Tracking Preferences */}
+        <div style={sectionHeader()}>
+          <svg {...svgProps} stroke="#8b5cf6">
+            <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+            <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+            <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+          </svg>
+          <span style={sectionLabel()}>TRACKING PREFERENCES</span>
         </div>
-        <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          marginBottom: '12px',
-          padding: '4px',
-          display: 'flex',
-          gap: '4px',
-        }}>
-          {Object.entries(trackingModes).map(([key, mode]) => (
-            <button
-              key={key}
-              onClick={() => setTrackingMode(key)}
-              style={{
-                flex: 1,
-                background: trackingMode === key ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.05)',
-                border: trackingMode === key ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid rgba(99, 102, 241, 0.15)',
-                borderRadius: '8px',
-                padding: '10px 8px',
-                color: trackingMode === key ? '#a5b4fc' : '#64748b',
-                fontSize: '13px',
-                fontWeight: trackingMode === key ? '600' : '500',
-                cursor: 'pointer',
-                textAlign: 'center',
-              }}
-            >
-              {mode.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Copy Days Setting */}
-        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          QUICK COPY
-        </div>
-        <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          marginBottom: '12px',
-          overflow: 'hidden',
-        }}>
-          <div style={{ padding: '14px 16px' }}>
-            <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px' }}>
-              Default number of days for copy button
+        <div style={card}>
+          {/* Time format */}
+          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.1)' }}>
+            <div style={{ ...iconCircle(), marginRight: '12px', color: '#a5b4fc' }}>
+              <svg {...svgProps}>
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Time format</div>
+              <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>How times are displayed in the app</div>
+            </div>
+            <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+              {Object.entries(trackingModes).map(([key, mode]) => (
+                <button
+                  key={key}
+                  onClick={() => setTrackingMode(key)}
+                  style={{
+                    padding: '8px 16px',
+                    background: trackingMode === key ? 'rgba(124, 58, 237, 0.9)' : 'rgba(255, 255, 255, 0.05)',
+                    border: trackingMode === key ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    color: trackingMode === key ? '#fff' : '#94a3b8',
+                    fontSize: '13px',
+                    fontWeight: trackingMode === key ? '600' : '400',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Default copy range */}
+          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.1)' }}>
+            <div style={{ ...iconCircle(), marginRight: '12px', color: '#a5b4fc' }}>
+              <svg {...svgProps}>
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Default copy range</div>
+              <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>Default number of days for copy</div>
+            </div>
+            <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
               {[1, 7, 14, 30, 60].map(days => (
                 <button
                   key={days}
                   onClick={() => setCopyDays(days)}
                   style={{
-                    flex: 1,
-                    padding: '10px 0',
-                    background: copyDays === days ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.05)',
-                    border: copyDays === days ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid rgba(99, 102, 241, 0.15)',
+                    padding: '8px 12px',
+                    minWidth: '36px',
+                    background: copyDays === days ? 'rgba(124, 58, 237, 0.9)' : 'rgba(255, 255, 255, 0.05)',
+                    border: copyDays === days ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
-                    color: copyDays === days ? '#a5b4fc' : '#64748b',
-                    fontSize: '14px',
+                    color: copyDays === days ? '#fff' : '#94a3b8',
+                    fontSize: '13px',
                     fontWeight: copyDays === days ? '600' : '400',
                     cursor: 'pointer',
                   }}
@@ -802,35 +884,30 @@ export default function Settings({
               ))}
             </div>
           </div>
-        </div>
 
-        {/* Trend Indicator Window Setting */}
-        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          TREND INDICATOR
-        </div>
-        <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          marginBottom: '12px',
-          overflow: 'hidden',
-        }}>
-          <div style={{ padding: '14px 16px' }}>
-            <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px' }}>
-              Days to analyze for trend arrows (↑↓)
+          {/* Trend analysis range */}
+          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px' }}>
+            <div style={{ ...iconCircle(), marginRight: '12px', color: '#a5b4fc' }}>
+              <svg {...svgProps}>
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+              </svg>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Trend analysis range</div>
+              <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>Days to analyze for trend arrows</div>
+            </div>
+            <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
               {[7, 14, 30].map(days => (
                 <button
                   key={days}
                   onClick={() => setTrendWindow(days)}
                   style={{
-                    flex: 1,
-                    padding: '10px 0',
-                    background: trendWindow === days ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.05)',
-                    border: trendWindow === days ? '1px solid rgba(99, 102, 241, 0.5)' : '1px solid rgba(99, 102, 241, 0.15)',
+                    padding: '8px 16px',
+                    background: trendWindow === days ? 'rgba(34, 197, 94, 0.8)' : 'rgba(255, 255, 255, 0.05)',
+                    border: trendWindow === days ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
-                    color: trendWindow === days ? '#a5b4fc' : '#64748b',
-                    fontSize: '14px',
+                    color: trendWindow === days ? '#fff' : '#94a3b8',
+                    fontSize: '13px',
                     fontWeight: trendWindow === days ? '600' : '400',
                     cursor: 'pointer',
                   }}
@@ -842,20 +919,22 @@ export default function Settings({
           </div>
         </div>
 
-        {/* Quick Copy for AI Section */}
-        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          QUICK COPY FOR AI
+        {/* AI Shortcuts */}
+        <div style={sectionHeader()}>
+          <svg {...svgProps} stroke="#8b5cf6" fill="none">
+            <path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"/>
+            <path d="M19 13l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z"/>
+          </svg>
+          <span style={sectionLabel()}>AI SHORTCUTS</span>
         </div>
-        <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          padding: '16px',
-          marginBottom: '12px',
-        }}>
-          <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '10px' }}>
-            Copy tracking data to clipboard for AI chat
+        <div style={{ ...card, padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <div>
+              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Quick Copy for AI</div>
+              <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>Copy tracking data to clipboard for AI chat</div>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '2px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '12px', marginBottom: '6px' }}>
             {[30, 60, 90].map(days => (
               <button
                 key={days}
@@ -868,16 +947,23 @@ export default function Settings({
                 }}
                 style={{
                   flex: 1,
-                  padding: '8px 0',
+                  padding: '10px 0',
                   background: 'rgba(139, 92, 246, 0.2)',
-                  border: 'none',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
                   borderRadius: '8px',
                   color: '#c4b5fd',
                   fontSize: '14px',
                   fontWeight: '500',
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
                 }}
               >
+                <svg {...svgPropsSmall} stroke="#c4b5fd" strokeWidth={1.5}>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/>
+                </svg>
                 {days}d
               </button>
             ))}
@@ -891,13 +977,14 @@ export default function Settings({
               width: '100%',
               background: 'transparent',
               border: 'none',
-              padding: '0',
+              padding: '4px 0',
               color: '#8b5cf6',
               fontSize: '14px',
               cursor: 'pointer',
-              textAlign: 'left',
+              textAlign: 'center',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '4px',
             }}
           >
@@ -908,72 +995,170 @@ export default function Settings({
           </button>
         </div>
 
-        {/* Backup Section */}
-        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          BACKUP
+        {/* Backup & Restore */}
+        <div style={sectionHeader()}>
+          <svg {...svgProps} stroke="#8b5cf6">
+            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+          </svg>
+          <span style={sectionLabel()}>BACKUP & RESTORE</span>
         </div>
-        <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          marginBottom: '12px',
-          overflow: 'hidden',
-        }}>
-          <div style={{ padding: '14px 16px' }}>
-            <div style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '12px' }}>
-              Save to Files to sync between devices
-            </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={backupToFile}
-                style={{
-                  flex: 1,
-                  background: 'rgba(99, 102, 241, 0.2)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px',
-                  color: '#a5b4fc',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                }}
-              >
-                Save Backup
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  flex: 1,
-                  background: 'rgba(99, 102, 241, 0.2)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px',
-                  color: '#a5b4fc',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                }}
-              >
-                Load Backup
-              </button>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={restoreFromFile}
-              style={{ display: 'none' }}
-            />
+        <div style={{ ...card, padding: '16px' }}>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={backupToFile}
+              style={{
+                flex: 1,
+                background: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '10px',
+                padding: '12px',
+                color: '#a5b4fc',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+            >
+              <svg {...svgPropsSmall} stroke="#a5b4fc" strokeWidth={1.5}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              Save Backup
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                flex: 1,
+                background: 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '10px',
+                padding: '12px',
+                color: '#a5b4fc',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+            >
+              <svg {...svgPropsSmall} stroke="#a5b4fc" strokeWidth={1.5}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Load Backup
+            </button>
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={restoreFromFile}
+            style={{ display: 'none' }}
+          />
         </div>
 
-        {/* About Section */}
-        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          ABOUT
+        {/* Data Tools */}
+        <div style={sectionHeader()}>
+          <svg {...svgProps} stroke="#8b5cf6">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+          </svg>
+          <span style={sectionLabel()}>DATA TOOLS</span>
+        </div>
+        <div style={card}>
+          <button
+            onClick={() => { setShowMergeModal(true); setMergeTarget(''); setMergeSource(''); setMergeStrategy('sum'); setConfirmMerge(false); haptic('light'); }}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid rgba(100, 116, 139, 0.1)',
+              padding: '14px 16px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}
+          >
+            <div style={{ ...iconCircle(), color: '#a5b4fc' }}>
+              <svg {...svgProps}>
+                <rect x="7" y="3" width="10" height="18" rx="2"/><path d="M4 7h3"/><path d="M4 17h3"/><path d="M17 7h3"/><path d="M17 17h3"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Merge Supplements</div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Combine duplicate supplements into one</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+          <button
+            onClick={() => { setShowRenameModal(true); setRenameTarget(''); setRenameValue(''); haptic('light'); }}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid rgba(100, 116, 139, 0.1)',
+              padding: '14px 16px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}
+          >
+            <div style={{ ...iconCircle(), color: '#a5b4fc' }}>
+              <svg {...svgProps}>
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Rename Supplement</div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Change a supplement's display name</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+          <button
+            onClick={() => { setShowDeleteModal(true); setDeleteTarget(''); setConfirmDelete(false); haptic('light'); }}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              padding: '14px 16px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}
+          >
+            <div style={{ ...iconCircle('rgba(239, 68, 68, 0.15)'), color: '#fca5a5' }}>
+              <svg {...svgProps}>
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Delete Supplement</div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Permanently remove a supplement and all its entries</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* About */}
+        <div style={sectionHeader()}>
+          <svg {...svgProps} stroke="#8b5cf6">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <span style={sectionLabel()}>ABOUT</span>
         </div>
         <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          marginBottom: '12px',
+          ...card,
           padding: '14px 16px',
           display: 'flex',
           justifyContent: 'space-between',
@@ -981,7 +1166,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.2.1
+              v5.2.2
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}
@@ -1009,8 +1194,8 @@ export default function Settings({
             style={{
               background: 'rgba(139, 92, 246, 0.15)',
               border: '1px solid rgba(139, 92, 246, 0.3)',
-              borderRadius: '6px',
-              padding: '8px 12px',
+              borderRadius: '8px',
+              padding: '8px 16px',
               color: checkingForUpdates ? '#64748b' : '#a5b4fc',
               fontSize: '13px',
               fontWeight: '500',
@@ -1039,442 +1224,16 @@ export default function Settings({
           </button>
         </div>
 
-        {/* Merge Supplements */}
-        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          DATA TOOLS
-        </div>
-        <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          marginBottom: '12px',
-          overflow: 'hidden',
-        }}>
-          <button
-            onClick={() => { setShowMergeModal(true); setMergeTarget(''); setMergeSource(''); setMergeStrategy('sum'); setConfirmMerge(false); haptic('light'); }}
-            style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
-              padding: '14px 16px',
-              color: '#a5b4fc',
-              fontSize: '15px',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
-            <div>Merge Supplements</div>
-            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Combine duplicate supplements into one</div>
-          </button>
-          <button
-            onClick={() => { setShowRenameModal(true); setRenameTarget(''); setRenameValue(''); haptic('light'); }}
-            style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
-              padding: '14px 16px',
-              color: '#a5b4fc',
-              fontSize: '15px',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
-            <div>Rename Supplement</div>
-            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Change a supplement's display name</div>
-          </button>
-          <button
-            onClick={() => { setShowDeleteModal(true); setDeleteTarget(''); setConfirmDelete(false); haptic('light'); }}
-            style={{
-              width: '100%',
-              background: 'transparent',
-              border: 'none',
-              padding: '14px 16px',
-              color: '#fca5a5',
-              fontSize: '15px',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
-            <div>Delete Supplement</div>
-            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Permanently remove a supplement and all its entries</div>
-          </button>
-        </div>
-
-        {showMergeModal && (
-          <div
-            onClick={() => setShowMergeModal(false)}
-            style={{
-              position: 'fixed', inset: 0,
-              background: 'rgba(0,0,0,0.85)',
-              zIndex: 1000,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '20px',
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%', maxWidth: '400px',
-                background: 'rgba(15,17,21,0.95)',
-                borderRadius: '12px',
-                border: '1px solid rgba(139,92,246,0.3)',
-                padding: '20px',
-              }}
-            >
-              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
-                Merge Supplements
-              </h3>
-
-              {/* Target dropdown */}
-              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
-                Keep (target)
-              </label>
-              <select
-                value={mergeTarget}
-                onChange={(e) => { setMergeTarget(e.target.value); if (e.target.value === mergeSource) setMergeSource(''); setConfirmMerge(false); }}
-                style={{
-                  width: '100%', padding: '10px 12px', marginBottom: '12px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
-                }}
-              >
-                <option value="">Select supplement to keep...</option>
-                {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).map(item => (
-                  <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
-                ))}
-              </select>
-
-              {/* Source dropdown */}
-              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
-                Merge & delete (source)
-              </label>
-              <select
-                value={mergeSource}
-                onChange={(e) => { setMergeSource(e.target.value); setConfirmMerge(false); }}
-                style={{
-                  width: '100%', padding: '10px 12px', marginBottom: '12px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
-                }}
-              >
-                <option value="">Select supplement to merge...</option>
-                {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).filter(i => i.id !== mergeTarget).map(item => (
-                  <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
-                ))}
-              </select>
-
-              {/* Strategy toggle */}
-              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '6px' }}>
-                When both have entries on the same day
-              </label>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                {['sum', 'higher'].map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setMergeStrategy(s)}
-                    style={{
-                      flex: 1, padding: '8px',
-                      borderRadius: '6px', border: 'none',
-                      background: mergeStrategy === s ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.04)',
-                      color: mergeStrategy === s ? '#c4b5fd' : '#6b7280',
-                      fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-                    }}
-                  >
-                    {s === 'sum' ? 'Sum doses' : 'Keep higher'}
-                  </button>
-                ))}
-              </div>
-
-              {/* Preview */}
-              {mergePreview && (() => {
-                const targetItem = (stackItems || []).find(i => i.id === mergeTarget);
-                const sourceItem = (stackItems || []).find(i => i.id === mergeSource);
-                const unitMismatch = targetItem && sourceItem && (targetItem.unit || 'mg') !== (sourceItem.unit || 'mg');
-                return (
-                  <div style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    marginBottom: '16px',
-                    fontSize: '13px',
-                    color: '#9ca3af',
-                    lineHeight: '1.6',
-                  }}>
-                    <div>{mergePreview.sourceEntryCount} entries will be moved</div>
-                    {mergePreview.conflictCount > 0 && (
-                      <div style={{ color: '#fbbf24' }}>
-                        {mergePreview.conflictCount} date conflict{mergePreview.conflictCount > 1 ? 's' : ''} ({mergeStrategy === 'sum' ? 'doses will be summed' : 'higher dose kept'})
-                      </div>
-                    )}
-                    {unitMismatch && (
-                      <div style={{ color: '#fb923c' }}>
-                        Warning: different units ({targetItem.unit || 'mg'} vs {sourceItem.unit || 'mg'})
-                      </div>
-                    )}
-                    <div style={{ color: '#fca5a5', marginTop: '4px' }}>
-                      &quot;{sourceItem?.name}&quot; will be permanently deleted
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={() => setShowMergeModal(false)}
-                  style={{
-                    flex: 1, padding: '10px',
-                    background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '8px',
-                    color: '#a5b4fc', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (!mergeTarget || !mergeSource || mergeTarget === mergeSource) return;
-                    if (!confirmMerge) { setConfirmMerge(true); return; }
-                    const sourceName = (stackItems || []).find(i => i.id === mergeSource)?.name;
-                    const targetName = (stackItems || []).find(i => i.id === mergeTarget)?.name;
-                    const result = mergeSupplements(stackItems, stackEntries, mergeTarget, mergeSource, mergeStrategy);
-                    setStackItems(() => result.stackItems);
-                    setStackEntries(() => result.stackEntries);
-                    setShowMergeModal(false);
-                    setLastAction(`Merged "${sourceName}" into "${targetName}" (${mergePreview?.sourceEntryCount || 0} entries moved)`);
-                    haptic('success');
-                  }}
-                  disabled={!mergeTarget || !mergeSource || mergeTarget === mergeSource}
-                  style={{
-                    flex: 1, padding: '10px',
-                    background: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? 'rgba(139,92,246,0.1)' : confirmMerge ? 'rgba(239,68,68,0.4)' : 'rgba(139,92,246,0.4)',
-                    border: 'none', borderRadius: '8px',
-                    color: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? '#6b7280' : confirmMerge ? '#fca5a5' : '#e9d5ff',
-                    fontSize: '14px', fontWeight: '600', cursor: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? 'default' : 'pointer',
-                    opacity: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? 0.5 : 1,
-                  }}
-                >
-                  {confirmMerge ? 'Confirm Merge' : 'Merge'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showRenameModal && (
-          <div
-            onClick={() => setShowRenameModal(false)}
-            style={{
-              position: 'fixed', inset: 0,
-              background: 'rgba(0,0,0,0.85)',
-              zIndex: 1000,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '20px',
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%', maxWidth: '400px',
-                background: 'rgba(15,17,21,0.95)',
-                borderRadius: '12px',
-                border: '1px solid rgba(139,92,246,0.3)',
-                padding: '20px',
-              }}
-            >
-              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
-                Rename Supplement
-              </h3>
-
-              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
-                Supplement
-              </label>
-              <select
-                value={renameTarget}
-                onChange={(e) => {
-                  setRenameTarget(e.target.value);
-                  const item = (stackItems || []).find(i => i.id === e.target.value);
-                  setRenameValue(item ? item.name : '');
-                }}
-                style={{
-                  width: '100%', padding: '10px 12px', marginBottom: '12px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
-                }}
-              >
-                <option value="">Select supplement...</option>
-                {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).map(item => (
-                  <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
-                ))}
-              </select>
-
-              {renameTarget && (
-                <>
-                  <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
-                    New name
-                  </label>
-                  <input
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    style={{
-                      width: '100%', padding: '10px 12px', marginBottom: '16px',
-                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </>
-              )}
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={() => setShowRenameModal(false)}
-                  style={{
-                    flex: 1, padding: '10px',
-                    background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '8px',
-                    color: '#a5b4fc', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (!renameTarget || !renameValue.trim()) return;
-                    const oldName = (stackItems || []).find(i => i.id === renameTarget)?.name;
-                    const newItems = renameSupplement(stackItems, renameTarget, renameValue.trim());
-                    setStackItems(() => newItems);
-                    setShowRenameModal(false);
-                    setLastAction(`Renamed "${oldName}" to "${renameValue.trim()}"`);
-                    haptic('success');
-                  }}
-                  disabled={!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name}
-                  style={{
-                    flex: 1, padding: '10px',
-                    background: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.4)',
-                    border: 'none', borderRadius: '8px',
-                    color: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? '#6b7280' : '#e9d5ff',
-                    fontSize: '14px', fontWeight: '600',
-                    cursor: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? 'default' : 'pointer',
-                    opacity: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? 0.5 : 1,
-                  }}
-                >
-                  Rename
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showDeleteModal && (
-          <div
-            onClick={() => setShowDeleteModal(false)}
-            style={{
-              position: 'fixed', inset: 0,
-              background: 'rgba(0,0,0,0.85)',
-              zIndex: 1000,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '20px',
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%', maxWidth: '400px',
-                background: 'rgba(15,17,21,0.95)',
-                borderRadius: '12px',
-                border: '1px solid rgba(239,68,68,0.3)',
-                padding: '20px',
-              }}
-            >
-              <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
-                Delete Supplement
-              </h3>
-
-              <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
-                Supplement
-              </label>
-              <select
-                value={deleteTarget}
-                onChange={(e) => { setDeleteTarget(e.target.value); setConfirmDelete(false); }}
-                style={{
-                  width: '100%', padding: '10px 12px', marginBottom: '12px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
-                }}
-              >
-                <option value="">Select supplement...</option>
-                {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).map(item => (
-                  <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
-                ))}
-              </select>
-
-              {deleteTarget && deletePreview && (
-                <div style={{
-                  background: 'rgba(239,68,68,0.08)',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  marginBottom: '16px',
-                  fontSize: '13px',
-                  color: '#fca5a5',
-                  lineHeight: '1.6',
-                }}>
-                  <div>{deletePreview.entryCount} historical entries will be permanently deleted</div>
-                  <div style={{ marginTop: '4px' }}>
-                    &quot;{(stackItems || []).find(i => i.id === deleteTarget)?.name}&quot; cannot be recovered
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  style={{
-                    flex: 1, padding: '10px',
-                    background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '8px',
-                    color: '#a5b4fc', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (!deleteTarget) return;
-                    if (!confirmDelete) { setConfirmDelete(true); return; }
-                    const itemName = (stackItems || []).find(i => i.id === deleteTarget)?.name;
-                    const result = deleteSupplement(stackItems, stackEntries, deleteTarget);
-                    setStackItems(() => result.stackItems);
-                    setStackEntries(() => result.stackEntries);
-                    setShowDeleteModal(false);
-                    setLastAction(`Deleted "${itemName}" (${result.deletedCount} entries removed)`);
-                    haptic('success');
-                  }}
-                  disabled={!deleteTarget}
-                  style={{
-                    flex: 1, padding: '10px',
-                    background: !deleteTarget ? 'rgba(239,68,68,0.1)' : confirmDelete ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.3)',
-                    border: 'none', borderRadius: '8px',
-                    color: !deleteTarget ? '#6b7280' : '#fca5a5',
-                    fontSize: '14px', fontWeight: '600',
-                    cursor: !deleteTarget ? 'default' : 'pointer',
-                    opacity: !deleteTarget ? 0.5 : 1,
-                  }}
-                >
-                  {confirmDelete ? 'Confirm Delete' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Danger Zone */}
-        <div style={{ marginBottom: '8px', marginTop: '24px', paddingLeft: '16px', color: '#64748b', fontSize: '12px', fontWeight: '600', letterSpacing: '0.5px' }}>
-          DANGER ZONE
+        <div style={sectionHeader('#ef4444')}>
+          <svg {...svgProps} stroke="#ef4444">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span style={sectionLabel('#ef4444')}>DANGER ZONE</span>
         </div>
         <div style={{
-          background: 'rgba(15, 17, 21, 0.5)',
-          borderRadius: '12px',
-          marginBottom: '12px',
-          overflow: 'hidden',
+          ...card,
+          border: '1px solid rgba(239, 68, 68, 0.2)',
         }}>
           {!confirmClearData ? (
             <button
@@ -1483,16 +1242,26 @@ export default function Settings({
                 width: '100%',
                 background: 'transparent',
                 border: 'none',
-                borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
+                borderBottom: '1px solid rgba(100, 116, 139, 0.1)',
                 padding: '14px 16px',
-                color: '#fca5a5',
-                fontSize: '15px',
                 cursor: 'pointer',
-                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
               }}
             >
-              <div>Clear All Entries</div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Keeps symptoms & supplements</div>
+              <div style={{ ...iconCircle('rgba(239, 68, 68, 0.15)'), color: '#fca5a5' }}>
+                <svg {...svgProps}>
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ color: '#fca5a5', fontSize: '15px', fontWeight: '500' }}>Clear All Entries</div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Keeps symptoms & supplements</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
             </button>
           ) : (
             <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.15)' }}>
@@ -1544,14 +1313,24 @@ export default function Settings({
                 background: 'transparent',
                 border: 'none',
                 padding: '14px 16px',
-                color: '#ef4444',
-                fontSize: '15px',
                 cursor: 'pointer',
-                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
               }}
             >
-              <div>Full Reset</div>
-              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Remove everything</div>
+              <div style={{ ...iconCircle('rgba(239, 68, 68, 0.15)'), color: '#ef4444' }}>
+                <svg {...svgProps}>
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ color: '#ef4444', fontSize: '15px', fontWeight: '500' }}>Full Reset</div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Remove everything</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
             </button>
           ) : (
             <div style={{ padding: '14px 16px' }}>
@@ -1607,6 +1386,368 @@ export default function Settings({
           </span>
         </div>
       </div>
+
+      {/* Modals */}
+      {showMergeModal && (
+        <div
+          onClick={() => setShowMergeModal(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '400px',
+              background: 'rgba(15,17,21,0.95)',
+              borderRadius: '12px',
+              border: '1px solid rgba(139,92,246,0.3)',
+              padding: '20px',
+            }}
+          >
+            <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
+              Merge Supplements
+            </h3>
+
+            <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+              Keep (target)
+            </label>
+            <select
+              value={mergeTarget}
+              onChange={(e) => { setMergeTarget(e.target.value); if (e.target.value === mergeSource) setMergeSource(''); setConfirmMerge(false); }}
+              style={{
+                width: '100%', padding: '10px 12px', marginBottom: '12px',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
+              }}
+            >
+              <option value="">Select supplement to keep...</option>
+              {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).map(item => (
+                <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
+              ))}
+            </select>
+
+            <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+              Merge & delete (source)
+            </label>
+            <select
+              value={mergeSource}
+              onChange={(e) => { setMergeSource(e.target.value); setConfirmMerge(false); }}
+              style={{
+                width: '100%', padding: '10px 12px', marginBottom: '12px',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
+              }}
+            >
+              <option value="">Select supplement to merge...</option>
+              {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).filter(i => i.id !== mergeTarget).map(item => (
+                <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
+              ))}
+            </select>
+
+            <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '6px' }}>
+              When both have entries on the same day
+            </label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+              {['sum', 'higher'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setMergeStrategy(s)}
+                  style={{
+                    flex: 1, padding: '8px',
+                    borderRadius: '6px', border: 'none',
+                    background: mergeStrategy === s ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.04)',
+                    color: mergeStrategy === s ? '#c4b5fd' : '#6b7280',
+                    fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+                  }}
+                >
+                  {s === 'sum' ? 'Sum doses' : 'Keep higher'}
+                </button>
+              ))}
+            </div>
+
+            {mergePreview && (() => {
+              const targetItem = (stackItems || []).find(i => i.id === mergeTarget);
+              const sourceItem = (stackItems || []).find(i => i.id === mergeSource);
+              const unitMismatch = targetItem && sourceItem && (targetItem.unit || 'mg') !== (sourceItem.unit || 'mg');
+              return (
+                <div style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '16px',
+                  fontSize: '13px',
+                  color: '#9ca3af',
+                  lineHeight: '1.6',
+                }}>
+                  <div>{mergePreview.sourceEntryCount} entries will be moved</div>
+                  {mergePreview.conflictCount > 0 && (
+                    <div style={{ color: '#fbbf24' }}>
+                      {mergePreview.conflictCount} date conflict{mergePreview.conflictCount > 1 ? 's' : ''} ({mergeStrategy === 'sum' ? 'doses will be summed' : 'higher dose kept'})
+                    </div>
+                  )}
+                  {unitMismatch && (
+                    <div style={{ color: '#fb923c' }}>
+                      Warning: different units ({targetItem.unit || 'mg'} vs {sourceItem.unit || 'mg'})
+                    </div>
+                  )}
+                  <div style={{ color: '#fca5a5', marginTop: '4px' }}>
+                    &quot;{sourceItem?.name}&quot; will be permanently deleted
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowMergeModal(false)}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '8px',
+                  color: '#a5b4fc', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!mergeTarget || !mergeSource || mergeTarget === mergeSource) return;
+                  if (!confirmMerge) { setConfirmMerge(true); return; }
+                  const sourceName = (stackItems || []).find(i => i.id === mergeSource)?.name;
+                  const targetName = (stackItems || []).find(i => i.id === mergeTarget)?.name;
+                  const result = mergeSupplements(stackItems, stackEntries, mergeTarget, mergeSource, mergeStrategy);
+                  setStackItems(() => result.stackItems);
+                  setStackEntries(() => result.stackEntries);
+                  setShowMergeModal(false);
+                  setLastAction(`Merged "${sourceName}" into "${targetName}" (${mergePreview?.sourceEntryCount || 0} entries moved)`);
+                  haptic('success');
+                }}
+                disabled={!mergeTarget || !mergeSource || mergeTarget === mergeSource}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? 'rgba(139,92,246,0.1)' : confirmMerge ? 'rgba(239,68,68,0.4)' : 'rgba(139,92,246,0.4)',
+                  border: 'none', borderRadius: '8px',
+                  color: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? '#6b7280' : confirmMerge ? '#fca5a5' : '#e9d5ff',
+                  fontSize: '14px', fontWeight: '600', cursor: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? 'default' : 'pointer',
+                  opacity: (!mergeTarget || !mergeSource || mergeTarget === mergeSource) ? 0.5 : 1,
+                }}
+              >
+                {confirmMerge ? 'Confirm Merge' : 'Merge'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRenameModal && (
+        <div
+          onClick={() => setShowRenameModal(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '400px',
+              background: 'rgba(15,17,21,0.95)',
+              borderRadius: '12px',
+              border: '1px solid rgba(139,92,246,0.3)',
+              padding: '20px',
+            }}
+          >
+            <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
+              Rename Supplement
+            </h3>
+
+            <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+              Supplement
+            </label>
+            <select
+              value={renameTarget}
+              onChange={(e) => {
+                setRenameTarget(e.target.value);
+                const item = (stackItems || []).find(i => i.id === e.target.value);
+                setRenameValue(item ? item.name : '');
+              }}
+              style={{
+                width: '100%', padding: '10px 12px', marginBottom: '12px',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
+              }}
+            >
+              <option value="">Select supplement...</option>
+              {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).map(item => (
+                <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
+              ))}
+            </select>
+
+            {renameTarget && (
+              <>
+                <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+                  New name
+                </label>
+                <input
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  style={{
+                    width: '100%', padding: '10px 12px', marginBottom: '16px',
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowRenameModal(false)}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '8px',
+                  color: '#a5b4fc', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!renameTarget || !renameValue.trim()) return;
+                  const oldName = (stackItems || []).find(i => i.id === renameTarget)?.name;
+                  const newItems = renameSupplement(stackItems, renameTarget, renameValue.trim());
+                  setStackItems(() => newItems);
+                  setShowRenameModal(false);
+                  setLastAction(`Renamed "${oldName}" to "${renameValue.trim()}"`);
+                  haptic('success');
+                }}
+                disabled={!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.4)',
+                  border: 'none', borderRadius: '8px',
+                  color: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? '#6b7280' : '#e9d5ff',
+                  fontSize: '14px', fontWeight: '600',
+                  cursor: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? 'default' : 'pointer',
+                  opacity: (!renameTarget || !renameValue.trim() || renameValue.trim() === (stackItems || []).find(i => i.id === renameTarget)?.name) ? 0.5 : 1,
+                }}
+              >
+                Rename
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div
+          onClick={() => setShowDeleteModal(false)}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '400px',
+              background: 'rgba(15,17,21,0.95)',
+              borderRadius: '12px',
+              border: '1px solid rgba(239,68,68,0.3)',
+              padding: '20px',
+            }}
+          >
+            <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: '0 0 16px' }}>
+              Delete Supplement
+            </h3>
+
+            <label style={{ color: '#9ca3af', fontSize: '12px', fontWeight: '500', display: 'block', marginBottom: '4px' }}>
+              Supplement
+            </label>
+            <select
+              value={deleteTarget}
+              onChange={(e) => { setDeleteTarget(e.target.value); setConfirmDelete(false); }}
+              style={{
+                width: '100%', padding: '10px 12px', marginBottom: '12px',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px', color: '#e5e7eb', fontSize: '14px',
+              }}
+            >
+              <option value="">Select supplement...</option>
+              {(stackItems || []).sort((a, b) => a.name.localeCompare(b.name)).map(item => (
+                <option key={item.id} value={item.id}>{item.name}{item.active ? '' : ' (hidden)'}</option>
+              ))}
+            </select>
+
+            {deleteTarget && deletePreview && (
+              <div style={{
+                background: 'rgba(239,68,68,0.08)',
+                borderRadius: '8px',
+                padding: '12px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                color: '#fca5a5',
+                lineHeight: '1.6',
+              }}>
+                <div>{deletePreview.entryCount} historical entries will be permanently deleted</div>
+                <div style={{ marginTop: '4px' }}>
+                  &quot;{(stackItems || []).find(i => i.id === deleteTarget)?.name}&quot; cannot be recovered
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '8px',
+                  color: '#a5b4fc', fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!deleteTarget) return;
+                  if (!confirmDelete) { setConfirmDelete(true); return; }
+                  const itemName = (stackItems || []).find(i => i.id === deleteTarget)?.name;
+                  const result = deleteSupplement(stackItems, stackEntries, deleteTarget);
+                  setStackItems(() => result.stackItems);
+                  setStackEntries(() => result.stackEntries);
+                  setShowDeleteModal(false);
+                  setLastAction(`Deleted "${itemName}" (${result.deletedCount} entries removed)`);
+                  haptic('success');
+                }}
+                disabled={!deleteTarget}
+                style={{
+                  flex: 1, padding: '10px',
+                  background: !deleteTarget ? 'rgba(239,68,68,0.1)' : confirmDelete ? 'rgba(239,68,68,0.5)' : 'rgba(239,68,68,0.3)',
+                  border: 'none', borderRadius: '8px',
+                  color: !deleteTarget ? '#6b7280' : '#fca5a5',
+                  fontSize: '14px', fontWeight: '600',
+                  cursor: !deleteTarget ? 'default' : 'pointer',
+                  opacity: !deleteTarget ? 0.5 : 1,
+                }}
+              >
+                {confirmDelete ? 'Confirm Delete' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
     </div>
   );
