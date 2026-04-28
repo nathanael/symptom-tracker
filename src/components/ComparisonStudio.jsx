@@ -807,7 +807,15 @@ export default function ComparisonStudio({
             Select Supplements
           </h3>
           <button
-            onClick={() => setShowSupplementPicker(false)}
+            onClick={() => {
+              if (suppSearch) {
+                const filtered = allSupplements.filter(s => s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
+                if (filtered.length === 1 && !selectedSupplements.includes(filtered[0].id)) {
+                  toggleSupplement(filtered[0].id);
+                }
+              }
+              setShowSupplementPicker(false);
+            }}
             style={{
               background: 'none', border: 'none', color: '#8b5cf6',
               fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '4px 8px',
@@ -824,8 +832,11 @@ export default function ComparisonStudio({
             onKeyDown={(e) => {
               if (e.key === 'Escape') { e.stopPropagation(); if (suppSearch) setSuppSearch(''); else setShowSupplementPicker(false); }
               if (e.key === 'Enter') {
-                const filtered = allSupplements.filter(s => s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
-                if (filtered.length === 1) { toggleSupplement(filtered[0].id); }
+                if (suppSearch) {
+                  const filtered = allSupplements.filter(s => s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
+                  if (filtered.length === 1 && !selectedSupplements.includes(filtered[0].id)) { toggleSupplement(filtered[0].id); }
+                }
+                setShowSupplementPicker(false);
               }
             }}
             placeholder="Search supplements..."
@@ -951,7 +962,15 @@ export default function ComparisonStudio({
             Select Symptoms
           </h3>
           <button
-            onClick={() => setShowSymptomPicker(false)}
+            onClick={() => {
+              if (symSearch) {
+                const filtered = activeSymptoms.filter(s => s.name.toLowerCase().includes(symSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(symSearch.toLowerCase()));
+                if (filtered.length === 1 && !selectedSymptoms.includes(filtered[0].id)) {
+                  toggleSymptom(filtered[0].id);
+                }
+              }
+              setShowSymptomPicker(false);
+            }}
             style={{
               background: 'none', border: 'none', color: '#8b5cf6',
               fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '4px 8px',
@@ -970,8 +989,11 @@ export default function ComparisonStudio({
             onKeyDown={(e) => {
               if (e.key === 'Escape') { e.stopPropagation(); if (symSearch) setSymSearch(''); else setShowSymptomPicker(false); }
               if (e.key === 'Enter') {
-                const filtered = activeSymptoms.filter(s => s.name.toLowerCase().includes(symSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(symSearch.toLowerCase()));
-                if (filtered.length === 1) { toggleSymptom(filtered[0].id); setShowSymptomPicker(false); }
+                if (symSearch) {
+                  const filtered = activeSymptoms.filter(s => s.name.toLowerCase().includes(symSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(symSearch.toLowerCase()));
+                  if (filtered.length === 1 && !selectedSymptoms.includes(filtered[0].id)) { toggleSymptom(filtered[0].id); }
+                }
+                setShowSymptomPicker(false);
               }
             }}
             placeholder="Search symptoms..."
@@ -1097,7 +1119,15 @@ export default function ComparisonStudio({
             Select Sleep Metrics
           </h3>
           <button
-            onClick={() => setShowSleepPicker(false)}
+            onClick={() => {
+              if (sleepSearch) {
+                const filtered = SLEEP_METRICS.filter(m => m.label.toLowerCase().includes(sleepSearch.toLowerCase()));
+                if (filtered.length === 1 && !selectedSleepMetrics.includes(filtered[0].key)) {
+                  toggleSleep(filtered[0].key);
+                }
+              }
+              setShowSleepPicker(false);
+            }}
             style={{
               background: 'none', border: 'none', color: SLEEP_PRIMARY,
               fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '4px 8px',
@@ -1127,8 +1157,11 @@ export default function ComparisonStudio({
                 onKeyDown={(e) => {
                   if (e.key === 'Escape') { e.stopPropagation(); if (sleepSearch) setSleepSearch(''); else setShowSleepPicker(false); }
                   if (e.key === 'Enter') {
-                    const filtered = SLEEP_METRICS.filter(m => m.label.toLowerCase().includes(sleepSearch.toLowerCase()));
-                    if (filtered.length === 1) { toggleSleep(filtered[0].key); }
+                    if (sleepSearch) {
+                      const filtered = SLEEP_METRICS.filter(m => m.label.toLowerCase().includes(sleepSearch.toLowerCase()));
+                      if (filtered.length === 1 && !selectedSleepMetrics.includes(filtered[0].key)) { toggleSleep(filtered[0].key); }
+                    }
+                    setShowSleepPicker(false);
                   }
                 }}
                 placeholder="Search sleep metrics..."
