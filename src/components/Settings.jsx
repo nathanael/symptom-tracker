@@ -101,7 +101,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '5.2.2',
+      version: '5.2.3',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -818,104 +818,185 @@ export default function Settings({
         </div>
         <div style={card}>
           {/* Time format */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.1)' }}>
-            <div style={{ ...iconCircle(), marginRight: '12px', color: '#a5b4fc' }}>
-              <svg {...svgProps}>
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: isDesktop ? 0 : '10px' }}>
+              <div style={{ ...iconCircle(), marginRight: '12px', color: '#a5b4fc' }}>
+                <svg {...svgProps}>
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Time format</div>
+                <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>How times are displayed in the app</div>
+              </div>
+              {isDesktop && (
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                  {Object.entries(trackingModes).map(([key, mode]) => (
+                    <button
+                      key={key}
+                      onClick={() => setTrackingMode(key)}
+                      style={{
+                        padding: '8px 16px',
+                        background: trackingMode === key ? 'rgba(124, 58, 237, 0.9)' : 'rgba(255, 255, 255, 0.05)',
+                        border: trackingMode === key ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        color: trackingMode === key ? '#fff' : '#94a3b8',
+                        fontSize: '13px',
+                        fontWeight: trackingMode === key ? '600' : '400',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Time format</div>
-              <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>How times are displayed in the app</div>
-            </div>
-            <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-              {Object.entries(trackingModes).map(([key, mode]) => (
-                <button
-                  key={key}
-                  onClick={() => setTrackingMode(key)}
-                  style={{
-                    padding: '8px 16px',
-                    background: trackingMode === key ? 'rgba(124, 58, 237, 0.9)' : 'rgba(255, 255, 255, 0.05)',
-                    border: trackingMode === key ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '8px',
-                    color: trackingMode === key ? '#fff' : '#94a3b8',
-                    fontSize: '13px',
-                    fontWeight: trackingMode === key ? '600' : '400',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {mode.label}
-                </button>
-              ))}
-            </div>
+            {!isDesktop && (
+              <div style={{ display: 'flex', gap: '6px', paddingLeft: '48px' }}>
+                {Object.entries(trackingModes).map(([key, mode]) => (
+                  <button
+                    key={key}
+                    onClick={() => setTrackingMode(key)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      background: trackingMode === key ? 'rgba(124, 58, 237, 0.9)' : 'rgba(255, 255, 255, 0.05)',
+                      border: trackingMode === key ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: trackingMode === key ? '#fff' : '#94a3b8',
+                      fontSize: '13px',
+                      fontWeight: trackingMode === key ? '600' : '400',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Default copy range */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.1)' }}>
-            <div style={{ ...iconCircle(), marginRight: '12px', color: '#a5b4fc' }}>
-              <svg {...svgProps}>
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(100, 116, 139, 0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: isDesktop ? 0 : '10px' }}>
+              <div style={{ ...iconCircle(), marginRight: '12px', color: '#a5b4fc' }}>
+                <svg {...svgProps}>
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Default copy range</div>
+                <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>Default number of days for copy</div>
+              </div>
+              {isDesktop && (
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                  {[1, 7, 14, 30, 60].map(days => (
+                    <button
+                      key={days}
+                      onClick={() => setCopyDays(days)}
+                      style={{
+                        padding: '8px 12px',
+                        minWidth: '36px',
+                        background: copyDays === days ? 'rgba(124, 58, 237, 0.9)' : 'rgba(255, 255, 255, 0.05)',
+                        border: copyDays === days ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        color: copyDays === days ? '#fff' : '#94a3b8',
+                        fontSize: '13px',
+                        fontWeight: copyDays === days ? '600' : '400',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {days}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Default copy range</div>
-              <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>Default number of days for copy</div>
-            </div>
-            <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-              {[1, 7, 14, 30, 60].map(days => (
-                <button
-                  key={days}
-                  onClick={() => setCopyDays(days)}
-                  style={{
-                    padding: '8px 12px',
-                    minWidth: '36px',
-                    background: copyDays === days ? 'rgba(124, 58, 237, 0.9)' : 'rgba(255, 255, 255, 0.05)',
-                    border: copyDays === days ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '8px',
-                    color: copyDays === days ? '#fff' : '#94a3b8',
-                    fontSize: '13px',
-                    fontWeight: copyDays === days ? '600' : '400',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {days}
-                </button>
-              ))}
-            </div>
+            {!isDesktop && (
+              <div style={{ display: 'flex', gap: '6px', paddingLeft: '48px' }}>
+                {[1, 7, 14, 30, 60].map(days => (
+                  <button
+                    key={days}
+                    onClick={() => setCopyDays(days)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 0',
+                      background: copyDays === days ? 'rgba(124, 58, 237, 0.9)' : 'rgba(255, 255, 255, 0.05)',
+                      border: copyDays === days ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: copyDays === days ? '#fff' : '#94a3b8',
+                      fontSize: '13px',
+                      fontWeight: copyDays === days ? '600' : '400',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {days}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Trend analysis range */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px' }}>
-            <div style={{ ...iconCircle(), marginRight: '12px', color: '#a5b4fc' }}>
-              <svg {...svgProps}>
-                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
-              </svg>
+          <div style={{ padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: isDesktop ? 0 : '10px' }}>
+              <div style={{ ...iconCircle(), marginRight: '12px', color: '#a5b4fc' }}>
+                <svg {...svgProps}>
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Trend analysis range</div>
+                <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>Days to analyze for trend arrows</div>
+              </div>
+              {isDesktop && (
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                  {[7, 14, 30].map(days => (
+                    <button
+                      key={days}
+                      onClick={() => setTrendWindow(days)}
+                      style={{
+                        padding: '8px 16px',
+                        background: trendWindow === days ? 'rgba(34, 197, 94, 0.8)' : 'rgba(255, 255, 255, 0.05)',
+                        border: trendWindow === days ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        color: trendWindow === days ? '#fff' : '#94a3b8',
+                        fontSize: '13px',
+                        fontWeight: trendWindow === days ? '600' : '400',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {days}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: '#f8fafc', fontSize: '15px', fontWeight: '500' }}>Trend analysis range</div>
-              <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>Days to analyze for trend arrows</div>
-            </div>
-            <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-              {[7, 14, 30].map(days => (
-                <button
-                  key={days}
-                  onClick={() => setTrendWindow(days)}
-                  style={{
-                    padding: '8px 16px',
-                    background: trendWindow === days ? 'rgba(34, 197, 94, 0.8)' : 'rgba(255, 255, 255, 0.05)',
-                    border: trendWindow === days ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '8px',
-                    color: trendWindow === days ? '#fff' : '#94a3b8',
-                    fontSize: '13px',
-                    fontWeight: trendWindow === days ? '600' : '400',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {days}
-                </button>
-              ))}
-            </div>
+            {!isDesktop && (
+              <div style={{ display: 'flex', gap: '6px', paddingLeft: '48px' }}>
+                {[7, 14, 30].map(days => (
+                  <button
+                    key={days}
+                    onClick={() => setTrendWindow(days)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 0',
+                      background: trendWindow === days ? 'rgba(34, 197, 94, 0.8)' : 'rgba(255, 255, 255, 0.05)',
+                      border: trendWindow === days ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: trendWindow === days ? '#fff' : '#94a3b8',
+                      fontSize: '13px',
+                      fontWeight: trendWindow === days ? '600' : '400',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {days}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1166,7 +1247,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.2.2
+              v5.2.3
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}
