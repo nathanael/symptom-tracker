@@ -1,5 +1,17 @@
 import { trackingModes, severityColors, NA_SEVERITY } from './constants';
 import { computeHealthScore } from './healthScore';
+import { METRICS as SLEEP_METRICS, valueForRow } from './sleepMetrics';
+
+function readSleepCache() {
+  try {
+    const raw = localStorage.getItem('garminSleepCache');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return parsed.days || [];
+  } catch {
+    return [];
+  }
+}
 
 // Schedule Helpers
 export const isScheduledForDate = (schedule, date) => {
@@ -406,6 +418,32 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
     }
   }
 
+  // Sleep data
+  const sleepDays = readSleepCache();
+  if (sleepDays.length > 0) {
+    const sleepByDate = new Map(sleepDays.map(d => [d.date, d]));
+    const sleepHeaders = ['Date', ...SLEEP_METRICS.map(m => `${m.label}${m.unit ? ` (${m.unit})` : ''}`)];
+
+    output.push('\n### Sleep Data (Garmin)');
+    output.push('| ' + sleepHeaders.join(' | ') + ' |');
+    output.push('| ' + sleepHeaders.map(() => '---').join(' | ') + ' |');
+
+    for (let i = 0; i < days; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateKey = getDateKey(date);
+      const row = sleepByDate.get(dateKey);
+      if (!row) continue;
+
+      const cells = [formatTableDate(dateKey)];
+      SLEEP_METRICS.forEach(metric => {
+        const val = valueForRow(metric, row);
+        cells.push(val != null ? String(val) : '-');
+      });
+      output.push('| ' + cells.join(' | ') + ' |');
+    }
+  }
+
   // Detected patterns section (if insights provided)
   if (insights && insights.hasEnoughData && insights.insights && insights.insights.length > 0) {
     output.push('\n## Patterns Already Detected');
@@ -807,6 +845,28 @@ export const buildCSVText = (days, entries, symptoms, trackingMode) => {
     const { score } = computeHealthScore(symptoms, entries, dateKey, trackingMode);
     if (score != null) {
       lines.push(`${dateKey},"Health Score",daily,${score}`);
+    }
+  }
+
+  // Sleep data rows
+  const sleepDays = readSleepCache();
+  if (sleepDays.length > 0) {
+    const sleepByDate = new Map(sleepDays.map(d => [d.date, d]));
+    for (let i = 0; i <= days; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dateKey = getDateKey(d);
+      const row = sleepByDate.get(dateKey);
+      if (!row) continue;
+
+      SLEEP_METRICS.forEach(metric => {
+        const val = valueForRow(metric, row);
+        if (val != null) {
+          const label = `Sleep ${metric.label}`;
+          const unit = metric.unit ? ` (${metric.unit})` : '';
+          lines.push(`${dateKey},"${label}${unit}",daily,${val}`);
+        }
+      });
     }
   }
 
