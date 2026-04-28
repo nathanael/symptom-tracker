@@ -101,7 +101,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '5.2.3',
+      version: '5.2.4',
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -398,52 +398,53 @@ export default function Settings({
                     {user.email}
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
-                  <button
-                    onClick={async () => {
-                      if (onForcePush) {
-                        await onForcePush();
-                        setLastAction('Data pushed to cloud');
-                      }
-                    }}
-                    disabled={syncing}
-                    style={{
-                      background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
-                      border: 'none',
-                      borderRadius: '10px',
-                      padding: '10px 20px',
-                      color: '#fff',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: syncing ? 'not-allowed' : 'pointer',
-                      opacity: syncing ? 0.6 : 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    <svg {...svgPropsSmall} stroke="#fff">
-                      <polyline points="1 4 1 10 7 10"/>
-                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                    </svg>
-                    {syncing ? 'Syncing...' : 'Sync Now'}
-                  </button>
-                  <button
-                    onClick={signOut}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: 0,
-                      color: '#8b5cf6',
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Sign out
-                  </button>
-                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px' }}>
+                <button
+                  onClick={async () => {
+                    if (onForcePush) {
+                      await onForcePush();
+                      setLastAction('Data pushed to cloud');
+                    }
+                  }}
+                  disabled={syncing}
+                  style={{
+                    background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '10px 20px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: syncing ? 'not-allowed' : 'pointer',
+                    opacity: syncing ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <svg {...svgPropsSmall} stroke="#fff">
+                    <polyline points="1 4 1 10 7 10"/>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                  </svg>
+                  {syncing ? 'Syncing...' : 'Sync Now'}
+                </button>
+                <button
+                  onClick={signOut}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '10px 12px',
+                    color: '#8b5cf6',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Sign out
+                </button>
               </div>
 
               <div style={{
@@ -1247,7 +1248,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.2.3
+              v5.2.4
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}
