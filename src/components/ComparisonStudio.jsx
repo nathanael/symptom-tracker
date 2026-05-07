@@ -20,8 +20,8 @@ import { METRICS as SLEEP_METRICS } from '../utils/sleepMetrics';
 
 const SYMPTOM_STYLES = [
   { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
-  { color: '#5ccbff', chipBg: 'rgba(92,203,255,0.12)', chipBorder: 'rgba(92,203,255,0.35)' },
-  { color: '#ffb830', chipBg: 'rgba(255,184,48,0.12)', chipBorder: 'rgba(255,184,48,0.35)' },
+  { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
+  { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
 ];
 
 const SUPP_COLOR = '#8b5cf6';
@@ -89,10 +89,11 @@ export default function ComparisonStudio({
           symptoms: validSymptoms,
           sleepMetrics: validSleep,
           primarySeriesId: saved.primarySeriesId || '',
+          showHealthScore: saved.showHealthScore || false,
         };
       }
     } catch {}
-    return { supplements: [], symptoms: [], sleepMetrics: [], primarySeriesId: '' };
+    return { supplements: [], symptoms: [], sleepMetrics: [], primarySeriesId: '', showHealthScore: false };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount only
 
@@ -103,6 +104,7 @@ export default function ComparisonStudio({
   const [showSupplementPicker, setShowSupplementPicker] = useState(false);
   const [showSymptomPicker, setShowSymptomPicker] = useState(false);
   const [showSleepPicker, setShowSleepPicker] = useState(false);
+  const [showHealthScore, setShowHealthScore] = useState(initialSelections.showHealthScore);
   const [suppSearch, setSuppSearch] = useState('');
   const [symSearch, setSymSearch] = useState('');
   const [sleepSearch, setSleepSearch] = useState('');
@@ -113,8 +115,9 @@ export default function ComparisonStudio({
   const [startOffset, setStartOffset] = useState(0);
   const [touchX, setTouchX] = useState(null);
   const svgRef = useRef(null);
-  // Health score shows automatically when no other series are selected
-  const showHealthScore = selectedSupplements.length === 0 && selectedSymptoms.length === 0 && selectedSleepMetrics.length === 0;
+  // Health score shows when user toggles it on, or when no other series are selected
+  const hasAnySeries = selectedSupplements.length > 0 || selectedSymptoms.length > 0 || selectedSleepMetrics.length > 0;
+  const healthScoreVisible = showHealthScore || !hasAnySeries;
 
   // Auto-focus search inputs when pickers open
   useEffect(() => { if (showSupplementPicker) { setSuppSearch(''); setTimeout(() => suppSearchRef.current?.focus(), 50); } }, [showSupplementPicker]);
@@ -129,13 +132,17 @@ export default function ComparisonStudio({
         symptoms: selectedSymptoms,
         sleepMetrics: selectedSleepMetrics,
         primarySeriesId,
+        showHealthScore,
       }));
     } catch {}
-  }, [selectedSupplements, selectedSymptoms, selectedSleepMetrics, primarySeriesId]);
+  }, [selectedSupplements, selectedSymptoms, selectedSleepMetrics, primarySeriesId, showHealthScore]);
 
   // Auto-set primary to first available series when current primary is removed
   useEffect(() => {
-    const allIds = [...selectedSupplements, ...selectedSymptoms, ...selectedSleepMetrics].filter(Boolean);
+    const allIds = [
+      ...selectedSupplements, ...selectedSymptoms, ...selectedSleepMetrics,
+      ...(showHealthScore ? ['__healthScore__'] : []),
+    ].filter(Boolean);
     if (!allIds.includes(primarySeriesId) && allIds.length > 0) {
       setPrimarySeriesId(allIds[0]);
     }
@@ -186,8 +193,19 @@ export default function ComparisonStudio({
     haptic('light');
   };
 
-  // Reset startOffset when timeframe changes
-  useEffect(() => { setStartOffset(0); }, [timeframe]);
+  // When timeframe changes, keep the window centered on the same date
+  const prevTimeframeRef = useRef(timeframe);
+  useEffect(() => {
+    const prev = prevTimeframeRef.current;
+    prevTimeframeRef.current = timeframe;
+    if (prev === timeframe) return;
+    setStartOffset(old => {
+      // Center of old window was at: old + prev/2 days back from today
+      // New offset to keep same center: centerOffset - timeframe/2
+      const centerOffset = old + prev / 2;
+      return Math.max(0, Math.round(centerOffset - timeframe / 2));
+    });
+  }, [timeframe]);
 
   const dates = useMemo(() => {
     const result = [];
@@ -323,17 +341,17 @@ export default function ComparisonStudio({
   );
 
   const healthScoreTransformed = useMemo(() => {
-    if (!showHealthScore) return null;
+    if (!healthScoreVisible) return null;
     const raw = getHealthScoreSeries(symptoms, entries, dates, trackingMode);
     const filled = interpolateSmallGaps(raw);
     return { values: filled, dates: [...dates], labels: [...dates] };
-  }, [showHealthScore, symptoms, entries, dates, trackingMode]);
+  }, [healthScoreVisible, symptoms, entries, dates, trackingMode]);
 
   // Raw (unsmoothed) health score values for touch-inspect — actual day's score
   const hsInspectValues = useMemo(() => {
-    if (!showHealthScore) return null;
+    if (!healthScoreVisible) return null;
     return getHealthScoreSeries(symptoms, entries, dates, trackingMode);
-  }, [showHealthScore, symptoms, entries, dates, trackingMode]);
+  }, [healthScoreVisible, symptoms, entries, dates, trackingMode]);
 
   const hsInspectValue = useMemo(() => {
     if (touchX === null || !hsInspectValues) return null;
@@ -425,7 +443,7 @@ export default function ComparisonStudio({
   }, [timeframe, startOffset]);
 
   const insightData = useMemo(() => {
-    if (!primarySeriesId || showHealthScore) return null;
+    if (!primarySeriesId || (!hasAnySeries && healthScoreVisible)) return null;
 
     const buildStats = (id, isSymptom) => {
       const isSleep = selectedSleepMetrics.includes(id);
@@ -466,7 +484,7 @@ export default function ComparisonStudio({
     return insight ? { ...insight, secondaryStats } : null;
   }, [primarySeriesId, primaryIsSymptom, selectedSupplements, selectedSymptoms, selectedSleepMetrics,
       stackEntries, stackItems, entries, symptoms, trackingMode, sleepDays,
-      extendedDates, timeframe, windowSize, showHealthScore]);
+      extendedDates, timeframe, windowSize, hasAnySeries, healthScoreVisible]);
 
   // ── Chart points ──
 
@@ -636,7 +654,7 @@ export default function ComparisonStudio({
         unit: m?.unit || '',
       });
     });
-    if (showHealthScore && hsInspectValues) {
+    if (healthScoreVisible && hsInspectValues) {
       const hsVal = hsInspectValues[touchX];
       if (hsVal !== null && hsVal !== undefined) {
         items.push({
@@ -650,7 +668,7 @@ export default function ComparisonStudio({
     const firstSuppPts = suppPointSets[0];
     const x = firstSuppPts ? firstSuppPts[touchX]?.x : padLeft + (touchX / Math.max(1, dates.length - 1)) * chartW;
     return { dateLabel, items, x };
-  }, [touchX, dates, suppDoseSeries, suppPointSets, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, selectedSleepMetrics, sleepTransformed, timeframe, chartW, showHealthScore, hsInspectValues, padLeft]);
+  }, [touchX, dates, suppDoseSeries, suppPointSets, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, selectedSleepMetrics, sleepTransformed, timeframe, chartW, healthScoreVisible, hsInspectValues, padLeft]);
 
   // Legend: show crosshair values when hovering, averages otherwise
   const legendItems = useMemo(() => {
@@ -696,7 +714,7 @@ export default function ComparisonStudio({
         });
       }
     });
-    if (showHealthScore && healthScoreTransformed) {
+    if (healthScoreVisible && healthScoreTransformed) {
       const vals = healthScoreTransformed.values.filter(v => v !== null);
       const hsAvg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
       items.push({
@@ -707,7 +725,7 @@ export default function ComparisonStudio({
       });
     }
     return { dateLabel: 'Average', items, x: null };
-  }, [crosshairData, suppTransformedSeries, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, selectedSleepMetrics, sleepTransformed, showHealthScore, healthScoreTransformed]);
+  }, [crosshairData, suppTransformedSeries, suppItems, selectedSupplements, symptomTransformed, symptoms, selectedSymptoms, selectedSleepMetrics, sleepTransformed, healthScoreVisible, healthScoreTransformed]);
 
   // Max offset: based on earliest data point across selected symptoms/supplement/health score
   const maxOffset = useMemo(() => {
@@ -742,8 +760,8 @@ export default function ComparisonStudio({
       }
     }
 
-    // When only health score is visible, use all entry dates for navigation range
-    if (showHealthScore) {
+    // When health score is visible, use all entry dates for navigation range
+    if (healthScoreVisible) {
       for (const key of Object.keys(entries || {})) {
         const e = entries[key];
         if (e?.date && (!earliest || e.date < earliest)) earliest = e.date;
@@ -754,7 +772,7 @@ export default function ComparisonStudio({
     const earliestDate = new Date(earliest + 'T12:00:00');
     const totalDays = Math.round((today - earliestDate) / (1000 * 60 * 60 * 24));
     return Math.max(0, totalDays - timeframe);
-  }, [selectedSymptoms, selectedSupplements, selectedSleepMetrics, sleepDays, showHealthScore, entries, stackEntries, timeframe]);
+  }, [selectedSymptoms, selectedSupplements, selectedSleepMetrics, sleepDays, healthScoreVisible, entries, stackEntries, timeframe]);
 
   // Clamp startOffset when maxOffset shrinks
   useEffect(() => { setStartOffset(prev => Math.min(prev, maxOffset)); }, [maxOffset]);
@@ -1253,7 +1271,7 @@ export default function ComparisonStudio({
   const chartSVGContent = (
     <>
       {/* Grid lines — follow primary series scale */}
-      {showHealthScore && hsYRange ? (
+      {healthScoreVisible && (!hasAnySeries || primarySeriesId === '__healthScore__') && hsYRange ? (
         (() => {
           const { min: yMin, max: yMax } = hsYRange;
           const step = (yMax - yMin) <= 30 ? 5 : 10;
@@ -1288,7 +1306,7 @@ export default function ComparisonStudio({
       </>}
 
       {/* Left Y-axis — primary series scale */}
-      {showHealthScore && hsYRange ? (
+      {healthScoreVisible && (!hasAnySeries || primarySeriesId === '__healthScore__') && hsYRange ? (
         (() => {
           const { min: yMin, max: yMax } = hsYRange;
           const step = (yMax - yMin) <= 30 ? 5 : 10;
@@ -1403,7 +1421,8 @@ export default function ComparisonStudio({
           strokeWidth={(isDesktop ? 1.0 : 2.5) * s}
           strokeLinecap="round"
           strokeLinejoin="round"
-          opacity={0.8}
+          strokeDasharray={primarySeriesId === '__healthScore__' || !hasAnySeries ? 'none' : `${6 * s},${4 * s}`}
+          opacity={primarySeriesId === '__healthScore__' || !hasAnySeries ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)}
         />
       )}
 
@@ -1767,6 +1786,7 @@ export default function ComparisonStudio({
           + Sleep
         </div>
       )}
+
     </div>
   );
 
@@ -1819,6 +1839,18 @@ export default function ComparisonStudio({
               rollingDays={timeframe}
               inspectValue={hsInspectValue}
               inspectLabel={hsInspectLabel}
+              showOnGraph={healthScoreVisible}
+              onToggleGraph={() => {
+                if (healthScoreVisible && primarySeriesId !== '__healthScore__') {
+                  setPrimarySeriesId('__healthScore__');
+                } else if (healthScoreVisible && primarySeriesId === '__healthScore__') {
+                  setShowHealthScore(false);
+                } else {
+                  setShowHealthScore(true);
+                  setPrimarySeriesId('__healthScore__');
+                }
+                haptic('light');
+              }}
             />
           </div>
 
@@ -1911,6 +1943,18 @@ export default function ComparisonStudio({
                       rollingDays={timeframe}
                       inspectValue={hsInspectValue}
                       inspectLabel={hsInspectLabel}
+                      showOnGraph={healthScoreVisible}
+                      onToggleGraph={() => {
+                        if (healthScoreVisible && primarySeriesId !== '__healthScore__') {
+                          setPrimarySeriesId('__healthScore__');
+                        } else if (healthScoreVisible && primarySeriesId === '__healthScore__') {
+                          setShowHealthScore(false);
+                        } else {
+                          setShowHealthScore(true);
+                          setPrimarySeriesId('__healthScore__');
+                        }
+                        haptic('light');
+                      }}
                     />
                   </div>
 

@@ -294,6 +294,10 @@ function App() {
   stackEntriesRef.current = stackEntries;
   const stackItemsRef = useRef(stackItems);
   stackItemsRef.current = stackItems;
+  const inputEntriesRef = useRef(inputEntries);
+  inputEntriesRef.current = inputEntries;
+  const inputItemsRef = useRef(inputItems);
+  inputItemsRef.current = inputItems;
   useEffect(() => {
     // Wait for sync engine to be ready before prefilling (prevents pushing stale data)
     if (firebase.user && !sync.isReady) return;
@@ -301,44 +305,64 @@ function App() {
     const todayKey = getDateKey(new Date());
     if (lastPrefillDateRef.current === todayKey) return;
 
-    const currentEntries = stackEntriesRef.current;
-
-    // Check if any stack entries already exist for today
-    const hasTodayEntries = Object.keys(currentEntries).some(key => key.startsWith(todayKey));
-    if (hasTodayEntries) {
-      lastPrefillDateRef.current = todayKey;
-      localStorage.setItem('lastStackPrefillDate', todayKey);
-      return;
-    }
-
-    // Copy yesterday's entries
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayKey = getDateKey(yesterday);
-    const yesterdayEntries = Object.entries(currentEntries).filter(([key]) => key.startsWith(yesterdayKey));
-    if (yesterdayEntries.length === 0) {
-      lastPrefillDateRef.current = todayKey;
-      localStorage.setItem('lastStackPrefillDate', todayKey);
-      return;
+
+    // Prefill stack entries (per-item, skipping items that already have today's entry)
+    const currentStackEntries = stackEntriesRef.current;
+    const yesterdayStackEntries = Object.entries(currentStackEntries).filter(([key]) => key.startsWith(yesterdayKey));
+    if (yesterdayStackEntries.length > 0) {
+      const currentStackItems = stackItemsRef.current;
+      setStackEntries(prev => {
+        const newEntries = { ...prev };
+        let changed = false;
+        yesterdayStackEntries.forEach(([key, entry]) => {
+          const itemId = key.substring(yesterdayKey.length + 1);
+          const todayEntryKey = `${todayKey}-${itemId}`;
+          if (newEntries[todayEntryKey]) return; // already has today's entry
+          const item = currentStackItems.find(i => i.id === itemId);
+          if (item && item.active && isScheduledForDate(item.schedule, new Date())) {
+            newEntries[todayEntryKey] = {
+              date: todayKey,
+              itemId,
+              dose: entry.dose,
+              taken: true,
+            };
+            changed = true;
+          }
+        });
+        return changed ? newEntries : prev;
+      });
     }
 
-    const currentStackItems = stackItemsRef.current;
-    setStackEntries(prev => {
-      const newEntries = { ...prev };
-      yesterdayEntries.forEach(([key, entry]) => {
-        const itemId = key.substring(yesterdayKey.length + 1);
-        const item = currentStackItems.find(i => i.id === itemId);
-        if (item && item.active && isScheduledForDate(item.schedule, new Date())) {
-          newEntries[`${todayKey}-${itemId}`] = {
-            date: todayKey,
-            itemId,
-            dose: entry.dose,
-            taken: true,
-          };
-        }
+    // Prefill input entries (per-item, skipping items that already have today's entry)
+    const currentInputEntries = inputEntriesRef.current;
+    const yesterdayInputEntries = Object.entries(currentInputEntries).filter(([key]) => key.startsWith(yesterdayKey));
+    if (yesterdayInputEntries.length > 0) {
+      const currentInputItems = inputItemsRef.current;
+      setInputEntries(prev => {
+        const newEntries = { ...prev };
+        let changed = false;
+        yesterdayInputEntries.forEach(([key, entry]) => {
+          const inputId = key.substring(yesterdayKey.length + 1);
+          const todayEntryKey = `${todayKey}-${inputId}`;
+          if (newEntries[todayEntryKey]) return; // already has today's entry
+          const item = currentInputItems.find(i => i.id === inputId);
+          if (item && item.active) {
+            newEntries[todayEntryKey] = {
+              date: todayKey,
+              inputId,
+              logged: true,
+              count: entry.count || 1,
+            };
+            changed = true;
+          }
+        });
+        return changed ? newEntries : prev;
       });
-      return newEntries;
-    });
+    }
+
     lastPrefillDateRef.current = todayKey;
     localStorage.setItem('lastStackPrefillDate', todayKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps

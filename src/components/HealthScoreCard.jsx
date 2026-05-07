@@ -8,14 +8,21 @@ export default function HealthScoreCard({ score, rollingAvg, delta, showOnGraph,
 
   const color = getScoreColor(displayValue);
   const isUsingAvg = score === null && !isInspecting;
+  const active = showOnGraph;
 
   return (
-    <div style={{
-      background: '#111827',
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 12,
-    }}>
+    <div
+      onClick={onToggleGraph}
+      style={{
+        background: '#111827',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        cursor: onToggleGraph ? 'pointer' : 'default',
+        border: active ? '2px solid rgba(16,185,129,0.6)' : '2px dashed rgba(16,185,129,0.25)',
+        transition: 'border 0.15s ease',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <div>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#888' }}>
@@ -53,32 +60,6 @@ export default function HealthScoreCard({ score, rollingAvg, delta, showOnGraph,
           borderRadius: 4,
         }} />
       </div>
-      {onToggleGraph && (
-        <div
-          onClick={onToggleGraph}
-          style={{
-            borderTop: '1px solid rgba(255,255,255,0.06)',
-            marginTop: 12,
-            paddingTop: 10,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            cursor: 'pointer',
-          }}
-        >
-          <div style={{
-            width: 16, height: 16, borderRadius: 4,
-            border: `2px solid ${showOnGraph ? '#10b981' : '#555'}`,
-            background: showOnGraph ? '#10b98130' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {showOnGraph && <span style={{ color: '#10b981', fontSize: 11, fontWeight: 'bold', lineHeight: 1 }}>✓</span>}
-          </div>
-          <span style={{ fontSize: 12, color: showOnGraph ? '#10b981' : '#888', fontWeight: 500 }}>
-            Show on graph
-          </span>
-        </div>
-      )}
     </div>
   );
 }

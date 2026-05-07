@@ -7,9 +7,11 @@ export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGra
   if (displayValue === null) return null;
 
   const color = getScoreColor(displayValue);
+  const active = showOnGraph;
 
   return (
     <div
+      onClick={onToggleGraph}
       style={{
         background: '#111827',
         borderRadius: 10,
@@ -17,6 +19,9 @@ export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGra
         display: 'flex',
         alignItems: 'center',
         gap: 12,
+        cursor: onToggleGraph ? 'pointer' : 'default',
+        border: active ? '2px solid rgba(16,185,129,0.6)' : '2px dashed rgba(16,185,129,0.25)',
+        transition: 'border 0.15s ease',
       }}
     >
       <span style={{ fontSize: 24, fontWeight: 700, color, flexShrink: 0, transition: 'color 0.15s ease' }}>
@@ -44,19 +49,6 @@ export default function HealthScoreCompact({ score, rollingAvg, delta, showOnGra
         <span style={{ fontSize: 11, color: delta > 0 ? '#22c55e' : '#ef4444', flexShrink: 0 }}>
           {delta > 0 ? '▲' : '▼'}{Math.abs(delta)}
         </span>
-      )}
-      {onToggleGraph && (
-        <div
-          onClick={(e) => { e.stopPropagation(); onToggleGraph(); }}
-          style={{
-            width: 18, height: 18, borderRadius: 4, flexShrink: 0, cursor: 'pointer',
-            border: `2px solid ${showOnGraph ? '#10b981' : '#555'}`,
-            background: showOnGraph ? '#10b98130' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          {showOnGraph && <span style={{ color: '#10b981', fontSize: 11, fontWeight: 'bold', lineHeight: 1 }}>✓</span>}
-        </div>
       )}
     </div>
   );
