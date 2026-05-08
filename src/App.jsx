@@ -288,8 +288,9 @@ function App() {
     }
   }, [lastAction]);
 
-  // Auto-prefill today's stack from yesterday's checked entries
-  const lastPrefillDateRef = useRef(localStorage.getItem('lastStackPrefillDate'));
+  // Auto-prefill today's stack and inputs from yesterday's checked entries.
+  // Uses refs to read latest data without causing re-triggers, and re-runs
+  // when sync becomes ready (so cloud data is included).
   const stackEntriesRef = useRef(stackEntries);
   stackEntriesRef.current = stackEntries;
   const stackItemsRef = useRef(stackItems);
@@ -298,22 +299,24 @@ function App() {
   inputEntriesRef.current = inputEntries;
   const inputItemsRef = useRef(inputItems);
   inputItemsRef.current = inputItems;
+  const prefillRanRef = useRef(false);
   useEffect(() => {
     // Wait for sync engine to be ready before prefilling (prevents pushing stale data)
     if (firebase.user && !sync.isReady) return;
+    // Only run once per app session (after sync is ready)
+    if (prefillRanRef.current) return;
+    prefillRanRef.current = true;
 
     const todayKey = getDateKey(new Date());
-    if (lastPrefillDateRef.current === todayKey) return;
-
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayKey = getDateKey(yesterday);
 
     // Prefill stack entries (per-item, skipping items that already have today's entry)
     const currentStackEntries = stackEntriesRef.current;
+    const currentStackItems = stackItemsRef.current;
     const yesterdayStackEntries = Object.entries(currentStackEntries).filter(([key]) => key.startsWith(yesterdayKey));
     if (yesterdayStackEntries.length > 0) {
-      const currentStackItems = stackItemsRef.current;
       setStackEntries(prev => {
         const newEntries = { ...prev };
         let changed = false;
@@ -338,9 +341,9 @@ function App() {
 
     // Prefill input entries (per-item, skipping items that already have today's entry)
     const currentInputEntries = inputEntriesRef.current;
+    const currentInputItems = inputItemsRef.current;
     const yesterdayInputEntries = Object.entries(currentInputEntries).filter(([key]) => key.startsWith(yesterdayKey));
     if (yesterdayInputEntries.length > 0) {
-      const currentInputItems = inputItemsRef.current;
       setInputEntries(prev => {
         const newEntries = { ...prev };
         let changed = false;
@@ -362,9 +365,6 @@ function App() {
         return changed ? newEntries : prev;
       });
     }
-
-    lastPrefillDateRef.current = todayKey;
-    localStorage.setItem('lastStackPrefillDate', todayKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firebase.user, sync.isReady]);
 
