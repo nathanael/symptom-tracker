@@ -27,7 +27,6 @@ const DOMAIN_STORAGE_KEYS = {
 
 const DEBOUNCE_MS = 500;
 const INIT_TIMEOUT_MS = 3000;
-const DIRTY_EXPIRY_MS = 300000; // Dirty flags older than 5min are likely stale
 const HEARTBEAT_INTERVAL_MS = 60000; // Check listener health every 60s
 const HEARTBEAT_DEAD_MS = 120000; // Listener considered dead after 2min of silence
 
@@ -130,29 +129,16 @@ export default class SyncEngine {
     // Pending local changes waiting to be flushed
     this.pendingChanges = new Map();
 
-    // Domains with unsynced local changes (persisted to localStorage to survive restarts)
-    try {
-      const dirtyRaw = JSON.parse(localStorage.getItem(`syncDirty_${uid}`) || '{}');
-      // v4.0.6+: stored as { domains: [...], ts: <epoch> }. Legacy: plain array.
-      const dirtyArr = Array.isArray(dirtyRaw) ? dirtyRaw : (dirtyRaw.domains || []);
-      const dirtyTs = dirtyRaw.ts || 0;
-      // Expire stale dirty flags — if the app closed >30s ago, the flush either
-      // completed or the data is too old to safely overwrite the server with.
-      // Also expire if no timestamp (legacy format) since we can't tell how old they are.
-      if (!dirtyTs || (Date.now() - dirtyTs > DIRTY_EXPIRY_MS)) {
-        this._dirtyDomains = new Set();
-        if (dirtyArr.length > 0) {
-          log('Expired stale dirty flags:', dirtyArr, 'ts:', dirtyTs, 'age:', Date.now() - dirtyTs);
-          localStorage.removeItem(`syncDirty_${uid}`);
-        }
-      } else {
-        this._dirtyDomains = new Set(dirtyArr);
-        logWarn('Active dirty flags:', dirtyArr, 'age:', Date.now() - dirtyTs, 'ms');
-      }
-    } catch (e) {
-      this._dirtyDomains = new Set();
-    }
-    log('Constructor: session=', this.sessionId, 'dirtyDomains=', [...this._dirtyDomains]);
+    // Dirty domains are tracked in-memory only — never resurrected across
+    // sessions. Resurrecting stale dirty flags caused bidirectional overwrites:
+    // a device reopened within the expiry window would re-flush its old
+    // localStorage data and clobber edits made on other devices in the gap.
+    // Trade-off: edits made within the ~500ms debounce window that get
+    // force-killed before flushNow() runs may be lost. visibilitychange and
+    // beforeunload normally cover those cases.
+    this._dirtyDomains = new Set();
+    try { localStorage.removeItem(`syncDirty_${uid}`); } catch (e) { /* ignore */ }
+    log('Constructor: session=', this.sessionId);
 
     // Debounce timer
     this._flushTimer = null;
@@ -582,21 +568,11 @@ export default class SyncEngine {
   }
 
   /**
-   * Persist dirty domain flags to localStorage so they survive app restarts.
+   * Dirty flags are in-memory only (see constructor). This still clears any
+   * legacy localStorage entry that may exist from older builds.
    */
   _persistDirty() {
-    try {
-      if (this._dirtyDomains.size === 0) {
-        localStorage.removeItem(`syncDirty_${this.uid}`);
-      } else {
-        localStorage.setItem(`syncDirty_${this.uid}`, JSON.stringify({
-          domains: [...this._dirtyDomains],
-          ts: Date.now(),
-        }));
-      }
-    } catch (e) {
-      // Ignore storage errors
-    }
+    try { localStorage.removeItem(`syncDirty_${this.uid}`); } catch (e) { /* ignore */ }
   }
 
   /**

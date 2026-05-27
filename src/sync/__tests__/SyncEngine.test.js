@@ -331,42 +331,19 @@ describe('SyncEngine', () => {
     });
   });
 
-  describe('BUG: Dirty flags block cloud data on reconnect', () => {
-    it('should accept cloud data after dirty flags expire', async () => {
-      // Simulate previous session's dirty flags that have expired
+  describe('Dirty flags are not resurrected across sessions', () => {
+    it('clears persisted dirty flags from a previous session regardless of age', async () => {
+      // Even "fresh" dirty flags from a recent close are not resurrected,
+      // because resurrecting them caused bidirectional overwrites across devices.
       localStorageMock.setItem('syncDirty_test-user', JSON.stringify({
         domains: ['entries', 'symptoms'],
-        ts: Date.now() - 400000, // 6.7 minutes ago (> 5 min expiry)
+        ts: Date.now() - 10000, // 10s ago — would have been resurrected previously
       }));
 
       createEngine();
-      const initPromise = engine.initialize();
-
-      // Server data arrives
-      const serverData = makeCloudData(
-        { entries: JSON.stringify({ '2026-03-27': { headache: 5 } }) },
-        { entries: 50 }
-      );
-      fireSnapshot(serverData, { fromCache: false });
-      await initPromise;
-
-      // Dirty flags should have expired, so entries should be applied
       expect(engine._dirtyDomains.size).toBe(0);
-      expect(engine.versions.entries).toBe(50);
-    });
-
-    it('should block cloud data when dirty flags are fresh', async () => {
-      // Simulate fresh dirty flags from a very recent session
-      localStorageMock.setItem('syncDirty_test-user', JSON.stringify({
-        domains: ['entries'],
-        ts: Date.now() - 10000, // 10 seconds ago (< 5 min expiry)
-      }));
-
-      createEngine();
-      expect(engine._dirtyDomains.has('entries')).toBe(true);
 
       const initPromise = engine.initialize();
-
       const serverData = makeCloudData(
         { entries: JSON.stringify({ '2026-03-27': { headache: 5 } }) },
         { entries: 50 }
@@ -374,10 +351,8 @@ describe('SyncEngine', () => {
       fireSnapshot(serverData, { fromCache: false });
       await initPromise;
 
-      // Fresh dirty flag blocks entries from being applied
-      // This is BY DESIGN but can cause data loss if the dirty data is stale
-      // The dirty domain's local data gets requeued and flushed, potentially overwriting cloud
-      expect(engine._dirtyDomains.has('entries')).toBe(true);
+      // Cloud data is applied — not blocked by stale dirty flags
+      expect(engine.versions.entries).toBe(50);
     });
   });
 
@@ -790,48 +765,27 @@ describe('SyncEngine', () => {
     });
   });
 
-  describe('Dirty flag persistence', () => {
-    it('should persist dirty flags to localStorage', () => {
+  describe('Dirty flags are in-memory only', () => {
+    it('tracks dirty flags in memory after notifyLocalChange', () => {
       createEngine();
       engine.notifyLocalChange('entries', { test: 1 });
-
-      const stored = JSON.parse(localStorageMock.getItem('syncDirty_test-user'));
-      expect(stored.domains).toContain('entries');
-      expect(stored.ts).toBeGreaterThan(0);
+      expect(engine._dirtyDomains.has('entries')).toBe(true);
     });
 
-    it('should clear dirty flags from localStorage after flush', async () => {
+    it('does not persist dirty flags to localStorage', () => {
       createEngine();
-      const initPromise = engine.initialize();
-      const serverData = makeCloudData({}, { entries: 10 });
-      fireSnapshot(serverData, { fromCache: false });
-      await initPromise;
-
       engine.notifyLocalChange('entries', { test: 1 });
-      await engine.flush();
-
-      const stored = localStorageMock.getItem('syncDirty_test-user');
-      expect(stored).toBeNull();
+      expect(localStorageMock.getItem('syncDirty_test-user')).toBeNull();
     });
 
-    it('should expire dirty flags older than 5 minutes on construction', () => {
+    it('clears any pre-existing dirty flag entry on construction', () => {
       localStorageMock.setItem('syncDirty_test-user', JSON.stringify({
         domains: ['entries'],
-        ts: Date.now() - 400000, // > 5 min
+        ts: Date.now() - 60000,
       }));
-
       createEngine();
       expect(engine._dirtyDomains.size).toBe(0);
-    });
-
-    it('should keep dirty flags newer than 5 minutes on construction', () => {
-      localStorageMock.setItem('syncDirty_test-user', JSON.stringify({
-        domains: ['entries'],
-        ts: Date.now() - 60000, // 1 min
-      }));
-
-      createEngine();
-      expect(engine._dirtyDomains.has('entries')).toBe(true);
+      expect(localStorageMock.getItem('syncDirty_test-user')).toBeNull();
     });
   });
 
