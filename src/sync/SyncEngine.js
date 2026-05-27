@@ -849,26 +849,53 @@ export default class SyncEngine {
   }
 
   /**
-   * Force-pull cloud data and apply it unconditionally, ignoring version
-   * vectors and pending state. Used as a manual recovery escape hatch when
-   * a device suspects it has stale local data and wants the cloud's truth.
-   * The timestamp-based merge in applyCloudData still preserves any local
-   * edits that are newer than cloud (by _t), so this is safe for live data.
+   * Destructive pull: fetch cloud and *replace* local state for every domain
+   * the cloud has. No merge, no timestamp comparison — cloud wins entirely.
+   * Returns a summary so the UI can show the user exactly what was applied.
+   *
+   * Use case: user has watched their browser disagree with their phone for
+   * a while, wants the cloud's authoritative view, and accepts losing any
+   * local edits that never flushed.
    */
   async forcePull() {
-    if (this._destroyed) return;
+    if (this._destroyed) return null;
     this.syncing = true;
     this.syncError = null;
     this._notifyStatus();
     try {
       const data = await this._restApiGet();
       if (!data) throw new Error('Could not fetch cloud document');
-      log('forcePull: applying', SYNC_DOMAINS.filter(d => data[d] !== undefined));
-      this._applySnapshot(data);
+
+      const updates = {};
+      const summary = {};
+      SYNC_DOMAINS.forEach(domain => {
+        if (data[domain] === undefined) return;
+        const decoded = decodeDomain(domain, data[domain]);
+        updates[domain] = decoded;
+        this._lastAppliedCloud[domain] = decoded;
+        const cloudVersion = (typeof data[`_v_${domain}`] === 'number') ? data[`_v_${domain}`] : 0;
+        if (cloudVersion > this.versions[domain]) this.versions[domain] = cloudVersion;
+        summary[domain] = Array.isArray(decoded) ? decoded.length
+          : (decoded && typeof decoded === 'object') ? Object.keys(decoded).length
+          : (decoded != null ? 1 : 0);
+      });
+
+      // Clear any pending in-memory state — user asked for cloud's truth.
+      this.pendingChanges.clear();
+      this._dirtyDomains.clear();
+
+      log('forcePull: cloud doc summary:', summary);
       this.lastSynced = new Date();
+
+      if (Object.keys(updates).length > 0) {
+        // 3rd arg = forceReplace: skip merge, set state to cloud directly.
+        this.onCloudUpdate(updates, false, true);
+      }
+      return summary;
     } catch (error) {
       console.error('SyncEngine: forcePull failed', error);
       this.syncError = error.message;
+      return null;
     } finally {
       this.syncing = false;
       this._notifyStatus();

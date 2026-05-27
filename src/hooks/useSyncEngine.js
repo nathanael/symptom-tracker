@@ -31,7 +31,7 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
   // The ref is reset by a useEffect in App.jsx declared AFTER all useLocalStorage
   // hooks — React guarantees declaration-order effect execution within a component,
   // so the reset runs after all useLocalStorage effects have checked the flag.
-  const applyCloudData = useCallback((updates, isInitial) => {
+  const applyCloudData = useCallback((updates, isInitial, forceReplace = false) => {
     const cloudRef = cloudRefRef.current;
     if (cloudRef) {
       cloudRef.current = true;
@@ -88,23 +88,23 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     };
 
     if (updates.symptoms && setters.symptoms) {
-      setters.symptoms(prev => mergeArrayByTime(prev, updates.symptoms));
+      setters.symptoms(prev => forceReplace ? updates.symptoms : mergeArrayByTime(prev, updates.symptoms));
     }
 
     if (updates.entries && setters.entries) {
-      setters.entries(prev => mergeMapByTime(prev, updates.entries));
+      setters.entries(prev => forceReplace ? updates.entries : mergeMapByTime(prev, updates.entries));
     }
 
     if (updates.dailyNotes && setters.dailyNotes) {
-      setters.dailyNotes(prev => mergeMapByTime(prev, updates.dailyNotes));
+      setters.dailyNotes(prev => forceReplace ? updates.dailyNotes : mergeMapByTime(prev, updates.dailyNotes));
     }
 
     if (updates.stackItems && setters.stackItems) {
-      setters.stackItems(prev => mergeArrayByTime(prev, updates.stackItems));
+      setters.stackItems(prev => forceReplace ? updates.stackItems : mergeArrayByTime(prev, updates.stackItems));
     }
 
     if (updates.stackEntries && setters.stackEntries) {
-      setters.stackEntries(prev => mergeMapByTime(prev, updates.stackEntries));
+      setters.stackEntries(prev => forceReplace ? updates.stackEntries : mergeMapByTime(prev, updates.stackEntries));
     }
 
     if (updates.trackingMode && setters.trackingMode) {
@@ -122,11 +122,11 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     }
 
     if (updates.inputItems && setters.inputItems) {
-      setters.inputItems(prev => mergeArrayByTime(prev, updates.inputItems));
+      setters.inputItems(prev => forceReplace ? updates.inputItems : mergeArrayByTime(prev, updates.inputItems));
     }
 
     if (updates.inputEntries && setters.inputEntries) {
-      setters.inputEntries(prev => mergeMapByTime(prev, updates.inputEntries));
+      setters.inputEntries(prev => forceReplace ? updates.inputEntries : mergeMapByTime(prev, updates.inputEntries));
     }
 
     // No timer-based reset here. The ref is reset by a useEffect in App.jsx

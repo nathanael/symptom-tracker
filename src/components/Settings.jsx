@@ -434,10 +434,17 @@ export default function Settings({
                 </button>
                 <button
                   onClick={async () => {
-                    if (onForcePull) {
-                      await onForcePull();
-                      setLastAction('Pulled latest from cloud');
+                    if (!onForcePull) return;
+                    const summary = await onForcePull();
+                    if (!summary) {
+                      setLastAction('Pull failed — see console');
+                      return;
                     }
+                    const total = Object.values(summary).reduce((a, b) => a + b, 0);
+                    const detail = Object.entries(summary)
+                      .filter(([, n]) => n > 0)
+                      .map(([d, n]) => `${d}=${n}`).join(' ');
+                    setLastAction(`Pulled ${total} items: ${detail || 'empty cloud doc'}`);
                   }}
                   disabled={syncing}
                   style={{
@@ -1271,7 +1278,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.2.9
+              v5.3.0
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}
