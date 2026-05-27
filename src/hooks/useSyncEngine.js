@@ -38,77 +38,73 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     }
 
     const setters = settersRef.current;
-    const engine = engineRef.current;
 
-    // Check if a domain has pending local changes that haven't been flushed yet.
-    // When NO pending changes exist, cloud data is authoritative (replacement) —
-    // this allows deletions (merged supplements, deleted items) to propagate.
-    // When pending changes DO exist, use additive merge to preserve local edits.
-    const hasPending = (domain) =>
-      engine && (engine.pendingChanges.has(domain) || engine._dirtyDomains.has(domain));
+    // Per-key timestamp merge. Each entry/item has an optional _t (write time
+    // in ms since epoch). For each key/id present in either side, keep the
+    // version with the higher _t. Entries without _t are treated as _t=0
+    // (legacy data — any new write supersedes them). This replaces the older
+    // per-domain dirty/pending gating, which silently dropped cloud updates
+    // when version vectors matched even though the data had diverged.
 
-    // Bail-out helpers: return prev when merge produces identical data,
-    // avoiding new object references that cascade re-renders.
-    // Uses JSON.stringify (native C++) for fast deep comparison.
     const jsonEqual = (a, b) => {
       if (a === b) return true;
       return JSON.stringify(a) === JSON.stringify(b);
     };
 
-    const mergeMap = (prev, cloud, pending) => {
-      if (!pending) {
-        // Cloud-authoritative: replace entirely (allows key deletions to propagate)
-        return jsonEqual(prev, cloud) ? prev : cloud;
+    const tOf = (v) => (v && typeof v === 'object' && typeof v._t === 'number') ? v._t : 0;
+
+    const mergeMapByTime = (prev, cloud) => {
+      if (!prev || typeof prev !== 'object') return cloud;
+      if (!cloud || typeof cloud !== 'object') return prev;
+      if (jsonEqual(prev, cloud)) return prev;
+      const merged = {};
+      const keys = new Set([...Object.keys(prev), ...Object.keys(cloud)]);
+      for (const k of keys) {
+        const p = prev[k];
+        const c = cloud[k];
+        if (p === undefined) merged[k] = c;
+        else if (c === undefined) merged[k] = p;
+        else merged[k] = tOf(p) > tOf(c) ? p : c;
       }
-      // Additive merge: preserve local keys, cloud overlays
-      const cloudKeys = Object.keys(cloud);
-      const prevKeys = Object.keys(prev);
-      if (cloudKeys.every(k => k in prev) && prevKeys.length >= cloudKeys.length) {
-        if (cloudKeys.every(k => jsonEqual(prev[k], cloud[k]))) return prev;
-      }
-      const merged = { ...prev, ...cloud };
-      return merged;
+      return jsonEqual(prev, merged) ? prev : merged;
     };
 
-    const mergeArrayById = (prev, cloud, pending) => {
-      if (!prev || !Array.isArray(prev)) return cloud;
-      if (!pending) {
-        // Cloud-authoritative: replace entirely (allows item deletions to propagate)
-        return jsonEqual(prev, cloud) ? prev : cloud;
+    const mergeArrayByTime = (prev, cloud) => {
+      if (!Array.isArray(prev)) return cloud;
+      if (!Array.isArray(cloud)) return prev;
+      if (jsonEqual(prev, cloud)) return prev;
+      const byId = new Map();
+      for (const item of cloud) {
+        if (item && item.id != null) byId.set(item.id, item);
       }
-      // Additive merge: cloud base + local-only items preserved
-      if (prev.length === cloud.length) {
-        const prevById = new Map(prev.map(i => [i.id, i]));
-        if (cloud.every(item => {
-          const existing = prevById.get(item.id);
-          return existing && jsonEqual(existing, item);
-        })) return prev;
+      for (const item of prev) {
+        if (!item || item.id == null) continue;
+        const existing = byId.get(item.id);
+        if (!existing) byId.set(item.id, item);
+        else if (tOf(item) > tOf(existing)) byId.set(item.id, item);
       }
-      const cloudById = new Map(cloud.map(i => [i.id, i]));
-      const localById = new Map(prev.map(i => [i.id, i]));
-      const merged = new Map(cloudById);
-      localById.forEach((item, id) => { if (!merged.has(id)) merged.set(id, item); });
-      return [...merged.values()];
+      const merged = [...byId.values()];
+      return jsonEqual(prev, merged) ? prev : merged;
     };
 
     if (updates.symptoms && setters.symptoms) {
-      setters.symptoms(prev => mergeArrayById(prev, updates.symptoms, hasPending('symptoms')));
+      setters.symptoms(prev => mergeArrayByTime(prev, updates.symptoms));
     }
 
     if (updates.entries && setters.entries) {
-      setters.entries(prev => mergeMap(prev, updates.entries, hasPending('entries')));
+      setters.entries(prev => mergeMapByTime(prev, updates.entries));
     }
 
     if (updates.dailyNotes && setters.dailyNotes) {
-      setters.dailyNotes(prev => mergeMap(prev, updates.dailyNotes, hasPending('dailyNotes')));
+      setters.dailyNotes(prev => mergeMapByTime(prev, updates.dailyNotes));
     }
 
     if (updates.stackItems && setters.stackItems) {
-      setters.stackItems(prev => mergeArrayById(prev, updates.stackItems, hasPending('stackItems')));
+      setters.stackItems(prev => mergeArrayByTime(prev, updates.stackItems));
     }
 
     if (updates.stackEntries && setters.stackEntries) {
-      setters.stackEntries(prev => mergeMap(prev, updates.stackEntries, hasPending('stackEntries')));
+      setters.stackEntries(prev => mergeMapByTime(prev, updates.stackEntries));
     }
 
     if (updates.trackingMode && setters.trackingMode) {
@@ -116,6 +112,7 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     }
 
     if (updates.pinnedSymptoms && setters.pinnedSymptoms) {
+      // pinnedSymptoms is a small id array — cloud-authoritative is fine.
       setters.pinnedSymptoms(prev => {
         const incoming = updates.pinnedSymptoms;
         if (prev instanceof Set && prev.size === incoming.length &&
@@ -125,11 +122,11 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     }
 
     if (updates.inputItems && setters.inputItems) {
-      setters.inputItems(prev => mergeArrayById(prev, updates.inputItems, hasPending('inputItems')));
+      setters.inputItems(prev => mergeArrayByTime(prev, updates.inputItems));
     }
 
     if (updates.inputEntries && setters.inputEntries) {
-      setters.inputEntries(prev => mergeMap(prev, updates.inputEntries, hasPending('inputEntries')));
+      setters.inputEntries(prev => mergeMapByTime(prev, updates.inputEntries));
     }
 
     // No timer-based reset here. The ref is reset by a useEffect in App.jsx
@@ -160,13 +157,13 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
 
     engineRef.current = engine;
 
-    // Initialize and apply server data.
-    // On init, server data is authoritative — only skip domains where the user
-    // made changes THIS session (pendingChanges), not stale dirty flags.
+    // Initialize and apply server data. The timestamp-based merge in
+    // applyCloudData handles any in-flight pending edits correctly, so we
+    // always apply every domain the cloud has.
     engine.initialize().then((serverData) => {
       if (serverData && !engine._destroyed) {
-        const domains = engine._extractDomains(serverData, 'skipPending');
-        console.log('[Sync] useSyncEngine: init resolved, applying domains:', Object.keys(domains), 'skippedPending:', [...engine.pendingChanges.keys()]);
+        const domains = engine._extractDomains(serverData, 'all');
+        console.log('[Sync] useSyncEngine: init resolved, applying domains:', Object.keys(domains));
         if (Object.keys(domains).length > 0) {
           applyCloudData(domains, true);
         }
@@ -225,9 +222,17 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     return Promise.resolve();
   }, []);
 
+  const forcePull = useCallback(() => {
+    if (engineRef.current) {
+      return engineRef.current.forcePull();
+    }
+    return Promise.resolve();
+  }, []);
+
   return {
     notifyChange,
     forcePush,
+    forcePull,
     syncing: syncStatus.syncing,
     lastSynced: syncStatus.lastSynced,
     syncError: syncStatus.syncError,

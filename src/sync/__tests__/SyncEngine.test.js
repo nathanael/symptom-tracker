@@ -222,7 +222,10 @@ describe('SyncEngine', () => {
       expect(engine.versions.entries).toBe(11);
     });
 
-    it('should skip snapshot with equal cloud version', async () => {
+    it('emits snapshot even when cloud version equals local — merge handles it', async () => {
+      // Previously version-gated; that gate caused stale-data-stuck bugs when
+      // versions matched but data had drifted. Now we always emit and let the
+      // per-key _t merge resolve.
       await initEngine({ entries: 10 });
 
       const sameData = makeCloudData(
@@ -231,7 +234,7 @@ describe('SyncEngine', () => {
       );
       fireSnapshot(sameData, { fromCache: false });
 
-      expect(cloudUpdates.length).toBe(0);
+      expect(cloudUpdates.length).toBe(1);
     });
 
     it('should skip own echo writes', async () => {
@@ -356,13 +359,13 @@ describe('SyncEngine', () => {
     });
   });
 
-  describe('BUG: Version bump on skip prevents re-application', () => {
-    it('should merge cloud data into pending changes so flush includes both', async () => {
+  describe('Cloud snapshot + pending local change', () => {
+    it('emits cloud to React (merge keeps local on top by _t) and pending stays queued', async () => {
       createEngine();
       const initPromise = engine.initialize();
 
       const serverData = makeCloudData(
-        { entries: JSON.stringify({ '2026-03-27': { headache: 5 } }) },
+        { entries: JSON.stringify({ '2026-03-27': { headache: 5, _t: 1000 } }) },
         { entries: 10 }
       );
       fireSnapshot(serverData, { fromCache: false });
@@ -372,28 +375,27 @@ describe('SyncEngine', () => {
       // Local change creates pending state
       engine.notifyLocalChange('entries', { '2026-03-27': { headache: 8 } });
 
-      // Cloud snapshot arrives with newer data (includes a new key 2026-03-26)
+      // Cloud snapshot arrives with a new key
       const newerData = makeCloudData(
-        { entries: JSON.stringify({ '2026-03-27': { headache: 5 }, '2026-03-26': { fatigue: 3 } }) },
+        { entries: JSON.stringify({ '2026-03-27': { headache: 5, _t: 1000 }, '2026-03-26': { fatigue: 3, _t: 2000 } }) },
         { entries: 15 }
       );
       fireSnapshot(newerData, { fromCache: false });
 
-      // entries was skipped (pending), version bumped to 16
-      expect(engine.versions.entries).toBe(16);
+      // Cloud is emitted to React; merge there will keep the locally-edited key
+      expect(cloudUpdates.length).toBe(1);
+      expect(cloudUpdates[0].updates.entries['2026-03-26']).toMatchObject({ fatigue: 3 });
 
-      // But cloud data should have been merged into pending changes
+      // Pending still holds the user's edit (with a fresh _t)
       const pending = engine.pendingChanges.get('entries');
-      expect(pending['2026-03-26']).toEqual({ fatigue: 3 }); // Cloud key preserved
-      expect(pending['2026-03-27']).toEqual({ headache: 8 }); // Local change wins
+      expect(pending['2026-03-27'].headache).toBe(8);
+      expect(typeof pending['2026-03-27']._t).toBe('number');
 
-      // Flush should include both cloud and local data
+      // Flush sends the local edit (cloud's other keys arrive via snapshots)
       await engine.flush();
-
       const payload = mockSetFn.mock.calls[0][0];
       const flushedEntries = JSON.parse(payload.entries);
-      expect(flushedEntries['2026-03-26']).toEqual({ fatigue: 3 });
-      expect(flushedEntries['2026-03-27']).toEqual({ headache: 8 });
+      expect(flushedEntries['2026-03-27'].headache).toBe(8);
     });
   });
 
@@ -440,7 +442,10 @@ describe('SyncEngine', () => {
       expect(mockSetFn).toHaveBeenCalledTimes(1);
       const payload = mockSetFn.mock.calls[0][0];
       expect(payload._v_entries).toBe(11); // 10 + 1
-      expect(JSON.parse(payload.entries)).toEqual({ '2026-03-27': { headache: 8 } });
+      // Entry is stamped with _t for per-key timestamp merge across devices.
+      const parsed = JSON.parse(payload.entries);
+      expect(parsed['2026-03-27'].headache).toBe(8);
+      expect(typeof parsed['2026-03-27']._t).toBe('number');
     });
 
     it('should clear dirty flags after successful flush', async () => {
@@ -704,7 +709,10 @@ describe('SyncEngine', () => {
       expect(engine.versions.entries).toBe(15);
     });
 
-    it('should skip domains where cloud version <= local version', () => {
+    it('always emits cloud data — the merge resolves conflicts by per-key _t', () => {
+      // Previously skipped when cloud version <= local. Version-gating caused
+      // the recurring "web doesn't pull data" bug when local and cloud version
+      // counters matched but the underlying data had drifted.
       createEngine();
       engine.versions.entries = 10;
 
@@ -714,22 +722,26 @@ describe('SyncEngine', () => {
       );
       engine._applySnapshot(data);
 
-      expect(cloudUpdates.length).toBe(0);
+      expect(cloudUpdates.length).toBe(1);
+      expect(cloudUpdates[0].updates.entries).toEqual({ old: 1 });
     });
 
-    it('should skip pending domains and bump version past cloud', () => {
+    it('emits cloud data even when local has pending changes for the domain', () => {
+      // The React-side merge keeps local entries with higher _t on top, so
+      // emitting cloud data alongside pending is safe and lets cloud's other
+      // keys reach the UI.
       createEngine();
       engine.versions.entries = 10;
-      engine.pendingChanges.set('entries', { local: 1 });
+      engine.pendingChanges.set('entries', { local: { _t: Date.now(), value: 1 } });
 
       const data = makeCloudData(
-        { entries: JSON.stringify({ cloud: 1 }) },
+        { entries: JSON.stringify({ cloud: { _t: 0, value: 1 } }) },
         { entries: 15 }
       );
       engine._applySnapshot(data);
 
-      expect(cloudUpdates.length).toBe(0);
-      expect(engine.versions.entries).toBe(16); // cloudVersion + 1
+      expect(cloudUpdates.length).toBe(1);
+      expect(engine.versions.entries).toBe(15); // bumped to cloud's version
     });
   });
 
@@ -928,13 +940,14 @@ describe('SyncEngine', () => {
       const flushedEntries = JSON.parse(payload.entries);
 
       // Cloud entries must be preserved
-      expect(flushedEntries['2026-03-23']).toEqual({ fatigue: 4 });
-      expect(flushedEntries['2026-03-24']).toEqual({ fatigue: 5 });
-      expect(flushedEntries['2026-03-25']).toEqual({ headache: 2 });
-      expect(flushedEntries['2026-03-26']).toEqual({ fatigue: 3 });
+      expect(flushedEntries['2026-03-23']).toMatchObject({ fatigue: 4 });
+      expect(flushedEntries['2026-03-24']).toMatchObject({ fatigue: 5 });
+      expect(flushedEntries['2026-03-25']).toMatchObject({ headache: 2 });
+      expect(flushedEntries['2026-03-26']).toMatchObject({ fatigue: 3 });
 
-      // User's local change should win for conflicting key
-      expect(flushedEntries['2026-03-27']).toEqual({ headache: 8 });
+      // User's local change should win for conflicting key (with fresh _t)
+      expect(flushedEntries['2026-03-27'].headache).toBe(8);
+      expect(typeof flushedEntries['2026-03-27']._t).toBe('number');
 
       // Clean up
       delete global.fetch;

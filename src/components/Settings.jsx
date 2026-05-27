@@ -45,6 +45,7 @@ export default function Settings({
   isDesktop,
   garminSync,
   onForcePush,
+  onForcePull,
 }) {
   const [confirmClearData, setConfirmClearData] = useState(false);
   const [confirmFullReset, setConfirmFullReset] = useState(false);
@@ -430,6 +431,28 @@ export default function Settings({
                     <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
                   </svg>
                   {syncing ? 'Syncing...' : 'Sync Now'}
+                </button>
+                <button
+                  onClick={async () => {
+                    if (onForcePull) {
+                      await onForcePull();
+                      setLastAction('Pulled latest from cloud');
+                    }
+                  }}
+                  disabled={syncing}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #334155',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    color: '#cbd5e1',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: syncing ? 'not-allowed' : 'pointer',
+                    opacity: syncing ? 0.6 : 1,
+                  }}
+                >
+                  Pull
                 </button>
                 <button
                   onClick={signOut}
@@ -1248,7 +1271,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.2.8
+              v5.2.9
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

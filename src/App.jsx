@@ -1406,6 +1406,7 @@ function App() {
             inputItems,
             inputEntries,
           })}
+          onForcePull={sync.forcePull}
         />
       )}
 

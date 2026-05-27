@@ -65,6 +65,19 @@ function decodeDomain(domain, data) {
   return data;
 }
 
+/** Deep equality on two objects/values, ignoring any _t field at the top level. */
+function _equalIgnoringT(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const ka = Object.keys(a).filter(k => k !== '_t');
+  const kb = Object.keys(b).filter(k => k !== '_t');
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
+  }
+  return true;
+}
+
 /** Race a promise against a timeout. Resolves 'timeout' if it takes too long. */
 const withTimeout = (promise, ms = WRITE_TIMEOUT_MS) =>
   Promise.race([
@@ -128,6 +141,12 @@ export default class SyncEngine {
 
     // Pending local changes waiting to be flushed
     this.pendingChanges = new Map();
+
+    // Last cloud-side data we saw per domain — used to detect which keys/items
+    // the user actually changed in notifyLocalChange so we only stamp those
+    // with a fresh _t. Without this baseline, every write would re-stamp every
+    // entry and last-writer-wins degenerates to last-flush-wins.
+    this._lastAppliedCloud = {};
 
     // Dirty domains are tracked in-memory only — never resurrected across
     // sessions. Resurrecting stale dirty flags caused bidirectional overwrites:
@@ -366,19 +385,18 @@ export default class SyncEngine {
 
     const result = {};
     SYNC_DOMAINS.forEach(domain => {
-      if (data[domain] !== undefined) {
-        if (mode === 'skipDirty' && (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain))) {
-          // Domain skipped due to pending/dirty — merge cloud data into pending
-          // so the eventual flush includes cloud data too
-          this._mergeCloudIntoPending(domain, decodeDomain(domain, data[domain]));
-          return;
-        }
-        if (mode === 'skipPending' && this.pendingChanges.has(domain)) {
-          this._mergeCloudIntoPending(domain, decodeDomain(domain, data[domain]));
-          return;
-        }
-        result[domain] = decodeDomain(domain, data[domain]);
+      if (data[domain] === undefined) return;
+      const decoded = decodeDomain(domain, data[domain]);
+      // Always record cloud baseline so notifyLocalChange can detect which
+      // keys changed — even for "skipped" domains, the cloud values are real.
+      this._lastAppliedCloud[domain] = decoded;
+      if (mode === 'skipDirty' && (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain))) {
+        return; // merge will preserve local on top later
       }
+      if (mode === 'skipPending' && this.pendingChanges.has(domain)) {
+        return;
+      }
+      result[domain] = decoded;
     });
     return result;
   }
@@ -484,40 +502,31 @@ export default class SyncEngine {
   }
 
   /**
-   * Apply domain data from a snapshot. Separated from _handleSnapshot so it
-   * can be re-invoked after a flush clears dirty flags.
+   * Apply domain data from a snapshot. Cloud data is always emitted; the
+   * React-side merge in useSyncEngine resolves per-key by _t timestamp so
+   * stale snapshots cannot clobber newer local edits.
+   *
+   * Domains with in-flight pending writes are still emitted (the merge will
+   * keep local on top), so we never let polling leave the UI stale just
+   * because we have unflushed changes.
    */
   _applySnapshot(data) {
-    // Per-domain: only accept if cloud version > our local version
     const updates = {};
     let hasUpdates = false;
-    const skipped = {};
 
     SYNC_DOMAINS.forEach(domain => {
+      if (data[domain] === undefined) return;
+      const decoded = decodeDomain(domain, data[domain]);
+      updates[domain] = decoded;
+      this._lastAppliedCloud[domain] = decoded;
       const cloudVersion = (typeof data[`_v_${domain}`] === 'number') ? data[`_v_${domain}`] : 0;
-      const localVersion = this.versions[domain];
-
-      if (cloudVersion > localVersion) {
-        if (this.pendingChanges.has(domain) || this._dirtyDomains.has(domain)) {
-          skipped[domain] = `dirty/pending (cloud=${cloudVersion} local=${localVersion})`;
-          // Merge cloud data into pending changes so flush doesn't lose it
-          if (data[domain] !== undefined) {
-            this._mergeCloudIntoPending(domain, decodeDomain(domain, data[domain]));
-          }
-          this.versions[domain] = cloudVersion + 1;
-          return;
-        }
-        if (data[domain] !== undefined) {
-          updates[domain] = decodeDomain(domain, data[domain]);
-          this.versions[domain] = cloudVersion;
-          hasUpdates = true;
-        }
-      } else if (cloudVersion < localVersion) {
-        skipped[domain] = `local ahead (cloud=${cloudVersion} local=${localVersion})`;
+      if (cloudVersion > this.versions[domain]) {
+        this.versions[domain] = cloudVersion;
       }
+      hasUpdates = true;
     });
 
-    log('  _applySnapshot: applying=', Object.keys(updates), 'skipped=', skipped);
+    log('  _applySnapshot: applying=', Object.keys(updates));
 
     if (hasUpdates) {
       this.lastSynced = (typeof data.updatedAt?.toDate === 'function') ? data.updatedAt.toDate() : new Date();
@@ -528,21 +537,61 @@ export default class SyncEngine {
 
   /**
    * Called when local data changes in a domain.
-   * Queues the change and schedules a debounced flush.
-   * Changes are queued even before initialization completes — they'll flush
-   * once the engine is ready, and block cloud data from overwriting them.
+   * Stamps newly changed keys/items with _t = now so cross-device merges can
+   * resolve by timestamp, then queues a debounced flush.
    */
   notifyLocalChange(domain, data) {
     if (this._destroyed) return;
-
+    const stamped = this._stampChanges(domain, data);
     log('notifyLocalChange:', domain, 'version:', this.versions[domain], '->', this.versions[domain] + 1);
-    this.pendingChanges.set(domain, data);
+    this.pendingChanges.set(domain, stamped);
     this.versions[domain]++;
     this._dirtyDomains.add(domain);
     this._persistDirty();
     if (this._ready) {
       this._scheduleFlush();
     }
+  }
+
+  /**
+   * Compare new local data against the last known cloud state for this domain.
+   * Add _t = now to any key/item that differs (or is new). Unchanged entries
+   * keep their existing _t (preserving "when this was last edited" info).
+   */
+  _stampChanges(domain, data) {
+    const now = Date.now();
+    const lastSeen = this._lastAppliedCloud[domain];
+
+    if (MAP_DOMAINS.has(domain) && data && typeof data === 'object' && !Array.isArray(data)) {
+      const lastMap = (lastSeen && typeof lastSeen === 'object') ? lastSeen : {};
+      const stamped = {};
+      for (const [k, v] of Object.entries(data)) {
+        const prev = lastMap[k];
+        if (prev && _equalIgnoringT(prev, v)) {
+          stamped[k] = prev; // unchanged → keep cloud's _t
+        } else if (v && typeof v === 'object' && !Array.isArray(v)) {
+          stamped[k] = { ...v, _t: now };
+        } else {
+          // Non-object value (rare for map domains). Wrap so we can carry _t.
+          stamped[k] = v;
+        }
+      }
+      return stamped;
+    }
+
+    if (ARRAY_ID_DOMAINS.has(domain) && Array.isArray(data)) {
+      const lastById = new Map(Array.isArray(lastSeen) ? lastSeen.map(i => [i.id, i]) : []);
+      return data.map(item => {
+        if (!item || typeof item !== 'object' || item.id == null) return item;
+        const prev = lastById.get(item.id);
+        if (prev && _equalIgnoringT(prev, item)) {
+          return prev; // unchanged
+        }
+        return { ...item, _t: now };
+      });
+    }
+
+    return data;
   }
 
   /**
@@ -792,6 +841,33 @@ export default class SyncEngine {
       this._persistDirty();
     } catch (error) {
       console.error('SyncEngine: forcePush failed', error);
+      this.syncError = error.message;
+    } finally {
+      this.syncing = false;
+      this._notifyStatus();
+    }
+  }
+
+  /**
+   * Force-pull cloud data and apply it unconditionally, ignoring version
+   * vectors and pending state. Used as a manual recovery escape hatch when
+   * a device suspects it has stale local data and wants the cloud's truth.
+   * The timestamp-based merge in applyCloudData still preserves any local
+   * edits that are newer than cloud (by _t), so this is safe for live data.
+   */
+  async forcePull() {
+    if (this._destroyed) return;
+    this.syncing = true;
+    this.syncError = null;
+    this._notifyStatus();
+    try {
+      const data = await this._restApiGet();
+      if (!data) throw new Error('Could not fetch cloud document');
+      log('forcePull: applying', SYNC_DOMAINS.filter(d => data[d] !== undefined));
+      this._applySnapshot(data);
+      this.lastSynced = new Date();
+    } catch (error) {
+      console.error('SyncEngine: forcePull failed', error);
       this.syncError = error.message;
     } finally {
       this.syncing = false;
