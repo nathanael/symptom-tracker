@@ -434,17 +434,35 @@ export default function Settings({
                 </button>
                 <button
                   onClick={async () => {
-                    if (!onForcePull) return;
-                    const summary = await onForcePull();
+                    console.log('[Pull] button clicked, onForcePull=', typeof onForcePull);
+                    if (!onForcePull) {
+                      if (setCopyToastMessage) setCopyToastMessage('Pull not wired up');
+                      return;
+                    }
+                    if (setCopyToastMessage) setCopyToastMessage('Pulling…');
+                    let summary;
+                    try {
+                      summary = await onForcePull();
+                    } catch (e) {
+                      console.error('[Pull] threw:', e);
+                      if (setCopyToastMessage) setCopyToastMessage(`Pull error: ${e.message}`);
+                      setTimeout(() => setCopyToastMessage(''), 4000);
+                      return;
+                    }
+                    console.log('[Pull] summary=', summary);
                     if (!summary) {
-                      setLastAction('Pull failed — see console');
+                      if (setCopyToastMessage) setCopyToastMessage('Pull returned nothing — see console');
+                      setTimeout(() => setCopyToastMessage(''), 4000);
                       return;
                     }
                     const total = Object.values(summary).reduce((a, b) => a + b, 0);
                     const detail = Object.entries(summary)
                       .filter(([, n]) => n > 0)
                       .map(([d, n]) => `${d}=${n}`).join(' ');
-                    setLastAction(`Pulled ${total} items: ${detail || 'empty cloud doc'}`);
+                    if (setCopyToastMessage) {
+                      setCopyToastMessage(`Pulled ${total}: ${detail || '(empty)'}`);
+                      setTimeout(() => setCopyToastMessage(''), 4000);
+                    }
                   }}
                   disabled={syncing}
                   style={{
@@ -1278,7 +1296,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.3.0
+              v5.3.1
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}
