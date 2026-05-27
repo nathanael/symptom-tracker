@@ -434,37 +434,40 @@ export default function Settings({
                 </button>
                 <button
                   onClick={async () => {
-                    console.log('[Pull] button clicked, onForcePull=', typeof onForcePull);
-                    if (!onForcePull) {
-                      if (setCopyToastMessage) setCopyToastMessage('Pull not wired up');
+                    // Loud fallback: alert proves the click fires even if toast/log are wired wrong.
+                    const haveCb = typeof onForcePull === 'function';
+                    const haveToast = typeof setCopyToastMessage === 'function';
+                    console.log('[Pull] click fired. onForcePull=', haveCb, 'setCopyToast=', haveToast);
+                    if (!haveCb) {
+                      alert('Pull: onForcePull prop is missing — wiring bug. See console.');
                       return;
                     }
-                    if (setCopyToastMessage) setCopyToastMessage('Pulling…');
+                    if (haveToast) setCopyToastMessage('Pulling…');
                     let summary;
                     try {
                       summary = await onForcePull();
                     } catch (e) {
                       console.error('[Pull] threw:', e);
-                      if (setCopyToastMessage) setCopyToastMessage(`Pull error: ${e.message}`);
-                      setTimeout(() => setCopyToastMessage(''), 4000);
+                      alert(`Pull error: ${e.message}`);
                       return;
                     }
                     console.log('[Pull] summary=', summary);
                     if (!summary) {
-                      if (setCopyToastMessage) setCopyToastMessage('Pull returned nothing — see console');
-                      setTimeout(() => setCopyToastMessage(''), 4000);
+                      alert('Pull returned null — Firestore fetch failed. Open console for details.');
                       return;
                     }
                     const total = Object.values(summary).reduce((a, b) => a + b, 0);
                     const detail = Object.entries(summary)
                       .filter(([, n]) => n > 0)
                       .map(([d, n]) => `${d}=${n}`).join(' ');
-                    if (setCopyToastMessage) {
-                      setCopyToastMessage(`Pulled ${total}: ${detail || '(empty)'}`);
-                      setTimeout(() => setCopyToastMessage(''), 4000);
+                    const msg = `Pulled ${total}: ${detail || '(empty)'}`;
+                    if (haveToast) {
+                      setCopyToastMessage(msg);
+                      setTimeout(() => setCopyToastMessage(''), 5000);
+                    } else {
+                      alert(msg);
                     }
                   }}
-                  disabled={syncing}
                   style={{
                     background: 'transparent',
                     border: '1px solid #334155',
@@ -473,8 +476,7 @@ export default function Settings({
                     color: '#cbd5e1',
                     fontSize: '14px',
                     fontWeight: '500',
-                    cursor: syncing ? 'not-allowed' : 'pointer',
-                    opacity: syncing ? 0.6 : 1,
+                    cursor: 'pointer',
                   }}
                 >
                   Pull
@@ -1296,7 +1298,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.3.1
+              v5.3.2
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}
