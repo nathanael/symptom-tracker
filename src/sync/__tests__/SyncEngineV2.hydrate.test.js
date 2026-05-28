@@ -109,6 +109,11 @@ describe('SyncEngineV2 — initialize + hydrate', () => {
     expect(engine.isReady()).toBe(true);
     expect(result).toBeTruthy();
     expect(result.domains).toBe(domains);
+
+    // Both reads must force the server source (avoid hydrating a partial
+    // local cache).
+    expect(mockDefGet).toHaveBeenCalledWith({ source: 'server' });
+    expect(mockMonthsGet).toHaveBeenCalledWith({ source: 'server' });
   });
 
   it('Test 2: empty cloud (no definitions, no months) does NOT emit', async () => {
@@ -174,6 +179,10 @@ describe('SyncEngineV2 — initialize + hydrate', () => {
 
     // The destroyed guard must have skipped the emit.
     expect(cloudUpdates.length).toBe(0);
+
+    // A destroyed engine must not mutate its own state: _shadow stays the
+    // empty initial value, never overwritten by the in-flight hydrate.
+    expect(engine._shadow).toEqual({});
   });
 
   describe('hasAnyData', () => {

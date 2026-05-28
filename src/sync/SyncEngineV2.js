@@ -75,9 +75,13 @@ export default class SyncEngineV2 {
       const monthsRef = userDoc.collection('months');
 
       const [defSnap, monthsSnap] = await Promise.all([
-        defRef.get(),
-        monthsRef.get(),
+        defRef.get({ source: 'server' }),
+        monthsRef.get({ source: 'server' }),
       ]);
+
+      // If destroy() was called mid-flight, do not mutate our own state or
+      // emit — a destroyed engine must be fully inert.
+      if (this._destroyed) return null;
 
       const monthDocs = monthsSnap.docs.map((d) => ({ id: d.id, data: d.data() }));
       const definitionsData = defSnap.exists ? defSnap.data() : null;
