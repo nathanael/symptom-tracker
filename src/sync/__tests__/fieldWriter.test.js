@@ -147,4 +147,44 @@ describe('writeFieldUpdates', () => {
     expect(typeof result.error).toBe('string');
     expect(result.error).toContain('503');
   });
+
+  it('returns {ok:false} instead of throwing when window.firebase is undefined', async () => {
+    const saved = global.window.firebase;
+    delete global.window.firebase;
+    try {
+      const docRef = { path: 'users/u/months/2026-05', update: () => Promise.resolve(), set: () => Promise.resolve() };
+      const result = await writeFieldUpdates(docRef, { updates: { 'entries.k': { v: 1 } } });
+      expect(result.ok).toBe(false);
+      expect(typeof result.error).toBe('string');
+    } finally {
+      global.window.firebase = saved;
+    }
+  });
+
+  it('returns {ok:false} when docRef.update throws synchronously and REST is unavailable', async () => {
+    // update throws synchronously; make REST also fail so the terminal result is {ok:false}
+    global.fetch = () => Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve('boom') });
+    const docRef = {
+      path: 'users/u/months/2026-05',
+      update: () => { throw new Error('sync boom'); },
+      set: () => Promise.resolve(),
+    };
+    const result = await writeFieldUpdates(docRef, { updates: { 'entries.k': { v: 1 } } });
+    expect(result.ok).toBe(false);
+    expect(typeof result.error).toBe('string');
+  });
+
+  it('falls back to REST when docRef.update throws synchronously (REST ok)', async () => {
+    let fetched = false;
+    global.fetch = (url, init) => { fetched = true; return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) }); };
+    const docRef = {
+      path: 'users/u/months/2026-05',
+      update: () => { throw new Error('sync boom'); },
+      set: () => Promise.resolve(),
+    };
+    const result = await writeFieldUpdates(docRef, { updates: { 'entries.k': { v: 1 } } });
+    expect(result.ok).toBe(true);
+    expect(result.via).toBe('rest');
+    expect(fetched).toBe(true);
+  });
 });

@@ -59,31 +59,47 @@ export async function writeFieldUpdates(docRef, { updates = {}, deletes = [] } =
     return { ok: true, skipped: true };
   }
 
-  const fb = window.firebase;
-  const { FieldPath, FieldValue } = fb.firestore;
-
-  // 2. Build the SDK varargs: (FieldPath, value, FieldPath, value, ...).
-  const sdkArgs = [];
-  for (const dotted of updateKeys) {
-    sdkArgs.push(new FieldPath(...pathToSegments(dotted)), updates[dotted]);
-  }
-  for (const dotted of deletes) {
-    sdkArgs.push(new FieldPath(...pathToSegments(dotted)), FieldValue.delete());
-  }
-
   // Race the SDK update against a timeout. Resolve with a tagged outcome so we
   // can tell apart success, rejection (and its error), and timeout.
-  let timer;
-  const outcome = await Promise.race([
-    docRef
-      .update(...sdkArgs)
-      .then(() => ({ status: 'ok' }))
-      .catch(err => ({ status: 'error', err })),
-    new Promise(resolve => {
-      timer = setTimeout(() => resolve({ status: 'timeout' }), timeoutMs);
-    }),
-  ]);
-  clearTimeout(timer);
+  //
+  // The entire SDK attempt — reading window.firebase, constructing FieldPath/
+  // FieldValue, and invoking docRef.update(...) — is wrapped in try/catch so
+  // that ANY synchronous throw (undefined window.firebase, a FieldPath ctor
+  // that throws, or a docRef.update that throws synchronously) is caught and
+  // routed to the same handling as a generic SDK error, rather than escaping
+  // the function and violating the never-throw contract. The update() call is
+  // wrapped in Promise.resolve().then(...) so a sync throw surfaces as a
+  // rejected promise inside the race instead of escaping it.
+  let outcome;
+  try {
+    const fb = window.firebase;
+    const { FieldPath, FieldValue } = fb.firestore;
+
+    // 2. Build the SDK varargs: (FieldPath, value, FieldPath, value, ...).
+    const sdkArgs = [];
+    for (const dotted of updateKeys) {
+      sdkArgs.push(new FieldPath(...pathToSegments(dotted)), updates[dotted]);
+    }
+    for (const dotted of deletes) {
+      sdkArgs.push(new FieldPath(...pathToSegments(dotted)), FieldValue.delete());
+    }
+
+    let timer;
+    outcome = await Promise.race([
+      Promise.resolve()
+        .then(() => docRef.update(...sdkArgs))
+        .then(() => ({ status: 'ok' }))
+        .catch(err => ({ status: 'error', err })),
+      new Promise(resolve => {
+        timer = setTimeout(() => resolve({ status: 'timeout' }), timeoutMs);
+      }),
+    ]);
+    clearTimeout(timer);
+  } catch (err) {
+    // Any synchronous throw from the SDK attempt (undefined window.firebase,
+    // FieldPath ctor, etc.) -> treat like a generic SDK error -> REST fallback.
+    outcome = { status: 'error', err };
+  }
 
   // 3. SDK success.
   if (outcome.status === 'ok') {
@@ -103,6 +119,11 @@ export async function writeFieldUpdates(docRef, { updates = {}, deletes = [] } =
   }
 
   // 5. Generic error or timeout -> REST fallback.
+  //    Known accepted trade-off on timeout: the SDK update() is not
+  //    cancellable, so a slow SDK write may still land after the REST write.
+  //    Same-payload writes are idempotent (harmless); the only residual risk is
+  //    a late SDK *delete* landing after the same key was re-added — low
+  //    probability for this single-user app, accepted for now.
   return restFallback(docRef, updates, deletes);
 }
 
@@ -131,7 +152,10 @@ async function restFallback(docRef, updates, deletes) {
     if (response.ok) {
       return { ok: true, via: 'rest' };
     }
-    throw new Error('REST PATCH ' + response.status);
+    const body = typeof response.text === 'function'
+      ? await response.text().catch(() => '')
+      : '';
+    throw new Error('REST PATCH ' + response.status + ' ' + body);
   } catch (err) {
     // 6. REST failed too -> let the caller (outbox) decide. Do not throw.
     return { ok: false, error: err && err.message ? err.message : String(err) };
