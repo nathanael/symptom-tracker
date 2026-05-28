@@ -651,18 +651,14 @@ export default class SyncEngine {
     // those pendingChanges as-is, the Firestore set({merge:true}) replaces the
     // domain field and destroys cloud-only keys. Pre-flush merge re-reads the
     // cloud and unions by per-key _t before writing.
-    const mergedDuringPreflush = await this._preFlushMerge(changes);
-
-    // Reflect the post-merge result back into React state so localStorage and
-    // the next user edit start from the union — otherwise the next flush would
-    // re-stamp local-only entries and ping-pong.
-    if (mergedDuringPreflush && this.onCloudUpdate) {
-      const updates = {};
-      changes.forEach((data, domain) => { updates[domain] = data; });
-      if (Object.keys(updates).length > 0) {
-        this.onCloudUpdate(updates, false);
-      }
-    }
+    //
+    // We deliberately do NOT call onCloudUpdate to push the merged result
+    // back into React state — doing so triggers applyCloudData every flush,
+    // which fires the >50% shrink guard on single-domain updates (cloudTotal
+    // for one domain ≪ localTotal), saves a snapshot per flush, and was
+    // visibly undoing user edits (e.g., supplement hide reverting after the
+    // 500ms debounce). The post-write listener echo will sync local state.
+    await this._preFlushMerge(changes);
 
     // Build the Firestore update payload
     const payload = {};
@@ -947,16 +943,11 @@ export default class SyncEngine {
       this._dirtyDomains.clear();
       this.pendingChanges.clear();
       this._persistDirty();
-
-      // If pre-merge brought in cloud-side keys, sync them back to React state
-      // so the user sees what was actually pushed.
-      if (mergedFromCloud && this.onCloudUpdate) {
-        const updates = {};
-        SYNC_DOMAINS.forEach(d => { if (toWrite[d] !== undefined) updates[d] = toWrite[d]; });
-        if (Object.keys(updates).length > 0) {
-          this.onCloudUpdate(updates, false);
-        }
-      }
+      // Listener echo will resync React state with the cloud-side merged
+      // result. We don't call onCloudUpdate here for the same reason as flush:
+      // single-domain updates trigger the >50% shrink guard, which both
+      // saves spurious snapshots and (when not aborting) can race with the
+      // user's just-committed local edit.
     } catch (error) {
       console.error('SyncEngine: forcePush failed', error);
       this.syncError = error.message;
