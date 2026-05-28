@@ -206,6 +206,49 @@ function App() {
   const deferredEntries = useDeferredValue(entries);
   const deferredStackEntries = useDeferredValue(stackEntries);
 
+  // URL action shortcut: handles ?action=push or ?action=pull-merge so a
+  // recovery can be a single bookmark/click instead of navigating Settings.
+  // Runs once when the engine is ready.
+  const urlActionRanRef = useRef(false);
+  useEffect(() => {
+    if (urlActionRanRef.current || !sync.isReady) return;
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    if (!action) return;
+    urlActionRanRef.current = true;
+
+    const clearAction = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('action');
+      window.history.replaceState({}, '', url.toString());
+    };
+
+    (async () => {
+      if (action === 'push') {
+        if (!confirm('Push this device\'s local data to cloud now? (Overwrites cloud with what this device has.)')) {
+          clearAction();
+          return;
+        }
+        await sync.forcePush({
+          symptoms, entries, dailyNotes, stackItems, stackEntries,
+          pinnedSymptoms: [...pinnedSymptoms], trackingMode, inputItems, inputEntries,
+        });
+        alert('Push complete. Cloud now has this device\'s data.');
+        clearAction();
+      } else if (action === 'pull-merge') {
+        const result = await sync.forcePull({ destructive: false });
+        if (result) {
+          const total = Object.values(result.summary).reduce((a, b) => a + b, 0);
+          alert(`Merge complete. Cloud had ${total} items; merged with local (snapshot saved as ${result.snapshotId}).`);
+        } else {
+          alert('Pull failed — see console.');
+        }
+        clearAction();
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sync.isReady]);
+
   // Reset scroll when switching views
   useEffect(() => {
     if (scrollContainerRef.current) {

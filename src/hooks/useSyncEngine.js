@@ -45,6 +45,15 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       }
       if (cloudTotal > 0 && localTotal > 0 && cloudTotal < localTotal * 0.95) {
         saveSnapshot(forceReplace ? 'preCloudReplace' : 'preCloudShrink');
+        // Hard guard: a merge (non-destructive) path must never reduce total
+        // local items by more than 50%. If we'd shrink that much, abort —
+        // a merge that drops half the data is almost certainly a bug or a
+        // garbage cloud doc.
+        if (!forceReplace && cloudTotal < localTotal * 0.5) {
+          console.warn('[Sync] aborting merge that would shrink local by >50%',
+            { localTotal, cloudTotal });
+          return;
+        }
       }
     } catch (e) {
       console.warn('[Sync] safety snapshot failed:', e);
