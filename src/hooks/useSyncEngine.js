@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import SyncEngine from '../sync/SyncEngine';
+import { saveSnapshot, listSnapshots, restoreSnapshot, bootSnapshotIfStale } from '../utils/snapshots';
 
 /**
  * React hook that bridges SyncEngine to component state.
@@ -144,6 +145,10 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       return;
     }
 
+    // Always take a boot snapshot before the engine touches anything. Cheap,
+    // and gives the user a recovery point from before any sync activity.
+    bootSnapshotIfStale();
+
     // Create new engine
     const engine = new SyncEngine(uid, applyCloudData);
 
@@ -222,17 +227,20 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     return Promise.resolve();
   }, []);
 
-  const forcePull = useCallback(() => {
+  const forcePull = useCallback((opts) => {
     if (engineRef.current) {
-      return engineRef.current.forcePull();
+      return engineRef.current.forcePull(opts);
     }
-    return Promise.resolve();
+    return Promise.resolve(null);
   }, []);
 
   return {
     notifyChange,
     forcePush,
     forcePull,
+    saveSnapshot,
+    listSnapshots,
+    restoreSnapshot,
     syncing: syncStatus.syncing,
     lastSynced: syncStatus.lastSynced,
     syncError: syncStatus.syncError,

@@ -1,4 +1,5 @@
 import { getFirebaseDb } from '../utils/firebase';
+import { saveSnapshot } from '../utils/snapshots';
 
 export const SYNC_DOMAINS = [
   'symptoms',
@@ -849,19 +850,25 @@ export default class SyncEngine {
   }
 
   /**
-   * Destructive pull: fetch cloud and *replace* local state for every domain
-   * the cloud has. No merge, no timestamp comparison — cloud wins entirely.
-   * Returns a summary so the UI can show the user exactly what was applied.
+   * Pull cloud data. Safe by default: takes a local snapshot first, then
+   * merges cloud with local using per-key _t timestamps (keys present only
+   * locally are preserved). Pass {destructive:true} to instead replace local
+   * state entirely with cloud — only use after the user confirms.
    *
-   * Use case: user has watched their browser disagree with their phone for
-   * a while, wants the cloud's authoritative view, and accepts losing any
-   * local edits that never flushed.
+   * Returns { summary, snapshotId, destructive } so the UI can tell the user
+   * exactly what happened and how to roll back.
    */
-  async forcePull() {
+  async forcePull({ destructive = false } = {}) {
     if (this._destroyed) return null;
     this.syncing = true;
     this.syncError = null;
     this._notifyStatus();
+
+    // ALWAYS snapshot first, even for the merge path — Pull has historically
+    // been the operation most likely to lose data and the cost of a snapshot
+    // is negligible.
+    const snapshotId = saveSnapshot(destructive ? 'preForcePullReplace' : 'preForcePullMerge');
+
     try {
       const data = await this._restApiGet();
       if (!data) throw new Error('Could not fetch cloud document');
@@ -880,18 +887,19 @@ export default class SyncEngine {
           : (decoded != null ? 1 : 0);
       });
 
-      // Clear any pending in-memory state — user asked for cloud's truth.
-      this.pendingChanges.clear();
-      this._dirtyDomains.clear();
+      if (destructive) {
+        this.pendingChanges.clear();
+        this._dirtyDomains.clear();
+      }
 
-      log('forcePull: cloud doc summary:', summary);
+      log('forcePull:', destructive ? 'REPLACE' : 'MERGE', 'summary:', summary, 'snapshot:', snapshotId);
       this.lastSynced = new Date();
 
       if (Object.keys(updates).length > 0) {
-        // 3rd arg = forceReplace: skip merge, set state to cloud directly.
-        this.onCloudUpdate(updates, false, true);
+        // 3rd arg = forceReplace: destructive caller only.
+        this.onCloudUpdate(updates, false, destructive);
       }
-      return summary;
+      return { summary, snapshotId, destructive };
     } catch (error) {
       console.error('SyncEngine: forcePull failed', error);
       this.syncError = error.message;
@@ -900,6 +908,16 @@ export default class SyncEngine {
       this.syncing = false;
       this._notifyStatus();
     }
+  }
+
+  /**
+   * Force-push also snapshots first so the user can roll back if force-push
+   * sent the wrong device's data to cloud.
+   */
+  async forcePushSafe(allData) {
+    const snapshotId = saveSnapshot('preForcePush');
+    log('forcePush: snapshot saved as', snapshotId);
+    return this.forcePush(allData);
   }
 
   /**

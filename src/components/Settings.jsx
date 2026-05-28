@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { trackingModes } from '../utils/constants';
 import { isStandalone, getDateKey, haptic, generateAIDataExport } from '../utils/helpers';
 import { mergeSupplements, previewMerge, renameSupplement, deleteSupplement, previewDelete } from '../utils/supplementTools';
+import { listSnapshots, restoreSnapshot, saveSnapshot } from '../utils/snapshots';
 
 export default function Settings({
   user,
@@ -69,6 +70,96 @@ export default function Settings({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const [showRestore, setShowRestore] = useState(false);
+  const [snapshots, setSnapshots] = useState([]);
+  const [confirmRestoreId, setConfirmRestoreId] = useState(null);
+  const [pullPreview, setPullPreview] = useState(null);
+  const [pullBusy, setPullBusy] = useState(false);
+
+  const refreshSnapshots = () => setSnapshots(listSnapshots());
+
+  const handlePullMerge = async () => {
+    if (!onForcePull || pullBusy) return;
+    setPullBusy(true);
+    try {
+      const result = await onForcePull({ destructive: false });
+      if (!result) {
+        alert('Pull failed — cloud fetch returned nothing.');
+        return;
+      }
+      const total = Object.values(result.summary).reduce((a, b) => a + b, 0);
+      const detail = Object.entries(result.summary).map(([d, n]) => `${d}=${n}`).join(' ');
+      setCopyToastMessage?.(`Pulled (merge) ${total}: ${detail}`);
+      setTimeout(() => setCopyToastMessage?.(''), 5000);
+    } finally {
+      setPullBusy(false);
+    }
+  };
+
+  const handlePullReplacePreview = async () => {
+    if (pullBusy) return;
+    setPullBusy(true);
+    try {
+      // Fetch cloud, show what would change, do NOT apply yet
+      const user = window.firebase?.auth().currentUser;
+      if (!user) { alert('Not signed in'); return; }
+      const doc = await window.firebase.firestore().collection('users').doc(user.uid).get({ source: 'server' });
+      const c = doc.data();
+      if (!c) { alert('Cloud doc not found'); return; }
+      const pre = {};
+      for (const [name, k] of Object.entries({
+        symptoms: 'symptomTracker_symptoms', entries: 'symptomTracker_entries',
+        dailyNotes: 'symptomTracker_notes', stackItems: 'symptomTracker_stackItems',
+        stackEntries: 'symptomTracker_stackEntries', pinnedSymptoms: 'symptomTracker_pinned',
+        trackingMode: 'symptomTracker_mode', inputItems: 'symptomTracker_inputItems',
+        inputEntries: 'symptomTracker_inputEntries',
+      })) {
+        let cv = c[name]; try { if (typeof cv === 'string') cv = JSON.parse(cv); } catch {}
+        let lv = null; try { lv = JSON.parse(localStorage.getItem(k) || 'null'); } catch {}
+        const sz = v => Array.isArray(v) ? v.length : (v && typeof v === 'object') ? Object.keys(v).length : (v != null ? 1 : 0);
+        pre[name] = { cloud: sz(cv), local: sz(lv) };
+      }
+      setPullPreview(pre);
+    } finally {
+      setPullBusy(false);
+    }
+  };
+
+  const handlePullReplaceConfirm = async () => {
+    if (!onForcePull) return;
+    setPullBusy(true);
+    try {
+      const result = await onForcePull({ destructive: true });
+      if (!result) {
+        alert('Pull failed');
+        return;
+      }
+      const total = Object.values(result.summary).reduce((a, b) => a + b, 0);
+      setCopyToastMessage?.(`REPLACED with cloud (${total} items). Snapshot saved as ${result.snapshotId}.`);
+      setTimeout(() => setCopyToastMessage?.(''), 8000);
+      setPullPreview(null);
+    } finally {
+      setPullBusy(false);
+    }
+  };
+
+  const handleRestore = (id) => {
+    if (confirmRestoreId !== id) {
+      setConfirmRestoreId(id);
+      return;
+    }
+    // Save a snapshot of the CURRENT state before restoring, in case the
+    // restore turns out to be wrong too.
+    saveSnapshot('preRestore');
+    const ok = restoreSnapshot(id);
+    if (!ok) {
+      alert('Restore failed');
+      return;
+    }
+    alert('Restored. Reloading…');
+    window.location.reload();
+  };
 
   const mergePreview = (mergeTarget && mergeSource && mergeTarget !== mergeSource)
     ? previewMerge(stackEntries, mergeTarget, mergeSource)
@@ -433,41 +524,26 @@ export default function Settings({
                   {syncing ? 'Syncing...' : 'Sync Now'}
                 </button>
                 <button
-                  onClick={async () => {
-                    // Loud fallback: alert proves the click fires even if toast/log are wired wrong.
-                    const haveCb = typeof onForcePull === 'function';
-                    const haveToast = typeof setCopyToastMessage === 'function';
-                    console.log('[Pull] click fired. onForcePull=', haveCb, 'setCopyToast=', haveToast);
-                    if (!haveCb) {
-                      alert('Pull: onForcePull prop is missing — wiring bug. See console.');
-                      return;
-                    }
-                    if (haveToast) setCopyToastMessage('Pulling…');
-                    let summary;
-                    try {
-                      summary = await onForcePull();
-                    } catch (e) {
-                      console.error('[Pull] threw:', e);
-                      alert(`Pull error: ${e.message}`);
-                      return;
-                    }
-                    console.log('[Pull] summary=', summary);
-                    if (!summary) {
-                      alert('Pull returned null — Firestore fetch failed. Open console for details.');
-                      return;
-                    }
-                    const total = Object.values(summary).reduce((a, b) => a + b, 0);
-                    const detail = Object.entries(summary)
-                      .filter(([, n]) => n > 0)
-                      .map(([d, n]) => `${d}=${n}`).join(' ');
-                    const msg = `Pulled ${total}: ${detail || '(empty)'}`;
-                    if (haveToast) {
-                      setCopyToastMessage(msg);
-                      setTimeout(() => setCopyToastMessage(''), 5000);
-                    } else {
-                      alert(msg);
-                    }
+                  onClick={handlePullMerge}
+                  disabled={pullBusy}
+                  title="Fetches cloud and merges with your local data (cloud + local both preserved, newer wins per entry). Snapshot saved automatically."
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #334155',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    color: '#cbd5e1',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: pullBusy ? 'not-allowed' : 'pointer',
+                    opacity: pullBusy ? 0.6 : 1,
                   }}
+                >
+                  {pullBusy ? 'Pulling…' : 'Pull (merge)'}
+                </button>
+                <button
+                  onClick={() => { refreshSnapshots(); setShowRestore(s => !s); }}
+                  title="Restore from a local snapshot taken automatically before each Pull/Push."
                   style={{
                     background: 'transparent',
                     border: '1px solid #334155',
@@ -479,7 +555,7 @@ export default function Settings({
                     cursor: 'pointer',
                   }}
                 >
-                  Pull
+                  Restore…
                 </button>
                 <button
                   onClick={signOut}
@@ -523,16 +599,145 @@ export default function Settings({
                 </div>
               )}
 
+              {showRestore && (
+                <div style={{
+                  marginTop: '14px',
+                  background: '#0f1115',
+                  border: '1px solid #1e293b',
+                  borderRadius: '10px',
+                  padding: '12px',
+                }}>
+                  <div style={{ color: '#cbd5e1', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+                    Local snapshots
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '10px' }}>
+                    Auto-saved before each Pull/Push and at app boot. Restoring overwrites
+                    your current local data with the snapshot, then reloads.
+                  </div>
+                  {snapshots.length === 0 ? (
+                    <div style={{ color: '#64748b', fontSize: '12px' }}>No snapshots yet.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {snapshots.map(s => (
+                        <div key={s.id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 8px',
+                          background: '#0a0c10',
+                          borderRadius: '6px',
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ color: '#cbd5e1', fontSize: '13px' }}>
+                              {new Date(s.ts).toLocaleString()}
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '11px' }}>
+                              {s.label} · {s.itemCount} items
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleRestore(s.id)}
+                            style={{
+                              background: confirmRestoreId === s.id ? '#ef4444' : 'transparent',
+                              border: `1px solid ${confirmRestoreId === s.id ? '#ef4444' : '#334155'}`,
+                              borderRadius: '6px',
+                              padding: '6px 10px',
+                              color: confirmRestoreId === s.id ? '#fff' : '#cbd5e1',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {confirmRestoreId === s.id ? 'Confirm?' : 'Restore'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => { saveSnapshot('manual'); refreshSnapshots(); }}
+                    style={{
+                      marginTop: '8px',
+                      background: 'transparent',
+                      border: '1px solid #334155',
+                      borderRadius: '6px',
+                      padding: '6px 10px',
+                      color: '#cbd5e1',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Save snapshot now
+                  </button>
+                </div>
+              )}
+
+              {pullPreview && (
+                <div style={{
+                  marginTop: '14px',
+                  background: '#1f1318',
+                  border: '1px solid #7f1d1d',
+                  borderRadius: '10px',
+                  padding: '12px',
+                }}>
+                  <div style={{ color: '#fca5a5', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>
+                    Destructive replace preview
+                  </div>
+                  <div style={{ color: '#cbd5e1', fontSize: '12px', marginBottom: '8px' }}>
+                    Cloud vs local item counts. After Replace, your local data becomes the cloud column.
+                    A snapshot is saved first so you can restore.
+                  </div>
+                  <table style={{ width: '100%', fontSize: '12px', color: '#cbd5e1' }}>
+                    <thead style={{ color: '#64748b' }}>
+                      <tr><th align="left">domain</th><th align="right">cloud</th><th align="right">local</th></tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(pullPreview).map(([d, v]) => (
+                        <tr key={d} style={{ color: v.cloud < v.local ? '#fca5a5' : '#cbd5e1' }}>
+                          <td>{d}</td>
+                          <td align="right">{v.cloud}</td>
+                          <td align="right">{v.local}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                    <button
+                      onClick={handlePullReplaceConfirm}
+                      disabled={pullBusy}
+                      style={{
+                        background: '#ef4444',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '8px 12px',
+                        color: '#fff',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: pullBusy ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Replace local with cloud
+                    </button>
+                    <button
+                      onClick={() => setPullPreview(null)}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid #334155',
+                        borderRadius: '6px',
+                        padding: '8px 12px',
+                        color: '#cbd5e1',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <button
-                onClick={() => {
-                  if (confirm('This will clear local data and reload from the cloud. Continue?')) {
-                    const keys = Object.keys(localStorage).filter(k => k.startsWith('symptomTracker_') || k.startsWith('syncDirty_'));
-                    keys.forEach(k => localStorage.removeItem(k));
-                    setLastAction('Local data cleared, reloading...');
-                    setTimeout(() => location.reload(), 500);
-                  }
-                }}
-                disabled={syncing}
+                onClick={handlePullReplacePreview}
+                disabled={pullBusy}
                 style={{
                   marginTop: '10px',
                   background: 'transparent',
@@ -540,11 +745,11 @@ export default function Settings({
                   padding: 0,
                   color: '#64748b',
                   fontSize: '12px',
-                  cursor: syncing ? 'not-allowed' : 'pointer',
-                  opacity: syncing ? 0.5 : 1,
+                  cursor: pullBusy ? 'not-allowed' : 'pointer',
+                  opacity: pullBusy ? 0.5 : 1,
                 }}
               >
-                Force pull from cloud
+                Replace local with cloud… (destructive)
               </button>
             </>
           ) : (
@@ -1298,7 +1503,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.3.2
+              v5.4.0
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}
