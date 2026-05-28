@@ -1,5 +1,6 @@
 import { getFirebaseDb } from '../utils/firebase';
 import { saveSnapshot } from '../utils/snapshots';
+import { firestoreValueToJs, jsToFirestoreValue } from './firestoreRest';
 
 export const SYNC_DOMAINS = [
   'symptoms',
@@ -85,49 +86,6 @@ const withTimeout = (promise, ms = WRITE_TIMEOUT_MS) =>
     promise.then(() => 'ok'),
     new Promise(resolve => setTimeout(() => resolve('timeout'), ms)),
   ]);
-
-/** Convert a Firestore REST API value back to a JS value. */
-function firestoreValueToJs(value) {
-  if (value === null || value === undefined) return null;
-  if ('nullValue' in value) return null;
-  if ('booleanValue' in value) return value.booleanValue;
-  if ('integerValue' in value) return Number(value.integerValue);
-  if ('doubleValue' in value) return value.doubleValue;
-  if ('stringValue' in value) return value.stringValue;
-  if ('timestampValue' in value) return { toDate: () => new Date(value.timestampValue) };
-  if ('arrayValue' in value) {
-    return (value.arrayValue.values || []).map(firestoreValueToJs);
-  }
-  if ('mapValue' in value) {
-    const result = {};
-    for (const [k, v] of Object.entries(value.mapValue.fields || {})) {
-      result[k] = firestoreValueToJs(v);
-    }
-    return result;
-  }
-  return null;
-}
-
-/** Convert a JS value to Firestore REST API value format. */
-function jsToFirestoreValue(value) {
-  if (value === null || value === undefined) return { nullValue: null };
-  if (typeof value === 'boolean') return { booleanValue: value };
-  if (typeof value === 'number') {
-    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
-  }
-  if (typeof value === 'string') return { stringValue: value };
-  if (Array.isArray(value)) {
-    return { arrayValue: { values: value.map(jsToFirestoreValue) } };
-  }
-  if (typeof value === 'object') {
-    const fields = {};
-    for (const [k, v] of Object.entries(value)) {
-      fields[k] = jsToFirestoreValue(v);
-    }
-    return { mapValue: { fields } };
-  }
-  return { stringValue: String(value) };
-}
 
 export default class SyncEngine {
   constructor(uid, onCloudUpdate) {
