@@ -135,9 +135,20 @@ export default class SyncEngineV2 {
     this._now = Date.now;
 
     // Parity with the old engine; status notification is optional here.
+    this.syncing = false;
     this.lastSynced = null;
     this.syncError = null;
     this.onStatusChange = null;
+  }
+
+  // Emit the current status to the React hook (if wired). Mirrors the old
+  // SyncEngine's _notifyStatus() so syncing/lastSynced/syncError surface live.
+  _notifyStatus() {
+    this.onStatusChange?.({
+      syncing: this.syncing,
+      lastSynced: this.lastSynced,
+      syncError: this.syncError,
+    });
   }
 
   // --- Write path -----------------------------------------------------------
@@ -418,6 +429,8 @@ export default class SyncEngineV2 {
 
   async _doFlush(paths) {
     this._flushing = true;
+    this.syncing = true;
+    this._notifyStatus();
     // Snapshot and clear pending so edits during the flush queue separately.
     const pending = this._pending;
     this._pending = {};
@@ -466,11 +479,15 @@ export default class SyncEngineV2 {
           // memory. The outbox survives reload; replayOutbox() retries it on
           // the next flush cycle / boot / reconnect with the same _t-guard.
           // We do NOT also keep it in _pending — that would double-write.
+          // We deliberately do NOT set a syncError here: a queued offline write
+          // is normal, not a genuine sync failure to surface in the UI.
           this._persistToOutbox(entry);
         }
       }
     } finally {
       this._flushing = false;
+      this.syncing = false;
+      this._notifyStatus();
     }
 
     // If new edits (or re-queues) arrived, schedule another flush.
@@ -759,10 +776,17 @@ export default class SyncEngineV2 {
   async forcePush(allData) {
     saveSnapshot('preForcePush');
     if (!allData || typeof allData !== 'object') return;
-    for (const domain of Object.keys(allData)) {
-      this.notifyLocalChange(domain, allData[domain]);
+    this.syncing = true;
+    this._notifyStatus();
+    try {
+      for (const domain of Object.keys(allData)) {
+        this.notifyLocalChange(domain, allData[domain]);
+      }
+      await this.flushNow();
+    } finally {
+      this.syncing = false;
+      this._notifyStatus();
     }
-    await this.flushNow();
   }
 
   /**
@@ -781,33 +805,40 @@ export default class SyncEngineV2 {
   async forcePull({ destructive = false } = {}) {
     const snapshotId = saveSnapshot(destructive ? 'preForcePullReplace' : 'preForcePullMerge');
 
-    const { definitionsData, monthDocs } = await this._readCloud();
-    if (this._destroyed) return { summary: {}, snapshotId, destructive };
+    this.syncing = true;
+    this._notifyStatus();
+    try {
+      const { definitionsData, monthDocs } = await this._readCloud();
+      if (this._destroyed) return { summary: {}, snapshotId, destructive };
 
-    // Refresh raw caches + shadow so the listener diffs against current cloud.
-    this._rawMonths = monthDocs;
-    this._rawDefs = definitionsData;
-    const { domains, shadow } = assembleDomainsFromDocs(definitionsData, monthDocs);
-    this._shadow = shadow;
+      // Refresh raw caches + shadow so the listener diffs against current cloud.
+      this._rawMonths = monthDocs;
+      this._rawDefs = definitionsData;
+      const { domains, shadow } = assembleDomainsFromDocs(definitionsData, monthDocs);
+      this._shadow = shadow;
 
-    // Per-domain counts for the Settings toast (array length / key count /
-    // scalar present = 1).
-    const summary = {};
-    for (const domain of Object.keys(domains)) {
-      const value = domains[domain];
-      if (Array.isArray(value)) summary[domain] = value.length;
-      else if (value && typeof value === 'object') summary[domain] = Object.keys(value).length;
-      else summary[domain] = value != null ? 1 : 0;
+      // Per-domain counts for the Settings toast (array length / key count /
+      // scalar present = 1).
+      const summary = {};
+      for (const domain of Object.keys(domains)) {
+        const value = domains[domain];
+        if (Array.isArray(value)) summary[domain] = value.length;
+        else if (value && typeof value === 'object') summary[domain] = Object.keys(value).length;
+        else summary[domain] = value != null ? 1 : 0;
+      }
+
+      if (destructive) {
+        this.onCloudUpdate(domains, false, { replace: true });
+      } else {
+        this.onCloudUpdate(domains, false, { deletes: {} });
+      }
+      this.lastSynced = new Date();
+
+      return { summary, snapshotId, destructive };
+    } finally {
+      this.syncing = false;
+      this._notifyStatus();
     }
-
-    if (destructive) {
-      this.onCloudUpdate(domains, false, { replace: true });
-    } else {
-      this.onCloudUpdate(domains, false, { deletes: {} });
-    }
-    this.lastSynced = new Date();
-
-    return { summary, snapshotId, destructive };
   }
 
   /**
@@ -846,6 +877,7 @@ export default class SyncEngineV2 {
   _onListenError(err) {
     // Capture and never throw — a listener error must not crash the app.
     this.syncError = err && err.message ? err.message : String(err);
+    this._notifyStatus();
   }
 
   /**
