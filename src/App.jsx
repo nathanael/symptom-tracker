@@ -4,6 +4,7 @@ import { useFirebase } from './hooks/useFirebase';
 import { useSyncEngine } from './hooks/useSyncEngine';
 import { useDesktopMode } from './hooks/useMediaQuery';
 import { useGarminSync } from './hooks/useGarminSync';
+import { detectDataShrink, restoreSnapshot } from './utils/snapshots';
 import {
   STORAGE_KEY_SYMPTOMS,
   STORAGE_KEY_ENTRIES,
@@ -161,6 +162,10 @@ function App() {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showSymptomGraph, setShowSymptomGraph] = useState(null);
   const [showSupplementGraph, setShowSupplementGraph] = useState(null);
+
+  // Detect possible data loss at boot — if any snapshot has substantially
+  // more items than current localStorage, surface a one-click restore banner.
+  const [dataLossSnapshot, setDataLossSnapshot] = useState(() => detectDataShrink(0.7));
 
   // UI state
   const [lastAction, setLastAction] = useState('');
@@ -1267,6 +1272,75 @@ function App() {
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* Data-loss banner: detected current localStorage has shrunk vs newest snapshot */}
+      {dataLossSnapshot && (
+        <div style={{
+          position: 'fixed',
+          top: 'calc(20px + env(safe-area-inset-top))',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          maxWidth: 'calc(100vw - 40px)',
+          background: '#7f1d1d',
+          color: '#fff',
+          padding: '14px 18px',
+          borderRadius: '10px',
+          fontSize: '13px',
+          zIndex: 3000,
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+        }}>
+          <div style={{ fontWeight: '600', fontSize: '14px' }}>
+            Possible data loss detected
+          </div>
+          <div style={{ fontSize: '13px', lineHeight: '1.4' }}>
+            You currently have <b>{dataLossSnapshot.currentCount}</b> items, but a snapshot from{' '}
+            {new Date(dataLossSnapshot.ts).toLocaleString()} ({dataLossSnapshot.label}) has{' '}
+            <b>{dataLossSnapshot.itemCount}</b>. Restore it?
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => {
+                const ok = restoreSnapshot(dataLossSnapshot.id);
+                if (ok) {
+                  alert('Restored. Reloading.');
+                  window.location.reload();
+                } else {
+                  alert('Restore failed.');
+                }
+              }}
+              style={{
+                background: '#fff',
+                color: '#7f1d1d',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '8px 14px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              Restore snapshot
+            </button>
+            <button
+              onClick={() => setDataLossSnapshot(null)}
+              style={{
+                background: 'transparent',
+                color: '#fecaca',
+                border: '1px solid #fecaca',
+                borderRadius: '6px',
+                padding: '8px 14px',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 

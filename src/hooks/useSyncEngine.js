@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import SyncEngine from '../sync/SyncEngine';
-import { saveSnapshot, listSnapshots, restoreSnapshot, bootSnapshotIfStale } from '../utils/snapshots';
+import { saveSnapshot, listSnapshots, restoreSnapshot, bootSnapshotIfStale, currentItemCount } from '../utils/snapshots';
 
 /**
  * React hook that bridges SyncEngine to component state.
@@ -33,6 +33,23 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
   // hooks — React guarantees declaration-order effect execution within a component,
   // so the reset runs after all useLocalStorage effects have checked the flag.
   const applyCloudData = useCallback((updates, isInitial, forceReplace = false) => {
+    // Belt-and-braces: if the incoming cloud data would meaningfully reduce
+    // total local item count, snapshot first. Cheap, covers any path
+    // (init, listener, polling, forcePull) that calls applyCloudData.
+    try {
+      const localTotal = currentItemCount();
+      let cloudTotal = 0;
+      for (const [domain, data] of Object.entries(updates)) {
+        if (Array.isArray(data)) cloudTotal += data.length;
+        else if (data && typeof data === 'object') cloudTotal += Object.keys(data).length;
+      }
+      if (cloudTotal > 0 && localTotal > 0 && cloudTotal < localTotal * 0.95) {
+        saveSnapshot(forceReplace ? 'preCloudReplace' : 'preCloudShrink');
+      }
+    } catch (e) {
+      console.warn('[Sync] safety snapshot failed:', e);
+    }
+
     const cloudRef = cloudRefRef.current;
     if (cloudRef) {
       cloudRef.current = true;

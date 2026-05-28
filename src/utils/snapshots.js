@@ -144,11 +144,57 @@ function pruneOldSnapshots() {
  * Take a boot snapshot if the most recent existing snapshot is older than
  * a threshold. Cheap to call on every app load.
  */
-export function bootSnapshotIfStale(thresholdMs = 6 * 60 * 60 * 1000) {
+export function bootSnapshotIfStale(thresholdMs = 60 * 60 * 1000) {
   const snaps = listSnapshots();
   const newest = snaps[0];
   if (!newest || (Date.now() - newest.ts) > thresholdMs) {
     return saveSnapshot('boot');
+  }
+  return null;
+}
+
+/**
+ * Compute total tracked item count for the CURRENT localStorage state.
+ */
+export function currentItemCount() {
+  return totalKeyCount(readTrackedKeys());
+}
+
+/**
+ * Detect a suspicious data shrink: look at the newest snapshot, and if the
+ * current item count is significantly smaller than its snapshot count,
+ * return the snapshot so the caller can offer restoration.
+ *
+ * @param {number} ratio - fraction below which we consider it "shrunk".
+ *   0.7 means: current < 70% of snapshot total → return the snapshot.
+ * @returns {{id, ts, label, itemCount, currentCount} | null}
+ */
+export function detectDataShrink(ratio = 0.7) {
+  const snaps = listSnapshots();
+  if (snaps.length === 0) return null;
+  const current = currentItemCount();
+  // Find newest snapshot strictly bigger than current
+  for (const s of snaps) {
+    if (s.itemCount > 0 && current < s.itemCount * ratio) {
+      return { ...s, currentCount: current };
+    }
+  }
+  return null;
+}
+
+/**
+ * Take an opportunistic snapshot before a cloud apply if it would shrink
+ * the local item count materially. This catches the "cloud has less than
+ * local, snapshot must be saved before we accept cloud" case without
+ * requiring every caller to remember.
+ *
+ * @param {number} projectedItemCount - the total item count the local state
+ *   would have AFTER the cloud apply.
+ */
+export function snapshotBeforeShrink(projectedItemCount, label = 'preCloudApply') {
+  const current = currentItemCount();
+  if (projectedItemCount < current * 0.95) {
+    return saveSnapshot(label);
   }
   return null;
 }
