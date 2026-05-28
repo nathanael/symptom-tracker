@@ -9,6 +9,33 @@
 
 import { getFirebaseDb } from '../utils/firebase';
 import { assembleDomainsFromDocs } from './hydrate';
+import { equalIgnoringT } from './changeDiff';
+import { MAP_DOMAINS } from './domains';
+
+// Definition domains stored as id-keyed maps in the shadow (so remote deletes
+// of individual records can be detected the same way map domains are).
+const ID_MAP_DOMAINS = ['symptoms', 'stackItems', 'inputItems'];
+
+// Compare two flat maps ({ key: value+_t }) for equality, ignoring `_t`.
+function mapsEqual(a, b) {
+  const ka = Object.keys(a || {});
+  const kb = Object.keys(b || {});
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    if (!(k in b)) return false;
+    if (!equalIgnoringT(a[k], b[k])) return false;
+  }
+  return true;
+}
+
+// Keys present in `oldMap` but absent in `newMap` — i.e. remote deletions.
+function deletedKeys(oldMap, newMap) {
+  const out = [];
+  for (const k of Object.keys(oldMap || {})) {
+    if (!newMap || !(k in newMap)) out.push(k);
+  }
+  return out;
+}
 
 /**
  * Whether the assembled domains carry ANY real data.
@@ -43,8 +70,18 @@ export default class SyncEngineV2 {
     this.uid = uid;
     this.onCloudUpdate = onCloudUpdate;
 
-    // Per-domain last-synced view, used for diffing on the write path (later).
+    // Per-domain last-synced view, used for diffing on the write path (later)
+    // and for echo suppression / remote-delete detection on the listener.
     this._shadow = {};
+
+    // Raw caches seeded during initialize and refreshed on each snapshot, so
+    // any single snapshot can re-assemble the FULL cloud state.
+    this._rawMonths = []; // array of { id, data }
+    this._rawDefs = null; // definitions doc data object (or null)
+
+    // Listener unsubscribe functions.
+    this._unsubMonths = null;
+    this._unsubDefs = null;
 
     this._ready = false;
     this._destroyed = false;
@@ -86,6 +123,10 @@ export default class SyncEngineV2 {
       const monthDocs = monthsSnap.docs.map((d) => ({ id: d.id, data: d.data() }));
       const definitionsData = defSnap.exists ? defSnap.data() : null;
 
+      // Seed the raw caches so the first listener diff has a baseline.
+      this._rawMonths = monthDocs;
+      this._rawDefs = definitionsData;
+
       const { domains, shadow } = assembleDomainsFromDocs(definitionsData, monthDocs);
       this._shadow = shadow;
 
@@ -94,6 +135,10 @@ export default class SyncEngineV2 {
       }
 
       this._ready = true;
+
+      // Begin watching for cloud changes (guarded inside).
+      this._startListening();
+
       return { domains, shadow };
     } catch (err) {
       this.syncError = err.message;
@@ -102,13 +147,134 @@ export default class SyncEngineV2 {
     }
   }
 
+  /**
+   * Subscribe to the months collection and the definitions doc. On each
+   * snapshot we re-assemble the full cloud state and diff it against our
+   * shadow; only cloud-side changes are emitted to React. Idempotent-ish:
+   * guarded against missing db / destroyed engine.
+   */
+  _startListening() {
+    if (this._destroyed) return;
+    const db = getFirebaseDb();
+    if (!db) return;
+
+    const userDoc = db.collection('users').doc(this.uid);
+    const monthsRef = userDoc.collection('months');
+    const defRef = userDoc.collection('meta').doc('definitions');
+
+    // Defensive: only subscribe when the ref actually exposes onSnapshot.
+    if (typeof monthsRef.onSnapshot === 'function') {
+      this._unsubMonths = monthsRef.onSnapshot(
+        (snap) => this._onCloudChanged('months', snap),
+        (err) => this._onListenError(err),
+      );
+    }
+    if (typeof defRef.onSnapshot === 'function') {
+      this._unsubDefs = defRef.onSnapshot(
+        (snap) => this._onCloudChanged('defs', snap),
+        (err) => this._onListenError(err),
+      );
+    }
+  }
+
+  _onListenError(err) {
+    // Capture and never throw — a listener error must not crash the app.
+    this.syncError = err && err.message ? err.message : String(err);
+  }
+
+  /**
+   * Handle a snapshot from either source. Refresh the relevant raw cache,
+   * re-assemble the FULL cloud state, suppress echoes (no-op when the new
+   * cloud equals our shadow), then emit only the cloud-side changes plus a
+   * per-domain list of REMOTE deletes (keys/ids that left the cloud).
+   */
+  _onCloudChanged(source, snap) {
+    if (this._destroyed) return;
+
+    // 1. Update the relevant raw cache.
+    if (source === 'months') {
+      this._rawMonths = (snap.docs || []).map((d) => ({ id: d.id, data: d.data() }));
+    } else {
+      this._rawDefs = snap && snap.exists ? snap.data() : null;
+    }
+
+    // 2. Re-assemble the full cloud state.
+    const { domains, shadow: newShadow } = assembleDomainsFromDocs(
+      this._rawDefs,
+      this._rawMonths,
+    );
+
+    // 3. Echo suppression: identical to our shadow → do nothing.
+    if (this._shadowsEqual(this._shadow, newShadow)) return;
+
+    // 4. Compute remote deletes per domain from (old cloud) MINUS (new cloud).
+    //    Deletes are derived ONLY from the shadow diff — never from local
+    //    state — so the engine can never instruct deletion of a local-only
+    //    pending key it never had in its shadow (clobber guard).
+    const deletes = {};
+    for (const domain of [...MAP_DOMAINS, ...ID_MAP_DOMAINS]) {
+      const removed = deletedKeys(this._shadow[domain], newShadow[domain]);
+      if (removed.length > 0) deletes[domain] = removed;
+    }
+
+    // 5. Emit the full assembled cloud state + deletes.
+    this.onCloudUpdate(domains, false, { deletes });
+
+    // 6. Advance the shadow and stamp last-synced.
+    this._shadow = newShadow;
+    this.lastSynced = new Date();
+  }
+
+  /**
+   * Deep-equal two shadow objects, ignoring `_t`. Map + id-map domains compare
+   * by key set and per-key equalIgnoringT; pinnedSymptoms by array equality;
+   * trackingMode by equalIgnoringT (objects) or scalar equality. Private.
+   */
+  _shadowsEqual(a, b) {
+    a = a || {};
+    b = b || {};
+
+    for (const domain of [...MAP_DOMAINS, ...ID_MAP_DOMAINS]) {
+      if (!mapsEqual(a[domain] || {}, b[domain] || {})) return false;
+    }
+
+    // pinnedSymptoms: plain array, order-sensitive.
+    const pa = a.pinnedSymptoms || [];
+    const pb = b.pinnedSymptoms || [];
+    if (pa.length !== pb.length) return false;
+    for (let i = 0; i < pa.length; i++) {
+      if (pa[i] !== pb[i]) return false;
+    }
+
+    // trackingMode: may be absent, a scalar, or a { value, _t } object.
+    const ta = a.trackingMode;
+    const tb = b.trackingMode;
+    if (ta == null && tb == null) {
+      // both absent — equal
+    } else if (ta == null || tb == null) {
+      return false;
+    } else if (typeof ta === 'object' && typeof tb === 'object') {
+      if (!equalIgnoringT(ta, tb)) return false;
+    } else if (ta !== tb) {
+      return false;
+    }
+
+    return true;
+  }
+
   isReady() {
     return this._ready;
   }
 
   destroy() {
-    // Listener teardown comes in Task 10; just set the flag so an in-flight
-    // hydrate skips its emit.
     this._destroyed = true;
+    if (this._unsubMonths) {
+      this._unsubMonths();
+      this._unsubMonths = null;
+    }
+    if (this._unsubDefs) {
+      this._unsubDefs();
+      this._unsubDefs = null;
+    }
   }
 }
