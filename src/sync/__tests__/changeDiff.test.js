@@ -79,6 +79,37 @@ describe('equalIgnoringT', () => {
   });
 });
 
+describe('equalIgnoringT — order insensitivity & edge cases', () => {
+  it('treats nested objects with different key order as equal', () => {
+    expect(equalIgnoringT(
+      { changes: { from: 1, to: 2 }, _t: 1 },
+      { changes: { to: 2, from: 1 }, _t: 9 },
+    )).toBe(true);
+  });
+
+  it('treats deeply nested reordered keys as equal', () => {
+    expect(equalIgnoringT(
+      { history: [{ type: 'updated', changes: { name: { from: 'a', to: 'b' } } }] },
+      { history: [{ changes: { name: { to: 'b', from: 'a' } }, type: 'updated' }] },
+    )).toBe(true);
+  });
+
+  it('still detects a real nested value difference', () => {
+    expect(equalIgnoringT(
+      { changes: { from: 1, to: 2 } },
+      { changes: { from: 1, to: 3 } },
+    )).toBe(false);
+  });
+
+  it('treats array order as significant (arrays are ordered)', () => {
+    expect(equalIgnoringT({ h: [1, 2] }, { h: [2, 1] })).toBe(false);
+  });
+
+  it('distinguishes null from missing key', () => {
+    expect(equalIgnoringT({ verdict: null }, {})).toBe(false);
+  });
+});
+
 describe('diffIdMapDomain', () => {
   it('detects new id entries as changed and stamps _t', () => {
     const { changed, deleted } = diffIdMapDomain(
@@ -96,5 +127,13 @@ describe('diffIdMapDomain', () => {
       T);
     expect(changed).toEqual({});
     expect(deleted).toEqual(['b']);
+  });
+
+  it('diffIdMapDomain ignores nested key-order churn on history objects', () => {
+    const prev = { 'b1': { id: 'b1', name: 'B1', history: [{ type: 'updated', changes: { active: { from: true, to: false } } }], _t: 5 } };
+    const next = { 'b1': { id: 'b1', name: 'B1', history: [{ changes: { active: { to: false, from: true } }, type: 'updated' }], _t: 5 } };
+    const { changed, deleted } = diffIdMapDomain(prev, next, 1000);
+    expect(changed).toEqual({});
+    expect(deleted).toEqual([]);
   });
 });
