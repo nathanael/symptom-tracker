@@ -643,10 +643,25 @@ export default class SyncEngine {
     const changes = new Map(this.pendingChanges);
     this.pendingChanges.clear();
 
-    // Safety: if we haven't received recent server data, do a pre-flush read
-    // to merge cloud data into our changes, preventing stale overwrites.
-    if (!this._hasServerData || !this._listenerWorking) {
-      await this._preFlushMerge(changes);
+    // ALWAYS pre-flush merge with cloud, even when the listener is healthy.
+    // Reason: there is a race where the listener delivers cloud-side keys and
+    // applyCloudData merges them into React state, but isApplyingCloudRef is
+    // true during that apply so useLocalStorage skips notifyLocalChange and
+    // pendingChanges never picks up the cloud-side keys. If we then flush
+    // those pendingChanges as-is, the Firestore set({merge:true}) replaces the
+    // domain field and destroys cloud-only keys. Pre-flush merge re-reads the
+    // cloud and unions by per-key _t before writing.
+    const mergedDuringPreflush = await this._preFlushMerge(changes);
+
+    // Reflect the post-merge result back into React state so localStorage and
+    // the next user edit start from the union — otherwise the next flush would
+    // re-stamp local-only entries and ping-pong.
+    if (mergedDuringPreflush && this.onCloudUpdate) {
+      const updates = {};
+      changes.forEach((data, domain) => { updates[domain] = data; });
+      if (Object.keys(updates).length > 0) {
+        this.onCloudUpdate(updates, false);
+      }
     }
 
     // Build the Firestore update payload
@@ -723,46 +738,88 @@ export default class SyncEngine {
   }
 
   /**
+   * Per-key/per-id _t-based merge: latest write wins per key, all keys preserved.
+   * This is the same merge the React side uses (mergeMapByTime/mergeArrayByTime)
+   * applied here so flushes never overwrite cloud-side keys this device hasn't
+   * seen yet.
+   *
+   * For non-map/non-array domains (scalars like trackingMode) we keep `local`
+   * since the caller decided to flush it.
+   */
+  _tMergeForFlush(domain, cloud, local) {
+    const tOf = (v) => (v && typeof v === 'object' && typeof v._t === 'number') ? v._t : 0;
+
+    if (MAP_DOMAINS.has(domain) && cloud && typeof cloud === 'object' && !Array.isArray(cloud)
+        && local && typeof local === 'object' && !Array.isArray(local)) {
+      const merged = {};
+      const keys = new Set([...Object.keys(cloud), ...Object.keys(local)]);
+      for (const k of keys) {
+        const c = cloud[k];
+        const l = local[k];
+        if (c === undefined) merged[k] = l;
+        else if (l === undefined) merged[k] = c;
+        else merged[k] = tOf(l) >= tOf(c) ? l : c;
+      }
+      return merged;
+    }
+
+    if (ARRAY_ID_DOMAINS.has(domain) && Array.isArray(cloud) && Array.isArray(local)) {
+      const byId = new Map();
+      for (const it of cloud) { if (it && it.id != null) byId.set(it.id, it); }
+      for (const it of local) {
+        if (!it || it.id == null) continue;
+        const existing = byId.get(it.id);
+        if (!existing || tOf(it) >= tOf(existing)) byId.set(it.id, it);
+      }
+      return [...byId.values()];
+    }
+
+    return local;
+  }
+
+  /**
    * Pre-flush safety read: fetch the latest cloud data and merge into the
-   * changes we're about to flush. Prevents stale local data from overwriting
-   * fresh cloud data when the streaming listener isn't delivering updates.
+   * changes we're about to flush. Uses per-key/per-id _t merge so cloud-only
+   * keys are preserved even when the listener has already delivered them but
+   * the user's pendingChanges (built from React state at edit time) haven't
+   * caught up. This is what prevents the catastrophic case where Device B
+   * overwrites Device A's just-pushed key K because B's listener fired after
+   * B's edit was queued.
+   *
+   * Returns true if the merge actually changed any flushed domain (so callers
+   * can re-apply to React state).
    */
   async _preFlushMerge(changes) {
+    let mutated = false;
     try {
       const cloudData = await this._restApiGet();
-      if (!cloudData) return;
+      if (!cloudData) return false;
 
       log('Pre-flush merge: got cloud data, merging into', [...changes.keys()]);
 
       changes.forEach((localData, domain) => {
         if (cloudData[domain] === undefined) return;
         const decoded = decodeDomain(domain, cloudData[domain]);
-
-        if (MAP_DOMAINS.has(domain) && typeof decoded === 'object' && decoded !== null) {
-          // Cloud as base, local on top
-          changes.set(domain, { ...decoded, ...localData });
-        } else if (ARRAY_ID_DOMAINS.has(domain) && Array.isArray(decoded) && Array.isArray(localData)) {
-          // ID-based merge: cloud as base, local items win for conflicts
-          const cloudById = new Map(decoded.map(i => [i.id, i]));
-          const localById = new Map(localData.map(i => [i.id, i]));
-          const merged = new Map(cloudById);
-          localById.forEach((item, id) => merged.set(id, item));
-          changes.set(domain, [...merged.values()]);
+        const before = localData;
+        const merged = this._tMergeForFlush(domain, decoded, localData);
+        if (merged !== before) {
+          changes.set(domain, merged);
+          mutated = true;
         }
-        // For other domains (scalars), local wins entirely — no merge needed
 
-        // Also update version to at least match cloud
+        // Also update version to at least match cloud so our write supersedes it.
         const cloudVersion = (typeof cloudData[`_v_${domain}`] === 'number')
           ? cloudData[`_v_${domain}`] : 0;
         if (cloudVersion >= this.versions[domain]) {
           this.versions[domain] = cloudVersion + 1;
         }
+        // Cache the cloud-side view so subsequent _stampChanges has the right baseline.
+        this._lastAppliedCloud[domain] = decoded;
       });
     } catch (e) {
       log('Pre-flush merge failed (continuing with local data):', e.message);
-      // If the read fails, flush proceeds with local data only.
-      // This is acceptable — better to flush potentially stale data than lose the user's changes.
     }
+    return mutated;
   }
 
   /**
@@ -779,25 +836,75 @@ export default class SyncEngine {
   }
 
   /**
-   * Force-push ALL local data to the server, overriding version checks.
+   * Push local data to the server. SAFE by default: pre-merges with cloud
+   * (per-key _t merge) so cloud-only keys are preserved. This is what
+   * "Sync Now" calls, and it must never destroy data the user has on another
+   * device.
+   *
+   * Pass {destructive: true} to bypass the pre-merge and write the supplied
+   * local data verbatim. Only the "Replace cloud with local" path should use
+   * that, and only after a user confirmation.
+   *
    * Uses the Firestore REST API directly (via fetch) to bypass the SDK's
-   * broken streaming channel — the SDK's set() hangs when the gRPC/WebSocket
-   * channel is down, but regular HTTP requests work fine.
+   * streaming channel which sometimes hangs.
+   *
    * @param {Object} allData - Map of domain name to current local data
+   * @param {{destructive?: boolean}} opts
    */
-  async forcePush(allData) {
+  async forcePush(allData, opts = {}) {
     if (this._destroyed) return;
+    const { destructive = false } = opts;
+
+    // Snapshot first — every push that touches cloud is a candidate for the
+    // user to want to undo.
+    saveSnapshot(destructive ? 'preForcePushReplace' : 'preForcePush');
 
     this.syncing = true;
     this.syncError = null;
     this._notifyStatus();
 
+    // Build a merged view: cloud + local, picking newer _t per key. For the
+    // destructive path we skip this and push `allData` as-is.
+    let toWrite = { ...allData };
+    let mergedFromCloud = false;
+    if (!destructive) {
+      try {
+        const cloudData = await this._restApiGet();
+        if (cloudData) {
+          SYNC_DOMAINS.forEach(domain => {
+            const local = allData[domain];
+            const cloudRaw = cloudData[domain];
+            if (cloudRaw === undefined) return;
+            const cloud = decodeDomain(domain, cloudRaw);
+            if (local === undefined) {
+              toWrite[domain] = cloud;
+              mergedFromCloud = true;
+              return;
+            }
+            const merged = this._tMergeForFlush(domain, cloud, local);
+            if (merged !== local) {
+              toWrite[domain] = merged;
+              mergedFromCloud = true;
+            }
+            const cloudVersion = (typeof cloudData[`_v_${domain}`] === 'number')
+              ? cloudData[`_v_${domain}`] : 0;
+            if (cloudVersion >= this.versions[domain]) {
+              this.versions[domain] = cloudVersion;
+            }
+          });
+        }
+      } catch (e) {
+        log('forcePush pre-merge failed (continuing with local only):', e.message);
+      }
+    }
+
     const payload = {};
     SYNC_DOMAINS.forEach(domain => {
-      if (allData[domain] !== undefined) {
-        payload[domain] = encodeDomain(domain, allData[domain]);
+      if (toWrite[domain] !== undefined) {
+        payload[domain] = encodeDomain(domain, toWrite[domain]);
         this.versions[domain] = (this.versions[domain] || 0) + 100;
         payload[`_v_${domain}`] = this.versions[domain];
+        this._lastAppliedCloud[domain] = toWrite[domain];
       }
     });
 
@@ -840,6 +947,16 @@ export default class SyncEngine {
       this._dirtyDomains.clear();
       this.pendingChanges.clear();
       this._persistDirty();
+
+      // If pre-merge brought in cloud-side keys, sync them back to React state
+      // so the user sees what was actually pushed.
+      if (mergedFromCloud && this.onCloudUpdate) {
+        const updates = {};
+        SYNC_DOMAINS.forEach(d => { if (toWrite[d] !== undefined) updates[d] = toWrite[d]; });
+        if (Object.keys(updates).length > 0) {
+          this.onCloudUpdate(updates, false);
+        }
+      }
     } catch (error) {
       console.error('SyncEngine: forcePush failed', error);
       this.syncError = error.message;
