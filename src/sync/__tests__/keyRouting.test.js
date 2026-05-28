@@ -25,6 +25,11 @@ describe('keyRouting', () => {
     });
   });
 
+  it('drops keys with no valid date prefix when grouping', () => {
+    const grouped = groupKeysByMonth(['2026-05-28-a', 'junk', '']);
+    expect(grouped).toEqual({ '2026-05': ['2026-05-28-a'] });
+  });
+
   it('exposes a YYYY-MM month matcher', () => {
     expect(MONTH_RE.test('2026-05')).toBe(true);
     expect(MONTH_RE.test('2026-5')).toBe(false);
