@@ -1405,7 +1405,7 @@ export default function Settings({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json"
+            accept="application/json,.json,*/*"
             onChange={restoreFromFile}
             style={{ display: 'none' }}
           />
@@ -1517,7 +1517,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.4.3
+              v5.4.4
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

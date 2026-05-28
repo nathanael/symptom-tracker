@@ -166,6 +166,8 @@ function App() {
   // Detect possible data loss at boot — if any snapshot has substantially
   // more items than current localStorage, surface a one-click restore banner.
   const [dataLossSnapshot, setDataLossSnapshot] = useState(() => detectDataShrink(0.7));
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const recoveryFileInputRef = useRef(null);
 
   // UI state
   const [lastAction, setLastAction] = useState('');
@@ -245,14 +247,11 @@ function App() {
         }
         clearAction();
       } else if (action === 'load-backup') {
-        // Open settings + file picker immediately for one-tap backup restore.
-        setShowSettings(true);
+        // Show a dedicated recovery modal with a giant tappable button — iOS
+        // Safari blocks programmatic file-picker clicks, so we MUST wait for
+        // a direct user gesture.
+        setShowRecoveryModal(true);
         clearAction();
-        // The file input lives inside Settings; give the modal a beat to mount.
-        setTimeout(() => {
-          const input = document.querySelector('input[type="file"][accept=".json"]');
-          if (input) input.click();
-        }, 300);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1324,6 +1323,141 @@ function App() {
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* Recovery modal — opened via ?action=load-backup URL. Big tappable
+          button triggers the file picker via a direct user gesture (iOS Safari
+          requires this for programmatic .click() on file inputs). */}
+      {showRecoveryModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          zIndex: 4000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+        }}>
+          <div style={{
+            background: '#0f1115',
+            border: '1px solid #334155',
+            borderRadius: '14px',
+            padding: '24px',
+            maxWidth: '480px',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          }}>
+            <div style={{ color: '#f8fafc', fontSize: '20px', fontWeight: '700' }}>
+              Restore from backup
+            </div>
+            <div style={{ color: '#cbd5e1', fontSize: '14px', lineHeight: '1.5' }}>
+              Tap the button below, then pick your backup JSON file from
+              <b> Files → iCloud Drive → Downloads</b>. The merge is additive —
+              your existing entries are kept, missing ones are restored.
+            </div>
+            <label
+              htmlFor="recovery-file-input"
+              style={{
+                display: 'block',
+                background: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '18px 20px',
+                color: '#fff',
+                fontSize: '16px',
+                fontWeight: '700',
+                textAlign: 'center',
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              Choose backup file
+            </label>
+            <input
+              id="recovery-file-input"
+              ref={recoveryFileInputRef}
+              type="file"
+              style={{ display: 'none' }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  try {
+                    const backup = JSON.parse(e.target.result);
+                    const counts = { added: 0, kept: 0 };
+                    if (backup.symptoms) setSymptoms(prev => {
+                      const map = new Map(prev.map(s => [s.id, s]));
+                      backup.symptoms.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); counts.added++; } else counts.kept++; });
+                      return Array.from(map.values());
+                    });
+                    if (backup.entries) setEntries(prev => {
+                      const m = { ...prev };
+                      Object.entries(backup.entries).forEach(([k, v]) => { if (!m[k]) { m[k] = v; counts.added++; } else counts.kept++; });
+                      return m;
+                    });
+                    if (backup.dailyNotes) setDailyNotes(prev => {
+                      const m = { ...prev };
+                      Object.entries(backup.dailyNotes).forEach(([k, v]) => { if (!m[k]) { m[k] = v; counts.added++; } else counts.kept++; });
+                      return m;
+                    });
+                    if (backup.stackItems) setStackItems(prev => {
+                      const map = new Map(prev.map(s => [s.id, s]));
+                      backup.stackItems.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); counts.added++; } else counts.kept++; });
+                      return Array.from(map.values());
+                    });
+                    if (backup.stackEntries) setStackEntries(prev => {
+                      const m = { ...prev };
+                      Object.entries(backup.stackEntries).forEach(([k, v]) => { if (!m[k]) { m[k] = v; counts.added++; } else counts.kept++; });
+                      return m;
+                    });
+                    if (backup.inputItems) setInputItems(prev => {
+                      const map = new Map(prev.map(s => [s.id, s]));
+                      backup.inputItems.forEach(s => { if (!map.has(s.id)) { map.set(s.id, s); counts.added++; } else counts.kept++; });
+                      return Array.from(map.values());
+                    });
+                    if (backup.inputEntries) setInputEntries(prev => {
+                      const m = { ...prev };
+                      Object.entries(backup.inputEntries).forEach(([k, v]) => { if (!m[k]) { m[k] = v; counts.added++; } else counts.kept++; });
+                      return m;
+                    });
+                    if (backup.trackingMode) setTrackingMode(backup.trackingMode);
+                    if (backup.pinnedSymptoms) setPinnedSymptoms(new Set(backup.pinnedSymptoms));
+                    alert(`Restore complete.\n\nAdded: ${counts.added}\nAlready present: ${counts.kept}\n\nBackup exported: ${backup.exportedAt || '(unknown)'}\nApp version: ${backup.version || '(unknown)'}`);
+                    setShowRecoveryModal(false);
+                  } catch (err) {
+                    alert(`Error: ${err.message}\n\nMake sure you selected a valid JSON backup file.`);
+                  }
+                };
+                reader.onerror = () => alert('FileReader error: could not read the file.');
+                reader.readAsText(file);
+                event.target.value = '';
+              }}
+            />
+            <button
+              onClick={() => setShowRecoveryModal(false)}
+              style={{
+                background: 'transparent',
+                border: '1px solid #334155',
+                borderRadius: '8px',
+                padding: '10px',
+                color: '#cbd5e1',
+                fontSize: '14px',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <div style={{ color: '#64748b', fontSize: '12px', lineHeight: '1.4' }}>
+              Doesn't show your .json file? Tap "Browse" in the file picker and
+              navigate manually. If the file is grayed out, your iCloud is
+              still downloading it — wait a few seconds and try again.
+            </div>
+          </div>
         </div>
       )}
 
