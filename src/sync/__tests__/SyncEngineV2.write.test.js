@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// --- Mock localStorage (the durable outbox persists failed flushes here). ---
+const localStorageMock = (() => {
+  let store = {};
+  return {
+    getItem: vi.fn((key) => (key in store ? store[key] : null)),
+    setItem: vi.fn((key, val) => { store[key] = String(val); }),
+    removeItem: vi.fn((key) => { delete store[key]; }),
+    clear: () => { store = {}; },
+  };
+})();
+Object.defineProperty(global, 'localStorage', { value: localStorageMock, writable: true });
+
 // --- Mock the field writer so we control its result and assert its args. ---
 vi.mock('../fieldWriter', () => ({
   writeFieldUpdates: vi.fn(() => Promise.resolve({ ok: true, via: 'sdk' })),
@@ -40,6 +52,20 @@ function buildMockDb() {
   };
   return {
     collection: vi.fn(() => ({ doc: vi.fn(() => userDocRef) })),
+    // Outbox replay rebuilds refs from a full path; map them back to the same
+    // identity-stable refs the write path uses so .path-based assertions match.
+    doc: vi.fn((fullPath) => {
+      if (fullPath === defDocRef.path) return defDocRef;
+      const monthId = fullPath.split('/').pop();
+      if (!monthDocRefs[monthId]) {
+        monthDocRefs[monthId] = {
+          path: `users/test-user/months/${monthId}`,
+          __kind: 'month',
+          __month: monthId,
+        };
+      }
+      return monthDocRefs[monthId];
+    }),
   };
 }
 
@@ -49,6 +75,7 @@ vi.mock('../../utils/firebase', () => ({
 
 import SyncEngineV2 from '../SyncEngineV2';
 import { writeFieldUpdates } from '../fieldWriter';
+import { listOps } from '../outbox';
 
 describe('SyncEngineV2 — granular write path', () => {
   let engine;
@@ -57,6 +84,7 @@ describe('SyncEngineV2 — granular write path', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorageMock.clear();
     writeFieldUpdates.mockImplementation(() => Promise.resolve({ ok: true, via: 'sdk' }));
     cloudUpdates = [];
     mockDbValue = buildMockDb();
@@ -226,23 +254,23 @@ describe('SyncEngineV2 — granular write path', () => {
     expect(call[1].deletes || []).toEqual([]);
   });
 
-  it('Test 10: {ok:false} re-queues the pending write for retry', async () => {
+  it('Test 10: {ok:false} persists the write to the durable outbox; replay retries it', async () => {
     makeEngine({ entries: {} });
     writeFieldUpdates.mockImplementationOnce(() => Promise.resolve({ ok: false, error: 'boom' }));
 
-    // Use single-attempt flush() (not the draining flushNow) to observe the
-    // re-queue/retry mechanism one attempt at a time.
     engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1 } });
     await engine.flush();
     expect(writeFieldUpdates).toHaveBeenCalledTimes(1);
-    // Failed write was re-queued.
-    expect(Object.keys(engine._pending).length).toBe(1);
+    // Failed write is durably queued in the outbox, NOT kept in memory.
+    expect(Object.keys(engine._pending).length).toBe(0);
+    expect(listOps()).toHaveLength(1);
 
-    // A subsequent flush retries the same write (now succeeds).
-    await engine.flush();
+    // replayOutbox retries the same write (now succeeds) and clears the outbox.
+    await engine.replayOutbox();
     expect(writeFieldUpdates).toHaveBeenCalledTimes(2);
     const retry = writeFieldUpdates.mock.calls[1];
     expect(retry[1].updates).toEqual({ 'entries.2026-03-15-a': { v: 1, _t: FIXED_NOW } });
+    expect(listOps()).toHaveLength(0);
   });
 
   it('Test 11: no-op — data deep-equal to shadow does not write', async () => {
@@ -288,17 +316,20 @@ describe('SyncEngineV2 — granular write path', () => {
     expect(Object.keys(engine._pending).length).toBe(0);
   });
 
-  it('Fix1: flushNow drain is bounded (does not spin forever on a re-queuing failure)', async () => {
+  it('Fix1: flushNow drain is bounded (a failed write moves to the durable outbox, not an in-memory spin)', async () => {
     makeEngine({ entries: {} });
-    // Every write fails → entry is re-queued every time. flushNow must stop
-    // after a bounded number of drain iterations rather than spinning forever.
+    // Every write fails. With the durable outbox, a failed flush no longer
+    // re-queues in memory — it persists to the outbox and clears _pending — so
+    // flushNow terminates naturally instead of spinning, and the call count is
+    // bounded.
     writeFieldUpdates.mockImplementation(() => Promise.resolve({ ok: false, error: 'boom' }));
 
     engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1 } });
     await engine.flushNow(); // must resolve (bounded), not hang.
 
-    // Still pending (durable outbox is Task 12) but the call count is bounded.
-    expect(Object.keys(engine._pending).length).toBeGreaterThan(0);
+    // Nothing left in memory; the failed write is durably persisted instead.
+    expect(Object.keys(engine._pending).length).toBe(0);
+    expect(listOps()).toHaveLength(1);
     expect(writeFieldUpdates.mock.calls.length).toBeLessThanOrEqual(6);
   });
 

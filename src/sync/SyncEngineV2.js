@@ -14,6 +14,7 @@ import { arrayToIdMap } from './definitionShape';
 import { groupKeysByMonth } from './keyRouting';
 import { writeFieldUpdates } from './fieldWriter';
 import { MAP_DOMAINS } from './domains';
+import { enqueueOp, listOps, removeOp } from './outbox';
 
 // Definition domains stored as id-keyed maps in the shadow (so remote deletes
 // of individual records can be detected the same way map domains are).
@@ -362,9 +363,11 @@ export default class SyncEngineV2 {
    * never fire before the page unloads — a lost edit. Instead we drain: await
    * any in-flight flush, then flush again, until nothing is pending.
    *
-   * Bounded: a flush that fails re-queues the SAME pending repeatedly, which
-   * would spin this loop forever. We cap drain iterations (the durable outbox
-   * in Task 12 is the real safety net for persistent failures).
+   * Bounded: a failed flush now persists the doc to the durable outbox and
+   * clears _pending (rather than re-queuing in memory), so this loop terminates
+   * naturally; we still cap drain iterations as belt-and-suspenders. The outbox
+   * (replayed on reconnect / next boot) is the real safety net for persistent
+   * failures.
    */
   async flushNow() {
     if (this._flushTimer) {
@@ -392,8 +395,9 @@ export default class SyncEngineV2 {
   /**
    * Issue one writeFieldUpdates per pending doc. On success, fold the staged
    * shadow changes into a FRESH shadow object (never mutating the existing
-   * shadow maps, which may alias React's hydrated state). On failure, re-queue
-   * the doc's updates/deletes for a later retry (the offline outbox is Task 12).
+   * shadow maps, which may alias React's hydrated state). On failure, persist
+   * the doc's updates/deletes to the durable outbox for a later replay (never
+   * kept in memory, to avoid a double write).
    */
   async flush() {
     if (!this._ready) return;
@@ -430,12 +434,8 @@ export default class SyncEngineV2 {
         for (const fieldPath of [...entry.deletes]) {
           const { domain, key } = this._domainKeyForDelete(entry, fieldPath);
           if (!domain) continue;
-          const current = (this._shadow[domain] || {})[key];
           const baseT = entry.deleteBaseT[fieldPath] || 0;
-          if (
-            current && typeof current === 'object' &&
-            typeof current._t === 'number' && current._t > baseT
-          ) {
+          if (this._deleteIsStale(domain, key, baseT)) {
             // Newer remote version arrived after the delete decision — skip.
             entry.deletes.delete(fieldPath);
             delete entry.deleteBaseT[fieldPath];
@@ -461,7 +461,11 @@ export default class SyncEngineV2 {
           this._applyShadow(entry);
           this.lastSynced = new Date();
         } else {
-          this._requeue(entry);
+          // Failure: persist to the DURABLE outbox instead of re-queuing in
+          // memory. The outbox survives reload; replayOutbox() retries it on
+          // the next flush cycle / boot / reconnect with the same _t-guard.
+          // We do NOT also keep it in _pending — that would double-write.
+          this._persistToOutbox(entry);
         }
       }
     } finally {
@@ -491,6 +495,164 @@ export default class SyncEngineV2 {
     return { domain, key };
   }
 
+  /**
+   * Shared _t-guard for DELETES, used by both the live flush and outbox replay.
+   * A pending/queued delete carries the base `_t` of the shadow record at the
+   * time the user decided to delete it. If a NEWER remote write has since
+   * advanced the shadow, the delete decision is stale and would destroy that
+   * newer data — so it must be skipped. Returns true when the delete is stale.
+   */
+  _deleteIsStale(domain, key, baseT) {
+    const current = (this._shadow[domain] || {})[key];
+    return !!(
+      current && typeof current === 'object' &&
+      typeof current._t === 'number' && current._t > (baseT || 0)
+    );
+  }
+
+  /**
+   * Shared _t-guard for UPDATES on replay. If the engine's current shadow
+   * already holds a record for (domain,key) with `_t` >= the queued value's
+   * `_t`, the cloud already has same-or-newer data and the queued update must
+   * be dropped (it would otherwise resurrect/clobber with stale data). Returns
+   * true when the update is stale. Values without a numeric `_t` are never
+   * considered stale (we cannot reason about ordering, so we let them through).
+   */
+  _updateIsStale(domain, key, value) {
+    if (!value || typeof value !== 'object' || typeof value._t !== 'number') return false;
+    const current = (this._shadow[domain] || {})[key];
+    return !!(
+      current && typeof current === 'object' &&
+      typeof current._t === 'number' && current._t >= value._t
+    );
+  }
+
+  // Resolve the (domain, key) an update fieldPath targets — same mapping as
+  // _domainKeyForDelete (a write and a delete on the same key share a fieldPath
+  // shape). Returns { domain: null } when unresolvable.
+  _domainKeyForUpdate(fieldPath) {
+    return this._domainKeyForDelete(null, fieldPath);
+  }
+
+  // Persist a failed flush entry to the durable outbox. Field shape mirrors the
+  // live pending entry so replay can re-derive (domain,key) the same way.
+  _persistToOutbox(entry) {
+    enqueueOp({
+      docPath: entry.ref.path,
+      updates: entry.updates,
+      deletes: [...entry.deletes],
+      deleteBaseT: entry.deleteBaseT,
+      ts: this._now(),
+    });
+  }
+
+  // Rebuild a Firestore doc ref from a stored full path. The compat SDK's
+  // db.doc(fullPath) accepts even-segment doc paths — month docs
+  // (users/uid/months/YYYY-MM = 4 segments) and the definitions doc
+  // (users/uid/meta/definitions = 4 segments) both qualify.
+  _docRefForPath(path) {
+    const db = getFirebaseDb();
+    if (!db || typeof db.doc !== 'function') return null;
+    return db.doc(path);
+  }
+
+  /**
+   * Replay durably-queued failed writes (oldest-first). For each op we apply
+   * the SAME _t-guards the live flush uses (via _updateIsStale/_deleteIsStale)
+   * so a stale op can never clobber newer cloud data. A guarded op that ends up
+   * empty is simply removed. A successful write applies the staged shadow
+   * changes (reusing _applyShadow) and removes the op; a failed write leaves it
+   * for the next attempt. Never throws.
+   */
+  async replayOutbox() {
+    const db = getFirebaseDb();
+    if (!db || this._destroyed) return;
+
+    let ops;
+    try {
+      ops = listOps();
+    } catch {
+      return; // outbox guards corruption itself, but be doubly safe.
+    }
+
+    for (const op of ops) {
+      if (this._destroyed) return;
+
+      const ref = this._docRefForPath(op.docPath);
+      if (!ref) continue;
+
+      // Re-derive a flush-shaped entry so we can reuse _applyShadow on success.
+      const entry = {
+        ref,
+        updates: {},
+        deletes: new Set(),
+        deleteBaseT: {},
+        shadowChanges: {},
+        shadowDeletes: {},
+        shadowWhole: {},
+      };
+
+      // Guard UPDATES: drop any fieldPath the shadow already has same-or-newer.
+      for (const [fieldPath, value] of Object.entries(op.updates || {})) {
+        const { domain, key } = this._domainKeyForUpdate(fieldPath);
+        if (domain && this._updateIsStale(domain, key, value)) continue;
+        entry.updates[fieldPath] = value;
+        if (domain) {
+          if (key == null) {
+            // Whole-field domain (pinnedSymptoms / trackingMode-style); stage
+            // as shadowWhole so _applyShadow records it.
+            entry.shadowWhole[domain] = value;
+          } else {
+            const sc = entry.shadowChanges[domain] || (entry.shadowChanges[domain] = {});
+            sc[key] = value;
+          }
+        } else {
+          // Unresolved domain (e.g. whole-field paths with no dot). Stage as
+          // shadowWhole keyed by the raw field so the cloud write still lands.
+          entry.shadowWhole[fieldPath] = value;
+        }
+      }
+
+      // Guard DELETES: skip any the shadow now has newer than the recorded base.
+      for (const fieldPath of op.deletes || []) {
+        const { domain, key } = this._domainKeyForDelete(null, fieldPath);
+        const baseT = (op.deleteBaseT && op.deleteBaseT[fieldPath]) || 0;
+        if (domain && this._deleteIsStale(domain, key, baseT)) continue;
+        entry.deletes.add(fieldPath);
+        if (domain) {
+          const sd = entry.shadowDeletes[domain] || (entry.shadowDeletes[domain] = []);
+          if (!sd.includes(key)) sd.push(key);
+        }
+      }
+
+      // Nothing left after guarding — the cloud is already current; drop it.
+      if (Object.keys(entry.updates).length === 0 && entry.deletes.size === 0) {
+        removeOp(op.id);
+        continue;
+      }
+
+      let result;
+      try {
+        result = await writeFieldUpdates(ref, {
+          updates: entry.updates,
+          deletes: [...entry.deletes],
+        });
+      } catch {
+        result = { ok: false };
+      }
+
+      if (this._destroyed) return;
+
+      if (result && result.ok) {
+        this._applyShadow(entry);
+        this.lastSynced = new Date();
+        removeOp(op.id);
+      }
+      // On failure: leave the op in the outbox for a later attempt; continue to
+      // the next op (the queue is bounded, so this is safe).
+    }
+  }
+
   // Fold a successfully-written entry's staged changes into the shadow, using
   // fresh per-domain objects so the existing shadow maps are never mutated.
   _applyShadow(entry) {
@@ -508,33 +670,6 @@ export default class SyncEngineV2 {
     for (const domain of Object.keys(entry.shadowWhole)) {
       this._shadow[domain] = entry.shadowWhole[domain];
     }
-  }
-
-  // Merge a failed entry back into _pending for retry (later edit wins).
-  _requeue(entry) {
-    const merged = this._pendingFor(entry.ref);
-    Object.assign(merged.updates, entry.updates);
-    for (const d of entry.deletes) {
-      merged.deletes.add(d);
-      merged.deleteBaseT[d] = entry.deleteBaseT[d] || 0;
-      delete merged.updates[d]; // unless a newer write re-added it below
-    }
-    // Re-apply this entry's updates AFTER deletes so a write wins over a stale
-    // delete of the same path within the same retry merge.
-    for (const [k, v] of Object.entries(entry.updates)) {
-      merged.updates[k] = v;
-      merged.deletes.delete(k);
-      delete merged.deleteBaseT[k];
-    }
-    for (const domain of Object.keys(entry.shadowChanges)) {
-      const sc = merged.shadowChanges[domain] || (merged.shadowChanges[domain] = {});
-      Object.assign(sc, entry.shadowChanges[domain]);
-    }
-    for (const domain of Object.keys(entry.shadowDeletes)) {
-      const sd = merged.shadowDeletes[domain] || (merged.shadowDeletes[domain] = []);
-      for (const k of entry.shadowDeletes[domain]) if (!sd.includes(k)) sd.push(k);
-    }
-    Object.assign(merged.shadowWhole, entry.shadowWhole);
   }
 
   /**
@@ -583,6 +718,10 @@ export default class SyncEngineV2 {
 
       // Begin watching for cloud changes (guarded inside).
       this._startListening();
+
+      // Replay any durably-queued writes from a previous offline session. Run
+      // AFTER hydrate so the _t-guard sees current cloud state; never throws.
+      this.replayOutbox();
 
       return { domains, shadow };
     } catch (err) {
