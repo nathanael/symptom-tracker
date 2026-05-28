@@ -269,11 +269,25 @@ export default function Settings({
         if (backup.trackingMode) setTrackingMode(backup.trackingMode);
         if (backup.pinnedSymptoms) setPinnedSymptoms(new Set(backup.pinnedSymptoms));
 
-        setLastAction(addedRef.count > 0
+        const msg = addedRef.count > 0
           ? `Merged ${addedRef.count} missing entries from backup`
-          : 'Backup loaded but no missing entries found — all data already present');
+          : 'Backup loaded but no missing entries — all data already present';
+        if (setCopyToastMessage) {
+          setCopyToastMessage(msg);
+          setTimeout(() => setCopyToastMessage(''), 6000);
+        } else {
+          alert(msg);
+        }
+        setLastAction(msg);
       } catch (err) {
-        setLastAction('Error: Invalid backup file');
+        const msg = `Error loading backup: ${err.message}`;
+        if (setCopyToastMessage) {
+          setCopyToastMessage(msg);
+          setTimeout(() => setCopyToastMessage(''), 6000);
+        } else {
+          alert(msg);
+        }
+        setLastAction(msg);
       }
     };
     reader.readAsText(file);
@@ -1503,7 +1517,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v5.4.2
+              v5.4.3
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

@@ -244,6 +244,15 @@ function App() {
           alert('Pull failed — see console.');
         }
         clearAction();
+      } else if (action === 'load-backup') {
+        // Open settings + file picker immediately for one-tap backup restore.
+        setShowSettings(true);
+        clearAction();
+        // The file input lives inside Settings; give the modal a beat to mount.
+        setTimeout(() => {
+          const input = document.querySelector('input[type="file"][accept=".json"]');
+          if (input) input.click();
+        }, 300);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
