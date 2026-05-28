@@ -230,12 +230,16 @@ describe('SyncEngineV2 — granular write path', () => {
     makeEngine({ entries: {} });
     writeFieldUpdates.mockImplementationOnce(() => Promise.resolve({ ok: false, error: 'boom' }));
 
+    // Use single-attempt flush() (not the draining flushNow) to observe the
+    // re-queue/retry mechanism one attempt at a time.
     engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1 } });
-    await engine.flushNow();
+    await engine.flush();
     expect(writeFieldUpdates).toHaveBeenCalledTimes(1);
+    // Failed write was re-queued.
+    expect(Object.keys(engine._pending).length).toBe(1);
 
     // A subsequent flush retries the same write (now succeeds).
-    await engine.flushNow();
+    await engine.flush();
     expect(writeFieldUpdates).toHaveBeenCalledTimes(2);
     const retry = writeFieldUpdates.mock.calls[1];
     expect(retry[1].updates).toEqual({ 'entries.2026-03-15-a': { v: 1, _t: FIXED_NOW } });
@@ -246,5 +250,178 @@ describe('SyncEngineV2 — granular write path', () => {
     engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1, _t: 999 } });
     await engine.flushNow();
     expect(writeFieldUpdates).not.toHaveBeenCalled();
+  });
+
+  // --- Fix 1: flushNow() durability while a flush is in flight ---------------
+  it('Fix1: flushNow drains an in-flight flush + later pending edits (no edit dropped)', async () => {
+    makeEngine({ entries: {} });
+
+    // First writeFieldUpdates call hangs until we resolve it manually; the rest
+    // succeed immediately.
+    let releaseFirst;
+    const firstGate = new Promise((resolve) => { releaseFirst = resolve; });
+    writeFieldUpdates.mockImplementationOnce(
+      () => firstGate.then(() => ({ ok: true, via: 'sdk' })),
+    );
+
+    // Enqueue an edit and start a (debounced) flush manually so it is mid-await.
+    engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1 } });
+    const inflight = engine.flush(); // begins, awaits the gated writeFieldUpdates
+
+    // While that flush is in flight, more edits arrive (different month) — they
+    // sit in _pending behind a setTimeout that won't fire before unload.
+    engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1 }, '2026-04-02-b': { v: 2 } });
+
+    // flushNow must NOT resolve until BOTH the in-flight flush and the newly
+    // pending edits are written.
+    const drained = engine.flushNow();
+    releaseFirst();
+    await Promise.all([inflight, drained]);
+
+    // Every edited key was ultimately written.
+    const mar = callForMonth('2026-03');
+    const apr = callForMonth('2026-04');
+    expect(mar).toBeTruthy();
+    expect(apr).toBeTruthy();
+    expect(apr[1].updates).toEqual({ 'entries.2026-04-02-b': { v: 2, _t: FIXED_NOW } });
+    // Nothing left pending after flushNow resolves.
+    expect(Object.keys(engine._pending).length).toBe(0);
+  });
+
+  it('Fix1: flushNow drain is bounded (does not spin forever on a re-queuing failure)', async () => {
+    makeEngine({ entries: {} });
+    // Every write fails → entry is re-queued every time. flushNow must stop
+    // after a bounded number of drain iterations rather than spinning forever.
+    writeFieldUpdates.mockImplementation(() => Promise.resolve({ ok: false, error: 'boom' }));
+
+    engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1 } });
+    await engine.flushNow(); // must resolve (bounded), not hang.
+
+    // Still pending (durable outbox is Task 12) but the call count is bounded.
+    expect(Object.keys(engine._pending).length).toBeGreaterThan(0);
+    expect(writeFieldUpdates.mock.calls.length).toBeLessThanOrEqual(6);
+  });
+
+  // --- Fix 2: _t-guarded deletes --------------------------------------------
+  it('Fix2(a): delete with no concurrent remote change proceeds', async () => {
+    makeEngine({ entries: { '2026-03-15-a': { v: 1, _t: 1 }, '2026-03-16-b': { v: 2, _t: 1 } } });
+    engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1, _t: 1 } });
+    await engine.flushNow();
+
+    const call = callForMonth('2026-03');
+    expect(call[1].deletes).toContain('entries.2026-03-16-b');
+    // Deleted from shadow.
+    expect('2026-03-16-b' in engine._shadow.entries).toBe(false);
+  });
+
+  it('Fix2(b): a newer remote write after the delete decision SKIPS the delete', async () => {
+    makeEngine({ entries: { '2026-03-16-b': { v: 2, _t: 10 } } });
+    // User deletes b (based on seeing _t:10).
+    engine.notifyLocalChange('entries', {});
+
+    // Before flush, a NEWER remote version of b arrives and advances the shadow.
+    engine._shadow.entries = { '2026-03-16-b': { v: 999, _t: 50 } };
+
+    await engine.flushNow();
+
+    // The delete must be skipped: either no write, or a write without the delete.
+    const call = callForMonth('2026-03');
+    if (call) {
+      expect(call[1].deletes || []).not.toContain('entries.2026-03-16-b');
+    }
+    // And b must NOT have been removed from the shadow.
+    expect(engine._shadow.entries['2026-03-16-b']).toEqual({ v: 999, _t: 50 });
+  });
+
+  // --- Fix 3: write-path data-loss tripwires --------------------------------
+  it('Fix3(i): same key edited twice in one window → one update with the SECOND value', async () => {
+    makeEngine({ entries: {} });
+    engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1 } });
+    engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 2 } });
+    await engine.flushNow();
+
+    const call = callForMonth('2026-03');
+    expect(call[1].updates).toEqual({ 'entries.2026-03-15-a': { v: 2, _t: FIXED_NOW } });
+  });
+
+  it('Fix3(ii): write-then-delete in one window → delete only, absent from shadow', async () => {
+    makeEngine({ entries: {} });
+    engine.notifyLocalChange('entries', { '2026-03-15-x': { v: 1 } });
+    engine.notifyLocalChange('entries', {}); // delete x
+    await engine.flushNow();
+
+    const call = callForMonth('2026-03');
+    if (call) {
+      expect(call[1].deletes).toContain('entries.2026-03-15-x');
+      expect('entries.2026-03-15-x' in call[1].updates).toBe(false);
+    }
+    expect(engine._shadow.entries && '2026-03-15-x' in engine._shadow.entries).toBeFalsy();
+  });
+
+  it('Fix3(iii): delete-then-re-add in one window → update only, present in shadow', async () => {
+    makeEngine({ entries: { '2026-03-15-a': { v: 1, _t: 1 } } });
+    engine.notifyLocalChange('entries', {}); // delete a
+    engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 5 } }); // re-add a
+    await engine.flushNow();
+
+    const call = callForMonth('2026-03');
+    expect(call[1].updates).toEqual({ 'entries.2026-03-15-a': { v: 5, _t: FIXED_NOW } });
+    expect(call[1].deletes || []).not.toContain('entries.2026-03-15-a');
+    expect(engine._shadow.entries['2026-03-15-a']).toEqual({ v: 5, _t: FIXED_NOW });
+  });
+
+  it('Fix3(iv): failed-flush re-queue then re-add → retry sends update, no delete', async () => {
+    makeEngine({ entries: { '2026-03-15-a': { v: 1, _t: 1 } } });
+    writeFieldUpdates.mockImplementationOnce(() => Promise.resolve({ ok: false, error: 'boom' }));
+
+    engine.notifyLocalChange('entries', {}); // delete a → flush fails → re-queued
+    await engine.flush(); // single attempt (draining flushNow would auto-retry)
+    expect(writeFieldUpdates).toHaveBeenCalledTimes(1);
+
+    // Before retry, the user re-adds a.
+    engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 7 } });
+    await engine.flushNow();
+
+    const retry = writeFieldUpdates.mock.calls[writeFieldUpdates.mock.calls.length - 1];
+    expect(retry[1].updates).toEqual({ 'entries.2026-03-15-a': { v: 7, _t: FIXED_NOW } });
+    expect(retry[1].deletes || []).not.toContain('entries.2026-03-15-a');
+  });
+
+  it('Fix3(v): pre-flush cross-path guard — interleaved cloud snapshot cannot clobber a pending local add', async () => {
+    const A = '2026-03-10-a';
+    const K = '2026-03-12-k';
+    const X = '2026-03-15-x';
+    makeEngine({ entries: { [A]: { v: 1, _t: 1 } } });
+
+    // Local add X, do NOT flush.
+    engine.notifyLocalChange('entries', { [A]: { v: 1, _t: 1 }, [X]: { v: 2 } });
+
+    // A cloud snapshot delivers {A, K} (K is new from cloud; X never in cloud).
+    const before = cloudUpdates.length;
+    engine._onCloudChanged('months', {
+      docs: [
+        {
+          id: '2026-03',
+          data: () => ({ entries: { [A]: { v: 1, _t: 1 }, [K]: { v: 3, _t: 5 } } }),
+        },
+      ],
+    });
+
+    // The emitted deletes opt must be EMPTY: X is local-only and was never in
+    // the shadow, so it can never be deleted by a cloud diff.
+    const emitted = cloudUpdates[cloudUpdates.length - 1];
+    expect(cloudUpdates.length).toBe(before + 1);
+    expect(emitted.opts && emitted.opts.deletes).toEqual({});
+
+    // X is still pending.
+    const monthEntry = engine._pending['users/test-user/months/2026-03'];
+    expect(monthEntry).toBeTruthy();
+    expect(`entries.${X}` in monthEntry.updates).toBe(true);
+
+    // Flushing now writes only entries.X.
+    await engine.flushNow();
+    const call = callForMonth('2026-03');
+    expect(Object.keys(call[1].updates)).toEqual([`entries.${X}`]);
+    expect(call[1].updates[`entries.${X}`]).toEqual({ v: 2, _t: FIXED_NOW });
   });
 });

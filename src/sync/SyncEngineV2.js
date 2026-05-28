@@ -11,7 +11,7 @@ import { getFirebaseDb } from '../utils/firebase';
 import { assembleDomainsFromDocs } from './hydrate';
 import { diffMapDomain, diffIdMapDomain, equalIgnoringT } from './changeDiff';
 import { arrayToIdMap } from './definitionShape';
-import { groupKeysByMonth, monthIdForKey } from './keyRouting';
+import { groupKeysByMonth } from './keyRouting';
 import { writeFieldUpdates } from './fieldWriter';
 import { MAP_DOMAINS } from './domains';
 
@@ -123,9 +123,12 @@ export default class SyncEngineV2 {
     // shadowChanges/Deletes apply to map + id-map domains; shadowWhole covers
     // whole-field domains (pinnedSymptoms, trackingMode).
     this._pending = {};
-    this._dirty = false;
     this._flushTimer = null;
     this._flushing = false;
+    // The in-flight flush promise, set for the duration of flush()'s async work
+    // and cleared when it settles. flushNow() awaits this so it cannot resolve
+    // prematurely while a debounced flush is mid-await (unload durability).
+    this._flushPromise = null;
     // Injectable clock so tests can fix "now".
     this._now = Date.now;
 
@@ -162,7 +165,6 @@ export default class SyncEngineV2 {
       return; // unknown domain — ignore.
     }
 
-    this._dirty = true;
     this._scheduleFlush();
   }
 
@@ -175,6 +177,10 @@ export default class SyncEngineV2 {
         ref,
         updates: {},
         deletes: new Set(),
+        // Base `_t` captured for each pending delete fieldPath at enqueue time
+        // (the `_t` of the shadow record being deleted, 0 if absent). Used at
+        // flush to skip a delete that a newer remote write has superseded.
+        deleteBaseT: {},
         shadowChanges: {},
         shadowDeletes: {},
         shadowWhole: {},
@@ -203,8 +209,10 @@ export default class SyncEngineV2 {
   }
 
   _enqueueMapDomain(domain, data, now) {
-    const { changed, deleted } = diffMapDomain(this._shadow[domain] || {}, data, now);
+    const shadowDomain = this._shadow[domain] || {};
+    const { changed, deleted } = diffMapDomain(shadowDomain, data, now);
     const field = fieldForMapDomain(domain);
+    const view = (data && typeof data === 'object') ? data : {};
 
     const changedByMonth = groupKeysByMonth(Object.keys(changed));
     for (const monthId of Object.keys(changedByMonth)) {
@@ -214,7 +222,7 @@ export default class SyncEngineV2 {
         const stamped = changed[key];
         entry.updates[`${field}.${key}`] = stamped;
         // A later edit wins; a write supersedes a prior delete of the same key.
-        entry.deletes.delete(`${field}.${key}`);
+        this._undelete(entry, domain, `${field}.${key}`, key);
         sc[key] = stamped;
         if (entry.shadowDeletes[domain]) {
           entry.shadowDeletes[domain] = entry.shadowDeletes[domain].filter((k) => k !== key);
@@ -225,40 +233,94 @@ export default class SyncEngineV2 {
     const deletedByMonth = groupKeysByMonth(deleted);
     for (const monthId of Object.keys(deletedByMonth)) {
       const entry = this._pendingFor(this._monthDocRef(monthId));
-      const sd = entry.shadowDeletes[domain] || (entry.shadowDeletes[domain] = []);
       for (const key of deletedByMonth[monthId]) {
-        // A delete supersedes a prior write of the same key in this window.
-        if (`${field}.${key}` in entry.updates) {
-          delete entry.updates[`${field}.${key}`];
-          if (entry.shadowChanges[domain]) delete entry.shadowChanges[domain][key];
+        this._enqueueDelete(entry, domain, `${field}.${key}`, key, shadowDomain[key]);
+      }
+    }
+
+    // Cancel any pending add/change for a key that the user removed within the
+    // SAME debounce window. diffMapDomain is shadow-relative, so a key that was
+    // added then removed before flush (and never existed in the shadow) is NOT
+    // reported as `deleted`; without this reconciliation its stale pending
+    // update would be written to the cloud, resurrecting a record the user
+    // explicitly deleted. Walk pending update paths and drop any whose key is
+    // absent from the new view.
+    for (const path of Object.keys(this._pending)) {
+      const entry = this._pending[path];
+      const sc = entry.shadowChanges[domain];
+      const prefix = `${field}.`;
+      for (const fieldPath of Object.keys(entry.updates)) {
+        if (!fieldPath.startsWith(prefix)) continue;
+        const key = fieldPath.slice(prefix.length);
+        if (key in view) continue; // still present — leave it.
+        // Removed in-window. Drop the pending update and its shadow staging.
+        delete entry.updates[fieldPath];
+        if (sc) delete sc[key];
+        // If the key also exists in the shadow, the removal is a genuine delete
+        // (it would otherwise persist in the cloud). Stage it as one, guarded.
+        if (key in shadowDomain) {
+          this._enqueueDelete(entry, domain, fieldPath, key, shadowDomain[key]);
         }
-        entry.deletes.add(`${field}.${key}`);
-        if (!sd.includes(key)) sd.push(key);
       }
     }
   }
 
+  // Stage a delete of `key` (fieldPath) on `entry`, recording the base `_t`
+  // of the shadow record so flush can skip it if a newer remote write arrives.
+  _enqueueDelete(entry, domain, fieldPath, key, shadowRecord) {
+    // A delete supersedes a prior write of the same key in this window.
+    if (fieldPath in entry.updates) {
+      delete entry.updates[fieldPath];
+      if (entry.shadowChanges[domain]) delete entry.shadowChanges[domain][key];
+    }
+    entry.deletes.add(fieldPath);
+    entry.deleteBaseT[fieldPath] =
+      (shadowRecord && typeof shadowRecord === 'object' && typeof shadowRecord._t === 'number')
+        ? shadowRecord._t
+        : 0;
+    const sd = entry.shadowDeletes[domain] || (entry.shadowDeletes[domain] = []);
+    if (!sd.includes(key)) sd.push(key);
+  }
+
+  // Cancel a previously-staged delete of `key` (fieldPath) on `entry` because a
+  // newer write of the same key arrived in the same window.
+  _undelete(entry, domain, fieldPath, key) {
+    entry.deletes.delete(fieldPath);
+    delete entry.deleteBaseT[fieldPath];
+    if (entry.shadowDeletes[domain]) {
+      entry.shadowDeletes[domain] = entry.shadowDeletes[domain].filter((k) => k !== key);
+    }
+  }
+
   _enqueueIdMapDomain(domain, data, now) {
+    const shadowDomain = this._shadow[domain] || {};
     const idMap = arrayToIdMap(data);
-    const { changed, deleted } = diffIdMapDomain(this._shadow[domain] || {}, idMap, now);
-    if (Object.keys(changed).length === 0 && deleted.length === 0) return;
+    const { changed, deleted } = diffIdMapDomain(shadowDomain, idMap, now);
 
     const entry = this._pendingFor(this._defsDocRef());
     const sc = entry.shadowChanges[domain] || (entry.shadowChanges[domain] = {});
     for (const id of Object.keys(changed)) {
       const stamped = changed[id];
       entry.updates[`${domain}.${id}`] = stamped;
-      entry.deletes.delete(`${domain}.${id}`);
+      this._undelete(entry, domain, `${domain}.${id}`, id);
       sc[id] = stamped;
     }
-    const sd = entry.shadowDeletes[domain] || (entry.shadowDeletes[domain] = []);
     for (const id of deleted) {
-      if (`${domain}.${id}` in entry.updates) {
-        delete entry.updates[`${domain}.${id}`];
-        delete sc[id];
+      this._enqueueDelete(entry, domain, `${domain}.${id}`, id, shadowDomain[id]);
+    }
+
+    // Cancel pending adds/changes for ids removed within the same window (see
+    // the matching reconciliation comment in _enqueueMapDomain).
+    const prefix = `${domain}.`;
+    for (const fieldPath of Object.keys(entry.updates)) {
+      if (!fieldPath.startsWith(prefix)) continue;
+      const id = fieldPath.slice(prefix.length);
+      if (id in idMap) continue;
+      delete entry.updates[fieldPath];
+      delete sc[id];
+      if (id in shadowDomain) {
+        this._enqueueDelete(entry, domain, fieldPath, id, shadowDomain[id]);
       }
-      entry.deletes.add(`${domain}.${id}`);
-      if (!sd.includes(id)) sd.push(id);
     }
   }
 
@@ -290,13 +352,41 @@ export default class SyncEngineV2 {
     }, 500);
   }
 
-  /** Cancel the debounce and flush immediately. */
+  /**
+   * Cancel the debounce and flush immediately, draining to completion.
+   *
+   * Durability on unload: a debounced flush() may be mid-await when this is
+   * called (e.g. on visibilitychange→hidden / beforeunload). Because flush()
+   * no-ops while one is already in flight, simply calling flush() here could
+   * resolve instantly while pending edits remain behind a setTimeout that will
+   * never fire before the page unloads — a lost edit. Instead we drain: await
+   * any in-flight flush, then flush again, until nothing is pending.
+   *
+   * Bounded: a flush that fails re-queues the SAME pending repeatedly, which
+   * would spin this loop forever. We cap drain iterations (the durable outbox
+   * in Task 12 is the real safety net for persistent failures).
+   */
   async flushNow() {
     if (this._flushTimer) {
       clearTimeout(this._flushTimer);
       this._flushTimer = null;
     }
-    return this.flush();
+    const MAX_DRAIN = 5;
+    let iterations = 0;
+    while (this._flushPromise || Object.keys(this._pending).length > 0) {
+      if (iterations++ >= MAX_DRAIN) break;
+      if (this._flushPromise) {
+        await this._flushPromise;
+      } else {
+        await this.flush();
+      }
+    }
+    // A failed flush re-schedules a debounced retry timer; clear it so flushNow
+    // leaves no dangling timer (the outbox owns durable retry).
+    if (this._flushTimer) {
+      clearTimeout(this._flushTimer);
+      this._flushTimer = null;
+    }
   }
 
   /**
@@ -311,15 +401,55 @@ export default class SyncEngineV2 {
     const paths = Object.keys(this._pending);
     if (paths.length === 0) return;
 
+    // Track the in-flight flush so flushNow() can await it (unload durability).
+    const promise = this._doFlush(paths);
+    this._flushPromise = promise;
+    try {
+      await promise;
+    } finally {
+      if (this._flushPromise === promise) this._flushPromise = null;
+    }
+  }
+
+  async _doFlush(paths) {
     this._flushing = true;
     // Snapshot and clear pending so edits during the flush queue separately.
     const pending = this._pending;
     this._pending = {};
-    this._dirty = false;
 
     try {
       for (const path of paths) {
         const entry = pending[path];
+        // _t-guard on deletes: a delete carries the base `_t` of the shadow
+        // record at the time the user decided to delete it. If a NEWER remote
+        // write of the same key has since advanced the shadow, the user's
+        // delete decision is stale — sending deleteField would destroy that
+        // newer remote write. Skip such deletes. This resolves the asymmetry
+        // where local writes are last-writer-wins (stamped + diffed) but
+        // deletes carried no `_t` and so unconditionally clobbered.
+        for (const fieldPath of [...entry.deletes]) {
+          const { domain, key } = this._domainKeyForDelete(entry, fieldPath);
+          if (!domain) continue;
+          const current = (this._shadow[domain] || {})[key];
+          const baseT = entry.deleteBaseT[fieldPath] || 0;
+          if (
+            current && typeof current === 'object' &&
+            typeof current._t === 'number' && current._t > baseT
+          ) {
+            // Newer remote version arrived after the delete decision — skip.
+            entry.deletes.delete(fieldPath);
+            delete entry.deleteBaseT[fieldPath];
+            if (entry.shadowDeletes[domain]) {
+              entry.shadowDeletes[domain] = entry.shadowDeletes[domain].filter((k) => k !== key);
+            }
+          }
+        }
+
+        // Nothing left to write for this doc after the guard? Skip it.
+        if (Object.keys(entry.updates).length === 0 && entry.deletes.size === 0) {
+          continue;
+        }
+
         const result = await writeFieldUpdates(entry.ref, {
           updates: entry.updates,
           deletes: [...entry.deletes],
@@ -342,6 +472,23 @@ export default class SyncEngineV2 {
     if (Object.keys(this._pending).length > 0) {
       this._scheduleFlush();
     }
+  }
+
+  // Resolve the (domain, key) a pending delete fieldPath targets, for the
+  // _t-guard. Map domains use a dotted `field.key`; the daily-notes domain maps
+  // the `notes` field back to the `dailyNotes` shadow domain. Id-map definition
+  // domains use `domain.id` directly. Returns { domain: null } if unresolvable.
+  _domainKeyForDelete(entry, fieldPath) {
+    const dot = fieldPath.indexOf('.');
+    if (dot === -1) return { domain: null };
+    const field = fieldPath.slice(0, dot);
+    const key = fieldPath.slice(dot + 1);
+    let domain = null;
+    for (const d of MAP_DOMAINS) {
+      if (fieldForMapDomain(d) === field) { domain = d; break; }
+    }
+    if (!domain && ID_MAP_DOMAINS.includes(field)) domain = field;
+    return { domain, key };
   }
 
   // Fold a successfully-written entry's staged changes into the shadow, using
@@ -369,6 +516,7 @@ export default class SyncEngineV2 {
     Object.assign(merged.updates, entry.updates);
     for (const d of entry.deletes) {
       merged.deletes.add(d);
+      merged.deleteBaseT[d] = entry.deleteBaseT[d] || 0;
       delete merged.updates[d]; // unless a newer write re-added it below
     }
     // Re-apply this entry's updates AFTER deletes so a write wins over a stale
@@ -376,6 +524,7 @@ export default class SyncEngineV2 {
     for (const [k, v] of Object.entries(entry.updates)) {
       merged.updates[k] = v;
       merged.deletes.delete(k);
+      delete merged.deleteBaseT[k];
     }
     for (const domain of Object.keys(entry.shadowChanges)) {
       const sc = merged.shadowChanges[domain] || (merged.shadowChanges[domain] = {});
@@ -386,7 +535,6 @@ export default class SyncEngineV2 {
       for (const k of entry.shadowDeletes[domain]) if (!sd.includes(k)) sd.push(k);
     }
     Object.assign(merged.shadowWhole, entry.shadowWhole);
-    this._dirty = true;
   }
 
   /**
