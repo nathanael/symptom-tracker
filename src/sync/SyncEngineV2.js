@@ -17,6 +17,8 @@ import { MAP_DOMAINS } from './domains';
 const ID_MAP_DOMAINS = ['symptoms', 'stackItems', 'inputItems'];
 
 // Compare two flat maps ({ key: value+_t }) for equality, ignoring `_t`.
+// Map-domain values are ALWAYS objects carrying `_t` (e.g. dailyNotes is
+// `{ text, _t }`), so object-based equalIgnoringT is safe to use here.
 function mapsEqual(a, b) {
   const ka = Object.keys(a || {});
   const kb = Object.keys(b || {});
@@ -155,6 +157,9 @@ export default class SyncEngineV2 {
    */
   _startListening() {
     if (this._destroyed) return;
+    // Idempotent: if we already hold listeners, do not double-subscribe — a
+    // second pass (retry / future hook wiring) would leak the first ones.
+    if (this._unsubMonths || this._unsubDefs) return;
     const db = getFirebaseDb();
     if (!db) return;
 
