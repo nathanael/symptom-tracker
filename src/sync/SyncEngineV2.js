@@ -15,6 +15,7 @@ import { groupKeysByMonth } from './keyRouting';
 import { writeFieldUpdates } from './fieldWriter';
 import { MAP_DOMAINS } from './domains';
 import { enqueueOp, listOps, removeOp } from './outbox';
+import { saveSnapshot } from '../utils/snapshots';
 
 // Definition domains stored as id-keyed maps in the shadow (so remote deletes
 // of individual records can be detected the same way map domains are).
@@ -673,6 +674,30 @@ export default class SyncEngineV2 {
   }
 
   /**
+   * Read the cloud once: the definitions doc + every month doc.
+   *
+   * Returns { definitionsData, monthDocs } on success. monthDocs is an array of
+   * { id, data }. Forces source:'server' to avoid hydrating a partial local
+   * cache. Shared by initialize() and forcePull(). Throws on read failure (the
+   * caller decides how to surface it).
+   */
+  async _readCloud() {
+    const db = getFirebaseDb();
+    const userDoc = db.collection('users').doc(this.uid);
+    const defRef = userDoc.collection('meta').doc('definitions');
+    const monthsRef = userDoc.collection('months');
+
+    const [defSnap, monthsSnap] = await Promise.all([
+      defRef.get({ source: 'server' }),
+      monthsRef.get({ source: 'server' }),
+    ]);
+
+    const monthDocs = monthsSnap.docs.map((d) => ({ id: d.id, data: d.data() }));
+    const definitionsData = defSnap.exists ? defSnap.data() : null;
+    return { definitionsData, monthDocs };
+  }
+
+  /**
    * Read the cloud once and push the assembled domains to React.
    *
    * Returns { domains, shadow } on a successful read, or null when there is no
@@ -687,21 +712,11 @@ export default class SyncEngineV2 {
     }
 
     try {
-      const userDoc = db.collection('users').doc(this.uid);
-      const defRef = userDoc.collection('meta').doc('definitions');
-      const monthsRef = userDoc.collection('months');
-
-      const [defSnap, monthsSnap] = await Promise.all([
-        defRef.get({ source: 'server' }),
-        monthsRef.get({ source: 'server' }),
-      ]);
+      const { definitionsData, monthDocs } = await this._readCloud();
 
       // If destroy() was called mid-flight, do not mutate our own state or
       // emit — a destroyed engine must be fully inert.
       if (this._destroyed) return null;
-
-      const monthDocs = monthsSnap.docs.map((d) => ({ id: d.id, data: d.data() }));
-      const definitionsData = defSnap.exists ? defSnap.data() : null;
 
       // Seed the raw caches so the first listener diff has a baseline.
       this._rawMonths = monthDocs;
@@ -729,6 +744,70 @@ export default class SyncEngineV2 {
       this._ready = true;
       return null;
     }
+  }
+
+  /**
+   * "Sync Now" — push any genuinely-unsynced local records to the cloud.
+   *
+   * Snapshots local state first (recovery point), then runs the normal
+   * shadow-diffing write path for every domain and drains it. Because
+   * notifyLocalChange diffs against the shadow, only records that differ from
+   * the last-synced view are written — no blob, no clobber. Returns void.
+   *
+   * @param {Object} allData full app-shape values keyed by domain.
+   */
+  async forcePush(allData) {
+    saveSnapshot('preForcePush');
+    if (!allData || typeof allData !== 'object') return;
+    for (const domain of Object.keys(allData)) {
+      this.notifyLocalChange(domain, allData[domain]);
+    }
+    await this.flushNow();
+  }
+
+  /**
+   * "Pull from cloud" — re-read the full cloud state and apply it to React.
+   *
+   * Snapshots local state first. Re-reads the cloud (same read as initialize),
+   * assembles the app-shape domains, and emits them:
+   *   - destructive: emit with { replace: true } — the hook REPLACES React
+   *     state per domain (cloud is authoritative).
+   *   - merge (default): emit with { deletes: {} } — the hook merges by `_t`.
+   * Advances the shadow to the freshly-read cloud either way.
+   *
+   * @param {{destructive?: boolean}} opts
+   * @returns {{summary: Object, snapshotId: string|null, destructive: boolean}}
+   */
+  async forcePull({ destructive = false } = {}) {
+    const snapshotId = saveSnapshot(destructive ? 'preForcePullReplace' : 'preForcePullMerge');
+
+    const { definitionsData, monthDocs } = await this._readCloud();
+    if (this._destroyed) return { summary: {}, snapshotId, destructive };
+
+    // Refresh raw caches + shadow so the listener diffs against current cloud.
+    this._rawMonths = monthDocs;
+    this._rawDefs = definitionsData;
+    const { domains, shadow } = assembleDomainsFromDocs(definitionsData, monthDocs);
+    this._shadow = shadow;
+
+    // Per-domain counts for the Settings toast (array length / key count /
+    // scalar present = 1).
+    const summary = {};
+    for (const domain of Object.keys(domains)) {
+      const value = domains[domain];
+      if (Array.isArray(value)) summary[domain] = value.length;
+      else if (value && typeof value === 'object') summary[domain] = Object.keys(value).length;
+      else summary[domain] = value != null ? 1 : 0;
+    }
+
+    if (destructive) {
+      this.onCloudUpdate(domains, false, { replace: true });
+    } else {
+      this.onCloudUpdate(domains, false, { deletes: {} });
+    }
+    this.lastSynced = new Date();
+
+    return { summary, snapshotId, destructive };
   }
 
   /**
