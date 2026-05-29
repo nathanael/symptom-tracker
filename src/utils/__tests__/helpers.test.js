@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { applyHistoricalState, generateAIDataExport, buildCSVText } from '../helpers';
+import { applyHistoricalState, generateAIDataExport, buildCSVText, noteText } from '../helpers';
+
+describe('noteText', () => {
+  it('returns a bare string unchanged (legacy data)', () => {
+    expect(noteText('hello')).toBe('hello');
+  });
+  it('reads text from a { text } record', () => {
+    expect(noteText({ text: 'hi' })).toBe('hi');
+  });
+  it('reads text from a { text, _t } record', () => {
+    expect(noteText({ text: 'hi', _t: 123 })).toBe('hi');
+  });
+  it('returns "" for null/undefined', () => {
+    expect(noteText(null)).toBe('');
+    expect(noteText(undefined)).toBe('');
+  });
+  it('returns "" for an object without a string text field', () => {
+    expect(noteText({ _t: 5 })).toBe('');
+    expect(noteText({ text: 42 })).toBe('');
+  });
+});
 
 describe('applyHistoricalState', () => {
   const today = new Date();

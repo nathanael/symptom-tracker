@@ -2,6 +2,13 @@ import { trackingModes, severityColors, NA_SEVERITY } from './constants';
 import { computeHealthScore } from './healthScore';
 import { METRICS as SLEEP_METRICS, valueForRow } from './sleepMetrics';
 
+// A daily note is stored as { text, _t }. Legacy data may be a bare string.
+export function noteText(note) {
+  if (note == null) return '';
+  if (typeof note === 'string') return note;
+  return typeof note.text === 'string' ? note.text : '';
+}
+
 function readSleepCache() {
   try {
     const raw = localStorage.getItem('garminSleepCache');
@@ -411,10 +418,10 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dateKey = getDateKey(date);
-    const note = dailyNotes[dateKey];
+    const text = noteText(dailyNotes[dateKey]).trim();
 
-    if (note && note.trim()) {
-      output.push(`- ${formatTableDate(dateKey)}: ${note}`);
+    if (text) {
+      output.push(`- ${formatTableDate(dateKey)}: ${text}`);
     }
   }
 

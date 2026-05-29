@@ -243,7 +243,7 @@ export default function Settings({
         });
         if (backup.dailyNotes) setDailyNotes(prev => {
           const merged = { ...prev };
-          Object.entries(backup.dailyNotes).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; addedRef.count++; } });
+          Object.entries(backup.dailyNotes).forEach(([k, v]) => { if (!merged[k]) { merged[k] = typeof v === 'string' ? { text: v } : v; addedRef.count++; } });
           return merged;
         });
         if (backup.stackItems) setStackItems(prev => {

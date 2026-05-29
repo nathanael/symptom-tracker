@@ -116,6 +116,24 @@ function App() {
   const [copyDays, setCopyDays] = useLocalStorage(STORAGE_KEY_COPY_DAYS, 7);
   const [trendWindow, setTrendWindow] = useLocalStorage(STORAGE_KEY_TREND_WINDOW, 7);
 
+  // Normalize legacy bare-string daily notes → { text } records, once, so the
+  // sync diff never spreads a bare string (which would corrupt the record).
+  // Guarded to only setDailyNotes when something actually changed (no loop).
+  const notesNormalizedRef = useRef(false);
+  useEffect(() => {
+    if (notesNormalizedRef.current) return;
+    notesNormalizedRef.current = true;
+    setDailyNotes(prev => {
+      let changed = false;
+      const next = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (typeof v === 'string') { next[k] = { text: v }; changed = true; }
+        else next[k] = v;
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
   // Reset the cloud-apply flag AFTER all useLocalStorage effects have run.
   // React guarantees effects run in declaration order within a component,
   // so this fires after every useLocalStorage effect above has checked the flag.
@@ -1402,7 +1420,7 @@ function App() {
                     });
                     if (backup.dailyNotes) setDailyNotes(prev => {
                       const m = { ...prev };
-                      Object.entries(backup.dailyNotes).forEach(([k, v]) => { if (!m[k]) { m[k] = v; counts.added++; } else counts.kept++; });
+                      Object.entries(backup.dailyNotes).forEach(([k, v]) => { if (!m[k]) { m[k] = typeof v === 'string' ? { text: v } : v; counts.added++; } else counts.kept++; });
                       return m;
                     });
                     if (backup.stackItems) setStackItems(prev => {

@@ -1,5 +1,20 @@
 import { useRef, useEffect, useState } from 'react';
-import { getDateKey } from '../utils/helpers';
+import { getDateKey, noteText } from '../utils/helpers';
+
+// Write a note as a { text } record, or delete the key when the text is empty.
+// The sync engine stamps `_t`; the app never sets it. Deleting an empty note
+// propagates via the sync delete path (matches prior empty-note behavior).
+function writeNote(setDailyNotes, dateKey, value) {
+  const trimmed = (value || '').trim();
+  setDailyNotes(prev => {
+    if (!trimmed) {
+      if (!(dateKey in prev)) return prev;
+      const { [dateKey]: _omit, ...rest } = prev;
+      return rest;
+    }
+    return { ...prev, [dateKey]: { text: trimmed } };
+  });
+}
 
 export default function NoteModal({
   selectedDate,
@@ -12,7 +27,7 @@ export default function NoteModal({
   const dateKey = getDateKey(selectedDate);
 
   // Local state for immediate input response
-  const [localNote, setLocalNote] = useState(dailyNotes[dateKey] || '');
+  const [localNote, setLocalNote] = useState(noteText(dailyNotes[dateKey]));
 
   useEffect(() => {
     // Focus textarea on mount
@@ -31,8 +46,8 @@ export default function NoteModal({
   // Debounced sync to parent state
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (localNote !== (dailyNotes[dateKey] || '')) {
-        setDailyNotes(prev => ({ ...prev, [dateKey]: localNote }));
+      if (localNote.trim() !== noteText(dailyNotes[dateKey]).trim()) {
+        writeNote(setDailyNotes, dateKey, localNote);
       }
     }, 300);
     return () => clearTimeout(timer);
@@ -41,7 +56,7 @@ export default function NoteModal({
   // Save immediately on unmount (in case debounce hasn't fired yet)
   useEffect(() => {
     return () => {
-      setDailyNotes(prev => ({ ...prev, [dateKey]: localNoteRef.current }));
+      writeNote(setDailyNotes, dateKey, localNoteRef.current);
     };
   }, [dateKey, setDailyNotes]);
 

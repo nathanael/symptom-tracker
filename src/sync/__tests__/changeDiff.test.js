@@ -137,3 +137,37 @@ describe('diffIdMapDomain', () => {
     expect(deleted).toEqual([]);
   });
 });
+
+import { noteText } from '../../utils/helpers';
+
+// Daily notes are stored as { text, _t } records (uniform with entries). This
+// documents the round-trip contract: a { text } note (no _t, as written by the
+// app) diffs to a { text, _t } changed record, and noteText reads it back.
+describe('dailyNotes { text } record contract', () => {
+  it('diffs a new { text } note into a { text, _t } changed record', () => {
+    const { changed, deleted } = diffMapDomain(
+      {},
+      { '2026-01-16': { text: 'I had alcohol last night' } },
+      T);
+    expect(deleted).toEqual([]);
+    expect(changed).toEqual({ '2026-01-16': { text: 'I had alcohol last night', _t: T } });
+    expect(noteText(changed['2026-01-16'])).toBe('I had alcohol last night');
+  });
+
+  it('detects an edited note as changed (ignoring _t) and re-stamps', () => {
+    const { changed } = diffMapDomain(
+      { '2026-01-16': { text: 'old', _t: 1 } },
+      { '2026-01-16': { text: 'new' } },
+      T);
+    expect(changed).toEqual({ '2026-01-16': { text: 'new', _t: T } });
+  });
+
+  it('treats a deleted (cleared) note key as a deletion', () => {
+    const { changed, deleted } = diffMapDomain(
+      { '2026-01-16': { text: 'old', _t: 1 } },
+      {},
+      T);
+    expect(changed).toEqual({});
+    expect(deleted).toEqual(['2026-01-16']);
+  });
+});
