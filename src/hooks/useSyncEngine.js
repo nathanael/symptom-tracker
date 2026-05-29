@@ -164,10 +164,15 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       }
     });
 
-    // Flush pending changes when app goes to background or closes
+    // Flush pending changes when app goes to background or closes; catch up on
+    // cloud changes missed while backgrounded when it returns to foreground.
+    // The Safari PWA streaming listener can die silently while hidden, so a
+    // refresh on visible is the user-facing complement to the engine heartbeat.
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') {
         engine.flushNow();
+      } else if (document.visibilityState === 'visible') {
+        engine.refreshFromCloud();
       }
     };
     const handleUnload = () => engine.flushNow();

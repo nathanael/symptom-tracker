@@ -18,6 +18,15 @@ import { enqueueOp, listOps, removeOp } from './outbox';
 import { saveSnapshot } from '../utils/snapshots';
 import { needsMigration, readLocalDomains, runMigration } from './migrationV2';
 
+// --- Resilience constants (silent-listener-death recovery) ---
+// On Safari PWA the Firestore streaming listener can die silently (no error
+// callback). The heartbeat detects a stall (no snapshot for too long) and
+// catches up via a one-shot re-read; the poll covers the case where the
+// listener NEVER delivers (channel blocked) so we still get data.
+export const HEARTBEAT_INTERVAL_MS = 60000;  // how often we check liveness
+export const HEARTBEAT_DEAD_MS = 120000;     // stall threshold → force refresh
+export const POLL_INTERVAL_MS = 30000;       // poll cadence until first deliver
+
 // Legacy blob (OLD model) domain fields stored as STRINGIFIED JSON on the doc
 // `users/{uid}`. trackingMode was stored as a PLAIN string (not stringified).
 // Mirrors the OLD SyncEngine.js STRINGIFIED_DOMAINS + SYNC_DOMAINS.
@@ -124,6 +133,18 @@ export default class SyncEngineV2 {
 
     this._ready = false;
     this._destroyed = false;
+
+    // --- Resilience (silent-listener-death recovery) ---
+    // Timestamp (ms via _now) of the last sign of cloud life: a processed
+    // snapshot, the initial hydrate, or a successful refreshFromCloud(). The
+    // heartbeat uses this to detect a stalled listener.
+    this._lastActivity = 0;
+    // Set true the first time a real snapshot reaches _onCloudChanged. Until
+    // then the poll fallback re-fetches the cloud (the streaming channel may be
+    // blocked); once true the poll no-ops.
+    this._listenerDelivered = false;
+    this._heartbeatTimer = null;
+    this._pollTimer = null;
 
     // --- Write path (Task 11) ---
     // Pending writes keyed by target doc PATH. Each entry:
@@ -907,6 +928,9 @@ export default class SyncEngineV2 {
 
       this._shadow = shadow;
 
+      // Initial hydrate counts as cloud activity (seeds the heartbeat clock).
+      this._touchActivity();
+
       if (hasAnyData(domains) && !this._destroyed) {
         this.onCloudUpdate(domains, true);
       }
@@ -1037,6 +1061,10 @@ export default class SyncEngineV2 {
         (err) => this._onListenError(err),
       );
     }
+
+    // Start liveness recovery (heartbeat detects a stalled listener; poll
+    // covers a listener that never delivers). Seeds activity to "now".
+    this._startResilienceTimers();
   }
 
   _onListenError(err) {
@@ -1054,6 +1082,10 @@ export default class SyncEngineV2 {
   _onCloudChanged(source, snap) {
     if (this._destroyed) return;
 
+    // A real snapshot arrived: the streaming listener is alive and delivering.
+    this._listenerDelivered = true;
+    this._touchActivity();
+
     // 1. Update the relevant raw cache.
     if (source === 'months') {
       this._rawMonths = (snap.docs || []).map((d) => ({ id: d.id, data: d.data() }));
@@ -1061,31 +1093,110 @@ export default class SyncEngineV2 {
       this._rawDefs = snap && snap.exists ? snap.data() : null;
     }
 
-    // 2. Re-assemble the full cloud state.
+    // 2. Apply the re-assembled full cloud state (echo-suppress → diff → emit
+    //    → advance shadow) from the current raw caches.
+    this._applyAssembledCloud();
+  }
+
+  /**
+   * Assemble the full cloud state from the CURRENT `_rawDefs`/`_rawMonths`,
+   * suppress echoes (no-op when the new cloud equals our shadow), emit the
+   * cloud-side changes plus a per-domain list of REMOTE deletes, and advance
+   * the shadow. Shared by the listener and refreshFromCloud() so both paths
+   * emit identically and stay echo-suppressed.
+   */
+  _applyAssembledCloud() {
+    // Re-assemble the full cloud state.
     const { domains, shadow: newShadow } = assembleDomainsFromDocs(
       this._rawDefs,
       this._rawMonths,
     );
 
-    // 3. Echo suppression: identical to our shadow → do nothing.
+    // Echo suppression: identical to our shadow → do nothing.
     if (this._shadowsEqual(this._shadow, newShadow)) return;
 
-    // 4. Compute remote deletes per domain from (old cloud) MINUS (new cloud).
-    //    Deletes are derived ONLY from the shadow diff — never from local
-    //    state — so the engine can never instruct deletion of a local-only
-    //    pending key it never had in its shadow (clobber guard).
+    // Compute remote deletes per domain from (old cloud) MINUS (new cloud).
+    // Deletes are derived ONLY from the shadow diff — never from local state —
+    // so the engine can never instruct deletion of a local-only pending key it
+    // never had in its shadow (clobber guard).
     const deletes = {};
     for (const domain of [...MAP_DOMAINS, ...ID_MAP_DOMAINS]) {
       const removed = deletedKeys(this._shadow[domain], newShadow[domain]);
       if (removed.length > 0) deletes[domain] = removed;
     }
 
-    // 5. Emit the full assembled cloud state + deletes.
+    // Emit the full assembled cloud state + deletes.
     this.onCloudUpdate(domains, false, { deletes });
 
-    // 6. Advance the shadow and stamp last-synced.
+    // Advance the shadow and stamp last-synced.
     this._shadow = newShadow;
     this.lastSynced = new Date();
+  }
+
+  // Record a sign of cloud life (snapshot / hydrate / successful refresh). The
+  // heartbeat compares _now() against this to detect a stalled listener.
+  _touchActivity() {
+    this._lastActivity = this._now();
+  }
+
+  /**
+   * Re-read the full cloud once and apply it via the shared listener path.
+   *
+   * The catch-up re-fetch used by the heartbeat, the poll fallback, and the
+   * hook's visibility handler when the streaming listener may have died or
+   * never delivered. Reuses _applyAssembledCloud() so the emit + echo
+   * suppression are identical to the live listener. Guarded against no-db /
+   * destroyed; NEVER throws — a read error is captured in syncError.
+   */
+  async refreshFromCloud() {
+    const db = getFirebaseDb();
+    if (!db || this._destroyed) return;
+    try {
+      const { definitionsData, monthDocs } = await this._readCloud();
+      if (this._destroyed) return;
+      this._rawMonths = monthDocs;
+      this._rawDefs = definitionsData;
+      this._applyAssembledCloud();
+      this._touchActivity();
+    } catch (err) {
+      this.syncError = err && err.message ? err.message : String(err);
+      this._notifyStatus();
+    }
+  }
+
+  // Start the heartbeat + poll timers once the listener is subscribed. Seeds
+  // _lastActivity so the heartbeat does not fire immediately on a fresh start.
+  _startResilienceTimers() {
+    this._touchActivity();
+    if (!this._heartbeatTimer) {
+      this._heartbeatTimer = setInterval(
+        () => this._checkHeartbeat(),
+        HEARTBEAT_INTERVAL_MS,
+      );
+    }
+    if (!this._pollTimer) {
+      this._pollTimer = setInterval(() => this._pollTick(), POLL_INTERVAL_MS);
+    }
+  }
+
+  // Heartbeat tick: if the listener has been silent past the dead threshold,
+  // force a catch-up re-fetch (fire-and-forget; it refreshes activity on
+  // success). A method so tests can invoke it deterministically.
+  _checkHeartbeat() {
+    if (this._destroyed) return;
+    if (this._now() - this._lastActivity >= HEARTBEAT_DEAD_MS) {
+      this.refreshFromCloud();
+    }
+  }
+
+  // Poll tick: while the streaming listener has never delivered (channel
+  // blocked), re-fetch the cloud directly. Once a snapshot has arrived this
+  // no-ops. A method so tests can invoke it deterministically.
+  _pollTick() {
+    if (this._destroyed) return;
+    if (!this._listenerDelivered) {
+      this.refreshFromCloud();
+    }
   }
 
   /**
@@ -1134,6 +1245,14 @@ export default class SyncEngineV2 {
     if (this._flushTimer) {
       clearTimeout(this._flushTimer);
       this._flushTimer = null;
+    }
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
+    if (this._pollTimer) {
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
     }
     if (this._unsubMonths) {
       this._unsubMonths();
