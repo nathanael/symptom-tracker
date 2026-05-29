@@ -16,6 +16,15 @@ import { writeFieldUpdates } from './fieldWriter';
 import { MAP_DOMAINS } from './domains';
 import { enqueueOp, listOps, removeOp } from './outbox';
 import { saveSnapshot } from '../utils/snapshots';
+import { needsMigration, readLocalDomains, runMigration } from './migrationV2';
+
+// Legacy blob (OLD model) domain fields stored as STRINGIFIED JSON on the doc
+// `users/{uid}`. trackingMode was stored as a PLAIN string (not stringified).
+// Mirrors the OLD SyncEngine.js STRINGIFIED_DOMAINS + SYNC_DOMAINS.
+const LEGACY_STRINGIFIED_DOMAINS = [
+  'entries', 'dailyNotes', 'stackEntries', 'stackItems',
+  'symptoms', 'inputItems', 'inputEntries', 'pinnedSymptoms',
+];
 
 // Definition domains stored as id-keyed maps in the shadow (so remote deletes
 // of individual records can be detected the same way map domains are).
@@ -715,10 +724,136 @@ export default class SyncEngineV2 {
   }
 
   /**
-   * Read the cloud once and push the assembled domains to React.
+   * Whether readLocalDomains() returned ANY real data (so a migration would
+   * actually carry something). Mirrors hasAnyData's "non-empty map / non-empty
+   * array / present scalar" rule against the flat local-domains shape.
+   */
+  _localHasData() {
+    let local;
+    try {
+      local = readLocalDomains();
+    } catch {
+      return false;
+    }
+    return hasAnyData(local);
+  }
+
+  /**
+   * Run the one-time migration if it hasn't completed AND there is local data
+   * to migrate. Idempotent across boots: once runMigration writes the
+   * `_migration` flag, a later boot reads v2DoneAt and needsMigration() returns
+   * false, so this no-ops (migration runs EXACTLY ONCE). Migration failure is
+   * NON-FATAL: it is caught here, surfaced via syncError, and boot continues.
+   */
+  async _maybeRunMigration(db) {
+    let migrationData = null;
+    try {
+      const snap = await db
+        .collection('users').doc(this.uid)
+        .collection('meta').doc('_migration')
+        .get({ source: 'server' });
+      migrationData = snap && snap.exists ? snap.data() : null;
+    } catch (err) {
+      // Could not read the flag — assume done rather than risk a re-migration.
+      this.syncError = err && err.message ? err.message : String(err);
+      return;
+    }
+
+    if (!needsMigration(migrationData)) return;
+    if (!this._localHasData()) return; // nothing to migrate.
+
+    try {
+      await runMigration({ db, uid: this.uid, now: this._now() });
+    } catch (err) {
+      // Non-fatal: log via syncError and continue booting. The flag stays unset
+      // so a future boot retries.
+      this.syncError = err && err.message ? err.message : String(err);
+    }
+  }
+
+  /**
+   * READ-ONLY legacy fallback. Read the OLD blob doc `users/{uid}`, decode each
+   * stringified domain field, and build BOTH app-shape `domains` and the
+   * diff-shape `shadow` directly. Bare legacy note strings are WRAPPED to
+   * `{ text }` so the engine's shadow/diff sees note objects consistently with
+   * the v2 model (matching migrationV2.stampMapValue, minus the `_t`).
+   *
+   * NEVER writes or deletes the blob. Returns { domains, shadow } or null when
+   * the blob does not exist / read fails.
+   */
+  async _readLegacyBlob(db) {
+    let snap;
+    try {
+      snap = await db.collection('users').doc(this.uid).get({ source: 'server' });
+    } catch {
+      return null;
+    }
+    if (!snap || !snap.exists) return null;
+    const data = snap.data() || {};
+
+    // Decode each stringified field (JSON.parse with a guard); else use as-is.
+    const decoded = {};
+    for (const domain of LEGACY_STRINGIFIED_DOMAINS) {
+      const raw = data[domain];
+      if (typeof raw === 'string') {
+        try { decoded[domain] = JSON.parse(raw); } catch { /* skip corrupt */ }
+      } else if (raw != null) {
+        decoded[domain] = raw;
+      }
+    }
+
+    // dailyNotes: wrap bare string values to { text } for shadow/diff parity.
+    const dailyNotes = {};
+    const rawNotes = (decoded.dailyNotes && typeof decoded.dailyNotes === 'object')
+      ? decoded.dailyNotes : {};
+    for (const key of Object.keys(rawNotes)) {
+      const v = rawNotes[key];
+      dailyNotes[key] = (v && typeof v === 'object') ? v : { text: v };
+    }
+
+    const entries = (decoded.entries && typeof decoded.entries === 'object') ? decoded.entries : {};
+    const stackEntries = (decoded.stackEntries && typeof decoded.stackEntries === 'object') ? decoded.stackEntries : {};
+    const inputEntries = (decoded.inputEntries && typeof decoded.inputEntries === 'object') ? decoded.inputEntries : {};
+    const symptoms = Array.isArray(decoded.symptoms) ? decoded.symptoms : [];
+    const stackItems = Array.isArray(decoded.stackItems) ? decoded.stackItems : [];
+    const inputItems = Array.isArray(decoded.inputItems) ? decoded.inputItems : [];
+    const pinnedSymptoms = Array.isArray(decoded.pinnedSymptoms) ? decoded.pinnedSymptoms : [];
+
+    // App shape (arrays for definition domains, flat maps for map domains).
+    const domains = {
+      entries, dailyNotes, stackEntries, inputEntries,
+      symptoms, stackItems, inputItems, pinnedSymptoms,
+    };
+    // Diff shape (definitions → id-maps; map domains → the same flat maps).
+    const shadow = {
+      entries, dailyNotes, stackEntries, inputEntries,
+      symptoms: arrayToIdMap(symptoms),
+      stackItems: arrayToIdMap(stackItems),
+      inputItems: arrayToIdMap(inputItems),
+      pinnedSymptoms,
+    };
+
+    // trackingMode: PLAIN string on the blob. Present app-side; mirror in shadow.
+    if (typeof data.trackingMode === 'string') {
+      domains.trackingMode = data.trackingMode;
+      shadow.trackingMode = data.trackingMode;
+    }
+
+    return { domains, shadow };
+  }
+
+  /**
+   * Boot sequence:
+   *   1. No db → ready, return null.
+   *   2. One-time migration (localStorage → new model) if needed + local data.
+   *   3. Read the cloud (definitions + months); assemble app-shape domains.
+   *   4. Legacy fallback: if the assembled cloud is empty AND a legacy blob
+   *      exists with data, use the blob's domains/shadow for the emit (READ-ONLY).
+   *   5. Emit initial cloud update if there's data; seed shadow + raw caches.
+   *   6. Start the realtime listener; replay the durable outbox.
    *
    * Returns { domains, shadow } on a successful read, or null when there is no
-   * db or the read fails. Never throws — read errors are captured in
+   * db or the cloud read fails. Never throws — read errors are captured in
    * this.syncError and the engine is still marked ready.
    */
   async initialize() {
@@ -728,6 +863,11 @@ export default class SyncEngineV2 {
       return null;
     }
 
+    // One-time migration BEFORE reading the cloud, so the subsequent _readCloud
+    // sees freshly-migrated months/definitions. Non-fatal on failure.
+    await this._maybeRunMigration(db);
+    if (this._destroyed) return null;
+
     try {
       const { definitionsData, monthDocs } = await this._readCloud();
 
@@ -735,11 +875,25 @@ export default class SyncEngineV2 {
       // emit — a destroyed engine must be fully inert.
       if (this._destroyed) return null;
 
-      // Seed the raw caches so the first listener diff has a baseline.
+      // Seed the raw caches so the first listener diff has a baseline. For the
+      // legacy-fallback case these reflect the (empty) cloud, which is correct:
+      // the listener will pick up real months once a device finishes migrating.
       this._rawMonths = monthDocs;
       this._rawDefs = definitionsData;
 
-      const { domains, shadow } = assembleDomainsFromDocs(definitionsData, monthDocs);
+      let { domains, shadow } = assembleDomainsFromDocs(definitionsData, monthDocs);
+
+      // Legacy fallback: the cloud (months + definitions) is empty. Try the OLD
+      // blob doc as a READ-ONLY source so an un-migrated device still sees data.
+      if (!hasAnyData(domains)) {
+        const legacy = await this._readLegacyBlob(db);
+        if (this._destroyed) return null;
+        if (legacy && hasAnyData(legacy.domains)) {
+          domains = legacy.domains;
+          shadow = legacy.shadow;
+        }
+      }
+
       this._shadow = shadow;
 
       if (hasAnyData(domains) && !this._destroyed) {

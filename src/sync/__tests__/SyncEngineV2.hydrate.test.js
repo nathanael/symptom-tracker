@@ -170,6 +170,13 @@ describe('SyncEngineV2 — initialize + hydrate', () => {
     createEngine();
     const initPromise = engine.initialize();
 
+    // initialize() now reads the one-time _migration flag (a resolved promise)
+    // before _readCloud fires the months get(); flush those microtasks so the
+    // deferred months read is in-flight before we destroy.
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
     // Destroy while the months get() is still pending.
     engine.destroy();
     expect(engine._destroyed).toBe(true);
