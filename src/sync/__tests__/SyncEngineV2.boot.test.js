@@ -28,6 +28,9 @@ let mockMonthsGet;
 let mockMigrationGet;
 let mockBlobGet;
 let mockDbValue;
+// Captures the months-collection onSnapshot callback so a test can simulate
+// Firestore firing it on subscribe (real Firestore fires immediately).
+let capturedMonthsOnSnapshot;
 
 function buildMockDb() {
   const definitionsDocRef = {
@@ -37,7 +40,10 @@ function buildMockDb() {
   const migrationDocRef = { get: (...a) => mockMigrationGet(...a) };
   const monthsCollectionRef = {
     get: (...a) => mockMonthsGet(...a),
-    onSnapshot: vi.fn(() => () => {}),
+    onSnapshot: vi.fn((cb) => {
+      capturedMonthsOnSnapshot = cb;
+      return () => {};
+    }),
   };
   const metaCollectionRef = {
     doc: vi.fn((name) => {
@@ -74,6 +80,7 @@ describe('SyncEngineV2 — boot: migration + legacy blob fallback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cloudUpdates = [];
+    capturedMonthsOnSnapshot = null;
 
     needsMigration.mockReturnValue(false);
     readLocalDomains.mockReturnValue({});
@@ -137,9 +144,13 @@ describe('SyncEngineV2 — boot: migration + legacy blob fallback', () => {
     // READ-ONLY: blob get() called, but no set/update on the user doc.
     expect(mockBlobGet).toHaveBeenCalled();
 
-    // Shadow seeded from the blob: symptoms as id-map, dailyNotes wrapped.
-    expect(engine._shadow.symptoms).toEqual({ s1: { id: 's1', name: 'Headache', order: 0 } });
-    expect(engine._shadow.dailyNotes['2026-03-22']).toEqual({ text: 'felt rough' });
+    // Shadow is NOT seeded from the blob: it must stay consistent with the
+    // ACTUAL (empty) new cloud, so the first listener tick (an empty months
+    // snapshot) is echo-suppressed instead of emitting spurious deletes of the
+    // blob data. The blob is still emitted to React for display (above).
+    expect(engine._shadow.symptoms || {}).toEqual({});
+    expect(engine._shadow.dailyNotes || {}).toEqual({});
+    expect(engine._shadow.entries || {}).toEqual({});
     expect(engine.isReady()).toBe(true);
   });
 
@@ -213,5 +224,42 @@ describe('SyncEngineV2 — boot: migration + legacy blob fallback', () => {
     expect(cloudUpdates.length).toBe(0);
     expect(runMigration).not.toHaveBeenCalled();
     expect(engine.isReady()).toBe(true);
+  });
+
+  it('Test 6: legacy-fallback boot does not delete blob data on the first listener tick', async () => {
+    // New cloud EMPTY (no months, no defs), localStorage EMPTY (no migration),
+    // but a legacy blob with data exists.
+    needsMigration.mockReturnValue(true);
+    readLocalDomains.mockReturnValue({}); // empty → runMigration no-op.
+
+    mockBlobSnap = {
+      exists: true,
+      data: () => ({
+        entries: JSON.stringify({ '2026-05-01-x': { severity: 1 } }),
+        symptoms: JSON.stringify([{ id: 's1', name: 'A' }]),
+      }),
+    };
+
+    createEngine();
+    await engine.initialize();
+
+    // The initial emit (isInitial=true) shows the blob data — display works.
+    const initial = cloudUpdates.find((u) => u.isInitial === true);
+    expect(initial).toBeTruthy();
+    expect(initial.domains.entries['2026-05-01-x']).toEqual({ severity: 1 });
+    expect(initial.domains.symptoms.map((s) => s.id)).toEqual(['s1']);
+
+    // Real Firestore fires the months onSnapshot IMMEDIATELY on subscribe with
+    // the current (empty) snapshot. Simulate that subscribe-time fire.
+    expect(typeof capturedMonthsOnSnapshot).toBe('function');
+    capturedMonthsOnSnapshot({ docs: [] });
+
+    // Across ALL onCloudUpdate calls, the blob keys must NEVER appear in an
+    // opts.deletes — otherwise the hook would wipe the displayed blob data.
+    for (const u of cloudUpdates) {
+      const deletes = (u.opts && u.opts.deletes) || {};
+      expect(deletes.entries || []).not.toContain('2026-05-01-x');
+      expect(deletes.symptoms || []).not.toContain('s1');
+    }
   });
 });

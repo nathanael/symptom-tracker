@@ -885,12 +885,23 @@ export default class SyncEngineV2 {
 
       // Legacy fallback: the cloud (months + definitions) is empty. Try the OLD
       // blob doc as a READ-ONLY source so an un-migrated device still sees data.
+      //
+      // CRITICAL: we override only `domains` (what React displays), NOT `shadow`.
+      // The shadow must stay consistent with the ACTUAL new cloud (empty), which
+      // is what `_rawMonths`/`_rawDefs` reflect. Real Firestore fires the months
+      // onSnapshot immediately on subscribe with the current (empty) snapshot;
+      // _onCloudChanged then re-assembles an empty newShadow and compares it to
+      // `_shadow`. If `_shadow` held the blob data, that diff would compute every
+      // blob key as a REMOTE delete and instruct React to wipe the just-displayed
+      // blob data (and localStorage). Keeping `_shadow` empty makes that first
+      // tick an echo (empty == empty) → suppressed → no spurious deletes. The
+      // blob is still emitted ONCE below for display.
       if (!hasAnyData(domains)) {
         const legacy = await this._readLegacyBlob(db);
         if (this._destroyed) return null;
         if (legacy && hasAnyData(legacy.domains)) {
           domains = legacy.domains;
-          shadow = legacy.shadow;
+          // shadow intentionally left as the empty assembled-cloud shadow.
         }
       }
 
