@@ -86,7 +86,6 @@
       "Bash(xargs*)",
       "Bash(tee*)",
       "Bash(source*)",
-      "Bash(.*)",
       "Bash(chmod*)",
       "Bash(ln*)",
       "Bash(tar*)",
