@@ -152,7 +152,11 @@ describe('SyncEngineV2 — realtime listener', () => {
     expect(u.opts.deletes.entries || []).toEqual([]);
   });
 
-  it('Test 3: remote delete — key B removed from cloud reported in deletes', async () => {
+  it('Test 3: union-only — a key absent from the new snapshot is NOT emitted as a delete', async () => {
+    // UNION-ONLY contract: absence != delete. A snapshot missing key B does not
+    // delete it (the hook keeps it via union merge). This is the deliberate
+    // tradeoff that makes stale/lagging-snapshot data loss impossible; true
+    // cross-device delete propagation is deferred to a tombstone mechanism.
     await initWith({ entries: { A: { v: 1, _t: 100 }, B: { v: 2, _t: 100 } } });
     expect(cloudUpdates.length).toBe(1);
 
@@ -163,9 +167,7 @@ describe('SyncEngineV2 — realtime listener', () => {
     expect(cloudUpdates.length).toBe(2);
     const u = cloudUpdates[1];
     expect(u.isInitial).toBe(false);
-    expect(u.opts.deletes.entries).toEqual(['B']);
-    expect(u.domains.entries.A).toEqual({ v: 1, _t: 100 });
-    expect('B' in u.domains.entries).toBe(false);
+    expect(u.opts.deletes).toEqual({}); // no deletes ever emitted from absence
   });
 
   it('Test 4: cloud value change — newer _t + different value emitted, no deletes', async () => {
@@ -221,7 +223,8 @@ describe('SyncEngineV2 — realtime listener', () => {
     expect(u.domains.trackingMode).toBe('daily');
   });
 
-  it('Test 7: definitions delete — removed symptom id reported in deletes', async () => {
+  it('Test 7: union-only — a removed symptom id is NOT emitted as a delete', async () => {
+    // Same union-only contract for definition domains: absence != delete.
     await initWith({
       entries: {},
       defs: { symptoms: { s1: { id: 's1', name: 'A' }, s2: { id: 's2', name: 'B' } } },
@@ -232,8 +235,7 @@ describe('SyncEngineV2 — realtime listener', () => {
 
     expect(cloudUpdates.length).toBe(2);
     const u = cloudUpdates[1];
-    expect(u.opts.deletes.symptoms).toEqual(['s2']);
-    expect(u.domains.symptoms.map((s) => s.id)).toEqual(['s1']);
+    expect(u.opts.deletes).toEqual({});
   });
 
   it('Test 8: destroy() unsubscribes both listeners', async () => {
@@ -275,7 +277,11 @@ describe('SyncEngineV2 — realtime listener', () => {
   // --- Data-loss regression tripwires (Change 2). These lock in existing
   //     behavior and must stay green permanently. ---
 
-  it('Test 11 (2a): entire month doc removed → its keys reported as remote deletes', async () => {
+  it('Test 11 (2a): union-only — a month doc vanishing does NOT emit deletes for its keys', async () => {
+    // Under union-only, even an entire month doc disappearing from the snapshot
+    // does not delete its keys (the hook keeps them via union merge). A doc can
+    // vanish transiently from a lagging/partial view, so absence must never be
+    // treated as deletion — that was the data-loss bug.
     await initWithDocs({
       monthDocs: [
         { id: '2026-04', data: { entries: { '2026-04-10-a': { _t: 1 } } } },
@@ -292,10 +298,7 @@ describe('SyncEngineV2 — realtime listener', () => {
     expect(cloudUpdates.length).toBe(2);
     const u = cloudUpdates[1];
     expect(u.isInitial).toBe(false);
-    expect(u.opts.deletes.entries).toContain('2026-04-10-a');
-    expect(u.opts.deletes.entries).not.toContain('2026-05-20-b');
-    expect(u.domains.entries['2026-05-20-b']).toEqual({ _t: 1 });
-    expect('2026-04-10-a' in u.domains.entries).toBe(false);
+    expect(u.opts.deletes).toEqual({}); // no deletes from absence
   });
 
   it('Test 12 (2b): defs-only snapshot preserves months cache, no entry deletes', async () => {
