@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import SyncEngineV2 from '../sync/SyncEngineV2';
 import { mergeMapByTime, mergeIdArrayByTime } from '../sync/merge';
+import { readLocalDomains } from '../sync/migrationV2';
 import { saveSnapshot, listSnapshots, restoreSnapshot, bootSnapshotIfStale } from '../utils/snapshots';
 
 // Map domains arrive from the engine as flat `{ key: value+_t }` maps and live
@@ -161,6 +162,15 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     engine.initialize().then(() => {
       if (!engine._destroyed && engine.syncError) {
         setSyncStatus(prev => ({ ...prev, syncError: engine.syncError }));
+      }
+      // Reconcile-on-load: heal silent drift between this device and the cloud.
+      // Reads the REAL cloud and pushes up any local record a dropped upload
+      // left local-only (the shadow wrongly believes it synced), and pulls down
+      // anything a dead listener missed. Additive only — never deletes. This is
+      // what stops "newest items missing on the other device" from persisting
+      // until a manual backup/import. Fire-and-forget; reconcile never throws.
+      if (!engine._destroyed) {
+        engine.reconcile(readLocalDomains());
       }
     });
 
