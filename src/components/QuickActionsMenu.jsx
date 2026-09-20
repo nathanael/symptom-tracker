@@ -43,7 +43,7 @@ export default function QuickActionsMenu({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const currentVersion = 'v6.4.1';
+  const currentVersion = 'v6.4.2';
 
   const tab = showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'protocol';
   const Item = ({ icon, label, hint, danger, primary, onClick }) => (
