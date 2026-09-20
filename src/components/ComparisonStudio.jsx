@@ -1099,7 +1099,7 @@ export default function ComparisonStudio({
   // ── Series rows with inline stats (shared between desktop/mobile) ──
   const fmtVal = (val, fixed) => (val === null || val === undefined || !isFinite(val))
     ? '--'
-    : (fixed || !Number.isInteger(val) ? val.toFixed(1) : val);
+    : (fixed ? val.toFixed(1) : (Math.abs(val) >= 10 ? Math.round(val) : +val.toFixed(1))); // 1516 mg, not 1515.8
   const seriesRow = ({ id, color, name, val, unit, onRemove }) => (
     <div key={id} className={`is-row${id === primarySeriesId ? ' on' : ''}`} onClick={() => makePrimary(id)}>
       <span className="dot" style={{ background: color }} />
@@ -1166,15 +1166,15 @@ export default function ComparisonStudio({
   const stepForward = () => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); };
   const rangeControls = (
     <>
-      <div className="dn-seg">
-        {TIMEFRAMES.map(tf => (
-          <button key={tf.days} className={timeframe === tf.days ? 'on' : ''} onClick={() => { setTimeframe(tf.days); haptic('light'); }}>{tf.label}</button>
-        ))}
-      </div>
       <div className="dn-step">
         <button onClick={stepBack} disabled={startOffset >= maxOffset} aria-label="Earlier"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg></button>
         <span className="dn-date">{dateWindowLabel}</span>
         <button onClick={stepForward} disabled={startOffset === 0} aria-label="Later"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg></button>
+      </div>
+      <div className="dn-seg">
+        {TIMEFRAMES.map(tf => (
+          <button key={tf.days} className={timeframe === tf.days ? 'on' : ''} onClick={() => { setTimeframe(tf.days); haptic('light'); }}>{tf.label}</button>
+        ))}
       </div>
     </>
   );
