@@ -36,7 +36,6 @@
 .lr-pill.on { background: rgba(74,222,128,.22); color: #86efac; }
 
 .lr-keys { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; }
-.lr-tag { font-size: 11px; font-weight: 600; color: #a5b4fc; letter-spacing: .5px; width: 26px; }
 .lr-key { width: 52px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); background: none; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; color: #d1d5db; cursor: pointer; font-family: inherit; }
 .lr-key:hover { border-color: #fff; }
 .lr-key.last { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
@@ -116,7 +115,6 @@
 .lr.mobile .lr-name small { display: block; margin: 1px 0 0; font-size: 13px; }
 .lr.mobile .lr-pill { width: 38px; height: 38px; border-radius: 19px; font-size: 15px; }
 .lr.mobile .lr-keys { flex-wrap: wrap; }
-.lr.mobile .lr-tag { width: 100%; }
 .lr.mobile .lr-key { flex: 1 1 13%; width: auto; height: 50px; font-size: 18px; border-radius: 10px; }
 .lr.mobile .lr-key.wide { flex: 1 1 40%; height: 42px; font-size: 13px; }
 .lr.mobile .lr-key.mobile-only { display: flex; }
