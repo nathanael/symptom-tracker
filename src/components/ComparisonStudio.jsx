@@ -12,7 +12,7 @@ import {
   getHealthScoreSeries,
   getSleepDailySeries,
 } from '../utils/correlationHelpers';
-import { computeLevels, getLevelColor } from '../utils/insightHelpers';
+import { getProtocolEvents, normalRange, beforeAfter, addDays } from '../utils/protocolEvents';
 import HealthScoreCompact from './HealthScoreCompact';
 import SeriesPicker from './SeriesPicker';
 import { useHealthScore } from '../hooks/useHealthScore';
@@ -28,6 +28,7 @@ const SUPPLEMENT_STYLES = [{ color: '#8b5cf6' }, { color: '#a78bfa' }, { color: 
 const SLEEP_STYLES = [{ color: '#22d3ee' }, { color: '#06b6d4' }, { color: '#0ea5e9' }];
 
 const HEALTH_SCORE_COLOR = '#86efac';
+const MARKER_COLOR = '#d4a017';
 
 export default function ComparisonStudio({
   entries,
@@ -231,7 +232,8 @@ export default function ComparisonStudio({
   const H = isDesktop ? desktopChartDims.h : H_MOBILE;
   // Scale factor for fonts/strokes — designed for 500-unit base
   const s = W / 500;
-  const padLeft = (isDesktop ? 36 : 32) * s, padRight = 28 * s, padTop = (isDesktop ? 14 : 28) * s, padBottom = (isDesktop ? 22 : 30) * s;
+  // Mobile drops the axis numbers (the scrub readout gives the values), so the plot runs nearly edge to edge
+  const padLeft = (isDesktop ? 36 : 6) * s, padRight = (isDesktop ? 28 : 6) * s, padTop = (isDesktop ? 14 : 30) * s, padBottom = (isDesktop ? 22 : 36) * s;
   const chartW = W - padLeft - padRight;
   const chartH = H - padTop - padBottom;
 
@@ -356,14 +358,6 @@ export default function ComparisonStudio({
   const primaryIsSymptom = selectedSymptoms.includes(primarySeriesId);
   const primaryIsSupplement = selectedSupplements.includes(primarySeriesId);
   const primaryIsSleep = selectedSleepMetrics.includes(primarySeriesId);
-  const primarySleepMetric = primaryIsSleep ? SLEEP_METRICS.find(m => m.key === primarySeriesId) : null;
-  // higherIsBetter semantics for primary series: symptom→false, supplement→true, sleep→metric.higherIsBetter
-  const primaryHigherIsBetter = primaryIsSymptom
-    ? false
-    : primaryIsSleep
-      ? (primarySleepMetric?.higherIsBetter ?? true)
-      : true;
-
   // Sleep primary Y-axis range
   const primarySleepIdx = selectedSleepMetrics.indexOf(primarySeriesId);
   const primarySleepValues = primarySleepIdx >= 0 ? sleepTransformed[primarySleepIdx]?.transformed.values : null;
@@ -386,23 +380,59 @@ export default function ComparisonStudio({
     return labels;
   }, [primaryIsSleep, sleepYMax]);
 
-  // Y-axis max for the primary series (used by level-segment overlays)
-  const primaryYMax = primaryIsSleep ? sleepYMax : (primaryIsSupplement ? suppYMax : 5);
+  // ── The primary symptom's own normal, change vs the previous window, and protocol changes ──
 
-  const primaryDailyValues = useMemo(() => {
-    const suppIdx = selectedSupplements.indexOf(primarySeriesId);
-    if (suppIdx >= 0 && suppDoseSeries[suppIdx]) return suppDoseSeries[suppIdx];
-    const symIdx = selectedSymptoms.indexOf(primarySeriesId);
-    if (symIdx >= 0 && symptomTransformed[symIdx]) return symptomTransformed[symIdx].smoothed;
-    const sleepIdx = selectedSleepMetrics.indexOf(primarySeriesId);
-    if (sleepIdx >= 0 && sleepTransformed[sleepIdx]) return sleepTransformed[sleepIdx].smoothed;
-    return null;
-  }, [primarySeriesId, selectedSupplements, suppDoseSeries, selectedSymptoms, symptomTransformed, selectedSleepMetrics, sleepTransformed]);
+  // Usual range of the primary symptom over the last 90 days, whatever window is on screen
+  const normalBand = useMemo(() => {
+    if (!primaryIsSymptom) return null;
+    const last90 = Array.from({ length: 90 }, (_, i) => addDays(todayStr, i - 89));
+    return normalRange(getSymptomDailySeries(entries, primarySeriesId, last90, trackingMode));
+  }, [primaryIsSymptom, primarySeriesId, entries, trackingMode, todayStr]);
 
-  const levels = useMemo(() => {
-    if (!primaryDailyValues || primaryIsSupplement) return [];
-    return computeLevels(primaryDailyValues, dates, timeframe);
-  }, [primaryDailyValues, primaryIsSupplement, dates, timeframe]);
+  const primarySymptomColor = primaryIsSymptom ? SYMPTOM_STYLES[selectedSymptoms.indexOf(primarySeriesId)].color : null;
+  const primaryDailyLogged = useMemo(
+    () => (primaryIsSymptom ? getSymptomDailySeries(entries, primarySeriesId, dates, trackingMode) : null),
+    [primaryIsSymptom, primarySeriesId, entries, dates, trackingMode]
+  );
+
+  // Each symptom's change in points against the window before this one (null until both have a few logged days)
+  const symptomDeltas = useMemo(() => {
+    const prior = Array.from({ length: timeframe }, (_, i) => addDays(dates[0], i - timeframe));
+    const avgOf = (symId, ds) => {
+      const logged = getSymptomDailySeries(entries, symId, ds, trackingMode).filter(v => v !== null && v !== undefined && v >= 0);
+      return logged.length >= 3 ? logged.reduce((a, b) => a + b, 0) / logged.length : null;
+    };
+    const out = {};
+    selectedSymptoms.forEach((symId) => {
+      const now = avgOf(symId, dates);
+      const before = avgOf(symId, prior);
+      out[symId] = now !== null && before !== null ? now - before : null;
+    });
+    return out;
+  }, [selectedSymptoms, entries, dates, timeframe, trackingMode]);
+
+  // Starts, stops and dose changes inside the window, one marker per day
+  const protocolMarkers = useMemo(() => {
+    const byDate = new Map();
+    getProtocolEvents(stackItems, stackEntries, todayStr).forEach((ev) => {
+      const idx = dates.indexOf(ev.date);
+      if (idx < 0) return;
+      if (!byDate.has(ev.date)) byDate.set(ev.date, { date: ev.date, idx, events: [] });
+      byDate.get(ev.date).events.push(ev);
+    });
+    return [...byDate.values()].map(m => ({ ...m, label: m.events.length === 1 ? m.events[0].label : `${m.events.length} changes` }));
+  }, [stackItems, stackEntries, dates, todayStr]);
+
+  const [pickedMarkerDate, setPickedMarkerDate] = useState(null);
+  const activeMarker = protocolMarkers.find(m => m.date === pickedMarkerDate) || protocolMarkers[protocolMarkers.length - 1] || null;
+
+  // What the change is measured against: the primary symptom, else the first symptom on the chart
+  const compareSymptomId = primaryIsSymptom ? primarySeriesId : (selectedSymptoms[0] || null);
+  const markerEffect = useMemo(() => {
+    if (!activeMarker || !compareSymptomId) return null;
+    const result = beforeAfter((ds) => getSymptomDailySeries(entries, compareSymptomId, ds, trackingMode), activeMarker.date, todayStr);
+    return { result, symptom: symptoms.find(s => s.id === compareSymptomId) };
+  }, [activeMarker, compareSymptomId, entries, trackingMode, todayStr, symptoms]);
 
   // ── Chart points ──
 
@@ -796,8 +826,8 @@ export default function ComparisonStudio({
         <line x1={padLeft} y1={padTop + chartH} x2={W - padRight} y2={padTop + chartH} stroke="rgba(255,255,255,0.12)" strokeWidth={0.5 * s} />
       </>}
 
-      {/* Left Y-axis — primary series scale */}
-      {healthScoreVisible && (!hasAnySeries || primarySeriesId === '__healthScore__') && hsYRange ? (
+      {/* Left Y-axis — primary series scale (desktop; mobile keeps just the lines) */}
+      {!isDesktop ? null : healthScoreVisible && (!hasAnySeries || primarySeriesId === '__healthScore__') && hsYRange ? (
         (() => {
           const { min: yMin, max: yMax } = hsYRange;
           const step = (yMax - yMin) <= 30 ? 5 : 10;
@@ -838,7 +868,7 @@ export default function ComparisonStudio({
       )}
 
       {/* Right Y-axis: secondary scale (only when dual-axis mode) */}
-      {selectedSupplements.length > 0 && selectedSymptoms.length > 0 && (
+      {isDesktop && selectedSupplements.length > 0 && selectedSymptoms.length > 0 && (
         primaryIsSupplement ? (
           [0, 2.5, 5].map((sev, i) => {
             const y = padTop + chartH - (sev / 5) * chartH;
@@ -860,8 +890,28 @@ export default function ComparisonStudio({
 
       {/* X-axis */}
       {xLabels.map((lbl, i) => (
-        <text key={i} x={lbl.x} y={H - 6 * s} textAnchor="middle"
-          fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="inherit" fontWeight={isDesktop ? 'normal' : '500'}>{lbl.label}</text>
+        <text key={i} x={lbl.x} y={H - (isDesktop ? 6 : 10) * s}
+          textAnchor={isDesktop ? 'middle' : i === 0 ? 'start' : lbl.x > W - padRight - 20 * s ? 'end' : 'middle'}
+          fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 16) * s} fontFamily="inherit" fontWeight={isDesktop ? 'normal' : '500'}>{lbl.label}</text>
+      ))}
+
+      {/* The primary symptom's usual range, and what was actually logged each day */}
+      {normalBand && (() => {
+        const yHi = padTop + chartH - (normalBand.hi / 5) * chartH;
+        const yLo = padTop + chartH - (normalBand.lo / 5) * chartH;
+        return (
+          <g>
+            <rect x={padLeft} y={yHi} width={chartW} height={Math.max(0, yLo - yHi)} fill={primarySymptomColor} opacity={0.1} />
+            <text x={W - padRight - 4 * s} y={yHi + (isDesktop ? 9 : 19) * s} textAnchor="end" fill="#9ca3af" opacity={0.8}
+              fontSize={(isDesktop ? 7 : 15) * s} fontFamily="inherit">your normal</text>
+          </g>
+        );
+      })()}
+      {!showDots && primaryDailyLogged && timeframe <= 90 && primaryDailyLogged.map((val, i) => (
+        val !== null && val !== undefined && val >= 0 && (
+          <circle key={`raw-${i}`} cx={padLeft + (i / Math.max(1, dates.length - 1)) * chartW} cy={padTop + chartH - (val / 5) * chartH}
+            r={(isDesktop ? 1.5 : 2.2) * s} fill={primarySymptomColor} opacity={0.45} />
+        )
       ))}
 
       {/* Supplement lines */}
@@ -909,76 +959,22 @@ export default function ComparisonStudio({
         />
       )}
 
-      {/* Level segments: 4 layers — bg boxes, then trend lines, then text */}
-      {/* Layer 1: Dark background boxes (behind everything) */}
-      {levels.map((level, i) => {
-        if (level.average === null) return null;
-        if (isDesktop) return null;
-        const y = padTop + chartH - (level.average / primaryYMax) * chartH;
-        const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
-        const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
-        const xMid = (x1 + x2) / 2;
-        const avgLabel = primaryIsSymptom
-          ? level.average.toFixed(1)
-          : (Number.isInteger(level.average) ? level.average : Math.round(level.average));
-        const avgFs = 11 * s;
-        const pctFs = 10 * s;
-        const hasPct = level.percentChange !== null && Math.abs(level.percentChange) >= 2;
-        const pctText = hasPct ? `${level.percentChange > 0 ? '+' : ''}${Math.round(level.percentChange)}%` : null;
-        const bgPadX = 5 * s;
-        const bgPadY = 3 * s;
-        const avgW = String(avgLabel).length * avgFs * 0.65 + bgPadX * 2;
-        const avgH = avgFs + bgPadY * 2;
+      {/* Protocol changes: a flag on the time axis; the picked one carries its label */}
+      {protocolMarkers.map((m) => {
+        const x = padLeft + (m.idx / Math.max(1, dates.length - 1)) * chartW;
+        const active = activeMarker?.date === m.date;
+        const base = padTop + chartH;
+        const flag = (isDesktop ? 3 : 5) * s;
+        const nearRight = x > W - padRight - (isDesktop ? 90 : 190) * s;
         return (
-          <g key={`level-bg-${i}`}>
-            <rect x={xMid - avgW / 2} y={y - 6 * s - avgFs - bgPadY} width={avgW} height={avgH} rx={3 * s} fill="rgba(0,0,0,0.50)" />
-            {pctText && (() => {
-              const pctW = pctText.length * pctFs * 0.6 + bgPadX * 2;
-              const pctH = pctFs + bgPadY * 2;
-              return <rect x={xMid - pctW / 2} y={y + 13 * s - pctFs - bgPadY} width={pctW} height={pctH} rx={3 * s} fill="rgba(0,0,0,0.50)" />;
-            })()}
-          </g>
-        );
-      })}
-
-      {/* Layer 2: Trend lines (on top of bg boxes) */}
-      {levels.map((level, i) => {
-        if (level.average === null) return null;
-        const y = padTop + chartH - (level.average / primaryYMax) * chartH;
-        const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
-        const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
-        const color = getLevelColor(level.percentChange, primaryHigherIsBetter);
-        return (
-          <line key={`level-line-${i}`} x1={x1} y1={y} x2={x2} y2={y}
-            stroke={color} strokeWidth={(isDesktop ? 1.6 : 3.0) * s} strokeLinecap="round" />
-        );
-      })}
-
-      {/* Layer 3: Text labels only (on top of trend lines) */}
-      {levels.map((level, i) => {
-        if (level.average === null) return null;
-        const y = padTop + chartH - (level.average / primaryYMax) * chartH;
-        const x1 = padLeft + (level.startIdx / Math.max(1, dates.length - 1)) * chartW;
-        const x2 = padLeft + (level.endIdx / Math.max(1, dates.length - 1)) * chartW;
-        const xMid = (x1 + x2) / 2;
-        const color = getLevelColor(level.percentChange, primaryHigherIsBetter);
-        const avgLabel = primaryIsSymptom
-          ? level.average.toFixed(1)
-          : (Number.isInteger(level.average) ? level.average : Math.round(level.average));
-        const avgFs = (isDesktop ? 8 : 11) * s;
-        const pctFs = (isDesktop ? 7 : 10) * s;
-        const hasPct = level.percentChange !== null && Math.abs(level.percentChange) >= 2;
-        return (
-          <g key={`level-text-${i}`}>
-            <text x={xMid} y={y - 6 * s} textAnchor="middle"
-              fill={isDesktop ? color : '#fff'} fontSize={avgFs} fontWeight={isDesktop ? '600' : '700'} fontFamily="inherit">
-              {avgLabel}
-            </text>
-            {hasPct && (
-              <text x={xMid} y={y + 13 * s} textAnchor="middle"
-                fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="inherit">
-                {level.percentChange > 0 ? '+' : ''}{Math.round(level.percentChange)}%
-              </text>
+          <g key={`pm-${m.date}`} opacity={active ? 1 : 0.45} style={{ cursor: 'pointer' }} onClick={() => { setPickedMarkerDate(m.date); haptic('light'); }}>
+            <title>{m.events.map(ev => ev.label).join(', ')}</title>
+            <rect x={x - 8 * s} y={padTop} width={16 * s} height={chartH} fill="transparent" />
+            <line x1={x} y1={padTop} x2={x} y2={base} stroke={MARKER_COLOR} strokeWidth={(isDesktop ? 0.6 : 1.2) * s} strokeDasharray={`${3 * s},${3 * s}`} />
+            <path d={`M${x - flag} ${base} L${x} ${base - flag * 1.4} L${x + flag} ${base} Z`} fill={MARKER_COLOR} />
+            {active && !(touchX !== null && !isDesktop) && (
+              <text x={nearRight ? x - 4 * s : x + 4 * s} y={padTop - (isDesktop ? 4 : 9) * s} textAnchor={nearRight ? 'end' : 'start'}
+                fill={MARKER_COLOR} fontSize={(isDesktop ? 7 : 16) * s} fontFamily="inherit" fontWeight="500">{m.label}</text>
             )}
           </g>
         );
@@ -1044,11 +1040,22 @@ export default function ComparisonStudio({
   const fmtVal = (val, fixed) => (val === null || val === undefined || !isFinite(val))
     ? '--'
     : (fixed ? val.toFixed(1) : (Math.abs(val) >= 10 ? Math.round(val) : +val.toFixed(1))); // 1516 mg, not 1515.8
-  const seriesRow = ({ id, color, name, val, unit, onRemove }) => (
+  // Symptoms: down is good. Under a tenth of a point is "no change".
+  const deltaTag = (delta, title) => {
+    if (delta === null || delta === undefined) return null;
+    const flat = Math.abs(delta) < 0.1;
+    return (
+      <span className={`delta ${flat ? '' : delta < 0 ? 'good' : 'bad'}`} title={title}>
+        {flat ? '–' : `${delta < 0 ? '▼' : '▲'}${Math.abs(delta).toFixed(1)}`}
+      </span>
+    );
+  };
+  const seriesRow = ({ id, color, name, val, unit, delta, onRemove }) => (
     <div key={id} className={`is-row${id === primarySeriesId ? ' on' : ''}`} onClick={() => makePrimary(id)}>
       <span className="dot" style={{ background: color }} />
       <span className="name">{name}</span>
       <span className="val">{val}{unit && val !== '--' && <small> {unit}</small>}</span>
+      {!crosshairData && deltaTag(delta, `vs previous ${timeframe} days`)}
       <button className="x" aria-label={`Remove ${name}`} onClick={(e) => { e.stopPropagation(); onRemove(); }}>&times;</button>
     </div>
   );
@@ -1076,6 +1083,7 @@ export default function ComparisonStudio({
           color: SYMPTOM_STYLES[idx].color,
           name: `${sym?.name ?? ''}${sym?.description ? ` (${sym.description})` : ''}`,
           val: fmtVal(legendVal(symId), true),
+          delta: symptomDeltas[symId],
           onRemove: () => removeSymptom(symId),
         });
       })}
@@ -1124,7 +1132,7 @@ export default function ComparisonStudio({
   );
 
   const valuesCaption = (
-    <div className={`is-cap${scrubDate ? ' on' : ''}`}>{scrubDate || `${timeframe}-day average`}</div>
+    <div className={`is-cap${scrubDate ? ' on' : ''}`}>{scrubDate || `${timeframe}-day average${selectedSymptoms.length > 0 ? ` · change vs previous ${timeframe}` : ''}`}</div>
   );
 
   // Mobile: the thumb hides the crosshair, so the day and its values read out above the chart
@@ -1138,6 +1146,37 @@ export default function ComparisonStudio({
           ))}
         </>
       ) : 'Drag across the chart to read a day'}
+    </div>
+  );
+
+  // What the compared symptom did around the picked protocol change
+  const fmtDay = (dateStr) => new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const sinceText = activeMarker && (activeMarker.events.length === 1 ? activeMarker.events[0].since : `${activeMarker.events.length} protocol changes`);
+  const markerChip = activeMarker && (
+    <div className="is-effect">
+      {protocolMarkers.length > 1 && (
+        <div className="is-effect-tabs">
+          {protocolMarkers.map(m => (
+            <button key={m.date} className={m.date === activeMarker.date ? 'on' : ''} onClick={() => { setPickedMarkerDate(m.date); haptic('light'); }}>
+              <span className="flag" />{m.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {!markerEffect ? (
+        <p>Add a symptom to see how it changed since {sinceText} on {fmtDay(activeMarker.date)}.</p>
+      ) : !markerEffect.result ? (
+        <p>Since {sinceText} on {fmtDay(activeMarker.date)}: not enough logged days on both sides to compare yet.</p>
+      ) : (
+        <>
+          <p>
+            Since {sinceText} on {fmtDay(activeMarker.date)}, <b>{markerEffect.symptom?.name}</b> went
+            from <b>{markerEffect.result.before.toFixed(1)}</b> to <b>{markerEffect.result.after.toFixed(1)}</b>{' '}
+            {deltaTag(+markerEffect.result.after.toFixed(1) - +markerEffect.result.before.toFixed(1))}
+          </p>
+          <small>Average of the 30 days before, against the {markerEffect.result.afterDays} day{markerEffect.result.afterDays === 1 ? '' : 's'} since.</small>
+        </>
+      )}
     </div>
   );
 
@@ -1180,13 +1219,16 @@ export default function ComparisonStudio({
             <div className="is-gap" />
             {seriesChips}
           </div>
-          <div ref={chartContainerRef} style={{ flex: 1, minWidth: 0, touchAction: 'none', paddingLeft: '12px', height: '100%' }}>
-            <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}
-              onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
-              style={{ display: 'block' }}
-            >
-              {chartSVGContent}
-            </svg>
+          <div style={{ flex: 1, minWidth: 0, paddingLeft: '12px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div ref={chartContainerRef} style={{ flex: 1, minHeight: 0, touchAction: 'none' }}>
+              <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}
+                onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
+                style={{ display: 'block' }}
+              >
+                {chartSVGContent}
+              </svg>
+            </div>
+            {markerChip}
           </div>
         </div>
       ) : (
@@ -1203,12 +1245,17 @@ export default function ComparisonStudio({
               onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
               onTouchStart={e => { e.preventDefault(); const t = e.touches[0]; setTouchX(getSnappedIndex(t.clientX)); }}
               onTouchMove={e => { e.preventDefault(); const t = e.touches[0]; setTouchX(getSnappedIndex(t.clientX)); }}
-              onTouchEnd={() => setTouchX(null)}
+              onTouchEnd={() => {
+                const near = protocolMarkers.find(m => Math.abs(m.idx - touchX) <= Math.max(1, Math.round(dates.length / 40)));
+                if (near) { setPickedMarkerDate(near.date); haptic('light'); }
+                setTouchX(null);
+              }}
               style={{ display: 'block' }}
             >
               {chartSVGContent}
             </svg>
           </div>
+          {markerChip}
         </div>
       )}
     </div>
