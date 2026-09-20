@@ -84,9 +84,9 @@ export default function SymptomRows({
     if (idx >= 0) setFocus({ id: activeSymptoms[idx].id, period: periodId });
   }, [activeSymptoms]);
 
-  const rate = (symptom, periodId, severity) => {
+  const rate = (symptom, periodId, severity, { stay = false } = {}) => {
     quickLog(symptom.id, severity, periodId);
-    advance(symptom.id, periodId);
+    if (!stay) advance(symptom.id, periodId);
   };
 
   const clearEntry = (symptom, periodId) => {
@@ -344,6 +344,12 @@ export default function SymptomRows({
               <div
                 key={symptom.id}
                 className={`lr-row lr-cols ${open ? 'open' : ''} ${done ? 'done' : ''}`}
+                // Desktop: the row under the mouse is the selected row. Uses mousemove, not mouseenter, so rows
+                // sliding under a resting cursor (scrolling, arrow keys) don't steal the keyboard selection.
+                onMouseMove={isDesktop && !open ? () => {
+                  const period = isApplicable(symptom, focus.period) ? focus.period : timePeriods.find((p) => isApplicable(symptom, p.id)).id;
+                  setFocus({ id: symptom.id, period });
+                } : undefined}
                 onClick={() => {
                   if (open && !isDesktop) { setFocus((f) => ({ ...f, id: null })); return; }
                   const period = isApplicable(symptom, focus.period) ? focus.period : timePeriods.find((p) => isApplicable(symptom, p.id)).id;
@@ -365,7 +371,7 @@ export default function SymptomRows({
                           className={`${n === NA_SEVERITY ? 'na' : ''} ${selected ? 'on' : lastSeverity === n ? 'last' : ''}`}
                           style={n === NA_SEVERITY ? undefined : { '--c': n === 0 ? '#9ca3af' : STRIP_COLOR[n], '--bg': SEV_BG[n], '--fg': SEV_FG[n] }}
                           title={selected ? 'Click again to clear' : undefined}
-                          onClick={() => (selected ? clearEntry(symptom, focus.period) : rate(symptom, focus.period, n))}
+                          onClick={() => (selected ? clearEntry(symptom, focus.period) : rate(symptom, focus.period, n, { stay: true }))}
                         >
                           {n === NA_SEVERITY ? 'N/A' : n}
                         </button>
