@@ -22,8 +22,6 @@ import {
   trackingModes,
   defaultSymptoms,
   defaultStackItems,
-  HOLD_DELAY,
-  DRAG_SENSITIVITY,
   SWIPE_THRESHOLD,
   SWIPE_TIME_LIMIT,
 } from './utils/constants';
@@ -41,21 +39,21 @@ import {
   getInsights,
   exportCSV,
 } from './utils/helpers';
+import { clearDay, restoreDay } from './utils/listHelpers';
+import { liveItems, markDeleted, restoreDeleted, isExpired, removeEntriesFor } from './utils/softDelete';
 
 // Components
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import DesktopToolbar from './components/DesktopToolbar';
-import SymptomList from './components/SymptomList';
-import Stack from './components/Stack';
-import Inputs from './components/Inputs';
+import SymptomRows from './components/SymptomRows';
+import UndoToast from './components/UndoToast';
+import ProtocolRows from './components/ProtocolRows';
 import Calendar from './components/Calendar';
 import Insights from './components/Insights';
 import Settings from './components/Settings';
 import Export from './components/Export';
-import RapidEntry from './components/RapidEntry';
 import NoteModal from './components/NoteModal';
-import DayNightToggle from './components/DayNightToggle';
 import SymptomGraph from './components/SymptomGraph';
 import SupplementGraph from './components/SupplementGraph';
 
@@ -63,7 +61,6 @@ function App() {
   // App mode: 'symptoms' or 'stack'
   const [appMode, setAppMode] = useState('symptoms');
   // Protocol sub-view: 'stack' or 'inputs'
-  const [protocolView, setProtocolView] = useState('stack');
   const scrollContainerRef = useRef(null);
 
   // Firebase (auth only)
@@ -192,24 +189,16 @@ function App() {
   const [copyToastMessage, setCopyToastMessage] = useState('');
   const [symptomSearch, setSymptomSearch] = useState('');
   const [protocolSearch, setProtocolSearch] = useState('');
-  const [searchVisible, setSearchVisible] = useState(false);
-  const [quickLogSymptom, setQuickLogSymptom] = useState(null);
-  const [quickLogTime, setQuickLogTime] = useState(null);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [insightsWindow, setInsightsWindow] = useState(60);
 
-  // Rapid entry state
-  const [rapidEntryMode, setRapidEntryMode] = useState(false);
-  const [rapidEntryConfirm, setRapidEntryConfirm] = useState(false);
-  const [rapidEntryIndex, setRapidEntryIndex] = useState(0);
 
   // Flash column indicator
-  const [flashColumn, setFlashColumn] = useState(null);
 
   // Manage symptoms/stack/inputs screens
-  const [showAddSymptom, setShowAddSymptom] = useState(false);
-  const [showManageStack, setShowManageStack] = useState(false);
-  const [showManageInputs, setShowManageInputs] = useState(false);
+  const [symptomEditMode, setSymptomEditMode] = useState(false);
+  const [undoToast, setUndoToast] = useState(null);
+  const [protocolEditMode, setProtocolEditMode] = useState(false);
 
   // Desktop mode
   const isDesktop = useDesktopMode();
@@ -220,9 +209,9 @@ function App() {
   const justLoggedRef = useRef(false);
 
   // Deferred entries: during rapid-fire entry, React defers re-renders of
-  // components that use this value, keeping the main thread free for the
-  // active RapidEntry overlay. Heavy components (SymptomList, Stack, Insights,
-  // health score, tab badges) use deferredEntries instead of entries.
+  // components that use this value, keeping keyboard logging responsive.
+  // Heavy components (SymptomRows, ProtocolRows, Insights, health score,
+  // tab badges) use deferredEntries instead of entries.
   const deferredEntries = useDeferredValue(entries);
   const deferredStackEntries = useDeferredValue(stackEntries);
 
@@ -280,13 +269,18 @@ function App() {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0;
     }
-  }, [appMode, protocolView]);
+  }, [appMode]);
 
   // Derived values
   const timePeriods = trackingModes[trackingMode].periods;
 
+  // Soft-deleted items stay in state (and sync) until purged, but nothing renders them
+  const liveSymptoms = useMemo(() => liveItems(symptoms), [symptoms]);
+  const liveStackItems = useMemo(() => liveItems(stackItems), [stackItems]);
+  const liveInputItems = useMemo(() => liveItems(inputItems), [inputItems]);
+
   const activeSymptoms = useMemo(() => {
-    let active = symptoms.filter(s => s.active);
+    let active = liveSymptoms.filter(s => s.active);
     if (symptomSearch.trim()) {
       const search = symptomSearch.toLowerCase();
       active = active.filter(s => s.name.toLowerCase().includes(search));
@@ -298,45 +292,7 @@ function App() {
       if (!aPinned && bPinned) return 1;
       return (a.order || 0) - (b.order || 0);
     });
-  }, [symptoms, symptomSearch, pinnedSymptoms]);
-
-  const totalActiveSymptoms = useMemo(() =>
-    symptoms.filter(s => s.active).length,
-    [symptoms]
-  );
-
-  const incompleteSymptoms = useMemo(() => {
-    const dateKey = selectedDate.toISOString().split('T')[0];
-    const timePeriod = quickLogTime || (new Date().getHours() < 12 ? 'morning' : 'evening');
-
-    const allActive = symptoms.filter(s => s.active).sort((a, b) => {
-      const aPinned = pinnedSymptoms.has(a.id);
-      const bPinned = pinnedSymptoms.has(b.id);
-      if (aPinned && !bPinned) return -1;
-      if (!aPinned && bPinned) return 1;
-      return (a.order || 0) - (b.order || 0);
-    });
-
-    return allActive.filter(symptom => {
-      if (trackingMode === 'ampm') {
-        // Auto-N/A: symptom doesn't apply to this period
-        if (symptom.applicablePeriods && !symptom.applicablePeriods.includes(timePeriod)) return false;
-        const hasTimePeriodEntry = deferredEntries[`${dateKey}-${symptom.id}-${timePeriod}`];
-        if (hasTimePeriodEntry) return false;
-        if (timePeriod === 'morning' && deferredEntries[`${dateKey}-${symptom.id}-daily`]) {
-          return false;
-        }
-        return true;
-      } else {
-        const hasDailyEntry = deferredEntries[`${dateKey}-${symptom.id}-daily`];
-        if (hasDailyEntry) return false;
-        const hasMorningEntry = deferredEntries[`${dateKey}-${symptom.id}-morning`];
-        const hasEveningEntry = deferredEntries[`${dateKey}-${symptom.id}-evening`];
-        if (hasMorningEntry || hasEveningEntry) return false;
-        return true;
-      }
-    });
-  }, [symptoms, deferredEntries, selectedDate, quickLogTime, trackingMode, pinnedSymptoms]);
+  }, [liveSymptoms, symptomSearch, pinnedSymptoms]);
 
   // Check for date changes (midnight) - uses local time
   useEffect(() => {
@@ -442,31 +398,156 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firebase.user, sync.isReady]);
 
+  const dismissUndoToast = useCallback(() => setUndoToast(null), []);
+
+  // List keyboard entry is live only when nothing is layered over the list
+  const listKeyboardEnabled = !showSettings && !showCalendar && !showExport && !showNoteModal
+    && !showSymptomGraph && !showSupplementGraph && !showInsights;
+
+  // Clear every symptom entry for the selected day; undoable from the toast
+  const clearSymptomDay = () => {
+    const { next, removed } = clearDay(entries, getDateKey(selectedDate));
+    const count = Object.keys(removed).length;
+    if (count === 0) return;
+    setEntries(next);
+    haptic('medium');
+    setUndoToast({
+      message: `Cleared ${count} ${count === 1 ? 'entry' : 'entries'} for ${formatDate(selectedDate)}`,
+      onUndo: () => setEntries(prev => ({ ...removed, ...prev })),
+    });
+  };
+
+  // Soft delete (90-day retention). kind: 'symptom' | 'supplement' | 'factor'
+  const DOMAIN = {
+    symptom: { setItems: setSymptoms, setEntries, idField: 'symptomId' },
+    supplement: { setItems: setStackItems, setEntries: setStackEntries, idField: 'itemId' },
+    factor: { setItems: setInputItems, setEntries: setInputEntries, idField: 'inputId' },
+  };
+
+  const softDeleteItem = (kind, item) => {
+    const { setItems } = DOMAIN[kind];
+    setItems(prev => prev.map(i => (i.id === item.id ? markDeleted(i) : i)));
+    setUndoToast({
+      message: `Deleted “${item.name}”. Restorable from Settings for 90 days`,
+      onUndo: () => setItems(prev => prev.map(i => (i.id === item.id ? { ...i, deletedAt: null } : i))),
+    });
+  };
+
+  const restoreDeletedItem = (kind, item) => {
+    DOMAIN[kind].setItems(prev => prev.map(i => (i.id === item.id ? restoreDeleted(i) : i)));
+    setLastAction(`Restored ${item.name}`);
+  };
+
+  const purgeItems = (kind, ids) => {
+    if (ids.length === 0) return;
+    const { setItems, setEntries: setDomainEntries, idField } = DOMAIN[kind];
+    setItems(prev => prev.filter(i => !ids.includes(i.id)));
+    setDomainEntries(prev => removeEntriesFor(prev, ids, idField));
+  };
+
+  const purgeItemNow = (kind, item) => {
+    purgeItems(kind, [item.id]);
+    setLastAction(`Deleted ${item.name} permanently`);
+  };
+
+  // Purge anything past retention once state is settled: signed-out, or signed-in with sync hydrated.
+  // Never while auth is still resolving, so a half-loaded cache can't drive deletes.
+  const purgeRanRef = useRef(false);
+  useEffect(() => {
+    if (purgeRanRef.current || firebase.authLoading) return;
+    if (firebase.user && !sync.isReady) return;
+    purgeRanRef.current = true;
+    purgeItems('symptom', symptoms.filter(i => isExpired(i)).map(i => i.id));
+    purgeItems('supplement', stackItems.filter(i => isExpired(i)).map(i => i.id));
+    purgeItems('factor', inputItems.filter(i => isExpired(i)).map(i => i.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firebase.authLoading, firebase.user, sync.isReady]);
+
+  // Protocol bulk actions: act immediately, undo restores the day exactly as it was
+  const withProtocolUndo = (message, mutate) => {
+    const dateKey = getDateKey(selectedDate);
+    const stackSnapshot = clearDay(stackEntries, dateKey).removed;
+    const inputSnapshot = clearDay(inputEntries, dateKey).removed;
+    mutate(dateKey);
+    setUndoToast({
+      message,
+      onUndo: () => {
+        setStackEntries(prev => restoreDay(prev, dateKey, stackSnapshot));
+        setInputEntries(prev => restoreDay(prev, dateKey, inputSnapshot));
+      },
+    });
+  };
+
+  const protocolCheckAll = () => withProtocolUndo('Checked all supplements due', (dateKey) => {
+    const due = liveStackItems.filter(i => i.active && isScheduledForDate(i.schedule, selectedDate));
+    setStackEntries(prev => {
+      const next = { ...prev };
+      due.forEach(item => {
+        const key = `${dateKey}-${item.id}`;
+        if (!next[key]) next[key] = { date: dateKey, itemId: item.id, dose: item.defaultDose, taken: true };
+      });
+      return next;
+    });
+    haptic('success');
+  });
+
+  const protocolClearDay = () => withProtocolUndo(`Cleared protocol for ${formatDate(selectedDate)}`, (dateKey) => {
+    setStackEntries(prev => clearDay(prev, dateKey).next);
+    setInputEntries(prev => clearDay(prev, dateKey).next);
+    haptic('medium');
+  });
+
+  const protocolMatchYesterday = () => {
+    const yesterday = new Date(selectedDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayKey = getDateKey(yesterday);
+    const source = Object.values(clearDay(stackEntries, yesterdayKey).removed);
+    if (source.length === 0) { setLastAction('No entries from yesterday'); return; }
+    withProtocolUndo(`Matched ${formatDate(yesterday)}`, (dateKey) => {
+      setStackEntries(prev => {
+        const next = { ...prev };
+        source.forEach(entry => {
+          const item = liveStackItems.find(i => i.id === entry.itemId);
+          if (item && item.active && isScheduledForDate(item.schedule, selectedDate)) {
+            next[`${dateKey}-${item.id}`] = { date: dateKey, itemId: item.id, dose: entry.dose, taken: true };
+          }
+        });
+        return next;
+      });
+      haptic('success');
+    });
+  };
+
   // Desktop keyboard shortcuts
   useEffect(() => {
     if (!isDesktop) return;
     const handleKeyDown = (e) => {
       // Don't fire when typing in inputs/textareas
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-      // Don't fire when rapid entry is open (it has its own keyboard handler)
-      if (rapidEntryMode) return;
+      // The symptom list owns 0-5 (rating) and, in AM/PM mode, the arrows (period).
+      // Tabs stay reachable with Shift+1/2/3 and dates with [ and ] from anywhere.
+      const listOwnsKeys = listKeyboardEnabled && appMode === 'symptoms' && !symptomEditMode;
+      if (symptomEditMode || protocolEditMode) { if (e.key !== 'Escape') return; }
+      if (listOwnsKeys && !e.shiftKey && /^[0-5]$/.test(e.key)) return;
+      if (listOwnsKeys && trackingMode === 'ampm' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
 
-      if (e.key === '1') {
+      const tabKey = e.shiftKey && /^Digit[123]$/.test(e.code) ? e.code.slice(-1) : e.key;
+      if (tabKey === '1') {
         setShowInsights(false);
         setAppMode('symptoms');
-      } else if (e.key === '2') {
+      } else if (tabKey === '2') {
         setShowInsights(false);
         setAppMode('protocol');
-      } else if (e.key === '3') {
+      } else if (tabKey === '3') {
         setShowInsights(true);
-      } else if (e.key === 'ArrowLeft') {
+      } else if (e.key === 'ArrowLeft' || e.key === '[') {
         e.preventDefault();
         setSelectedDate(prev => {
           const d = new Date(prev);
           d.setDate(d.getDate() - 1);
           return d;
         });
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowRight' || e.key === ']') {
         e.preventDefault();
         setSelectedDate(prev => {
           const d = new Date(prev);
@@ -477,10 +558,6 @@ function App() {
         });
       } else if (e.key === 't' || e.key === 'T') {
         setSelectedDate(new Date());
-      } else if (e.key === 'r' || e.key === 'R') {
-        if (!showSettings && !showCalendar && !showExport && !showNoteModal && !showSymptomGraph && !showSupplementGraph) {
-          setRapidEntryMode(true);
-        }
       } else if (e.key === 'Escape') {
         // Close modals in priority order
         if (showSymptomGraph) setShowSymptomGraph(null);
@@ -489,15 +566,12 @@ function App() {
         else if (showCalendar) setShowCalendar(false);
         else if (showExport) setShowExport(false);
         else if (showNoteModal) setShowNoteModal(false);
-        else if (showAddSymptom) setShowAddSymptom(false);
-        else if (showManageStack) setShowManageStack(false);
-        else if (showManageInputs) setShowManageInputs(false);
         else if (showInsights) setShowInsights(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDesktop, rapidEntryMode, showSettings, showCalendar, showExport, showNoteModal, showSymptomGraph, showSupplementGraph, showInsights, showAddSymptom, showManageStack, showManageInputs]);
+  }, [isDesktop, listKeyboardEnabled, appMode, symptomEditMode, trackingMode, showSettings, showCalendar, showExport, showNoteModal, showSymptomGraph, showSupplementGraph, showInsights]);
 
   // Handlers
   const changeDate = useCallback((days) => {
@@ -536,19 +610,18 @@ function App() {
     const symptom = symptoms.find(s => s.id === symptomId);
     const period = timePeriods.find(p => p.id === timeId);
     haptic('light');
-    setQuickLogSymptom(null);
     const severityLabel = severity === NA_SEVERITY ? 'N/A' : severity;
     setLastAction(`${symptom?.name}: ${severityLabel} (${period?.label || timeId})`);
   }, [selectedDate, timePeriods, symptoms]);
 
   const quickCopyData = useCallback(() => {
-    const insights = getInsights(copyDays, entries, symptoms);
-    const data = generateAIDataExport(copyDays, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, insights, inputItems, inputEntries);
+    const insights = getInsights(copyDays, entries, liveSymptoms);
+    const data = generateAIDataExport(copyDays, entries, liveSymptoms, liveStackItems, stackEntries, dailyNotes, trackingMode, insights, liveInputItems, inputEntries);
     navigator.clipboard.writeText(data);
     setCopyToastMessage(`Copied ${copyDays} day${copyDays > 1 ? 's' : ''} of tracking for AI chat`);
     haptic('light');
     setTimeout(() => setCopyToastMessage(''), 2250);
-  }, [copyDays, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, inputItems, inputEntries]);
+  }, [copyDays, entries, liveSymptoms, liveStackItems, stackEntries, dailyNotes, trackingMode, liveInputItems, inputEntries]);
 
   const canGoForward = useMemo(() => {
     const tomorrow = new Date(selectedDate);
@@ -558,13 +631,13 @@ function App() {
     return tomorrow <= today;
   }, [selectedDate]);
 
-  // Tab badge data — uses deferred entries to avoid blocking during rapid entry
+  // Tab badge data — uses deferred entries to avoid blocking during fast logging
   const tabBadges = useMemo(() => {
     const dateKey = getDateKey(selectedDate);
     const todaySymptomEntries = Object.values(deferredEntries).filter(e => e.date === dateKey);
     const todayStackEntries = Object.values(deferredStackEntries).filter(e => e.date === dateKey);
-    const activeStackCount = stackItems.filter(i => i.active).length;
-    const activeSymptomCount = symptoms.filter(s => s.active).length;
+    const activeStackCount = liveStackItems.filter(i => i.active).length;
+    const activeSymptomCount = liveSymptoms.filter(s => s.active).length;
 
     const symptomStatus = todaySymptomEntries.length === 0 ? 'none'
       : todaySymptomEntries.length >= activeSymptomCount ? 'all' : 'some';
@@ -575,100 +648,9 @@ function App() {
       symptoms: { count: todaySymptomEntries.length, total: activeSymptomCount, status: symptomStatus },
       stack: { taken: todayStackEntries.length, total: activeStackCount, status: stackStatus },
     };
-  }, [deferredEntries, deferredStackEntries, stackItems, symptoms, selectedDate]);
+  }, [deferredEntries, deferredStackEntries, liveStackItems, liveSymptoms, selectedDate]);
 
   // Get symptom entries for a given symptom
-  const getSymptomEntries = useCallback((symptomId) => {
-    const dateKey = getDateKey(selectedDate);
-    const timeOrder = { night: 0, morning: 1, allday: 2, midday: 3, evening: 4, daily: 2 };
-
-    const allDayEntries = Object.entries(deferredEntries)
-      .filter(([key]) => key.startsWith(`${dateKey}-${symptomId}`))
-      .map(([key, value]) => value);
-
-    if (trackingMode === 'simple') {
-      const dailyEntry = allDayEntries.find(e => e.time === 'daily');
-      if (dailyEntry) return [dailyEntry];
-
-      const morningEntry = allDayEntries.find(e => e.time === 'morning');
-      const eveningEntry = allDayEntries.find(e => e.time === 'evening');
-
-      if (morningEntry || eveningEntry) {
-        const severities = [];
-        if (morningEntry && morningEntry.severity !== NA_SEVERITY) severities.push(morningEntry.severity);
-        if (eveningEntry && eveningEntry.severity !== NA_SEVERITY) severities.push(eveningEntry.severity);
-        if (severities.length === 0) {
-          // Both are N/A, show N/A
-          return [{
-            time: 'daily',
-            severity: NA_SEVERITY,
-            date: dateKey,
-            symptomId,
-            _synthetic: true,
-            _fromAmPm: true,
-          }];
-        }
-        const avgSeverity = Math.round(severities.reduce((a, b) => a + b, 0) / severities.length);
-        return [{
-          time: 'daily',
-          severity: avgSeverity,
-          date: dateKey,
-          symptomId,
-          _synthetic: true,
-          _fromAmPm: true,
-        }];
-      }
-      return [];
-    }
-
-    if (trackingMode === 'ampm') {
-      const morningEntry = allDayEntries.find(e => e.time === 'morning');
-      const eveningEntry = allDayEntries.find(e => e.time === 'evening');
-      const dailyEntry = allDayEntries.find(e => e.time === 'daily');
-
-      if (dailyEntry && !morningEntry && !eveningEntry) {
-        return [{
-          ...dailyEntry,
-          time: 'morning',
-          _synthetic: true,
-          _fromDaily: true,
-        }];
-      }
-
-      return allDayEntries
-        .filter(e => e.time === 'morning' || e.time === 'evening')
-        .sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
-    }
-
-    return allDayEntries.sort((a, b) => (timeOrder[a.time] || 0) - (timeOrder[b.time] || 0));
-  }, [deferredEntries, selectedDate, trackingMode]);
-
-  // Get most recent entry for a symptom
-  const getMostRecentEntry = useCallback((symptomId, currentTimePeriod = null) => {
-    const selectedDateKey = getDateKey(selectedDate);
-    const timeOrder = { morning: 0, daily: 1, evening: 2 };
-    const currentTimeOrder = timeOrder[currentTimePeriod] ?? 999;
-
-    const allEntries = Object.entries(deferredEntries)
-      .filter(([key]) => key.includes(`-${symptomId}-`))
-      .map(([key, value]) => ({ key, ...value }))
-      .filter(entry => {
-        if (entry.date < selectedDateKey) return true;
-        if (entry.date === selectedDateKey) {
-          const entryTimeOrder = timeOrder[entry.time] ?? 0;
-          return entryTimeOrder < currentTimeOrder;
-        }
-        return false;
-      })
-      .sort((a, b) => {
-        const dateCompare = b.date.localeCompare(a.date);
-        if (dateCompare !== 0) return dateCompare;
-        return (timeOrder[b.time] || 0) - (timeOrder[a.time] || 0);
-      });
-
-    return allEntries.length > 0 ? allEntries[0] : null;
-  }, [deferredEntries, selectedDate]);
-
   // Main render
   return (
     <div
@@ -704,29 +686,8 @@ function App() {
         boxShadow: !isDesktop && window.innerWidth > 500 ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
       }}
     >
-      {/* Rapid Entry Mode */}
-      {rapidEntryMode && (
-        <RapidEntry
-          symptoms={activeSymptoms}
-          entries={entries}
-          selectedDate={selectedDate}
-          trackingMode={trackingMode}
-          quickLogTime={quickLogTime}
-          setQuickLogTime={setQuickLogTime}
-          initialRapidEntryIndex={rapidEntryIndex}
-          rapidEntryConfirm={rapidEntryConfirm}
-          setRapidEntryConfirm={setRapidEntryConfirm}
-          setRapidEntryMode={setRapidEntryMode}
-          quickLog={quickLog}
-          setEntries={setEntries}
-          getMostRecentEntry={getMostRecentEntry}
-          setCopyToastMessage={setCopyToastMessage}
-          isDesktop={isDesktop}
-        />
-      )}
-
       {/* Desktop Toolbar - replaces Header + BottomNav on desktop */}
-      {isDesktop && !showAddSymptom && !showManageStack && !showManageInputs && (
+      {isDesktop && (
         <DesktopToolbar
           selectedDate={selectedDate}
           changeDate={changeDate}
@@ -737,108 +698,18 @@ function App() {
           setAppMode={setAppMode}
           showInsights={showInsights}
           setShowInsights={setShowInsights}
-          quickLogTime={quickLogTime}
-          setQuickLogTime={setQuickLogTime}
           trackingMode={trackingMode}
-          symptoms={symptoms}
+          symptoms={liveSymptoms}
           entries={deferredEntries}
-          flashColumn={flashColumn}
-          setFlashColumn={setFlashColumn}
           setCopyToastMessage={setCopyToastMessage}
-          onRapidEntry={() => {
-            const effectiveTime = quickLogTime || getCurrentTimePeriod(trackingMode);
-            if (trackingMode === 'ampm' && !quickLogTime) {
-              setQuickLogTime(effectiveTime);
-            }
-            const dateKey = getDateKey(selectedDate);
-            const timeKey = trackingMode === 'ampm' ? effectiveTime : 'daily';
-            const allActive = symptoms.filter(s => s.active).sort((a, b) => {
-              const aPinned = pinnedSymptoms.has(a.id);
-              const bPinned = pinnedSymptoms.has(b.id);
-              if (aPinned && !bPinned) return -1;
-              if (!aPinned && bPinned) return 1;
-              return (a.order || 0) - (b.order || 0);
-            });
-            const firstIncomplete = allActive.findIndex(s => !entries[`${dateKey}-${s.id}-${timeKey}`]);
-            setRapidEntryIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
-            if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
-              setRapidEntryConfirm(true);
-              setRapidEntryMode(true);
-            } else {
-              setRapidEntryMode(true);
-            }
-          }}
           onEditNote={() => setShowNoteModal(true)}
           onCopyData={quickCopyData}
           copyDays={copyDays}
-          onEditSymptoms={() => setShowAddSymptom(true)}
-          onCheckAll={() => {
-            const dateKey = getDateKey(selectedDate);
-            const activeItems = stackItems.filter(i =>
-              i.active && isScheduledForDate(i.schedule, selectedDate)
-            );
-            setStackEntries(prev => {
-              const newEntries = { ...prev };
-              activeItems.forEach(item => {
-                const entryKey = `${dateKey}-${item.id}`;
-                newEntries[entryKey] = {
-                  date: dateKey,
-                  itemId: item.id,
-                  dose: item.defaultDose,
-                  taken: true
-                };
-              });
-              return newEntries;
-            });
-            haptic('success');
-            setLastAction('All selected');
-          }}
-          onClear={() => {
-            const dateKey = getDateKey(selectedDate);
-            setStackEntries(prev => {
-              const newEntries = { ...prev };
-              Object.keys(newEntries).forEach(key => {
-                if (key.startsWith(dateKey)) {
-                  delete newEntries[key];
-                }
-              });
-              return newEntries;
-            });
-            setLastAction('All cleared');
-          }}
-          onMatchYesterday={() => {
-            const dateKey = getDateKey(selectedDate);
-            const yesterday = new Date(selectedDate);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayKey = getDateKey(yesterday);
-            setStackEntries(prev => {
-              const yesterdayEntries = Object.entries(prev).filter(([key]) => key.startsWith(yesterdayKey));
-              if (yesterdayEntries.length === 0) {
-                setLastAction('No entries from yesterday');
-                return prev;
-              }
-              const newEntries = { ...prev };
-              let copiedCount = 0;
-              yesterdayEntries.forEach(([key, entry]) => {
-                const itemId = key.substring(yesterdayKey.length + 1);
-                const item = stackItems.find(i => i.id === itemId);
-                if (item && item.active && isScheduledForDate(item.schedule, selectedDate)) {
-                  newEntries[`${dateKey}-${itemId}`] = {
-                    date: dateKey,
-                    itemId: itemId,
-                    dose: entry.dose,
-                    taken: true
-                  };
-                  copiedCount++;
-                }
-              });
-              setLastAction(`Matched ${copiedCount} from yesterday`);
-              return newEntries;
-            });
-            haptic('success');
-          }}
-          onEditStack={() => setShowManageStack(true)}
-          onEditInputs={() => setShowManageInputs(true)}
+          onEditSymptoms={() => { setAppMode('symptoms'); setShowInsights(false); setSymptomEditMode(true); }}
+          onCheckAll={protocolCheckAll}
+          onClear={protocolClearDay}
+          onMatchYesterday={protocolMatchYesterday}
+          onEditProtocol={() => { setAppMode('stack'); setShowInsights(false); setProtocolEditMode(true); }}
           onOpenSettings={() => {
             setShowSettings(true);
             setShowInsights(false);
@@ -847,14 +718,14 @@ function App() {
       )}
 
       {/* Mobile Header - hide on desktop and when in edit modes */}
-      {!isDesktop && !showAddSymptom && !showManageStack && !showManageInputs && (
+      {!isDesktop && (
         <Header
           selectedDate={selectedDate}
           changeDate={changeDate}
           canGoForward={canGoForward}
           setShowCalendar={setShowCalendar}
           setCalendarMonth={setCalendarMonth}
-          symptoms={symptoms}
+          symptoms={liveSymptoms}
           entries={deferredEntries}
           trackingMode={trackingMode}
         />
@@ -878,8 +749,8 @@ function App() {
               <Insights
                 user={firebase.user}
                 entries={deferredEntries}
-                symptoms={symptoms}
-                stackItems={stackItems}
+                symptoms={liveSymptoms}
+                stackItems={liveStackItems}
                 stackEntries={deferredStackEntries}
                 insightsWindow={insightsWindow}
                 setInsightsWindow={setInsightsWindow}
@@ -890,230 +761,52 @@ function App() {
                 setStackItems={setStackItems}
               />
             ) : appMode === 'symptoms' ? (
-              <SymptomList
-                symptoms={symptoms}
+              <SymptomRows
+                symptoms={liveSymptoms}
                 setSymptoms={setSymptoms}
                 activeSymptoms={activeSymptoms}
                 entries={deferredEntries}
                 setEntries={setEntries}
                 selectedDate={selectedDate}
-                trackingMode={trackingMode}
                 timePeriods={timePeriods}
                 pinnedSymptoms={pinnedSymptoms}
-                setPinnedSymptoms={setPinnedSymptoms}
-                quickLogSymptom={quickLogSymptom}
-                setQuickLogSymptom={setQuickLogSymptom}
-                quickLogTime={quickLogTime}
-                setQuickLogTime={setQuickLogTime}
                 quickLog={quickLog}
                 setLastAction={setLastAction}
                 symptomSearch={symptomSearch}
                 setSymptomSearch={setSymptomSearch}
-                searchVisible={searchVisible}
-                setSearchVisible={setSearchVisible}
-                showAddSymptom={showAddSymptom}
-                setShowAddSymptom={setShowAddSymptom}
-                getSymptomEntries={getSymptomEntries}
-                getMostRecentEntry={getMostRecentEntry}
-                getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
-                trendWindow={trendWindow}
-                flashColumn={flashColumn}
                 onOpenGraph={setShowSymptomGraph}
-                isDesktop={isDesktop}
-                onRapidEntry={() => {
-                  const effectiveTime = quickLogTime || getCurrentTimePeriod(trackingMode);
-                  if (trackingMode === 'ampm' && !quickLogTime) {
-                    setQuickLogTime(effectiveTime);
-                  }
-                  const dateKey = getDateKey(selectedDate);
-                  const timeKey = trackingMode === 'ampm' ? effectiveTime : 'daily';
-                  const allActive = symptoms.filter(s => s.active).sort((a, b) => {
-                    const aPinned = pinnedSymptoms.has(a.id);
-                    const bPinned = pinnedSymptoms.has(b.id);
-                    if (aPinned && !bPinned) return -1;
-                    if (!aPinned && bPinned) return 1;
-                    return (a.order || 0) - (b.order || 0);
-                  });
-                  const firstIncomplete = allActive.findIndex(s => !entries[`${dateKey}-${s.id}-${timeKey}`]);
-                  setRapidEntryIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
-                  if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
-                    setRapidEntryConfirm(true);
-                    setRapidEntryMode(true);
-                  } else {
-                    setRapidEntryMode(true);
-                  }
-                }}
                 onEditNote={() => setShowNoteModal(true)}
-                onCopyData={quickCopyData}
-                copyDays={copyDays}
-                setCopyDays={setCopyDays}
-                onEditSymptoms={() => setShowAddSymptom(true)}
+                onClearDay={clearSymptomDay}
+                onDeleteSymptom={(symptom) => softDeleteItem('symptom', symptom)}
+                editing={symptomEditMode}
+                setEditing={setSymptomEditMode}
+                keyboardEnabled={listKeyboardEnabled}
+                isDesktop={isDesktop}
               />
             ) : (
-              /* Protocol: action bar + side-by-side supplements + inputs */
-              <div>
-                {/* Protocol action bar — matches symptoms layout */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  marginBottom: '16px',
-                }}>
-                  {/* Search — ~25% width */}
-                  <div style={{ position: 'relative', width: '25%', minWidth: '180px', flexShrink: 0 }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                    <input
-                      type="text"
-                      value={protocolSearch}
-                      onChange={(e) => setProtocolSearch(e.target.value)}
-                      placeholder="Search..."
-                      style={{
-                        width: '100%',
-                        padding: '8px 32px 8px 34px',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        borderRadius: '8px',
-                        color: '#f8fafc',
-                        fontSize: '13px',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    {protocolSearch && (
-                      <button
-                        onClick={() => setProtocolSearch('')}
-                        style={{
-                          position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
-                          background: 'transparent', border: 'none', color: '#6b7280',
-                          fontSize: '14px', cursor: 'pointer', padding: '2px 6px',
-                        }}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Actions — right-aligned */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
-                    {[
-                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>, label: 'Match Yesterday', action: () => {
-                        const dateKey = getDateKey(selectedDate);
-                        const yesterday = new Date(selectedDate);
-                        yesterday.setDate(yesterday.getDate() - 1);
-                        const yesterdayKey = getDateKey(yesterday);
-                        setStackEntries(prev => {
-                          const yesterdayEntries = Object.entries(prev).filter(([key]) => key.startsWith(yesterdayKey));
-                          if (yesterdayEntries.length === 0) { setLastAction('No entries from yesterday'); return prev; }
-                          const newEntries = { ...prev };
-                          let copiedCount = 0;
-                          yesterdayEntries.forEach(([key, entry]) => {
-                            const itemId = key.substring(yesterdayKey.length + 1);
-                            const item = stackItems.find(i => i.id === itemId);
-                            if (item && item.active && isScheduledForDate(item.schedule, selectedDate)) {
-                              newEntries[`${dateKey}-${itemId}`] = { date: dateKey, itemId, dose: entry.dose, taken: true };
-                              copiedCount++;
-                            }
-                          });
-                          setLastAction(`Matched ${copiedCount} from yesterday`);
-                          return newEntries;
-                        });
-                        haptic('success');
-                      }},
-                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>, label: 'Check All', action: () => {
-                        const dateKey = getDateKey(selectedDate);
-                        const activeItems = stackItems.filter(i => i.active && isScheduledForDate(i.schedule, selectedDate));
-                        setStackEntries(prev => {
-                          const newEntries = { ...prev };
-                          activeItems.forEach(item => {
-                            newEntries[`${dateKey}-${item.id}`] = { date: dateKey, itemId: item.id, dose: item.defaultDose, taken: true };
-                          });
-                          return newEntries;
-                        });
-                        haptic('success');
-                        setLastAction('All selected');
-                      }},
-                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>, label: 'Clear', action: () => {
-                        const dateKey = getDateKey(selectedDate);
-                        setStackEntries(prev => {
-                          const newEntries = { ...prev };
-                          Object.keys(newEntries).forEach(key => { if (key.startsWith(dateKey)) delete newEntries[key]; });
-                          return newEntries;
-                        });
-                        setLastAction('All cleared');
-                      }},
-                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>, label: 'Edit Stack', action: () => setShowManageStack(true) },
-                      { icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>, label: 'Edit Inputs', action: () => setShowManageInputs(true) },
-                    ].map(({ icon, label, action }) => (
-                      <button
-                        key={label}
-                        onClick={action}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '5px',
-                          padding: '6px 10px', background: 'transparent',
-                          border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px',
-                          color: '#9ca3af', fontSize: '12px', fontWeight: '500',
-                          cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s ease',
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#e5e7eb'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = '#9ca3af'; }}
-                      >
-                        <span style={{ display: 'flex', alignItems: 'center', width: '14px', height: '14px' }}>{icon}</span>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Side-by-side panels */}
-                <div style={{
-                  display: 'flex',
-                  gap: '24px',
-                }}>
-                  <div style={{
-                    flex: 1,
-                    background: 'rgba(255,255,255,0.02)',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    overflow: 'hidden',
-                  }}>
-                    <Stack
-                      stackItems={stackItems}
-                      setStackItems={setStackItems}
-                      stackEntries={deferredStackEntries}
-                      setStackEntries={setStackEntries}
-                      selectedDate={selectedDate}
-                      setLastAction={setLastAction}
-                      showManageStack={showManageStack}
-                      setShowManageStack={setShowManageStack}
-                      onOpenSupplementGraph={setShowSupplementGraph}
-                      isDesktop={isDesktop}
-                      searchFilter={protocolSearch}
-                    />
-                  </div>
-                  <div style={{
-                    flex: 1,
-                    background: 'rgba(255,255,255,0.02)',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    overflow: 'hidden',
-                  }}>
-                    <Inputs
-                      inputItems={inputItems}
-                      setInputItems={setInputItems}
-                      inputEntries={inputEntries}
-                      setInputEntries={setInputEntries}
-                      selectedDate={selectedDate}
-                      setLastAction={setLastAction}
-                      showManageInputs={showManageInputs}
-                      setShowManageInputs={setShowManageInputs}
-                      isDesktop={isDesktop}
-                      searchFilter={protocolSearch}
-                    />
-                  </div>
-                </div>
-              </div>
+              <ProtocolRows
+                stackItems={liveStackItems}
+                setStackItems={setStackItems}
+                stackEntries={deferredStackEntries}
+                setStackEntries={setStackEntries}
+                inputItems={liveInputItems}
+                setInputItems={setInputItems}
+                inputEntries={inputEntries}
+                setInputEntries={setInputEntries}
+                selectedDate={selectedDate}
+                setLastAction={setLastAction}
+                search={protocolSearch}
+                setSearch={setProtocolSearch}
+                onOpenSupplementGraph={setShowSupplementGraph}
+                onCheckAll={protocolCheckAll}
+                onClearDay={protocolClearDay}
+                onMatchYesterday={protocolMatchYesterday}
+                onDeleteItem={(item, kind) => softDeleteItem(kind, item)}
+                editing={protocolEditMode}
+                setEditing={setProtocolEditMode}
+                keyboardEnabled={listKeyboardEnabled}
+                isDesktop={isDesktop}
+              />
             )}
           </div>
         </div>
@@ -1121,72 +814,61 @@ function App() {
         /* Mobile: tab-switching layout */
         <div ref={scrollContainerRef} style={{
           flex: 1,
-          overflowY: (showManageStack || showAddSymptom || showManageInputs) ? 'hidden' : 'auto',
+          overflowY: 'auto',
           overflowX: 'hidden',
-          paddingBottom: '155px',
+          paddingBottom: '110px',
           WebkitOverflowScrolling: 'touch',
         }}>
           <div style={{
             width: '100%',
           }}>
             {appMode === 'symptoms' ? (
-              <SymptomList
-                symptoms={symptoms}
+              <SymptomRows
+                symptoms={liveSymptoms}
                 setSymptoms={setSymptoms}
                 activeSymptoms={activeSymptoms}
                 entries={deferredEntries}
                 setEntries={setEntries}
                 selectedDate={selectedDate}
-                trackingMode={trackingMode}
                 timePeriods={timePeriods}
                 pinnedSymptoms={pinnedSymptoms}
-                setPinnedSymptoms={setPinnedSymptoms}
-                quickLogSymptom={quickLogSymptom}
-                setQuickLogSymptom={setQuickLogSymptom}
-                quickLogTime={quickLogTime}
-                setQuickLogTime={setQuickLogTime}
                 quickLog={quickLog}
                 setLastAction={setLastAction}
                 symptomSearch={symptomSearch}
                 setSymptomSearch={setSymptomSearch}
-                searchVisible={searchVisible}
-                setSearchVisible={setSearchVisible}
-                showAddSymptom={showAddSymptom}
-                setShowAddSymptom={setShowAddSymptom}
-                getSymptomEntries={getSymptomEntries}
-                getMostRecentEntry={getMostRecentEntry}
-                getCurrentTimePeriod={() => getCurrentTimePeriod(trackingMode)}
-                trendWindow={trendWindow}
-                flashColumn={flashColumn}
                 onOpenGraph={setShowSymptomGraph}
+                onEditNote={() => setShowNoteModal(true)}
+                onClearDay={clearSymptomDay}
+                onDeleteSymptom={(symptom) => softDeleteItem('symptom', symptom)}
+                editing={symptomEditMode}
+                setEditing={setSymptomEditMode}
+                keyboardEnabled={listKeyboardEnabled}
+                isDesktop={isDesktop}
               />
             ) : (
-              <>
-                {protocolView === 'stack' ? (
-                  <Stack
-                    stackItems={stackItems}
-                    setStackItems={setStackItems}
-                    stackEntries={deferredStackEntries}
-                    setStackEntries={setStackEntries}
-                    selectedDate={selectedDate}
-                    setLastAction={setLastAction}
-                    showManageStack={showManageStack}
-                    setShowManageStack={setShowManageStack}
-                    onOpenSupplementGraph={setShowSupplementGraph}
-                  />
-                ) : (
-                  <Inputs
-                    inputItems={inputItems}
-                    setInputItems={setInputItems}
-                    inputEntries={inputEntries}
-                    setInputEntries={setInputEntries}
-                    selectedDate={selectedDate}
-                    setLastAction={setLastAction}
-                    showManageInputs={showManageInputs}
-                    setShowManageInputs={setShowManageInputs}
-                  />
-                )}
-              </>
+              <ProtocolRows
+                stackItems={liveStackItems}
+                setStackItems={setStackItems}
+                stackEntries={deferredStackEntries}
+                setStackEntries={setStackEntries}
+                inputItems={liveInputItems}
+                setInputItems={setInputItems}
+                inputEntries={inputEntries}
+                setInputEntries={setInputEntries}
+                selectedDate={selectedDate}
+                setLastAction={setLastAction}
+                search={protocolSearch}
+                setSearch={setProtocolSearch}
+                onOpenSupplementGraph={setShowSupplementGraph}
+                onCheckAll={protocolCheckAll}
+                onClearDay={protocolClearDay}
+                onMatchYesterday={protocolMatchYesterday}
+                onDeleteItem={(item, kind) => softDeleteItem(kind, item)}
+                editing={protocolEditMode}
+                setEditing={setProtocolEditMode}
+                keyboardEnabled={listKeyboardEnabled}
+                isDesktop={isDesktop}
+              />
             )}
           </div>
         </div>
@@ -1201,147 +883,6 @@ function App() {
           onClose={() => setShowNoteModal(false)}
           isDesktop={isDesktop}
         />
-      )}
-
-      {/* Floating AM/PM + Rapid Entry Pill - mobile only, symptoms page in AM/PM mode */}
-      {!isDesktop && appMode === 'symptoms' && trackingMode === 'ampm' && !showAddSymptom && !showManageStack && !showManageInputs && !showInsights && !showSettings && !showSymptomGraph && !rapidEntryMode && (
-        <div style={{
-          position: 'fixed',
-          bottom: 'calc(105px + env(safe-area-inset-bottom))',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          zIndex: 200,
-        }}>
-          {/* Note Button */}
-          <button
-            onClick={() => setShowNoteModal(true)}
-            style={{
-              width: '44px',
-              height: '44px',
-              background: 'rgba(15, 17, 21, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '50%',
-              color: '#9ca3af',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
-              flexShrink: 0,
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9"/>
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-          </button>
-          {/* AM/PM Toggle */}
-          {(() => {
-            const current = quickLogTime || getCurrentTimePeriod(trackingMode);
-            const isAM = current === 'morning';
-            return (
-              <div style={{
-                display: 'flex',
-                background: 'rgba(15, 17, 21, 0.95)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '22px',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
-                padding: '4px',
-                gap: '2px',
-              }}>
-                <button
-                  onClick={() => {
-                    if (!isAM) {
-                      setQuickLogTime('morning');
-                      setFlashColumn('morning');
-                      setTimeout(() => setFlashColumn(null), 400);
-                      setCopyToastMessage('..AM..');
-                      setTimeout(() => setCopyToastMessage(''), 2000);
-                    }
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '18px',
-                    border: 'none',
-                    background: isAM ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
-                    color: isAM ? '#a5b4fc' : '#6b7280',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
-                >AM</button>
-                <button
-                  onClick={() => {
-                    if (isAM) {
-                      setQuickLogTime('evening');
-                      setFlashColumn('evening');
-                      setTimeout(() => setFlashColumn(null), 400);
-                      setCopyToastMessage('..PM..');
-                      setTimeout(() => setCopyToastMessage(''), 2000);
-                    }
-                  }}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '18px',
-                    border: 'none',
-                    background: !isAM ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
-                    color: !isAM ? '#a5b4fc' : '#6b7280',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
-                >PM</button>
-              </div>
-            );
-          })()}
-          {/* Rapid Entry Button */}
-          <button
-            onClick={() => {
-              const effectiveTime = quickLogTime || getCurrentTimePeriod(trackingMode);
-              if (!quickLogTime) {
-                setQuickLogTime(effectiveTime);
-              }
-              const dateKey = getDateKey(selectedDate);
-              const timeKey = trackingMode === 'ampm' ? effectiveTime : 'daily';
-              const allActive = symptoms.filter(s => s.active).sort((a, b) => {
-                const aPinned = pinnedSymptoms.has(a.id);
-                const bPinned = pinnedSymptoms.has(b.id);
-                if (aPinned && !bPinned) return -1;
-                if (!aPinned && bPinned) return 1;
-                return (a.order || 0) - (b.order || 0);
-              });
-              const firstIncomplete = allActive.findIndex(s => !entries[`${dateKey}-${s.id}-${timeKey}`]);
-              setRapidEntryIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
-              if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
-                setRapidEntryConfirm(true);
-                setRapidEntryMode(true);
-              } else {
-                setRapidEntryMode(true);
-              }
-            }}
-            style={{
-              width: '44px',
-              height: '44px',
-              background: 'rgba(15, 17, 21, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '50%',
-              color: '#fbbf24',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
-              flexShrink: 0,
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-            </svg>
-          </button>
-        </div>
       )}
 
       {/* Recovery modal — opened via ?action=load-backup URL. Big tappable
@@ -1548,6 +1089,8 @@ function App() {
         </div>
       )}
 
+      <UndoToast toast={undoToast} onDismiss={dismissUndoToast} isDesktop={isDesktop} />
+
       {/* Toast Notification */}
       {copyToastMessage && (
         <div style={{
@@ -1587,8 +1130,8 @@ function App() {
         <Insights
           user={firebase.user}
           entries={deferredEntries}
-          symptoms={symptoms}
-          stackItems={stackItems}
+          symptoms={liveSymptoms}
+          stackItems={liveStackItems}
           stackEntries={deferredStackEntries}
           insightsWindow={insightsWindow}
           setInsightsWindow={setInsightsWindow}
@@ -1605,7 +1148,7 @@ function App() {
       {showSymptomGraph && (
         <SymptomGraph
           primarySymptomId={showSymptomGraph}
-          symptoms={symptoms}
+          symptoms={liveSymptoms}
           activeSymptoms={activeSymptoms}
           entries={deferredEntries}
           trackingMode={trackingMode}
@@ -1619,9 +1162,9 @@ function App() {
       {showSupplementGraph && (
         <SupplementGraph
           primaryItemId={showSupplementGraph}
-          stackItems={stackItems}
+          stackItems={liveStackItems}
           stackEntries={deferredStackEntries}
-          symptoms={symptoms}
+          symptoms={liveSymptoms}
           entries={deferredEntries}
           trackingMode={trackingMode}
           onClose={() => setShowSupplementGraph(null)}
@@ -1634,6 +1177,8 @@ function App() {
       {showSettings && (
         <Settings
           user={firebase.user}
+          onRestoreDeleted={restoreDeletedItem}
+          onDeleteNow={purgeItemNow}
           syncing={sync.syncing}
           lastSynced={sync.lastSynced}
           syncError={sync.syncError}
@@ -1692,12 +1237,12 @@ function App() {
       {showExport && (
         <Export
           entries={deferredEntries}
-          symptoms={symptoms}
+          symptoms={liveSymptoms}
           dailyNotes={dailyNotes}
-          stackItems={stackItems}
+          stackItems={liveStackItems}
           stackEntries={deferredStackEntries}
           trackingMode={trackingMode}
-          inputItems={inputItems}
+          inputItems={liveInputItems}
           inputEntries={inputEntries}
           setCopyToastMessage={setCopyToastMessage}
           onClose={() => setShowExport(false)}
@@ -1706,12 +1251,10 @@ function App() {
       )}
 
       {/* Bottom Navigation - mobile only, hide when in edit modes */}
-      {!isDesktop && !showAddSymptom && !showManageStack && !showManageInputs && (
+      {!isDesktop && (
         <BottomNav
           appMode={appMode}
           setAppMode={setAppMode}
-          protocolView={protocolView}
-          setProtocolView={setProtocolView}
           showInsights={showInsights}
           setShowInsights={setShowInsights}
           insightsSubtab={insightsSubtab}
@@ -1725,104 +1268,14 @@ function App() {
           // Symptoms page actions
           onCopyData={quickCopyData}
           copyDays={copyDays}
-          onRapidEntry={() => {
-            const effectiveTime = quickLogTime || getCurrentTimePeriod(trackingMode);
-            if (trackingMode === 'ampm' && !quickLogTime) {
-              setQuickLogTime(effectiveTime);
-            }
-            // Compute first incomplete symptom index
-            const dateKey = getDateKey(selectedDate);
-            const timeKey = trackingMode === 'ampm' ? effectiveTime : 'daily';
-            const allActive = symptoms.filter(s => s.active).sort((a, b) => {
-              const aPinned = pinnedSymptoms.has(a.id);
-              const bPinned = pinnedSymptoms.has(b.id);
-              if (aPinned && !bPinned) return -1;
-              if (!aPinned && bPinned) return 1;
-              return (a.order || 0) - (b.order || 0);
-            });
-            const firstIncomplete = allActive.findIndex(s => !entries[`${dateKey}-${s.id}-${timeKey}`]);
-            setRapidEntryIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
-            if (incompleteSymptoms.length === 0 && totalActiveSymptoms > 0) {
-              setRapidEntryConfirm(true);
-              setRapidEntryMode(true);
-            } else {
-              setRapidEntryMode(true);
-            }
-          }}
           onEditNote={() => setShowNoteModal(true)}
-          onEditSymptoms={() => setShowAddSymptom(true)}
+          onEditSymptoms={() => { setAppMode('symptoms'); setShowInsights(false); setSymptomEditMode(true); }}
           // Stack page actions
-          onCheckAll={() => {
-            const dateKey = getDateKey(selectedDate);
-            const activeItems = stackItems.filter(i =>
-              i.active && isScheduledForDate(i.schedule, selectedDate)
-            );
-            setStackEntries(prev => {
-              const newEntries = { ...prev };
-              activeItems.forEach(item => {
-                const entryKey = `${dateKey}-${item.id}`;
-                newEntries[entryKey] = {
-                  date: dateKey,
-                  itemId: item.id,
-                  dose: item.defaultDose,
-                  taken: true
-                };
-              });
-              return newEntries;
-            });
-            haptic('success');
-            setLastAction('All selected');
-          }}
-          onClear={() => {
-            const dateKey = getDateKey(selectedDate);
-            setStackEntries(prev => {
-              const newEntries = { ...prev };
-              Object.keys(newEntries).forEach(key => {
-                if (key.startsWith(dateKey)) {
-                  delete newEntries[key];
-                }
-              });
-              return newEntries;
-            });
-            setLastAction('All cleared');
-          }}
-          onMatchYesterday={() => {
-            const dateKey = getDateKey(selectedDate);
-            const yesterday = new Date(selectedDate);
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayKey = getDateKey(yesterday);
-
-            setStackEntries(prev => {
-              const yesterdayEntries = Object.entries(prev).filter(([key]) => key.startsWith(yesterdayKey));
-              if (yesterdayEntries.length === 0) {
-                setLastAction('No entries from yesterday');
-                return prev;
-              }
-
-              const newEntries = { ...prev };
-              let copiedCount = 0;
-              yesterdayEntries.forEach(([key, entry]) => {
-                const itemId = key.substring(yesterdayKey.length + 1);
-                const item = stackItems.find(i => i.id === itemId);
-                if (item && item.active && isScheduledForDate(item.schedule, selectedDate)) {
-                  newEntries[`${dateKey}-${itemId}`] = {
-                    date: dateKey,
-                    itemId: itemId,
-                    dose: entry.dose,
-                    taken: true
-                  };
-                  copiedCount++;
-                }
-              });
-
-              setLastAction(`Matched ${copiedCount} from yesterday`);
-              return newEntries;
-            });
-            haptic('success');
-          }}
-          onEditStack={() => setShowManageStack(true)}
-          onEditInputs={() => setShowManageInputs(true)}
-          symptoms={symptoms}
+          onCheckAll={protocolCheckAll}
+          onClear={protocolClearDay}
+          onMatchYesterday={protocolMatchYesterday}
+          onEditProtocol={() => { setAppMode('stack'); setShowInsights(false); setProtocolEditMode(true); }}
+          symptoms={liveSymptoms}
           entries={deferredEntries}
           trackingMode={trackingMode}
           selectedDate={selectedDate}

@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { isDeleted, liveItems, countEntriesFor, daysUntilPurge, RETENTION_DAYS } from '../utils/softDelete';
 import { trackingModes } from '../utils/constants';
 import { isStandalone, getDateKey, haptic, generateAIDataExport } from '../utils/helpers';
 import { mergeSupplements, previewMerge, renameSupplement, deleteSupplement, previewDelete } from '../utils/supplementTools';
@@ -46,6 +47,8 @@ export default function Settings({
   isDesktop,
   garminSync,
   onForcePush,
+  onRestoreDeleted,
+  onDeleteNow,
   onForcePull,
 }) {
   const [confirmClearData, setConfirmClearData] = useState(false);
@@ -311,6 +314,13 @@ export default function Settings({
   };
 
   // Shared styles
+  const recentlyDeleted = [
+    ...(symptoms || []).filter(isDeleted).map(item => ({ kind: 'symptom', label: 'Symptom', item, entryCount: countEntriesFor(entries, item.id, 'symptomId') })),
+    ...(stackItems || []).filter(isDeleted).map(item => ({ kind: 'supplement', label: 'Supplement', item, entryCount: countEntriesFor(stackEntries, item.id, 'itemId') })),
+    ...(inputItems || []).filter(isDeleted).map(item => ({ kind: 'factor', label: 'Factor', item, entryCount: countEntriesFor(inputEntries, item.id, 'inputId') })),
+  ].map(row => ({ ...row, daysLeft: daysUntilPurge(row.item) }))
+    .sort((a, b) => a.daysLeft - b.daysLeft);
+
   const sectionHeader = (color = '#8b5cf6') => ({
     marginBottom: '10px', marginTop: '28px', paddingLeft: '4px',
     display: 'flex', alignItems: 'center', gap: '8px',
@@ -1290,7 +1300,7 @@ export default function Settings({
               <button
                 key={days}
                 onClick={() => {
-                  const data = generateAIDataExport(days, entries, symptoms, stackItems, stackEntries, dailyNotes, trackingMode, null, inputItems, inputEntries);
+                  const data = generateAIDataExport(days, entries, liveItems(symptoms), liveItems(stackItems), stackEntries, dailyNotes, trackingMode, null, liveItems(inputItems), inputEntries);
                   navigator.clipboard.writeText(data);
                   setCopyToastMessage(`Copied ${days} days of tracking for AI chat`);
                   haptic('light');
@@ -1345,6 +1355,59 @@ export default function Settings({
             </svg>
           </button>
         </div>
+
+        {/* Recently deleted */}
+        {recentlyDeleted.length > 0 && (
+          <>
+            <div style={sectionHeader()}>
+              <svg {...svgProps} stroke="#8b5cf6" fill="none">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              </svg>
+              <span style={sectionLabel()}>RECENTLY DELETED</span>
+            </div>
+            <div style={{ ...card, padding: '16px' }}>
+              <div style={{ color: '#64748b', fontSize: '12px', marginBottom: '12px' }}>
+                Deleted items and their entries are kept for {RETENTION_DAYS} days, then purged for good.
+              </div>
+              {recentlyDeleted.map(({ kind, label, item, entryCount, daysLeft }) => (
+                <div key={`${kind}-${item.id}`} style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 0',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: '#f8fafc', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+                    <div style={{ color: daysLeft <= 7 ? '#fbbf24' : '#64748b', fontSize: '12px', marginTop: '2px' }}>
+                      {label} · {entryCount} {entryCount === 1 ? 'entry' : 'entries'} · purges in {daysLeft} {daysLeft === 1 ? 'day' : 'days'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => { onRestoreDeleted(kind, item); haptic('light'); }}
+                    style={{
+                      padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer',
+                      background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)', color: '#e5e7eb',
+                    }}
+                  >
+                    Restore
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Permanently delete “${item.name}” and its ${entryCount} ${entryCount === 1 ? 'entry' : 'entries'}? This can't be undone.`)) {
+                        onDeleteNow(kind, item);
+                      }
+                    }}
+                    style={{
+                      padding: '6px 8px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer',
+                      background: 'transparent', border: 'none', color: '#64748b',
+                    }}
+                  >
+                    Delete now
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Backup & Restore */}
         <div style={sectionHeader()}>
@@ -1517,7 +1580,7 @@ export default function Settings({
         }}>
           <div>
             <div style={{ color: '#f8fafc', fontSize: '14px', fontWeight: '500' }}>
-              v6.0.4
+              v6.1.0
             </div>
             <div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
               {isStandalone() ? 'Home Screen App' : 'Browser'}

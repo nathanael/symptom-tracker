@@ -7,15 +7,13 @@ export default function QuickActionsMenu({
   // Symptoms page actions
   onCopyData,
   copyDays,
-  onRapidEntry,
   onEditNote,
   onEditSymptoms,
   // Stack page actions
   onCheckAll,
   onClear,
   onMatchYesterday,
-  onEditStack,
-  onEditInputs,
+  onEditProtocol,
   // Common
   onOpenSettings,
 }) {
@@ -106,12 +104,6 @@ export default function QuickActionsMenu({
     </svg>
   );
 
-  const LightningIcon = (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-    </svg>
-  );
-
   const PencilIcon = (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 20h9"/>
@@ -164,7 +156,7 @@ export default function QuickActionsMenu({
     </svg>
   );
 
-  const currentVersion = 'v6.0.4';
+  const currentVersion = 'v6.1.0';
 
   const handleCheckForUpdates = () => {
     if ('serviceWorker' in navigator) {
@@ -248,12 +240,6 @@ export default function QuickActionsMenu({
             />
             <Divider />
             <MenuItem
-              icon={LightningIcon}
-              label="Rapid Entry Mode"
-              subtext="Quickly log all symptoms in sequence"
-              onClick={onRapidEntry}
-            />
-            <MenuItem
               icon={PencilIcon}
               label="Edit Day's Note"
               subtext="Add notes about today"
@@ -277,17 +263,10 @@ export default function QuickActionsMenu({
             />
             <MenuItem
               icon={ListIcon}
-              label="Edit Supplement Stack"
-              subtext="Manage your supplement list"
+              label="Edit Protocol"
+              subtext="Manage supplements and other factors"
               color="#e5e7eb"
-              onClick={onEditStack}
-            />
-            <MenuItem
-              icon={ListIcon}
-              label="Edit Inputs"
-              subtext="Manage foods, substances, activities"
-              color="#e5e7eb"
-              onClick={onEditInputs}
+              onClick={onEditProtocol}
             />
             <Divider />
             <MenuItem

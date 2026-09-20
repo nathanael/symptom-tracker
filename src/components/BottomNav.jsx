@@ -5,8 +5,6 @@ import { getScoreColor } from '../utils/healthScore';
 export default function BottomNav({
   appMode,
   setAppMode,
-  protocolView,
-  setProtocolView,
   showInsights,
   setShowInsights,
   showSettings,
@@ -18,14 +16,12 @@ export default function BottomNav({
   // Action handlers
   onCopyData,
   copyDays,
-  onRapidEntry,
   onEditNote,
   onEditSymptoms,
   onCheckAll,
   onClear,
   onMatchYesterday,
-  onEditStack,
-  onEditInputs,
+  onEditProtocol,
   // Health score
   symptoms,
   entries,
@@ -47,42 +43,6 @@ export default function BottomNav({
       zIndex: 200,
       paddingBottom: '20px',
     }}>
-      {/* Pinned Protocol Tabs */}
-      {!isViewOpen && appMode === 'stack' && (
-        <div style={{
-          maxWidth: '500px',
-          margin: '0 auto',
-          padding: '8px 16px',
-          display: 'flex',
-          gap: '8px',
-        }}>
-          {['stack', 'inputs'].map(view => {
-            const isActive = protocolView === view;
-            return (
-              <button
-                key={view}
-                onClick={() => setProtocolView(view)}
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  background: isActive ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
-                  color: isActive ? '#a78bfa' : '#64748b',
-                  border: isActive
-                    ? '1px solid rgba(139, 92, 246, 0.3)'
-                    : '1px solid rgba(255, 255, 255, 0.08)',
-                }}
-              >
-                {view === 'stack' ? 'Supplements' : 'Other Factors'}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       <div style={{
         display: 'flex',
         justifyContent: 'space-around',
@@ -253,14 +213,12 @@ export default function BottomNav({
           onClose={() => setShowQuickActions(false)}
           onCopyData={onCopyData}
           copyDays={copyDays}
-          onRapidEntry={onRapidEntry}
           onEditNote={onEditNote}
           onEditSymptoms={onEditSymptoms}
           onCheckAll={onCheckAll}
           onClear={onClear}
           onMatchYesterday={onMatchYesterday}
-          onEditStack={onEditStack}
-          onEditInputs={onEditInputs}
+          onEditProtocol={onEditProtocol}
           onOpenSettings={() => {
             setShowSettings(true);
             setShowQuickActions(false);

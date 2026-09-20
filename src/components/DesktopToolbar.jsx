@@ -1,5 +1,4 @@
 import { formatDate, getCurrentTimePeriod } from '../utils/helpers';
-import DayNightToggle from './DayNightToggle';
 import HealthScoreBadge from './HealthScoreBadge';
 import { useHealthScore } from '../hooks/useHealthScore';
 
@@ -15,12 +14,7 @@ export default function DesktopToolbar({
   setAppMode,
   showInsights,
   setShowInsights,
-  // AM/PM toggle
-  quickLogTime,
-  setQuickLogTime,
   trackingMode,
-  flashColumn,
-  setFlashColumn,
   setCopyToastMessage,
   // Action handlers
   onOpenSettings,
