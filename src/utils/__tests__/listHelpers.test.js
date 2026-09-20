@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { restoreDay, isApplicable, getStripDateKeys, getSeverityStrip, clearDay, stepIndex, reorder, makeId } from '../listHelpers';
+import { restoreDay, isApplicable, getStripDateKeys, getSeverityStrip, clearDay, stepIndex, nextIndexBelow, reorder, makeId } from '../listHelpers';
 
 const periods = [{ id: 'morning' }, { id: 'evening' }];
 
@@ -93,5 +93,17 @@ describe('makeId', () => {
   it('never contains a dot (sync field-path separator)', () => {
     for (let i = 0; i < 50; i++) expect(makeId('Heartburn / bile reflux 2.0')).not.toContain('.');
     expect(makeId('Brain fog')).toMatch(/^brain-fog-\d+$/);
+  });
+});
+
+describe('nextIndexBelow', () => {
+  const list = [{ done: false }, { done: true }, { done: true }, { done: false }];
+  const blank = (x) => !x.done;
+  it('skips items that are not accepted', () => {
+    expect(nextIndexBelow(list, 0, blank)).toBe(3);
+  });
+  it('never wraps back to the top', () => {
+    expect(nextIndexBelow(list, 3, blank)).toBe(-1);
+    expect(nextIndexBelow(list, 1, (x) => x.done && false)).toBe(-1);
   });
 });

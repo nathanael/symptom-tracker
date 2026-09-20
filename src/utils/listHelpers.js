@@ -59,6 +59,12 @@ export const stepIndex = (list, from, dir, accept = () => true) => {
   return from;
 };
 
+// Index of the next item after `from` that `accept`s, searching downward only (no wrap); -1 if none
+export const nextIndexBelow = (list, from, accept) => {
+  for (let i = from + 1; i < list.length; i++) if (accept(list[i])) return i;
+  return -1;
+};
+
 // Move an item within an ordered list and return [{id, order}] for every item
 export const reorder = (orderedIds, fromId, toId) => {
   const ids = [...orderedIds];

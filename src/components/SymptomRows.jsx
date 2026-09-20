@@ -4,7 +4,7 @@ import './listUi.css';
 import { NA_SEVERITY } from '../utils/constants';
 import { getDateKey, haptic } from '../utils/helpers';
 import { isTyping, DraftInput, useReorderDrag, ChangeLog } from './listParts';
-import { isApplicable, getStripDateKeys, getSeverityStrip, getLastSeverity, stepIndex, reorder, makeId } from '../utils/listHelpers';
+import { isApplicable, getStripDateKeys, getSeverityStrip, getLastSeverity, stepIndex, nextIndexBelow, reorder, makeId } from '../utils/listHelpers';
 import {
   createSymptomHistoryEntry,
   applySymptomPatch,
@@ -92,8 +92,13 @@ export default function SymptomRows({
       const keys = rootRef.current?.querySelector('.lr-row.open .lr-keys');
       if (keys) thumbAnchor.current = { top: keys.getBoundingClientRect().top, at: Date.now() };
     }
+    // Filling a blank jumps to the next blank slot below; correcting an existing value stays on the row
+    const wasBlank = !entryFor(symptom, periodId);
     quickLog(symptom.id, severity, periodId);
-    if (!stay) advance(symptom.id, periodId);
+    if (stay || !wasBlank) return;
+    const from = activeSymptoms.findIndex((s) => s.id === symptom.id);
+    const idx = nextIndexBelow(activeSymptoms, from, (s) => isApplicable(s, periodId) && !entryFor(s, periodId));
+    if (idx >= 0) setFocus({ id: activeSymptoms[idx].id, period: periodId });
   };
 
   // After a mobile rating advances to the next row, scroll so its keys land under the thumb
