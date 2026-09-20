@@ -39,6 +39,7 @@ export default function ComparisonStudio({
   setStackItems,
   user,
   barSlot,
+  focusSymptomId,
 }) {
   const { days: sleepDays } = useGarminSleep(SLEEP_ENABLED ? user : null);
   const todayStr = useMemo(() => {
@@ -171,6 +172,17 @@ export default function ComparisonStudio({
     setPrimarySeriesId(id);
     haptic('light');
   };
+
+  // Opened from a symptom's History button: select that symptom and make it primary
+  useEffect(() => {
+    if (!focusSymptomId || !activeSymptoms.some(s => s.id === focusSymptomId)) return;
+    setSelectedSymptoms(prev => {
+      if (prev.includes(focusSymptomId)) return prev;
+      return prev.length >= 3 ? [...prev.slice(0, 2), focusSymptomId] : [...prev, focusSymptomId];
+    });
+    setPrimarySeriesId(focusSymptomId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSymptomId]);
 
   // startOffset counts back from today to the window's END date, so changing the timeframe
   // keeps the right-hand date anchored and only moves the start.

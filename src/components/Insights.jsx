@@ -27,8 +27,9 @@ export default function Insights({
   barSlot,
   trackingMode,
   setStackItems,
+  focusSymptomId,
 }) {
-  const [view, setView] = useState(readInitialView);
+  const [view, setView] = useState(() => (focusSymptomId ? 'comparison' : readInitialView()));
 
   useEffect(() => {
     if (!SLEEP_ENABLED) return;
@@ -50,6 +51,7 @@ export default function Insights({
             setStackItems={setStackItems}
             user={user}
             barSlot={SLEEP_ENABLED ? null : barSlot}
+            focusSymptomId={focusSymptomId}
           />
         ) : (
           <SleepAnalyzer user={user} isDesktop={isDesktop} />

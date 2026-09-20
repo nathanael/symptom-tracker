@@ -177,6 +177,10 @@ function App() {
   const [showRapidEntry, setShowRapidEntry] = useState(false);
   const [showSymptomGraph, setShowSymptomGraph] = useState(null);
   const [showSupplementGraph, setShowSupplementGraph] = useState(null);
+  // Mobile History button: jump to Insights with that symptom selected
+  const [insightsFocusSymptom, setInsightsFocusSymptom] = useState(null);
+  const openSymptomInInsights = (symptomId) => { setInsightsFocusSymptom(symptomId); setShowInsights(true); };
+  useEffect(() => { if (!showInsights) setInsightsFocusSymptom(null); }, [showInsights]);
 
   // Detect possible data loss at boot — if any snapshot has substantially
   // more items than current localStorage, surface a one-click restore banner.
@@ -835,6 +839,7 @@ function App() {
                 barSlot={navSlot}
                 trackingMode={trackingMode}
                 setStackItems={setStackItems}
+                focusSymptomId={insightsFocusSymptom}
               />
             ) : appMode === 'symptoms' ? (
               <SymptomRows
@@ -850,7 +855,7 @@ function App() {
                 setLastAction={setLastAction}
                 symptomSearch={symptomSearch}
                 setSymptomSearch={setSymptomSearch}
-                onOpenGraph={setShowSymptomGraph}
+                onOpenGraph={openSymptomInInsights}
                 onEditNote={() => setShowNoteModal(true)}
                 onClearDay={clearSymptomDay}
                 onDeleteSymptom={(symptom) => softDeleteItem('symptom', symptom)}

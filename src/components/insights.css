@@ -37,7 +37,7 @@
 .is-mhead .dn-step .dn-date { flex: 1; min-width: 0; }
 .is-mhead svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .is:not(.desktop) .is-row { min-height: 44px; font-size: 14px; }
-.is:not(.desktop) .is-add { height: 36px; }
+.is:not(.desktop) .is-add { height: 36px; align-self: stretch; }
 
 /* Series picker modal: single-column rows, neutral chrome */
 .is-pick-back { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: center; align-items: flex-start; padding: calc(72px + env(safe-area-inset-top)) 20px 20px; background: rgba(0,0,0,.7); }
