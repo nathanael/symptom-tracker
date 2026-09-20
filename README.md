@@ -1,4 +1,4 @@
-# Symptom Tracker v3.3.19
+# Glimpse
 
 A mobile-first health tracking PWA for symptoms and supplements with cloud sync.
 

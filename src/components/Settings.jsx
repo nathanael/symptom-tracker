@@ -231,7 +231,7 @@ export default function Settings({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `symptom-tracker-backup-${getDateKey(new Date())}.json`;
+    a.download = `glimpse-backup-${getDateKey(new Date())}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -591,7 +591,7 @@ export default function Settings({
 
   const about = (
     <div className="st-about">
-      v6.4.8 · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
+      v6.4.9 · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
       <button onClick={checkForUpdates} disabled={checkingForUpdates}>{checkingForUpdates ? 'Checking…' : 'Check for updates'}</button>
     </div>
   );

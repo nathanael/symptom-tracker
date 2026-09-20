@@ -80,7 +80,7 @@ export default function DesktopToolbar({
         <div className="dn-wrap">
           <div className="dn-brand">
             <span className="dn-logo"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg></span>
-            Symptom Tracker
+            Glimpse
           </div>
 
           <div className="dn-seg" role="tablist">

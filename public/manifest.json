@@ -1,6 +1,6 @@
 {
-  "name": "Symptom Tracker",
-  "short_name": "Symptoms",
+  "name": "Glimpse",
+  "short_name": "Glimpse",
   "description": "Track symptoms and supplements daily",
   "start_url": "./index.html",
   "scope": "./",
