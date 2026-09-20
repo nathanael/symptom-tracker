@@ -200,3 +200,6 @@
 .hg-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 .hg-controls button { font-family: inherit; cursor: pointer; }
 @media (max-width: 1000px) { .hg-controls .dn-seg { display: flex; flex: 1 1 100%; height: 36px; } .hg-controls .dn-seg button { flex: 1; padding: 0; } }
+
+/* Mobile: room below the last rows so the rating keys can always scroll up to thumb height */
+.lr.sym.mobile:not(.edit) { padding-bottom: 45vh; }

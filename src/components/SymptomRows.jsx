@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import './listUi.css';
 import { NA_SEVERITY } from '../utils/constants';
@@ -41,6 +41,8 @@ export default function SymptomRows({
   barSlot,
 }) {
   const dateKey = getDateKey(selectedDate);
+  const rootRef = useRef(null);
+  const thumbAnchor = useRef(null);
   const defaultPeriod = () =>
     timePeriods.length === 1 ? timePeriods[0].id : (new Date().getHours() < 12 ? 'morning' : 'evening');
 
@@ -85,9 +87,27 @@ export default function SymptomRows({
   }, [activeSymptoms]);
 
   const rate = (symptom, periodId, severity, { stay = false } = {}) => {
+    // Mobile: remember where the rating keys sit on screen so the next row's keys can be scrolled to the same spot
+    if (!isDesktop && !stay) {
+      const keys = rootRef.current?.querySelector('.lr-row.open .lr-keys');
+      if (keys) thumbAnchor.current = { top: keys.getBoundingClientRect().top, at: Date.now() };
+    }
     quickLog(symptom.id, severity, periodId);
     if (!stay) advance(symptom.id, periodId);
   };
+
+  // After a mobile rating advances to the next row, scroll so its keys land under the thumb
+  useLayoutEffect(() => {
+    const anchor = thumbAnchor.current;
+    thumbAnchor.current = null;
+    if (!anchor || Date.now() - anchor.at > 500) return;
+    const keys = rootRef.current?.querySelector('.lr-row.open .lr-keys');
+    if (!keys) return;
+    let scroller = keys.parentElement;
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+    const delta = keys.getBoundingClientRect().top - anchor.top;
+    if (Math.abs(delta) > 1) (scroller || window).scrollBy({ top: delta, behavior: 'smooth' });
+  }, [focus.id, focus.period]);
 
   const clearEntry = (symptom, periodId) => {
     const key = `${dateKey}-${symptom.id}-${periodId}`;
@@ -264,7 +284,7 @@ export default function SymptomRows({
   };
 
   // ---- Render ----
-  const rootClass = `lr ${isDesktop ? 'desktop' : 'mobile'} ${editing ? 'edit' : ''}`;
+  const rootClass = `lr sym ${isDesktop ? 'desktop' : 'mobile'} ${editing ? 'edit' : ''}`;
   const rootStyle = { '--lr-periods': timePeriods.length };
 
   // Scope + actions live in the nav's context bar (desktop) or the second row of the mobile top bar
@@ -322,7 +342,7 @@ export default function SymptomRows({
   }
 
   return (
-    <div className={rootClass} style={rootStyle}>
+    <div ref={rootRef} className={rootClass} style={rootStyle}>
       {bar}
       {activeSymptoms.length === 0 ? (
         <div className="lr-empty">{symptomSearch ? `No symptoms match "${symptomSearch}"` : 'No symptoms yet. Use Edit symptoms to add one.'}</div>
