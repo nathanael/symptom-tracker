@@ -126,6 +126,11 @@ input:focus, textarea:focus, select:focus {
   border-color: rgba(99, 102, 241, 0.6) !important;
 }
 
+/* Buttons: no browser focus ring. A clicked button is blurred straight away (see main.jsx), and
+   anyone tabbing through with the keyboard gets a quiet ring in the app's own style. */
+button:focus { outline: none; }
+button:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.35); outline-offset: 2px; }
+
 /* Button hover effects */
 button {
   transition: opacity 0.15s ease, transform 0.1s ease;

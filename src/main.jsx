@@ -36,6 +36,13 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// A button clicked with the mouse or a finger should not keep focus: the browser would ring it as soon as a
+// key is pressed, and Space / Enter (rating and check shortcuts) would press it again. Keyboard activation
+// has detail 0, so tabbing to a button and pressing it keeps focus where it is.
+document.addEventListener('click', (e) => {
+  if (e.detail > 0) e.target.closest?.('button')?.blur();
+});
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
