@@ -115,3 +115,43 @@ export const computeFlareGroups = (symptoms, entries, today, viewDate = today) =
   if (solo.length > 0) sections.push({ name: null, rows: solo, badge: null });
   return { ready: true, historyDays, sections };
 };
+
+// Flare line per symptom (its own normal over the window), for badging the person's own groups
+export const flareThresholds = (symptoms, entries, today) => {
+  const keys = getStripDateKeys(today, WINDOW_DAYS);
+  return new Map(symptoms.map((s) => [s.id, flareThreshold(getSeverityStrip(entries, s.id, keys))]));
+};
+
+// "flaring · 3 of 4 up" when at least half of a group (and 2+) is at or above its flare line on viewDate
+export const flaringBadge = (rows, thresholds, entries, viewDate) => {
+  const [viewKey] = getStripDateKeys(viewDate, 1);
+  const up = rows.filter((s) => {
+    const v = getSeverityStrip(entries, s.id, [viewKey])[0];
+    return v !== null && v >= (thresholds.get(s.id) ?? Infinity);
+  }).length;
+  return up >= 2 && up * 2 >= rows.length ? `flaring · ${up} of ${rows.length} up` : null;
+};
+
+/**
+ * One suggested grouping for Edit symptoms to preview: flare history first, names for whatever that leaves.
+ * A symptom the word list files under a group that history already proposed simply joins that group.
+ * @param offer  group names the word list may choose from (groups in use + unused defaults)
+ * @returns Array<{ name, source: 'history' | 'name', rows }> in display order; symptoms it cannot place are left out
+ */
+export const suggestGrouping = (symptoms, entries, today, offer = DEFAULT_GROUPS) => {
+  const proposal = new Map();
+  const placed = new Set();
+  const put = (name, source, rows) => {
+    const at = proposal.get(name) || { name, source, rows: [] };
+    proposal.set(name, { ...at, rows: [...at.rows, ...rows] });
+    rows.forEach((r) => placed.add(r.id));
+  };
+  computeFlareGroups(symptoms, entries, today).sections
+    .filter((sec) => sec.name)
+    .forEach((sec) => put(sec.name, 'history', sec.rows));
+  symptoms.filter((s) => !placed.has(s.id)).forEach((s) => {
+    const name = suggestGroup(s.name, s.description, offer);
+    if (name) put(name, proposal.get(name)?.source || 'name', [s]);
+  });
+  return [...proposal.values()];
+};

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeFlareGroups, flareThreshold, flareSimilarity, MIN_HISTORY_DAYS } from '../flareGroups';
+import { computeFlareGroups, flareThreshold, flareSimilarity, flareThresholds, flaringBadge, suggestGrouping, MIN_HISTORY_DAYS } from '../flareGroups';
 import { getStripDateKeys } from '../listHelpers';
 
 const TODAY = new Date(2026, 8, 20);
@@ -54,6 +54,37 @@ describe('flareSimilarity', () => {
     expect(flareSimilarity([5, 14], [5, 14], 90)).toBe(0);
     const often = Array.from({ length: 45 }, (_, i) => i * 2);
     expect(flareSimilarity(often, often.map((d) => d + 1), 90)).toBe(0);
+  });
+});
+
+describe('suggestGrouping', () => {
+  it('uses flare history first, then names for what is left, and leaves out what it cannot place', () => {
+    const extra = [...symptoms, { id: 'rash', name: 'Itchy rash' }, { id: 'odd', name: 'Urinary urgency' }];
+    expect(suggestGrouping(extra, entries, TODAY).map((g) => [g.name, g.source, g.rows.map((r) => r.id)])).toEqual([
+      ['Gut', 'history', ['diarrhea', 'bloating']],
+      ['Mood', 'history', ['irritable', 'anxiety']],
+      ['Nerve & pain', 'name', ['headache']],
+      ['Skin', 'name', ['rash']],
+    ]);
+  });
+
+  it('falls back to names alone for someone with no history', () => {
+    expect(suggestGrouping(symptoms, {}, TODAY).map((g) => [g.name, g.source, g.rows.map((r) => r.id)])).toEqual([
+      ['Gut', 'name', ['diarrhea', 'bloating']],
+      ['Mood', 'name', ['irritable', 'anxiety']],
+      ['Nerve & pain', 'name', ['headache']],
+    ]);
+  });
+});
+
+describe('flaringBadge', () => {
+  it('badges any set of symptoms when most of them are up on the day viewed', () => {
+    const thresholds = flareThresholds(symptoms, entries, TODAY);
+    const gut = symptoms.filter((s) => ['diarrhea', 'bloating'].includes(s.id));
+    const flareDay = new Date(2026, 8, 20 - (DAYS - 1 - 40));
+    expect(flaringBadge(gut, thresholds, entries, flareDay)).toBe('flaring · 2 of 2 up');
+    expect(flaringBadge(gut, thresholds, entries, TODAY)).toBe(null);
+    expect(flaringBadge([gut[0]], thresholds, entries, flareDay)).toBe(null); // one symptom is not a group flare
   });
 });
 

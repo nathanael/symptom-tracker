@@ -6,7 +6,7 @@ import { getDateKey, haptic } from '../utils/helpers';
 import { isTyping, DraftInput, useReorderDrag, ChangeLog } from './listParts';
 import { isApplicable, getStripDateKeys, getSeverityStrip, getLastSeverity, stepIndex, nextIndexBelow, reorder, makeId } from '../utils/listHelpers';
 import { suggestGroup, groupNames, groupSymptoms, availableGroups, nextGroupOrder, groupColor } from '../utils/symptomGroups';
-import { computeFlareGroups, WINDOW_DAYS, MIN_HISTORY_DAYS } from '../utils/flareGroups';
+import { suggestGrouping, flareThresholds, flaringBadge } from '../utils/flareGroups';
 import {
   createSymptomHistoryEntry,
   applySymptomPatch,
@@ -62,10 +62,10 @@ export default function SymptomRows({
   const [showHidden, setShowHidden] = useState(true);
   const [adding, setAdding] = useState(false);
 
-  // Grouping: 'order' = the flat list, 'groups' = sections the person defined, 'smart' = sections found from the log
+  // Grouping: 'order' = the flat list, 'groups' = sections the person defined
   const [groupBy, setGroupByState] = useState(() => {
     const saved = readPref(GROUP_BY_KEY, 'order');
-    return ['order', 'groups', 'smart'].includes(saved) ? saved : 'order';
+    return saved === 'groups' ? 'groups' : 'order';
   });
   const setGroupBy = (value) => { setGroupByState(value); writePref(GROUP_BY_KEY, value); };
   const [collapsed, setCollapsed] = useState(() => new Set(readPref(COLLAPSED_KEY, [])));
@@ -79,26 +79,25 @@ export default function SymptomRows({
   const [namingFor, setNamingFor] = useState(null); // symptom id whose Group menu chose "New group…"
   const [addingGroup, setAddingGroup] = useState(false);
   const [suggestedIds, setSuggestedIds] = useState(() => new Set()); // grouped by suggestion this session
-  // Grouping stays out of sight until the person has made a group in Edit symptoms: no control, flat list
+  // Outside Edit, grouping stays out of sight until the person has made a group: no switch, flat list.
+  // Inside Edit the switch is always there, so Groups can be opened to start building them.
   const hasGroups = useMemo(() => symptoms.some((s) => s.active && s.group), [symptoms]) || draftGroups.length > 0;
-  const grouped = hasGroups && groupBy === 'groups'; // the person's own groups (editable)
-  const smart = hasGroups && groupBy === 'smart'; // automatic groups (read-only)
-  const sectioned = grouped || smart;
-  const foldKey = (name) => `${smart ? 'smart:' : ''}${name ?? ''}`;
+  const grouped = groupBy === 'groups' && (hasGroups || editing);
+  const [proposal, setProposal] = useState(null); // suggested grouping being previewed in Edit
 
   // What is on screen, in on-screen order. Rating, arrows and hover all walk this list.
-  const flareGroups = useMemo(
-    () => (smart ? computeFlareGroups(activeSymptoms, entries, new Date(), selectedDate) : null),
-    [smart, activeSymptoms, entries, dateKey] // eslint-disable-line react-hooks/exhaustive-deps
+  const sections = useMemo(
+    () => (grouped ? groupSymptoms(activeSymptoms) : [{ name: undefined, rows: activeSymptoms }]),
+    [grouped, activeSymptoms]
   );
-  const sections = useMemo(() => {
-    if (grouped) return groupSymptoms(activeSymptoms);
-    if (smart) return flareGroups.sections;
-    return [{ name: undefined, rows: activeSymptoms }];
-  }, [grouped, smart, flareGroups, activeSymptoms]);
   const rows = useMemo(
-    () => sections.flatMap((sec) => (sectioned && collapsed.has(foldKey(sec.name))) ? [] : sec.rows),
-    [sections, sectioned, collapsed] // eslint-disable-line react-hooks/exhaustive-deps
+    () => sections.flatMap((sec) => (grouped && collapsed.has(sec.name ?? '')) ? [] : sec.rows),
+    [sections, grouped, collapsed]
+  );
+  // A group of the person's own gets a "flaring" badge when most of it is above its normal on the day viewed
+  const thresholds = useMemo(
+    () => (grouped && !editing ? flareThresholds(activeSymptoms, entries, new Date()) : null),
+    [grouped, editing, activeSymptoms, entries]
   );
 
   // Keep the focused period valid when tracking mode changes
@@ -282,41 +281,36 @@ export default function SymptomRows({
     }));
     haptic('medium');
   };
-  // Word-list suggestions for everything still ungrouped; only ever picks from groups on offer
-  const ungroupedSuggestions = () => {
-    const offer = availableGroups(symptoms, draftGroups);
-    return symptoms.filter((s) => s.active && !s.group)
-      .map((s) => [s.id, suggestGroup(s.name, s.description, offer)])
-      .filter(([, g]) => g);
+  // Suggestion box: flare history first, names for the rest. Nothing changes until Apply.
+  const openProposal = () => {
+    const active = symptoms.filter((s) => s.active).sort((a, b) => (a.order || 0) - (b.order || 0));
+    setProposal(suggestGrouping(active, entries, new Date(), availableGroups(symptoms, draftGroups)));
   };
-  const applySuggestions = () => {
-    const found = ungroupedSuggestions();
-    const byGroup = new Map();
-    found.forEach(([id, g]) => byGroup.set(g, [...(byGroup.get(g) || []), id]));
-    // One pass so each new group gets its own order slot
-    let order = nextGroupOrder(symptoms);
+  // replace = false files only what is still ungrouped; replace = true re-files everything the way the proposal has it
+  const applyProposal = (replace) => {
+    const existing = groupNames(symptoms);
     const orderFor = new Map();
-    [...byGroup.keys()].forEach((g) => {
-      const member = symptoms.find((s) => s.group === g && typeof s.groupOrder === 'number');
-      orderFor.set(g, member ? member.groupOrder : order++);
+    let next = replace ? 0 : nextGroupOrder(symptoms);
+    proposal.forEach((g) => {
+      const member = !replace && symptoms.find((s) => s.group === g.name && typeof s.groupOrder === 'number');
+      orderFor.set(g.name, member ? member.groupOrder : next++);
     });
-    const target = new Map(found);
-    setSymptoms((prev) => prev.map((s) => (target.has(s.id)
-      ? applySymptomPatch(s, { group: target.get(s.id), groupOrder: orderFor.get(target.get(s.id)) }) : s)));
-    setSuggestedIds((prev) => new Set([...prev, ...target.keys()]));
-    setGroupBy('groups');
-    setLastAction(`Grouped ${found.length} symptom${found.length === 1 ? '' : 's'}. Change any of them from its Group menu`);
-  };
-
-  // "Start from Intelligent": file every symptom the way the automatic grouping has it
-  const adoptFlareGroups = () => {
-    if (groupNames(symptoms).length > 0 && !confirm('Replace your current groups with the Intelligent ones? Symptoms and their history are not affected.')) return;
     const target = new Map();
-    flareGroups.sections.forEach((sec, i) => sec.rows.forEach((row) => target.set(row.id, sec.name ? { group: sec.name, groupOrder: i } : { group: null })));
-    setSymptoms((prev) => prev.map((s) => (target.has(s.id) ? applySymptomPatch(s, target.get(s.id)) : s)));
-    setSuggestedIds(new Set());
+    proposal.forEach((g) => g.rows.forEach((r) => target.set(r.id, g.name)));
+    setSymptoms((prev) => prev.map((s) => {
+      if (!s.active) return s;
+      if (!replace && s.group) return s;
+      const name = target.get(s.id);
+      if (!name) return replace && s.group ? applySymptomPatch(s, { group: null }) : s;
+      return applySymptomPatch(s, { group: name, groupOrder: orderFor.get(name) });
+    }));
+    const count = [...target.keys()].filter((id) => replace || !symptoms.find((s) => s.id === id)?.group).length;
+    setSuggestedIds(new Set([...target.keys()]));
+    setProposal(null);
     setGroupBy('groups');
-    setLastAction('Copied the Intelligent groups into My groups. Rename or move anything you like');
+    setLastAction(replace && existing.length > 0
+      ? 'Replaced your groups with the suggestion. Rename or move anything you like'
+      : `Grouped ${count} symptom${count === 1 ? '' : 's'}. Rename or move anything you like`);
   };
 
   // Nothing is written until a name is committed, so an abandoned row leaves no trace
@@ -471,13 +465,41 @@ export default function SymptomRows({
   const rootStyle = { '--lr-periods': timePeriods.length };
 
   // Scope + actions live in the nav's context bar (desktop) or the second row of the mobile top bar
-  const toggleEdit = () => { setEditing(!editing); setExpandedId(null); setNamingFor(null); setAddingGroup(false); };
-  const suggestCount = editing ? ungroupedSuggestions().length : 0;
+  const toggleEdit = () => { setEditing(!editing); setExpandedId(null); setNamingFor(null); setAddingGroup(false); setProposal(null); };
+  const ungroupedIds = new Set(symptoms.filter((s) => s.active && !s.group).map((s) => s.id));
+  const proposalFiles = proposal ? proposal.flatMap((g) => g.rows).filter((r) => ungroupedIds.has(r.id)).length : 0;
+  const proposalPanel = proposal && (
+    <div className="lr-suggest">
+      <div className="lr-suggest-head">
+        <b>Suggested grouping</b>
+        <small>Nothing changes until you apply it. You can rename or move anything afterwards.</small>
+      </div>
+      {proposal.length === 0 ? (
+        <p>No suggestion yet. There is not enough flare history, and none of the names match Gut, Mood, Nerve &amp; pain or Skin.</p>
+      ) : proposal.map((g) => (
+        <div className="lr-suggest-row" key={g.name} style={{ '--c': groupColor(g.name) }}>
+          <i /><b>{g.name}</b>
+          <span>{g.rows.map((r) => r.name).join(' · ')}</span>
+          <small>{g.source === 'history' ? 'from your flare history' : 'from the name'}</small>
+        </div>
+      ))}
+      <div className="lr-suggest-acts">
+        {hasGroups && proposal.length > 0 && (
+          <small>{proposalFiles === 0
+            ? 'Everything this can place is already in one of your groups.'
+            : `Apply files the ${proposalFiles} symptom${proposalFiles === 1 ? '' : 's'} you have not grouped. Your own groups stay as they are.`}</small>
+        )}
+        <span className="lr-spacer" />
+        <button className="dn-btn" onClick={() => setProposal(null)}>Dismiss</button>
+        {hasGroups && proposal.length > 0 && <button className="dn-btn" onClick={() => { if (confirm('Replace your current groups with this suggestion? Symptoms and their history are not affected.')) applyProposal(true); }}>Replace my groups</button>}
+        {proposal.length > 0 && <button className="dn-btn primary" disabled={hasGroups && proposalFiles === 0} onClick={() => applyProposal(!hasGroups)}>Apply</button>}
+      </div>
+    </div>
+  );
   const groupByControl = (
     <div className={`dn-seg ${isDesktop ? 'sm' : ''} lr-groupby`} role="group" aria-label="Group symptoms by">
-      <button className={sectioned ? '' : 'on'} onClick={() => setGroupBy('order')}>My order</button>
-      <button className={grouped ? 'on' : ''} onClick={() => setGroupBy('groups')}>My groups</button>
-      <button className={smart ? 'on' : ''} onClick={() => setGroupBy('smart')} title={`Groups symptoms whose bad days coincide, from your last ${WINDOW_DAYS} days`}>Intelligent</button>
+      <button className={grouped ? '' : 'on'} onClick={() => setGroupBy('order')}>Order</button>
+      <button className={grouped ? 'on' : ''} onClick={() => setGroupBy('groups')}>Groups</button>
     </div>
   );
   const bar = barSlot ? createPortal(
@@ -488,12 +510,9 @@ export default function SymptomRows({
           <i style={{ '--p': `${c.total ? (c.done / c.total) * 100 : 0}%` }} />
         </span>
       ))}
-      {isDesktop && hasGroups && groupByControl}
+      {isDesktop && (hasGroups || editing) && groupByControl}
       <span className="lr-spacer" />
-      {editing && smart && flareGroups.ready && flareGroups.sections.some((sec) => sec.name) && (
-        <button className="dn-btn" onClick={adoptFlareGroups} title="Copies the Intelligent groups into My groups as a draft you can rename and correct">Use as my groups</button>
-      )}
-      {editing && suggestCount > 0 && <button className="dn-btn" onClick={applySuggestions} title="Files ungrouped symptoms into Gut, Mood, Nerve & pain or Skin by their names. You can change any of them.">Suggest groups · {suggestCount}</button>}
+      {editing && <button className={`dn-btn ${proposal ? 'on' : ''}`} onClick={() => (proposal ? setProposal(null) : openProposal())}>Suggest grouping</button>}
       {isDesktop && !editing && hasEntriesToday && <button className="dn-btn ghost" onClick={onClearDay}>Clear day</button>}
       {isDesktop && !editing && <button className="dn-btn" onClick={onEditNote}>Day notes</button>}
       {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={toggleEdit}>{editing ? 'Done' : 'Edit symptoms'}</button>}
@@ -512,7 +531,8 @@ export default function SymptomRows({
             <div />
           </div>
         )}
-        {!isDesktop && hasGroups && groupByControl}
+        {!isDesktop && groupByControl}
+        {proposal && proposalPanel}
         {grouped ? groupSymptoms(orderedActive, draftGroups).map((sec) => {
           const key = sec.name ?? '';
           const draft = sec.name !== null && sec.rows.length === 0;
@@ -538,7 +558,7 @@ export default function SymptomRows({
             </div>
           );
         }) : orderedActive.map((s) => renderEditRow(s, false))}
-        {(grouped || !hasGroups) && (addingGroup ? (
+        {grouped && (addingGroup ? (
           <div className="lr-row lr-cols lr-add">
             <span className="lr-grip" style={{ cursor: 'default' }}>+</span>
             <div className="lr-fields">
@@ -587,20 +607,15 @@ export default function SymptomRows({
             {isDesktop && <div className="strip-h">LAST 14 DAYS</div>}
             {timePeriods.map((p) => <div className="c" key={p.id}>{timePeriods.length > 1 ? p.label : 'TODAY'}</div>)}
           </div>
-          {smart && !flareGroups.ready && (
-            <div className="lr-gnote">Intelligent groups need about {MIN_HISTORY_DAYS} days of logs. You have {flareGroups.historyDays} so far.</div>
-          )}
-          {smart && flareGroups.ready && !flareGroups.sections.some((sec) => sec.name) && (
-            <div className="lr-gnote">No symptoms have clearly flared together in the last {WINDOW_DAYS} days yet.</div>
-          )}
           {sections.map((sec) => {
-            const key = foldKey(sec.name);
-            const folded = sectioned && collapsed.has(key);
+            const key = sec.name ?? '';
+            const folded = grouped && collapsed.has(key);
             const slots = sec.rows.filter((s) => isApplicable(s, focus.period));
-            const header = sectioned && (smart ? flareGroups.ready : true) && (
+            const badge = grouped && sec.name && thresholds ? flaringBadge(sec.rows, thresholds, entries, selectedDate) : null;
+            const header = grouped && (
               <div key={`h-${key}`} className={`lr-ghead ${folded ? 'folded' : ''}`} style={{ '--c': groupColor(sec.name) }} onClick={() => toggleCollapsed(key)}>
-                <i /><b>{sec.name ?? (smart ? 'On their own' : 'Ungrouped')}</b>
-                {sec.badge && <em className="lr-gbadge">{sec.badge}</em>}
+                <i /><b>{sec.name ?? 'Ungrouped'}</b>
+                {badge && <em className="lr-gbadge">{badge}</em>}
                 <span>{slots.filter((s) => entryFor(s, focus.period)).length}/{slots.length} logged</span>
                 <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg>
               </div>

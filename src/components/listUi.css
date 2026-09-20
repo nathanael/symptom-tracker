@@ -217,7 +217,24 @@
 .lr-ghead.folded svg { transform: rotate(-90deg); }
 .lr-ghead:hover b { color: #f3f4f6; }
 .lr-ghead .lr-gbadge { font-style: normal; margin-left: 2px; padding: 1px 7px; border-radius: 6px; font-size: 11px; letter-spacing: 0; color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); background: color-mix(in srgb, var(--c) 12%, transparent); }
-.lr-gnote {padding: 4px 14px 10px; font-size: 12px; color: #6b7280; }
+/* Suggested grouping preview (Edit symptoms) */
+.lr-suggest { margin: 4px 0 14px; padding: 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(255,255,255,.03); font-size: 13px; color: #9ca3af; }
+.lr-suggest-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.lr-suggest-head b { color: #f3f4f6; font-size: 14px; font-weight: 600; }
+.lr-suggest small { font-size: 12px; color: #6b7280; }
+.lr-suggest p { margin: 0 0 10px; }
+.lr-suggest-row { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-top: 1px solid rgba(255,255,255,.06); }
+.lr-suggest-row i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; align-self: center; }
+.lr-suggest-row b { flex: none; width: 110px; color: #e5e7eb; font-weight: 600; }
+.lr-suggest-row span { flex: 1; min-width: 0; color: #d1d5db; }
+.lr-suggest-row small { flex: none; }
+.lr-suggest-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.06); }
+.lr-suggest .dn-btn:disabled { opacity: .4; cursor: default; }
+.dn-btn.on { background: rgba(255,255,255,.1); color: #f3f4f6; }
+.lr.mobile .lr-suggest-row { flex-wrap: wrap; }
+.lr.mobile .lr-suggest-row b { width: auto; }
+.lr.mobile .lr-suggest-row span { flex-basis: 100%; order: 3; }
+.lr.mobile .lr-suggest-row small { margin-left: auto; }
 .lr-ghead.edit { cursor: default; padding: 16px 14px 4px; border-top: 1px solid transparent; }
 .lr-ghead.edit.over, .lr-ghead.edit:has(.over) { border-top-color: #818cf8; }
 .lr-ghead.edit.dragging { opacity: .35; }
