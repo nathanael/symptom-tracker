@@ -1,4 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
+import './desktopNav.css';
+import './listUi.css';
 import { haptic } from '../utils/helpers';
 import {
   TIMEFRAMES, COLORS, SMOOTH_WINDOWS,
@@ -16,7 +18,7 @@ export default function SymptomGraph({
   onChangeSymptom,
   isDesktop,
 }) {
-  const [timeframe, setTimeframe] = useState(28);
+  const [timeframe, setTimeframe] = useState(30);
   const [compareIds, setCompareIds] = useState([]);
   const [touchX, setTouchX] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -25,7 +27,7 @@ export default function SymptomGraph({
   const primarySymptom = symptoms.find(s => s.id === primarySymptomId);
 
   // Chart dimensions
-  const W = 340, H = 200;
+  const W = isDesktop ? 680 : 340, H = isDesktop ? 280 : 200; // wider viewBox on desktop so text isn't scaled up 2x
   const padLeft = 28, padRight = 10, padTop = 18, padBottom = 28;
   const chartW = W - padLeft - padRight;
   const chartH = H - padTop - padBottom;
@@ -142,7 +144,7 @@ export default function SymptomGraph({
     };
   }, [primaryData, entries, dates, primarySymptomId, trackingMode]);
 
-  const showDots = timeframe <= 28;
+  const showDots = timeframe <= 7;
 
   // Comparison toggle
   const toggleCompare = (id) => {
@@ -258,7 +260,7 @@ export default function SymptomGraph({
               }}>
                 <div style={{
                   color: '#f8fafc',
-                  fontSize: '22px',
+                  fontSize: '16px',
                   fontWeight: '600',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -299,36 +301,13 @@ export default function SymptomGraph({
           );
         })()}
 
-        {/* Timeframe selector */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${TIMEFRAMES.length}, 1fr)`,
-          gap: '4px',
-          padding: '4px',
-          marginBottom: '24px',
-          borderRadius: '12px',
-          background: 'rgba(23, 23, 23, 0.5)',
-          border: '1px solid rgba(255,255,255,0.1)',
-        }}>
-          {TIMEFRAMES.map(tf => (
-            <button
-              key={tf.days}
-              onClick={() => { setTimeframe(tf.days); haptic('light'); }}
-              style={{
-                padding: '10px',
-                borderRadius: '8px',
-                border: 'none',
-                background: timeframe === tf.days ? 'rgba(255,255,255,0.1)' : 'transparent',
-                boxShadow: timeframe === tf.days ? '0 1px 2px rgba(0,0,0,0.05), inset 0 0 0 1px rgba(255,255,255,0.05)' : 'none',
-                color: timeframe === tf.days ? '#fff' : '#a3a3a3',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}
-            >
-              {tf.label}
-            </button>
-          ))}
+        {/* View + timeframe: same flat segmented controls as the nav */}
+        <div className="hg-controls">
+          <div className="dn-seg">
+            {TIMEFRAMES.map(tf => (
+              <button key={tf.days} className={timeframe === tf.days ? 'on' : ''} onClick={() => { setTimeframe(tf.days); haptic('light'); }}>{tf.label}</button>
+            ))}
+          </div>
         </div>
 
         {/* SVG Chart */}
@@ -365,7 +344,7 @@ export default function SymptomGraph({
               const y = padTop + chartH - (sev / 5) * chartH;
               return (
                 <text key={sev} x={padLeft - 6} y={y + 4} textAnchor="end"
-                  fill="#6b7280" fontSize="10" fontFamily="system-ui">
+                  fill="#6b7280" fontSize="10" fontFamily="inherit">
                   {sev}
                 </text>
               );
@@ -374,7 +353,7 @@ export default function SymptomGraph({
             {/* X-axis labels */}
             {xLabels.map((lbl, i) => (
               <text key={i} x={lbl.x} y={H - 4} textAnchor="middle"
-                fill="#6b7280" fontSize="9" fontFamily="system-ui">
+                fill="#6b7280" fontSize="9" fontFamily="inherit">
                 {lbl.label}
               </text>
             ))}
@@ -393,14 +372,14 @@ export default function SymptomGraph({
             <path d={buildPath(primaryPoints)}
               fill="none"
               stroke={COLORS.primary}
-              strokeWidth="2.5"
+              strokeWidth="1.75"
               strokeLinejoin="round"
             />
 
             {/* Data dots for short timeframes */}
             {showDots && primaryPoints.map((pt, i) => (
               pt.y !== null && (
-                <circle key={`pd-${i}`} cx={pt.x} cy={pt.y} r="2.5"
+                <circle key={`pd-${i}`} cx={pt.x} cy={pt.y} r="2"
                   fill={COLORS.primary} />
               )
             ))}

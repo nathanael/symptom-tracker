@@ -1,4 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
+import './desktopNav.css';
+import './listUi.css';
 import { haptic, isScheduledForDate, getDateKey, getSupplementAdherence, getSupplementStreak } from '../utils/helpers';
 import {
   TIMEFRAMES, COLORS, SMOOTH_WINDOWS,
@@ -17,7 +19,7 @@ export default function SupplementGraph({
   onChangeItem,
   isDesktop,
 }) {
-  const [timeframe, setTimeframe] = useState(28);
+  const [timeframe, setTimeframe] = useState(30);
   const [viewMode, setViewMode] = useState('adherence'); // 'adherence' or 'dose'
   const [compareIds, setCompareIds] = useState([]);
   const [overlaySymptomId, setOverlaySymptomId] = useState(null);
@@ -30,7 +32,7 @@ export default function SupplementGraph({
   const activeItems = stackItems.filter(i => i.active).sort((a, b) => (a.order || 0) - (b.order || 0));
 
   // Chart dimensions
-  const W = 340, H = 200;
+  const W = isDesktop ? 680 : 340, H = isDesktop ? 280 : 200; // wider viewBox on desktop so text isn't scaled up 2x
   const padLeft = 32, padRight = overlaySymptomId ? 28 : 10, padTop = 18, padBottom = 28;
   const chartW = W - padLeft - padRight;
   const chartH = H - padTop - padBottom;
@@ -241,7 +243,7 @@ export default function SupplementGraph({
     };
   }, [primaryItemId, stackEntries, stackItems, timeframe, dates]);
 
-  const showDots = timeframe <= 28;
+  const showDots = timeframe <= 7;
 
   const toggleCompare = (id) => {
     setCompareIds(prev => {
@@ -358,7 +360,7 @@ export default function SupplementGraph({
               }}>
                 <div style={{
                   color: '#f8fafc',
-                  fontSize: '22px',
+                  fontSize: '16px',
                   fontWeight: '600',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -399,68 +401,18 @@ export default function SupplementGraph({
           );
         })()}
 
-        {/* View mode toggle */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '4px',
-          padding: '4px',
-          marginBottom: '16px',
-          borderRadius: '12px',
-          background: 'rgba(23, 23, 23, 0.5)',
-          border: '1px solid rgba(255,255,255,0.1)',
-        }}>
-          {[{ id: 'adherence', label: 'Adherence' }, { id: 'dose', label: 'Dose' }].map(mode => (
-            <button
-              key={mode.id}
-              onClick={() => { setViewMode(mode.id); haptic('light'); }}
-              style={{
-                padding: '10px',
-                borderRadius: '8px',
-                border: 'none',
-                background: viewMode === mode.id ? 'rgba(255,255,255,0.1)' : 'transparent',
-                boxShadow: viewMode === mode.id ? '0 1px 2px rgba(0,0,0,0.05), inset 0 0 0 1px rgba(255,255,255,0.05)' : 'none',
-                color: viewMode === mode.id ? '#fff' : '#a3a3a3',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}
-            >
-              {mode.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Timeframe selector */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${TIMEFRAMES.length}, 1fr)`,
-          gap: '4px',
-          padding: '4px',
-          marginBottom: '24px',
-          borderRadius: '12px',
-          background: 'rgba(23, 23, 23, 0.5)',
-          border: '1px solid rgba(255,255,255,0.1)',
-        }}>
-          {TIMEFRAMES.map(tf => (
-            <button
-              key={tf.days}
-              onClick={() => { setTimeframe(tf.days); haptic('light'); }}
-              style={{
-                padding: '10px',
-                borderRadius: '8px',
-                border: 'none',
-                background: timeframe === tf.days ? 'rgba(255,255,255,0.1)' : 'transparent',
-                boxShadow: timeframe === tf.days ? '0 1px 2px rgba(0,0,0,0.05), inset 0 0 0 1px rgba(255,255,255,0.05)' : 'none',
-                color: timeframe === tf.days ? '#fff' : '#a3a3a3',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-              }}
-            >
-              {tf.label}
-            </button>
-          ))}
+        {/* View + timeframe: same flat segmented controls as the nav */}
+        <div className="hg-controls">
+          <div className="dn-seg">
+            {[{ id: 'adherence', label: 'Adherence' }, { id: 'dose', label: 'Dose' }].map(mode => (
+              <button key={mode.id} className={viewMode === mode.id ? 'on' : ''} onClick={() => { setViewMode(mode.id); haptic('light'); }}>{mode.label}</button>
+            ))}
+          </div>
+          <div className="dn-seg">
+            {TIMEFRAMES.map(tf => (
+              <button key={tf.days} className={timeframe === tf.days ? 'on' : ''} onClick={() => { setTimeframe(tf.days); haptic('light'); }}>{tf.label}</button>
+            ))}
+          </div>
         </div>
 
         {/* SVG Chart */}
@@ -497,7 +449,7 @@ export default function SupplementGraph({
               const y = padTop + chartH - (val / yMax) * chartH;
               return (
                 <text key={val} x={padLeft - 6} y={y + 4} textAnchor="end"
-                  fill="#6b7280" fontSize="9" fontFamily="system-ui">
+                  fill="#6b7280" fontSize="9" fontFamily="inherit">
                   {viewMode === 'adherence' ? `${val}%` : val}
                 </text>
               );
@@ -508,7 +460,7 @@ export default function SupplementGraph({
               const y = padTop + chartH - (sev / 5) * chartH;
               return (
                 <text key={`r-${sev}`} x={W - padRight + 6} y={y + 4} textAnchor="start"
-                  fill="rgba(251, 113, 133, 0.5)" fontSize="9" fontFamily="system-ui">
+                  fill="rgba(251, 113, 133, 0.5)" fontSize="9" fontFamily="inherit">
                   {sev}
                 </text>
               );
@@ -517,7 +469,7 @@ export default function SupplementGraph({
             {/* X-axis labels */}
             {xLabels.map((lbl, i) => (
               <text key={i} x={lbl.x} y={H - 4} textAnchor="middle"
-                fill="#6b7280" fontSize="9" fontFamily="system-ui">
+                fill="#6b7280" fontSize="9" fontFamily="inherit">
                 {lbl.label}
               </text>
             ))}
@@ -546,14 +498,14 @@ export default function SupplementGraph({
             <path d={buildPath(primaryPoints)}
               fill="none"
               stroke={COLORS.primary}
-              strokeWidth="2.5"
+              strokeWidth="1.75"
               strokeLinejoin="round"
             />
 
             {/* Data dots */}
             {showDots && primaryPoints.map((pt, i) => (
               pt.y !== null && (
-                <circle key={`pd-${i}`} cx={pt.x} cy={pt.y} r="2.5"
+                <circle key={`pd-${i}`} cx={pt.x} cy={pt.y} r="2"
                   fill={COLORS.primary} />
               )
             ))}

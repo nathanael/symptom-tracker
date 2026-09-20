@@ -591,7 +591,7 @@ export default function Settings({
 
   const about = (
     <div className="st-about">
-      v6.3.4 · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
+      v6.3.5 · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
       <button onClick={checkForUpdates} disabled={checkingForUpdates}>{checkingForUpdates ? 'Checking…' : 'Check for updates'}</button>
     </div>
   );

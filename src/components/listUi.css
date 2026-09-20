@@ -170,3 +170,33 @@
 .lr.mobile .lr-input.unit { width: 90px; }
 .lr.mobile .lr-dose .lr-input.num { width: 80px; padding: 6px 8px; }
 .lr.mobile .lr-stepper button { width: 32px; height: 32px; border-radius: 8px; font-size: 16px; }
+
+/* Schedule picker (Protocol edit > More): same flat controls as the nav */
+.sp { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; font-size: 13px; color: #9ca3af; }
+.sp button, .sp-cal button { font-family: inherit; cursor: pointer; }
+.sp-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sp .dn-seg { max-width: 100%; }
+.sp .dn-seg button { white-space: nowrap; }
+.sp-days button { width: 36px; padding: 0; }
+.sp .dn-step .dn-date { min-width: 44px; }
+.sp .dn-step button { width: 32px; font-size: 16px; }
+.sp .dn-btn { color: #f3f4f6; }
+.sp-back { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.7); }
+.sp-cal { width: 100%; max-width: 320px; padding: 14px; border-radius: 12px; background: #17191c; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 16px 40px rgba(0,0,0,.6); color: #e5e7eb; }
+.sp-cal svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sp-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sp-cal-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: #f3f4f6; }
+.sp-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.sp-cal-grid.head { margin-bottom: 4px; font-size: 11px; color: #6b7280; text-align: center; }
+.sp-cal-grid button { aspect-ratio: 1; border: 1px solid transparent; border-radius: 8px; background: none; color: #e5e7eb; font-size: 13px; }
+.sp-cal-grid button:hover:not(:disabled) { background: rgba(255,255,255,.06); }
+.sp-cal-grid button.today { border-color: rgba(255,255,255,.2); }
+.sp-cal-grid button.on { background: #8b5cf6; color: #fff; font-weight: 600; }
+.sp-cal-grid button:disabled { color: #4b5563; cursor: default; }
+.sp-cal-today { width: 100%; justify-content: center; margin-top: 12px; color: #f3f4f6; }
+.lr .dn-btn { font-family: inherit; cursor: pointer; }
+
+/* History chart modals (symptom + supplement) */
+.hg-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.hg-controls button { font-family: inherit; cursor: pointer; }
+@media (max-width: 1000px) { .hg-controls .dn-seg { display: flex; flex: 1 1 100%; height: 36px; } .hg-controls .dn-seg button { flex: 1; padding: 0; } }

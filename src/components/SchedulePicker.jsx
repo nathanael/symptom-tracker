@@ -1,7 +1,12 @@
 import { useState, useMemo } from 'react';
+import './desktopNav.css';
+import './listUi.css';
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const CHEV_LEFT = <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg>;
+const CHEV_RIGHT = <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg>;
 
 const getTodayString = () => new Date().toISOString().split('T')[0];
 
@@ -62,174 +67,25 @@ function DatePickerModal({ selectedDate, onSelect, onClose }) {
   };
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.92)',
-        zIndex: 2000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'rgba(15, 17, 21, 0.95)',
-          borderRadius: '12px',
-          padding: '20px',
-          width: '100%',
-          maxWidth: '360px',
-          border: '1px solid rgba(99, 102, 241, 0.3)',
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px',
-        }}>
-          <button
-            onClick={() => changeMonth(-1)}
-            style={{
-              background: 'rgba(99, 102, 241, 0.15)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              borderRadius: '5px',
-              width: '36px',
-              height: '36px',
-              color: '#a5b4fc',
-              fontSize: '18px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            ‹
-          </button>
-
-          <h3 style={{
-            color: '#f8fafc',
-            fontSize: '18px',
-            fontWeight: '600',
-            margin: 0,
-          }}>
-            {viewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </h3>
-
-          <button
-            onClick={() => changeMonth(1)}
-            style={{
-              background: 'rgba(99, 102, 241, 0.15)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              borderRadius: '5px',
-              width: '36px',
-              height: '36px',
-              color: '#a5b4fc',
-              fontSize: '18px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            ›
-          </button>
+    <div className="sp-back" onClick={onClose}>
+      <div className="sp-cal" onClick={(e) => e.stopPropagation()}>
+        <div className="sp-cal-head">
+          <button className="dn-icon" aria-label="Previous month" onClick={() => changeMonth(-1)}>{CHEV_LEFT}</button>
+          <h3>{viewMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h3>
+          <button className="dn-icon" aria-label="Next month" onClick={() => changeMonth(1)}>{CHEV_RIGHT}</button>
         </div>
-
-        {/* Day labels */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '4px',
-          marginBottom: '8px',
-        }}>
-          {DAY_LABELS.map((day, i) => (
-            <div
-              key={i}
-              style={{
-                textAlign: 'center',
-                color: '#64748b',
-                fontSize: '12px',
-                fontWeight: '600',
-                padding: '4px',
-              }}
-            >
-              {day}
-            </div>
-          ))}
+        <div className="sp-cal-grid head">
+          {DAY_LABELS.map((day, i) => <span key={i}>{day}</span>)}
         </div>
-
-        {/* Calendar grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '4px',
-        }}>
+        <div className="sp-cal-grid">
           {calendarDays.map((day, i) => {
-            if (!day) {
-              return <div key={i} />;
-            }
-
+            if (!day) return <span key={i} />;
             const dateStr = day.toISOString().split('T')[0];
-            const isSelected = dateStr === selectedDate;
-            const isToday = day.getTime() === today.getTime();
-            const isPast = day < today;
-
-            return (
-              <button
-                key={i}
-                onClick={() => handleSelectDate(day)}
-                disabled={isPast}
-                style={{
-                  aspectRatio: '1',
-                  background: isSelected
-                    ? 'rgba(139, 92, 246, 0.4)'
-                    : 'transparent',
-                  border: isToday
-                    ? '2px solid #8b5cf6'
-                    : isSelected
-                    ? '2px solid rgba(139, 92, 246, 0.6)'
-                    : '1px solid transparent',
-                  borderRadius: '8px',
-                  color: isPast ? '#475569' : isSelected ? '#fff' : '#e2e8f0',
-                  fontSize: '14px',
-                  fontWeight: isToday || isSelected ? '700' : '400',
-                  cursor: isPast ? 'default' : 'pointer',
-                  opacity: isPast ? 0.4 : 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {day.getDate()}
-              </button>
-            );
+            const cls = `${dateStr === selectedDate ? 'on' : ''} ${day.getTime() === today.getTime() ? 'today' : ''}`;
+            return <button key={i} className={cls} disabled={day < today} onClick={() => handleSelectDate(day)}>{day.getDate()}</button>;
           })}
         </div>
-
-        {/* Today button */}
-        <button
-          onClick={() => handleSelectDate(today)}
-          style={{
-            width: '100%',
-            marginTop: '16px',
-            padding: '10px',
-            background: 'rgba(139, 92, 246, 0.2)',
-            border: '1px solid rgba(139, 92, 246, 0.4)',
-            borderRadius: '8px',
-            color: '#c4b5fd',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-          }}
-        >
-          Start Today
-        </button>
+        <button className="dn-btn sp-cal-today" onClick={() => handleSelectDate(today)}>Start today</button>
       </div>
     </div>
   );
@@ -275,170 +131,51 @@ export default function SchedulePicker({ schedule, onChange }) {
     onChange({ ...currentSchedule, interval });
   };
 
+  const interval = currentSchedule.interval || 2;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Type selector */}
-      <div style={{ display: 'flex', gap: '8px' }}>
+    <div className="sp">
+      <div className="dn-seg">
         {[
           { type: 'daily', label: 'Daily' },
-          { type: 'days', label: 'Days of Week' },
-          { type: 'interval', label: 'Every X Days' },
+          { type: 'days', label: 'Days of week' },
+          { type: 'interval', label: 'Every X days' },
         ].map(({ type, label }) => (
-          <button
-            key={type}
-            type="button"
-            onClick={() => handleTypeChange(type)}
-            style={{
-              flex: 1,
-              padding: '12px 14px',
-              background: currentSchedule.type === type
-                ? 'rgba(99, 102, 241, 0.3)'
-                : 'rgba(15, 23, 42, 0.5)',
-              border: currentSchedule.type === type
-                ? '2px solid rgba(99, 102, 241, 0.5)'
-                : '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
-              color: currentSchedule.type === type ? '#a5b4fc' : '#9ca3af',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {label}
-          </button>
+          <button key={type} type="button" className={currentSchedule.type === type ? 'on' : ''} onClick={() => handleTypeChange(type)}>{label}</button>
         ))}
       </div>
 
-      {/* Days of week selector */}
       {currentSchedule.type === 'days' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <span style={{ color: '#94a3b8', fontSize: '15px' }}>
-            Take on these days:
-          </span>
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between' }}>
-            {DAY_LABELS.map((label, index) => {
-              const isSelected = currentSchedule.days?.includes(index);
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => toggleDay(index)}
-                  title={DAY_NAMES[index]}
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '50%',
-                    background: isSelected
-                      ? 'rgba(99, 102, 241, 0.4)'
-                      : 'rgba(15, 23, 42, 0.5)',
-                    border: isSelected
-                      ? '2px solid rgba(99, 102, 241, 0.6)'
-                      : '1px solid rgba(255, 255, 255, 0.1)',
-                    color: isSelected ? '#c7d2fe' : '#6b7280',
-                    fontSize: '15px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
+        <div className="sp-line">
+          <span>Take on</span>
+          <div className="dn-seg sp-days">
+            {DAY_LABELS.map((label, index) => (
+              <button key={index} type="button" title={DAY_NAMES[index]} className={currentSchedule.days?.includes(index) ? 'on' : ''} onClick={() => toggleDay(index)}>{label}</button>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Interval selector with date picker */}
       {currentSchedule.type === 'interval' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Interval row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ color: '#94a3b8', fontSize: '15px' }}>Take every</span>
-            <button
-              type="button"
-              onClick={() => handleIntervalChange(-1)}
-              disabled={(currentSchedule.interval || 2) <= 2}
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                background: 'rgba(15, 23, 42, 0.8)',
-                border: '2px solid rgba(99, 102, 241, 0.3)',
-                color: (currentSchedule.interval || 2) <= 2 ? '#4b5563' : '#a5b4fc',
-                fontSize: '18px',
-                fontWeight: '500',
-                cursor: (currentSchedule.interval || 2) <= 2 ? 'default' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              −
-            </button>
-            <span style={{
-              color: '#f8fafc',
-              fontSize: '15px',
-              fontWeight: '600',
-              minWidth: '24px',
-              textAlign: 'center',
-            }}>
-              {currentSchedule.interval || 2}
-            </span>
-            <button
-              type="button"
-              onClick={() => handleIntervalChange(1)}
-              disabled={(currentSchedule.interval || 2) >= 30}
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                background: 'rgba(15, 23, 42, 0.8)',
-                border: '2px solid rgba(99, 102, 241, 0.3)',
-                color: (currentSchedule.interval || 2) >= 30 ? '#4b5563' : '#a5b4fc',
-                fontSize: '18px',
-                fontWeight: '500',
-                cursor: (currentSchedule.interval || 2) >= 30 ? 'default' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              +
-            </button>
-            <span style={{ color: '#94a3b8', fontSize: '15px' }}>days</span>
+        <>
+          <div className="sp-line">
+            <span>Take every</span>
+            <div className="dn-step">
+              <button type="button" aria-label="Fewer days" disabled={interval <= 2} onClick={() => handleIntervalChange(-1)}>−</button>
+              <span className="dn-date">{interval}</span>
+              <button type="button" aria-label="More days" disabled={interval >= 30} onClick={() => handleIntervalChange(1)}>+</button>
+            </div>
+            <span>days</span>
           </div>
-
-          {/* Start date row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ color: '#94a3b8', fontSize: '15px' }}>Starting from</span>
-            <button
-              type="button"
-              onClick={() => setShowDatePicker(true)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '10px 14px',
-                background: 'rgba(15, 23, 42, 0.8)',
-                border: '2px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '15px',
-                color: '#f8fafc',
-                fontWeight: '500',
-              }}
-            >
+          <div className="sp-line">
+            <span>Starting from</span>
+            <button type="button" className="dn-btn" onClick={() => setShowDatePicker(true)}>
               {formatFriendlyDate(currentSchedule.startDate || getTodayString())}
             </button>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Full-screen date picker modal */}
       {showDatePicker && (
         <DatePickerModal
           selectedDate={currentSchedule.startDate || getTodayString()}

@@ -305,8 +305,8 @@ export default function ProtocolRows({
                 <SchedulePicker schedule={schedule} onChange={setScheduleDraft} />
                 {scheduleDraft && (
                   <div className="lr-prow" style={{ marginTop: 8 }}>
-                    <button className="lr-btn primary" onClick={() => { patchSupplement(item.id, { schedule: scheduleDraft }); setScheduleDraft(null); }}>Save schedule</button>
-                    <button className="lr-btn" onClick={() => setScheduleDraft(null)}>Cancel</button>
+                    <button className="dn-btn primary" onClick={() => { patchSupplement(item.id, { schedule: scheduleDraft }); setScheduleDraft(null); }}>Save schedule</button>
+                    <button className="dn-btn" onClick={() => setScheduleDraft(null)}>Cancel</button>
                   </div>
                 )}
               </div>
@@ -490,6 +490,7 @@ export default function ProtocolRows({
       <div
         key={item.id}
         className={`lr-row lr-cols ${focused ? 'focus' : ''} ${entry ? 'done' : ''} ${due ? '' : 'muted'}`}
+        onMouseMove={isDesktop && due && !focused ? () => setFocusId(item.id) : undefined}
         onClick={() => { if (due) setFocusId(item.id); if (!isDesktop) toggleSupplement(item); }}
       >
         <div className="lr-name">{item.name}{item.description && <small>{item.description}</small>}</div>
@@ -521,6 +522,7 @@ export default function ProtocolRows({
       <div
         key={item.id}
         className={`lr-row lr-cols ${focused ? 'focus' : ''} ${entry ? 'done' : ''}`}
+        onMouseMove={isDesktop && !focused ? () => setFocusId(item.id) : undefined}
         onClick={() => { setFocusId(item.id); if (!isDesktop) setFactorCount(item, count ? 0 : 1); }}
       >
         <div className="lr-name">
@@ -558,7 +560,13 @@ export default function ProtocolRows({
       {factors.length === 0 && <div className="lr-empty">{search ? `Nothing matches "${search}"` : 'No factors yet.'}</div>}
       {factors.map(renderFactorRow)}
       {isDesktop && (
-        <div className="lr-hintbar"><span><kbd>Space</kbd> check and move down · <kbd>D</kbd> dose · <kbd>↑</kbd><kbd>↓</kbd> · <kbd>E</kbd> edit</span></div>
+        <div className="lr-hintbar">
+          <span><kbd>Space</kbd> check</span>
+          <span><kbd>D</kbd> dose</span>
+          <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+          <span><kbd>←</kbd><kbd>→</kbd> day</span>
+          <span><kbd>E</kbd> edit</span>
+        </div>
       )}
     </div>
   );
