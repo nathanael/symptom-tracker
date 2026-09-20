@@ -35,6 +35,7 @@
 .lr-tag { font-size: 11px; font-weight: 600; color: #a5b4fc; letter-spacing: .5px; width: 26px; }
 .lr-key { width: 52px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); background: none; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; color: #d1d5db; cursor: pointer; font-family: inherit; }
 .lr-key:hover { border-color: #fff; }
+.lr-key.last { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
 .lr-key.wide { width: auto; padding: 0 14px; font-size: 12px; font-weight: 500; color: #6b7280; }
 .lr-key.mobile-only { display: none; }
 .lr-hint { margin-left: auto; font-size: 12px; color: #6b7280; white-space: nowrap; }

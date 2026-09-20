@@ -45,6 +45,7 @@ import { liveItems, markDeleted, restoreDeleted, isExpired, removeEntriesFor } f
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import DesktopToolbar from './components/DesktopToolbar';
+import RapidEntry from './components/RapidEntry';
 import SymptomRows from './components/SymptomRows';
 import UndoToast from './components/UndoToast';
 import ProtocolRows from './components/ProtocolRows';
@@ -173,6 +174,7 @@ function App() {
   const [showExport, setShowExport] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showRapidEntry, setShowRapidEntry] = useState(false);
   const [showSymptomGraph, setShowSymptomGraph] = useState(null);
   const [showSupplementGraph, setShowSupplementGraph] = useState(null);
 
@@ -898,6 +900,21 @@ function App() {
         </div>
       )}
 
+      {/* Rapid Entry */}
+      {showRapidEntry && (
+        <RapidEntry
+          symptoms={activeSymptoms}
+          entries={entries}
+          setEntries={setEntries}
+          selectedDate={selectedDate}
+          trackingMode={trackingMode}
+          timePeriods={timePeriods}
+          quickLog={quickLog}
+          setCopyToastMessage={setCopyToastMessage}
+          onClose={() => setShowRapidEntry(false)}
+        />
+      )}
+
       {/* Note Modal */}
       {showNoteModal && (
         <NoteModal
@@ -1276,6 +1293,7 @@ function App() {
           onEditNote={() => setShowNoteModal(true)}
           onEditSymptoms={() => { setAppMode('symptoms'); setShowInsights(false); setSymptomEditMode(true); }}
           onClearSymptoms={clearSymptomDay}
+          onRapidEntry={() => { setAppMode('symptoms'); setShowInsights(false); setShowRapidEntry(true); }}
           // Stack page actions
           onCheckAll={protocolCheckAll}
           onClear={protocolClearDay}

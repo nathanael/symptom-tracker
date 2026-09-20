@@ -25,6 +25,7 @@ export default function BottomNav({
   onEditNote,
   onEditSymptoms,
   onClearSymptoms,
+  onRapidEntry,
   onClear,
   onMatchYesterday,
   onEditProtocol,
@@ -71,6 +72,7 @@ export default function BottomNav({
           onEditNote={onEditNote}
           onEditSymptoms={onEditSymptoms}
           onClearSymptoms={onClearSymptoms}
+          onRapidEntry={onRapidEntry}
           onClear={onClear}
           onMatchYesterday={onMatchYesterday}
           onEditProtocol={onEditProtocol}

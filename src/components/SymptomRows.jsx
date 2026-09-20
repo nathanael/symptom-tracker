@@ -4,7 +4,7 @@ import './listUi.css';
 import { NA_SEVERITY } from '../utils/constants';
 import { getDateKey, haptic } from '../utils/helpers';
 import { isTyping, DraftInput, useReorderDrag, ChangeLog, BarMenu } from './listParts';
-import { isApplicable, getStripDateKeys, getSeverityStrip, stepIndex, reorder, makeId } from '../utils/listHelpers';
+import { isApplicable, getStripDateKeys, getSeverityStrip, getLastSeverity, stepIndex, reorder, makeId } from '../utils/listHelpers';
 import {
   createSymptomHistoryEntry,
   applySymptomPatch,
@@ -338,6 +338,8 @@ export default function SymptomRows({
             const done = timePeriods.every((p) => !isApplicable(symptom, p.id) || entryFor(symptom, p.id));
             const currentPeriod = timePeriods.find((p) => p.id === focus.period);
             const current = entryFor(symptom, focus.period);
+            // Until this slot is rated, outline the value picked last time
+            const lastSeverity = open && !current ? getLastSeverity(entries, symptom.id, focus.period, selectedDate) : null;
             return (
               <div
                 key={symptom.id}
@@ -378,8 +380,8 @@ export default function SymptomRows({
                     {SEVERITIES.map((n) => (
                       <button
                         key={n}
-                        className="lr-key"
-                        style={current?.severity === n ? { background: SEV_BG[n], color: SEV_FG[n], borderColor: 'transparent' } : undefined}
+                        className={`lr-key ${lastSeverity === n ? 'last' : ''}`}
+                        style={current?.severity === n ? { background: SEV_BG[n], color: SEV_FG[n], borderColor: 'transparent' } : lastSeverity === n ? { '--c': STRIP_COLOR[n] } : undefined}
                         onClick={() => rate(symptom, focus.period, n)}
                       >
                         {n}

@@ -1,0 +1,49 @@
+/* Rapid entry — one symptom at a time, big keys. Same tokens as the nav and Settings. */
+.re { position: fixed; inset: 0; z-index: 260; display: flex; flex-direction: column; background: #08090a; color: #f3f4f6; font-size: 13px; padding-top: env(safe-area-inset-top); }
+.re-in { flex: 1; min-height: 0; width: 100%; max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; }
+.re button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.re svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.re-bar { flex: none; height: 48px; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
+.re-bar h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.re-close { width: 40px; height: 40px; border: 0; border-radius: 11px; background: none; color: #9ca3af; display: grid; place-items: center; }
+.re-close:active { background: rgba(255,255,255,.06); }
+.re-bar .dn-seg { margin-left: auto; }
+.re-bar .dn-seg button { padding: 5px 14px; font-size: 12.5px; }
+
+.re-progress { flex: none; padding: 14px 16px 0; }
+.re-count { display: flex; justify-content: space-between; color: #9ca3af; font-size: 12px; margin-bottom: 8px; }
+.re-count b { color: #f3f4f6; font-weight: 500; }
+.re-ticks { display: flex; gap: 3px; }
+.re-ticks i { flex: 1; height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); transition: background .15s; }
+.re-ticks i.done { background: #4ade80; }
+.re-ticks i.na { background: #4b5563; }
+.re-ticks i.cur { background: #8b5cf6; box-shadow: 0 0 0 2px rgba(139,92,246,.25); }
+
+.re-symptom { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px 24px; text-align: center; }
+.re-symptom h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+.re-symptom p { margin: 0; color: #6b7280; font-size: 14.5px; min-height: 1.4em; }
+.re-last { margin-top: 6px; padding: 3px 10px; border-radius: 99px; border: 1px solid rgba(255,255,255,.07); color: #9ca3af; font-size: 12px; }
+.re-last b { font-weight: 600; }
+
+.re-pad { flex: none; padding: 0 12px calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
+.re-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.re-key { position: relative; height: 74px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: #0e0f11; color: var(--c, #d1d5db); font-size: 26px; font-weight: 600; display: grid; place-items: center; transition: transform .06s, background .12s, border-color .12s; }
+.re-key:active { transform: scale(.97); background: color-mix(in srgb, var(--c) 14%, #0e0f11); }
+.re-key.last { border-color: var(--c); background: color-mix(in srgb, var(--c) 12%, #0e0f11); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
+.re-key.last::after { content: "last"; position: absolute; bottom: 7px; font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: #6b7280; }
+.re-key.on { background: color-mix(in srgb, var(--c) 20%, #0e0f11); border-color: var(--c); }
+.re-key.on::after { content: "✓"; position: absolute; top: 7px; right: 10px; bottom: auto; font-size: 12px; color: var(--c); }
+.re-key.na { height: 46px; font-size: 14px; font-weight: 500; color: #9ca3af; --c: #64748b; }
+.re-nav { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; }
+.re-nav button { height: 46px; border-radius: 14px; border: 1px solid rgba(255,255,255,.07); background: none; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 500; }
+.re-nav button:active { background: rgba(255,255,255,.06); color: #f3f4f6; }
+
+/* Done screen */
+.re-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; }
+.re-check { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.3); color: #4ade80; margin-bottom: 6px; }
+.re-check svg { width: 28px; height: 28px; stroke-width: 2.4; }
+.re-done h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.re-done p { margin: 0; color: #6b7280; font-size: 14px; }
+.re-done-actions { width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.re-done-actions .dn-btn { height: 46px; justify-content: center; border-radius: 14px; font-size: 14.5px; }

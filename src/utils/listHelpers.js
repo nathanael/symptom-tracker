@@ -67,3 +67,14 @@ export const reorder = (orderedIds, fromId, toId) => {
 // Ids must not contain '.', which the sync layer treats as a field-path separator
 export const makeId = (name) =>
   `${name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${Date.now()}${Math.floor(Math.random() * 1e6)}`;
+
+// Most recent earlier rating (N/A ignored) for a symptom + period, to hint the likely answer
+export const getLastSeverity = (entries, symptomId, periodId, date, days = 14) => {
+  const d = new Date(date);
+  for (let i = 0; i < days; i++) {
+    d.setDate(d.getDate() - 1);
+    const entry = entries[`${getDateKey(d)}-${symptomId}-${periodId}`];
+    if (entry && entry.severity >= 0) return entry.severity;
+  }
+  return null;
+};
