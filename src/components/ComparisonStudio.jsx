@@ -172,20 +172,8 @@ export default function ComparisonStudio({
     haptic('light');
   };
 
-  // When timeframe changes, keep the window centered on the same date
-  const prevTimeframeRef = useRef(timeframe);
-  useEffect(() => {
-    const prev = prevTimeframeRef.current;
-    prevTimeframeRef.current = timeframe;
-    if (prev === timeframe) return;
-    setStartOffset(old => {
-      // Center of old window was at: old + prev/2 days back from today
-      // New offset to keep same center: centerOffset - timeframe/2
-      const centerOffset = old + prev / 2;
-      return Math.max(0, Math.round(centerOffset - timeframe / 2));
-    });
-  }, [timeframe]);
-
+  // startOffset counts back from today to the window's END date, so changing the timeframe
+  // keeps the right-hand date anchored and only moves the start.
   const dates = useMemo(() => {
     const result = [];
     const end = new Date();
