@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getProtocolEvents, normalRange, beforeAfter, addDays } from '../protocolEvents';
+import { getProtocolEvents, normalRange, changeEffect, addDays } from '../protocolEvents';
 
 const TODAY = '2026-09-20';
 
@@ -73,18 +73,38 @@ describe('normalRange', () => {
   });
 });
 
-describe('beforeAfter', () => {
+describe('changeEffect', () => {
   const series = (map) => (dates) => dates.map((d) => (d in map ? map[d] : null));
+  // `value(i)` for each of `days` days starting at `from`
+  const fill = (map, from, days, value) => { for (let i = 0; i < days; i++) map[addDays(from, i)] = typeof value === 'function' ? value(i) : value; return map; };
 
-  it('averages up to 30 days either side of the change', () => {
-    const map = {};
-    for (let i = 1; i <= 10; i++) map[addDays('2026-09-01', -i)] = 3;
-    for (let i = 0; i < 10; i++) map[addDays('2026-09-01', i)] = 1;
-    expect(beforeAfter(series(map), '2026-09-01', TODAY)).toEqual({ before: 3, after: 1, afterDays: 20 });
+  it('reports a clear improvement in points', () => {
+    const map = fill(fill({}, '2026-08-02', 30, 3), '2026-09-01', 20, 1);
+    expect(changeEffect(series(map), '2026-09-01', TODAY)).toMatchObject({ status: 'ok', before: 3, after: 1, delta: -2, meaningful: true });
   });
 
-  it('returns null until there are three logged days on each side', () => {
-    const map = { '2026-09-18': 2, '2026-09-19': 2, '2026-09-10': 3, '2026-09-11': 3, '2026-09-12': 3 };
-    expect(beforeAfter(series(map), '2026-09-18', TODAY)).toBeNull();
+  it('does not call a wobble of a tenth of a point a change', () => {
+    const map = fill(fill({}, '2026-08-02', 30, (i) => (i % 2 ? 1 : 2)), '2026-09-01', 20, (i) => (i % 5 ? 1.5 : 1));
+    const effect = changeEffect(series(map), '2026-09-01', TODAY);
+    expect(effect.status).toBe('ok');
+    expect(effect.meaningful).toBe(false);
+  });
+
+  it('asks for more than half a point when the symptom is noisy anyway', () => {
+    const map = fill(fill({}, '2026-08-02', 30, (i) => (i % 2 ? 0 : 5)), '2026-09-01', 20, (i) => (i % 2 ? 0 : 3.8));
+    expect(changeEffect(series(map), '2026-09-01', TODAY).meaningful).toBe(false);
+  });
+
+  it('says it is too early until a week is logged since the change', () => {
+    const map = fill(fill({}, '2026-08-10', 36, 3), '2026-09-15', 5, 1);
+    expect(changeEffect(series(map), '2026-09-15', TODAY).status).toBe('early');
+  });
+
+  it('only compares clean stretches: stops at the next change and starts at the previous one', () => {
+    const map = fill(fill(fill({}, '2026-08-01', 20, 3), '2026-08-21', 10, 1), '2026-08-31', 21, 4);
+    const effect = changeEffect(series(map), '2026-08-21', TODAY, { nextChange: '2026-08-31' });
+    expect(effect).toMatchObject({ status: 'ok', before: 3, after: 1 });
+    expect(changeEffect(series(map), '2026-08-21', TODAY, { nextChange: '2026-08-25' }).status).toBe('crowded');
+    expect(changeEffect(series(map), '2026-08-21', TODAY, { prevChange: '2026-08-17' }).status).toBe('crowded');
   });
 });

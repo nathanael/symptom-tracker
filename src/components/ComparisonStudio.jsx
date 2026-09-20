@@ -12,7 +12,7 @@ import {
   getHealthScoreSeries,
   getSleepDailySeries,
 } from '../utils/correlationHelpers';
-import { getProtocolEvents, normalRange, beforeAfter, addDays } from '../utils/protocolEvents';
+import { getProtocolEvents, normalRange, changeEffect, addDays } from '../utils/protocolEvents';
 import HealthScoreCompact from './HealthScoreCompact';
 import SeriesPicker from './SeriesPicker';
 import { useHealthScore } from '../hooks/useHealthScore';
@@ -28,7 +28,7 @@ const SUPPLEMENT_STYLES = [{ color: '#8b5cf6' }, { color: '#a78bfa' }, { color: 
 const SLEEP_STYLES = [{ color: '#22d3ee' }, { color: '#06b6d4' }, { color: '#0ea5e9' }];
 
 const HEALTH_SCORE_COLOR = '#86efac';
-const MARKER_COLOR = '#d4a017';
+const MARKER_COLOR = '#a78bfa'; // protocol changes share the supplements' hue: a marker, not a warning
 
 export default function ComparisonStudio({
   entries,
@@ -411,28 +411,39 @@ export default function ComparisonStudio({
     return out;
   }, [selectedSymptoms, entries, dates, timeframe, trackingMode]);
 
-  // Starts, stops and dose changes inside the window, one marker per day
-  const protocolMarkers = useMemo(() => {
+  // Starts, stops and dose changes, one marker per day; the chart shows the ones inside the window
+  const allMarkers = useMemo(() => {
     const byDate = new Map();
     getProtocolEvents(stackItems, stackEntries, todayStr).forEach((ev) => {
-      const idx = dates.indexOf(ev.date);
-      if (idx < 0) return;
-      if (!byDate.has(ev.date)) byDate.set(ev.date, { date: ev.date, idx, events: [] });
+      if (!byDate.has(ev.date)) byDate.set(ev.date, { date: ev.date, events: [] });
       byDate.get(ev.date).events.push(ev);
     });
     return [...byDate.values()].map(m => ({ ...m, label: m.events.length === 1 ? m.events[0].label : `${m.events.length} changes` }));
-  }, [stackItems, stackEntries, dates, todayStr]);
+  }, [stackItems, stackEntries, todayStr]);
+  const protocolMarkers = useMemo(
+    () => allMarkers.map(m => ({ ...m, idx: dates.indexOf(m.date) })).filter(m => m.idx >= 0),
+    [allMarkers, dates]
+  );
 
   const [pickedMarkerDate, setPickedMarkerDate] = useState(null);
   const activeMarker = protocolMarkers.find(m => m.date === pickedMarkerDate) || protocolMarkers[protocolMarkers.length - 1] || null;
 
-  // What the change is measured against: the primary symptom, else the first symptom on the chart
-  const compareSymptomId = primaryIsSymptom ? primarySeriesId : (selectedSymptoms[0] || null);
+  // Which symptoms clearly moved after the picked change, biggest first. Every active symptom is
+  // checked, not just the ones on the chart, and only against stretches free of other changes.
   const markerEffect = useMemo(() => {
-    if (!activeMarker || !compareSymptomId) return null;
-    const result = beforeAfter((ds) => getSymptomDailySeries(entries, compareSymptomId, ds, trackingMode), activeMarker.date, todayStr);
-    return { result, symptom: symptoms.find(s => s.id === compareSymptomId) };
-  }, [activeMarker, compareSymptomId, entries, trackingMode, todayStr, symptoms]);
+    if (!activeMarker) return null;
+    const i = allMarkers.findIndex(m => m.date === activeMarker.date);
+    const bounds = { prevChange: allMarkers[i - 1]?.date || null, nextChange: allMarkers[i + 1]?.date || null };
+    const effects = activeSymptoms.map(sym => ({
+      sym,
+      ...changeEffect((ds) => getSymptomDailySeries(entries, sym.id, ds, trackingMode), activeMarker.date, todayStr, bounds),
+    }));
+    const judged = effects.filter(e => e.status === 'ok');
+    const movers = judged.filter(e => e.meaningful)
+      .sort((a, b) => Math.abs(b.delta) / Math.max(b.noise, 0.5) - Math.abs(a.delta) / Math.max(a.noise, 0.5));
+    const status = judged.length > 0 ? 'ok' : effects.some(e => e.status === 'crowded') ? 'crowded' : 'early';
+    return { status, movers };
+  }, [activeMarker, allMarkers, activeSymptoms, entries, trackingMode, todayStr]);
 
   // ── Chart points ──
 
@@ -1074,8 +1085,6 @@ export default function ComparisonStudio({
         <button className="dn-btn is-add" onClick={() => { setShowSupplementPicker(true); haptic('light'); }}>+ Supplement</button>
       )}
 
-      <div className="is-gap" />
-
       {selectedSymptoms.map((symId, idx) => {
         const sym = activeSymptoms.find(s => s.id === symId);
         return seriesRow({
@@ -1093,7 +1102,6 @@ export default function ComparisonStudio({
 
       {SLEEP_ENABLED && (
         <>
-          <div className="is-gap" />
           {selectedSleepMetrics.map((metricKey, idx) => {
             const metric = SLEEP_METRICS.find(m => m.key === metricKey);
             return seriesRow({
@@ -1149,35 +1157,26 @@ export default function ComparisonStudio({
     </div>
   );
 
-  // What the compared symptom did around the picked protocol change
-  const fmtDay = (dateStr) => new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  // One line under the chart: which symptoms clearly moved after the picked protocol change. With several changes in the window, tapping it steps to the next one.
   const sinceText = activeMarker && (activeMarker.events.length === 1 ? activeMarker.events[0].since : `${activeMarker.events.length} protocol changes`);
-  const markerChip = activeMarker && (
-    <div className="is-effect">
-      {protocolMarkers.length > 1 && (
-        <div className="is-effect-tabs">
-          {protocolMarkers.map(m => (
-            <button key={m.date} className={m.date === activeMarker.date ? 'on' : ''} onClick={() => { setPickedMarkerDate(m.date); haptic('light'); }}>
-              <span className="flag" />{m.label}
-            </button>
-          ))}
-        </div>
-      )}
-      {!markerEffect ? (
-        <p>Add a symptom to see how it changed since {sinceText} on {fmtDay(activeMarker.date)}.</p>
-      ) : !markerEffect.result ? (
-        <p>Since {sinceText} on {fmtDay(activeMarker.date)}: not enough logged days on both sides to compare yet.</p>
-      ) : (
-        <>
-          <p>
-            Since {sinceText} on {fmtDay(activeMarker.date)}, <b>{markerEffect.symptom?.name}</b> went
-            from <b>{markerEffect.result.before.toFixed(1)}</b> to <b>{markerEffect.result.after.toFixed(1)}</b>{' '}
-            {deltaTag(+markerEffect.result.after.toFixed(1) - +markerEffect.result.before.toFixed(1))}
-          </p>
-          <small>Average of the 30 days before, against the {markerEffect.result.afterDays} day{markerEffect.result.afterDays === 1 ? '' : 's'} since.</small>
-        </>
-      )}
-    </div>
+  const nextMarker = () => {
+    const i = protocolMarkers.findIndex(m => m.date === activeMarker.date);
+    setPickedMarkerDate(protocolMarkers[(i + 1) % protocolMarkers.length].date);
+    haptic('light');
+  };
+  const markerChip = activeMarker && markerEffect && (
+    <button className="is-effect" disabled={protocolMarkers.length < 2} onClick={nextMarker}
+      title="Up to 30 days before the change against up to 30 days since, stopping at any other protocol change. Only clear changes are listed.">
+      <span className="mark" />
+      <span>Since {sinceText}</span>
+      {markerEffect.status === 'early' ? <span>· too early to tell</span>
+        : markerEffect.status === 'crowded' ? <span>· too close to another change to tell</span>
+        : markerEffect.movers.length === 0 ? <span>· no clear change in any symptom</span>
+        : markerEffect.movers.slice(0, isDesktop ? 3 : 2).map(e => (
+          <b key={e.sym.id}>{e.sym.name} {deltaTag(e.delta)}</b>
+        ))}
+      {protocolMarkers.length > 1 && <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg>}
+    </button>
   );
 
   const healthScoreTile = (

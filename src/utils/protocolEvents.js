@@ -77,18 +77,33 @@ export const normalRange = (values) => {
   return { lo: Math.max(0, avg - half), hi: Math.min(5, avg + half) };
 };
 
+const MIN_VERDICT_DAYS = 7; // logged days needed on each side before saying anything
+const MIN_POINTS = 0.5; // on the 0–5 scale, less than this is not a change worth reporting
+const MIN_EFFECT = 0.5; // ...and it has to stand out from the symptom's own day-to-day noise
+
 /**
- * Average of a daily series before and after a change, up to `span` days each side.
+ * What a daily series did around a protocol change, comparing only clean stretches: the "before"
+ * starts no earlier than the previous change and the "after" stops at the next one.
  * @param seriesFor  (dates: string[]) => Array<number|null>
- * @returns {{ before, after, afterDays }|null}  null until both sides have a few logged days
+ * @returns {{ status: 'ok', before, after, delta, meaningful } | { status: 'early'|'crowded' }}
+ *   early = not enough days logged yet; crowded = another change is too close to tell them apart
  */
-export const beforeAfter = (seriesFor, eventDate, todayStr, span = 30) => {
-  const afterDays = Math.min(span, diffDays(todayStr, eventDate) + 1);
-  if (afterDays <= 0) return null;
-  const range = (from, count) => Array.from({ length: count }, (_, i) => addDays(from, i));
-  const logged = (dates) => seriesFor(dates).filter((v) => v !== null && v !== undefined);
-  const before = logged(range(addDays(eventDate, -span), span));
-  const after = logged(range(eventDate, afterDays));
-  if (before.length < MIN_SIDE_DAYS || after.length < MIN_SIDE_DAYS) return null;
-  return { before: mean(before), after: mean(after), afterDays };
+export const changeEffect = (seriesFor, eventDate, todayStr, { prevChange = null, nextChange = null, span = 30 } = {}) => {
+  const range = (from, to) => Array.from({ length: Math.max(0, diffDays(to, from) + 1) }, (_, i) => addDays(from, i));
+  const logged = (dates) => seriesFor(dates).filter((v) => v !== null && v !== undefined && v >= 0);
+
+  const openStart = addDays(eventDate, -span);
+  const cutStart = prevChange && prevChange > openStart;
+  const openEnd = [addDays(eventDate, span - 1), todayStr].sort()[0];
+  const cutEnd = nextChange && addDays(nextChange, -1) < openEnd;
+  const before = logged(range(cutStart ? prevChange : openStart, addDays(eventDate, -1)));
+  const after = logged(range(eventDate, cutEnd ? addDays(nextChange, -1) : openEnd));
+  if (after.length < MIN_VERDICT_DAYS) return { status: cutEnd ? 'crowded' : 'early' };
+  if (before.length < MIN_VERDICT_DAYS) return { status: cutStart ? 'crowded' : 'early' };
+
+  const delta = mean(after) - mean(before);
+  const variance = (values) => mean(values.map((v) => (v - mean(values)) ** 2));
+  const noise = Math.sqrt((variance(before) * before.length + variance(after) * after.length) / (before.length + after.length));
+  const meaningful = Math.abs(delta) >= MIN_POINTS && Math.abs(delta) >= MIN_EFFECT * noise;
+  return { status: 'ok', before: mean(before), after: mean(after), delta, noise, meaningful };
 };
