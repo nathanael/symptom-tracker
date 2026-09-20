@@ -1,15 +1,10 @@
 /* Shared list UI for the Symptoms and Protocol tabs */
 .lr { max-width: 860px; margin: 0 auto; color: #e5e7eb; font-size: 14px; }
-.lr-bar { display: flex; align-items: center; gap: 10px; padding: 0 0 12px; position: relative; }
-.lr-search { width: 240px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); border-radius: 8px; padding: 7px 12px; color: #f8fafc; font-size: 13px; outline: none; }
-.lr-search:focus { border-color: rgba(99,102,241,.6); }
+.lr.desktop { max-width: 1032px; } /* matches the desktop nav container */
 .lr-spacer { margin-left: auto; }
 .lr-btn { border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); color: #d1d5db; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; font-family: inherit; }
 .lr-btn:hover { border-color: rgba(255,255,255,.2); color: #fff; }
 .lr-btn.primary { background: rgba(99,102,241,.3); border-color: transparent; color: #e0e7ff; }
-.lr-count { border: 1px solid rgba(74,222,128,.3); color: #4ade80; border-radius: 8px; padding: 6px 12px; font-size: 12px; white-space: nowrap; }
-.lr-actions { display: contents; }
-.lr-more { display: none; }
 
 .lr-cols { display: grid; grid-template-columns: minmax(0,1fr) 170px repeat(var(--lr-periods, 2), 56px); gap: 16px; align-items: center; }
 .lr-head { padding: 0 14px 8px; font-size: 11px; color: #6b7280; letter-spacing: .4px; }
@@ -93,16 +88,8 @@
 .lr-toast-undo { color: #a5b4fc; font-weight: 600; background: none; border: none; cursor: pointer; font: inherit; font-weight: 600; padding: 0; }
 
 /* Mobile density */
-.lr.mobile { max-width: none; padding: 0 8px; }
-.lr.mobile .lr-bar { padding: 12px 8px 8px; }
-.lr.mobile .lr-search, .lr.mobile .lr-strip, .lr.mobile .lr-hint, .lr.mobile .lr-hintbar, .lr.mobile .lr-head .strip-h { display: none; }
-.lr.mobile .lr-more { display: block; font-size: 16px; padding: 2px 12px; }
-.lr.mobile .lr-actions { display: none; position: absolute; right: 8px; top: 100%; z-index: 20; flex-direction: column; background: #1f2937; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 6px; min-width: 200px; }
-.lr.mobile .lr-actions .lr-btn { border: 0; background: none; font-size: 15px; padding: 12px; text-align: left; }
-.lr.mobile .lr-bar.menu .lr-actions { display: flex; }
-.lr.mobile.edit .lr-actions { display: contents; }
-.lr.mobile.edit .lr-more, .lr.mobile.edit .lr-actions .lr-btn:not(.primary) { display: none; }
-.lr.mobile.edit .lr-actions .lr-btn.primary { border: 1px solid transparent; background: rgba(99,102,241,.3); font-size: 13px; padding: 7px 14px; }
+.lr.mobile { max-width: none; padding: 8px 8px 0; }
+.lr.mobile .lr-strip, .lr.mobile .lr-hint, .lr.mobile .lr-hintbar, .lr.mobile .lr-head .strip-h { display: none; }
 .lr.mobile .lr-cols { grid-template-columns: minmax(0,1fr) repeat(var(--lr-periods, 2), 48px); gap: 8px; }
 .lr.mobile.edit .lr-cols { grid-template-columns: 22px minmax(0,1fr) auto 30px; }
 .lr.mobile .lr-head { padding: 0 10px 4px; }

@@ -14,7 +14,6 @@ import {
   STORAGE_KEY_STACK_ENTRIES,
   STORAGE_KEY_PINNED,
   STORAGE_KEY_COPY_DAYS,
-  STORAGE_KEY_TREND_WINDOW,
   STORAGE_KEY_INPUT_ITEMS,
   STORAGE_KEY_INPUT_ENTRIES,
   severityColors,
@@ -111,7 +110,6 @@ function App() {
     isApplyingCloudRef
   );
   const [copyDays, setCopyDays] = useLocalStorage(STORAGE_KEY_COPY_DAYS, 7);
-  const [trendWindow, setTrendWindow] = useLocalStorage(STORAGE_KEY_TREND_WINDOW, 7);
 
   // Normalize legacy bare-string daily notes → { text } records, once, so the
   // sync diff never spreads a bare string (which would corrupt the record).
@@ -189,6 +187,7 @@ function App() {
   const [copyToastMessage, setCopyToastMessage] = useState('');
   const [symptomSearch, setSymptomSearch] = useState('');
   const [protocolSearch, setProtocolSearch] = useState('');
+  const [navSlot, setNavSlot] = useState(null); // desktop context-bar node the active view portals into
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [insightsWindow, setInsightsWindow] = useState(60);
 
@@ -532,6 +531,7 @@ function App() {
       if (listOwnsKeys && trackingMode === 'ampm' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
 
       const tabKey = e.shiftKey && /^Digit[123]$/.test(e.code) ? e.code.slice(-1) : e.key;
+      if (/^[123]$/.test(tabKey)) setShowSettings(false);
       if (tabKey === '1') {
         setShowInsights(false);
         setAppMode('symptoms');
@@ -699,6 +699,9 @@ function App() {
           showInsights={showInsights}
           setShowInsights={setShowInsights}
           trackingMode={trackingMode}
+          search={appMode === 'symptoms' ? symptomSearch : protocolSearch}
+          setSearch={appMode === 'symptoms' ? setSymptomSearch : setProtocolSearch}
+          slotRef={setNavSlot}
           symptoms={liveSymptoms}
           entries={deferredEntries}
           setCopyToastMessage={setCopyToastMessage}
@@ -710,10 +713,9 @@ function App() {
           onClear={protocolClearDay}
           onMatchYesterday={protocolMatchYesterday}
           onEditProtocol={() => { setAppMode('stack'); setShowInsights(false); setProtocolEditMode(true); }}
-          onOpenSettings={() => {
-            setShowSettings(true);
-            setShowInsights(false);
-          }}
+          settingsOpen={showSettings}
+          onCloseSettings={() => setShowSettings(false)}
+          onOpenSettings={() => setShowSettings((open) => !open)}
         />
       )}
 
@@ -728,6 +730,8 @@ function App() {
           symptoms={liveSymptoms}
           entries={deferredEntries}
           trackingMode={trackingMode}
+          showInsights={showInsights}
+          slotRef={setNavSlot}
         />
       )}
 
@@ -742,7 +746,7 @@ function App() {
           <div style={{
             maxWidth: showInsights ? '1800px' : '1400px',
             margin: '0 auto',
-            padding: '24px 32px',
+            padding: '20px 24px',
             paddingBottom: '80px',
           }}>
             {showInsights ? (
@@ -757,6 +761,7 @@ function App() {
                 onOpenGraph={setShowSymptomGraph}
                 onOpenSupplementGraph={setShowSupplementGraph}
                 isDesktop={true}
+                barSlot={navSlot}
                 trackingMode={trackingMode}
                 setStackItems={setStackItems}
               />
@@ -782,6 +787,7 @@ function App() {
                 setEditing={setSymptomEditMode}
                 keyboardEnabled={listKeyboardEnabled}
                 isDesktop={isDesktop}
+                barSlot={navSlot}
               />
             ) : (
               <ProtocolRows
@@ -806,6 +812,7 @@ function App() {
                 setEditing={setProtocolEditMode}
                 keyboardEnabled={listKeyboardEnabled}
                 isDesktop={isDesktop}
+                barSlot={navSlot}
               />
             )}
           </div>
@@ -822,7 +829,22 @@ function App() {
           <div style={{
             width: '100%',
           }}>
-            {appMode === 'symptoms' ? (
+            {showInsights ? (
+              <Insights
+                user={firebase.user}
+                entries={deferredEntries}
+                symptoms={liveSymptoms}
+                stackItems={liveStackItems}
+                stackEntries={deferredStackEntries}
+                insightsWindow={insightsWindow}
+                setInsightsWindow={setInsightsWindow}
+                onOpenGraph={setShowSymptomGraph}
+                onOpenSupplementGraph={setShowSupplementGraph}
+                barSlot={navSlot}
+                trackingMode={trackingMode}
+                setStackItems={setStackItems}
+              />
+            ) : appMode === 'symptoms' ? (
               <SymptomRows
                 symptoms={liveSymptoms}
                 setSymptoms={setSymptoms}
@@ -844,6 +866,7 @@ function App() {
                 setEditing={setSymptomEditMode}
                 keyboardEnabled={listKeyboardEnabled}
                 isDesktop={isDesktop}
+                barSlot={navSlot}
               />
             ) : (
               <ProtocolRows
@@ -868,6 +891,7 @@ function App() {
                 setEditing={setProtocolEditMode}
                 keyboardEnabled={listKeyboardEnabled}
                 isDesktop={isDesktop}
+                barSlot={navSlot}
               />
             )}
           </div>
@@ -1126,23 +1150,6 @@ function App() {
       )}
 
       {/* Insights - mobile only as overlay (desktop renders inline) */}
-      {showInsights && !isDesktop && (
-        <Insights
-          user={firebase.user}
-          entries={deferredEntries}
-          symptoms={liveSymptoms}
-          stackItems={liveStackItems}
-          stackEntries={deferredStackEntries}
-          insightsWindow={insightsWindow}
-          setInsightsWindow={setInsightsWindow}
-          onOpenGraph={setShowSymptomGraph}
-          onOpenSupplementGraph={setShowSupplementGraph}
-          trackingMode={trackingMode}
-          insightsSubtab={insightsSubtab}
-          setInsightsSubtab={setInsightsSubtab}
-          setStackItems={setStackItems}
-        />
-      )}
 
       {/* Symptom Graph */}
       {showSymptomGraph && (
@@ -1210,8 +1217,6 @@ function App() {
           setInputEntries={setInputEntries}
           copyDays={copyDays}
           setCopyDays={setCopyDays}
-          trendWindow={trendWindow}
-          setTrendWindow={setTrendWindow}
           setLastAction={setLastAction}
           setCopyToastMessage={setCopyToastMessage}
           setShowExport={setShowExport}
@@ -1270,6 +1275,7 @@ function App() {
           copyDays={copyDays}
           onEditNote={() => setShowNoteModal(true)}
           onEditSymptoms={() => { setAppMode('symptoms'); setShowInsights(false); setSymptomEditMode(true); }}
+          onClearSymptoms={clearSymptomDay}
           // Stack page actions
           onCheckAll={protocolCheckAll}
           onClear={protocolClearDay}

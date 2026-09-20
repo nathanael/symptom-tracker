@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import './listUi.css';
 import { INPUT_CATEGORIES, VERDICT_COLORS } from '../utils/constants';
 import {
@@ -19,7 +20,7 @@ import {
 } from '../utils/protocolHistory';
 import { matchSupplementCategory } from '../utils/supplementLookup';
 import SchedulePicker, { formatSchedule } from './SchedulePicker';
-import { isTyping, DraftInput, useReorderDrag, ChangeLog } from './listParts';
+import { isTyping, DraftInput, useReorderDrag, ChangeLog, BarMenu } from './listParts';
 
 const UNITS = ['mg', 'mcg', 'g', 'IU', 'ml', 'drops', 'caps'];
 const VERDICTS = [
@@ -60,24 +61,18 @@ export default function ProtocolRows({
   setEditing,
   keyboardEnabled,
   isDesktop,
+  barSlot,
 }) {
   const dateKey = getDateKey(selectedDate);
   const isToday = selectedDate.toDateString() === new Date().toDateString();
 
   const [focusId, setFocusId] = useState(null);
   const [dosingId, setDosingId] = useState(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [scheduleDraft, setScheduleDraft] = useState(null);
   const [showAllHidden, setShowAllHidden] = useState(false);
   const [adding, setAdding] = useState(null); // 'supplement' | 'factor'
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = () => setMenuOpen(false);
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, [menuOpen]);
 
   useEffect(() => setScheduleDraft(null), [expandedId]);
 
@@ -421,24 +416,35 @@ export default function ProtocolRows({
   // ---- Render ----
   const rootClass = `lr lr-protocol ${isDesktop ? 'desktop' : 'mobile'} ${editing ? 'edit' : ''}`;
 
-  const bar = (
-    <div className={`lr-bar ${menuOpen ? 'menu' : ''}`}>
-      {isDesktop && !editing && (
-        <input className="lr-search" type="text" value={search} placeholder="Search…" onChange={(e) => setSearch(e.target.value)} />
+  // Scope + actions live in the nav's context bar (desktop) or the second row of the mobile top bar
+  const totalCount = dueItems.length + factors.length;
+  const bar = barSlot ? createPortal(
+    <>
+      {editing ? <span className="dn-progress"><b>{activeSupplements.length + activeFactors.length}</b> active</span> : (
+        <span className="dn-progress">
+          Logged <b>{takenCount + loggedCount}/{totalCount}</b>
+          <i style={{ '--p': `${totalCount ? ((takenCount + loggedCount) / totalCount) * 100 : 0}%` }} />
+        </span>
       )}
-      <span className="lr-count">
-        {editing ? `${activeSupplements.length + activeFactors.length} active` : `${takenCount + loggedCount} / ${dueItems.length + factors.length} logged`}
-      </span>
       <span className="lr-spacer" />
-      <div className="lr-actions">
-        {!editing && <button className="lr-btn" onClick={onMatchYesterday}>Match yesterday</button>}
-        {!editing && <button className="lr-btn" onClick={onCheckAll}>Check all</button>}
-        {!editing && hasAnyToday && <button className="lr-btn" onClick={onClearDay}>Clear day</button>}
-        <button className={`lr-btn ${editing ? 'primary' : ''}`} onClick={() => { setEditing(!editing); setExpandedId(null); }}>{editing ? 'Done' : 'Edit protocol'}</button>
-      </div>
-      <button className="lr-btn lr-more" onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}>⋯</button>
-    </div>
-  );
+      {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={() => { setEditing(!editing); setExpandedId(null); }}>{editing ? 'Done' : 'Edit protocol'}</button>}
+      {!editing && (isDesktop ? (
+        <span className="dn-split">
+          <button className="dn-btn primary" onClick={onCheckAll}>Check all</button>
+          <BarMenu
+            className="dn-btn primary caret"
+            ariaLabel="More bulk actions"
+            label={<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9" /></svg>}
+            items={[
+              { label: 'Match yesterday', onClick: onMatchYesterday },
+              hasAnyToday && { label: 'Clear day', danger: true, onClick: onClearDay },
+            ]}
+          />
+        </span>
+      ) : <button className="dn-btn primary" onClick={onCheckAll}>Check all</button>)}
+    </>,
+    barSlot
+  ) : null;
 
   if (editing) {
     const visibleHidden = showAllHidden ? hiddenRows : hiddenRows.slice(0, HIDDEN_PREVIEW);

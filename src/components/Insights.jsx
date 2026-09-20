@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import './desktopNav.css';
 import ComparisonStudio from './ComparisonStudio';
 import SleepAnalyzer from './SleepAnalyzer';
 
@@ -20,6 +22,7 @@ export default function Insights({
   stackItems,
   stackEntries,
   isDesktop,
+  barSlot,
   trackingMode,
   setStackItems,
 }) {
@@ -30,23 +33,9 @@ export default function Insights({
   }, [view]);
 
   return (
-    <div
-      style={isDesktop ? {} : {
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: '#08090A',
-        zIndex: 100,
-        overflowY: 'auto',
-        padding: '20px 20px 120px 20px',
-        paddingTop: 'calc(20px + env(safe-area-inset-top))',
-      }}
-    >
+    <div style={isDesktop ? {} : { padding: '12px 12px 0' }}>
       <div style={{ maxWidth: isDesktop ? '100%' : '700px', margin: '0 auto' }}>
-        <ViewToggle value={view} onChange={setView} />
-        <div style={{ height: 12 }} />
+        {barSlot && createPortal(<ViewToggle value={view} onChange={setView} />, barSlot)}
         {view === 'comparison' ? (
           <ComparisonStudio
             entries={entries}
@@ -72,28 +61,10 @@ function ViewToggle({ value, onChange }) {
     { key: 'sleep',      label: 'Sleep'      },
   ];
   return (
-    <div style={{
-      display: 'flex', gap: 2, borderRadius: 8,
-      background: 'rgba(255,255,255,0.06)', padding: 2,
-    }}>
-      {opts.map(opt => {
-        const active = opt.key === value;
-        return (
-          <button
-            key={opt.key}
-            onClick={() => onChange(opt.key)}
-            style={{
-              padding: '7px 0', fontSize: 13, borderRadius: 6,
-              border: 'none', cursor: 'pointer', flex: 1,
-              color: active ? '#fff' : '#9ca3af',
-              background: active ? 'rgba(255,255,255,0.15)' : 'transparent',
-              fontWeight: active ? 600 : 500,
-            }}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
+    <div className="dn-seg sm">
+      {opts.map(opt => (
+        <button key={opt.key} className={opt.key === value ? 'on' : ''} onClick={() => onChange(opt.key)}>{opt.label}</button>
+      ))}
     </div>
   );
 }

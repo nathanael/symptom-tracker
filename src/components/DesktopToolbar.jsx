@@ -1,6 +1,16 @@
-import { formatDate, getCurrentTimePeriod } from '../utils/helpers';
-import HealthScoreBadge from './HealthScoreBadge';
+import { useEffect, useRef } from 'react';
+import './desktopNav.css';
+import { formatDate } from '../utils/helpers';
+import { getScoreColor } from '../utils/healthScore';
 import { useHealthScore } from '../hooks/useHealthScore';
+
+const TABS = [
+  { id: 'symptoms', label: 'Symptoms' },
+  { id: 'stack', label: 'Protocol' },
+  { id: 'insights', label: 'Insights' },
+];
+
+const Chevron = ({ points }) => <svg viewBox="0 0 24 24"><polyline points={points} /></svg>;
 
 export default function DesktopToolbar({
   // Date navigation
@@ -15,22 +25,30 @@ export default function DesktopToolbar({
   showInsights,
   setShowInsights,
   trackingMode,
-  setCopyToastMessage,
+  // Search (filters the active list)
+  search,
+  setSearch,
+  // The active view portals its scope + actions into this node
+  slotRef,
   // Action handlers
+  settingsOpen,
+  onCloseSettings,
   onOpenSettings,
   onCopyData,
   copyDays,
   symptoms,
   entries,
 }) {
+  const searchRef = useRef(null);
   const isToday = selectedDate.toDateString() === new Date().toDateString();
-
-  // Determine active tab
-  const activeTab = showInsights ? 'insights' : appMode;
+  const activeTab = showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'stack';
 
   const { score, delta, rollingAvg } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
+  const scoreValue = score !== null ? score : rollingAvg;
+  const scoreColor = scoreValue !== null ? getScoreColor(scoreValue) : null;
 
   const handleTabClick = (tab) => {
+    onCloseSettings?.();
     if (tab === 'insights') {
       setShowInsights(true);
     } else {
@@ -39,245 +57,112 @@ export default function DesktopToolbar({
     }
   };
 
-  // Icons
-  const GearIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
+  // ⌘K / Ctrl+K focuses search from anywhere
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const relativeLabel = formatDate(selectedDate);
+  const fullDate = selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
   return (
-    <div style={{
-      flexShrink: 0,
-      height: '56px',
-      background: 'rgba(8, 9, 10, 0.98)',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-      display: 'flex',
-      alignItems: 'center',
-      zIndex: 200,
-    }}>
-      <div style={{
-        maxWidth: '1400px',
-        width: '100%',
-        margin: '0 auto',
-        padding: '0 24px',
-        display: 'flex',
-        alignItems: 'center',
-      }}>
-        {/* Left: Date navigation — fixed width, hidden on insights */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          flexShrink: 0,
-          width: '280px',
-          visibility: activeTab === 'insights' ? 'hidden' : 'visible',
-        }}>
-          <button
-            onClick={() => changeDate(-1)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              width: '32px',
-              height: '32px',
-              color: '#9ca3af',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '6px',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
+    <>
+      {/* Layer 1: where am I — identical on every tab */}
+      <div className="dn-top">
+        <div className="dn-wrap">
+          <div className="dn-brand">
+            <span className="dn-logo"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg></span>
+            Symptom Tracker
+          </div>
 
-          <button
-            onClick={() => {
-              setCalendarMonth(new Date(selectedDate));
-              setShowCalendar(true);
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '6px 12px',
-              borderRadius: '6px',
-              color: '#f3f4f6',
-              fontSize: '15px',
-              fontWeight: '600',
-              whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            {formatDate(selectedDate)}
-          </button>
-
-          <button
-            onClick={() => changeDate(1)}
-            disabled={!canGoForward}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              width: '32px',
-              height: '32px',
-              color: canGoForward ? '#9ca3af' : '#4b5563',
-              cursor: canGoForward ? 'pointer' : 'default',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: canGoForward ? 1 : 0.5,
-              borderRadius: '6px',
-            }}
-            onMouseEnter={(e) => { if (canGoForward) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-
-          {!isToday && (
-            <button
-              onClick={() => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                setShowCalendar(false);
-                changeDate(Math.round((today - new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())) / (1000 * 60 * 60 * 24)));
-              }}
-              style={{
-                background: 'rgba(139, 92, 246, 0.1)',
-                border: '1px solid rgba(139, 92, 246, 0.2)',
-                borderRadius: '6px',
-                padding: '4px 10px',
-                color: '#a78bfa',
-                fontSize: '12px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                marginLeft: '4px',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)'; }}
-            >
-              Today
-            </button>
-          )}
-        </div>
-
-        {/* Center: Health score + View tabs — fixed in center */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flex: 1,
-          gap: '8px',
-        }}>
-          <HealthScoreBadge score={score} delta={delta} rollingAvg={rollingAvg} />
-          {[
-            { id: 'symptoms', label: 'Symptoms' },
-            { id: 'stack', label: 'Protocol' },
-            { id: 'insights', label: 'Insights' },
-          ].map(tab => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => handleTabClick(tab.id)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '8px 20px',
-                  color: isActive ? '#f3f4f6' : '#6b7280',
-                  fontSize: '14px',
-                  fontWeight: isActive ? '600' : '500',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  borderBottom: isActive ? '2px solid #8b5cf6' : '2px solid transparent',
-                  marginBottom: '-1px',
-                  transition: 'color 0.15s ease',
-                }}
-                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = '#9ca3af'; }}
-                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = '#6b7280'; }}
-              >
+          <div className="dn-seg" role="tablist">
+            {TABS.map((tab) => (
+              <button key={tab.id} role="tab" aria-selected={!settingsOpen && activeTab === tab.id} className={!settingsOpen && activeTab === tab.id ? 'on' : ''} onClick={() => handleTabClick(tab.id)}>
                 {tab.label}
               </button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
 
-        {/* Right: Copy + Settings — fixed width to balance left */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          flexShrink: 0,
-          width: '280px',
-          justifyContent: 'flex-end',
-        }}>
-          <button
-            onClick={onCopyData}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '6px 10px',
-              background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '6px',
-              color: '#9ca3af',
-              fontSize: '12px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-              e.currentTarget.style.color = '#e5e7eb';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = '#9ca3af';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy {copyDays}d
-          </button>
-          <button
-            onClick={onOpenSettings}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              padding: '6px 10px',
-              background: 'transparent',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '6px',
-              color: '#9ca3af',
-              fontSize: '12px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-              e.currentTarget.style.color = '#e5e7eb';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = '#9ca3af';
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', width: '14px', height: '14px' }}>{GearIcon}</span>
-            Settings
-          </button>
+          <div className="dn-right">
+            {activeTab !== 'insights' && !settingsOpen && (
+              <label className="dn-search">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={search}
+                  placeholder={activeTab === 'symptoms' ? 'Search symptoms…' : 'Search protocol…'}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') { setSearch(''); e.target.blur(); } }}
+                />
+                <kbd>⌘K</kbd>
+              </label>
+            )}
+            {scoreValue !== null && (
+              <div className="dn-score" title="Health score">
+                <span className="dn-ring" style={{ background: `conic-gradient(${scoreColor} ${scoreValue}%, rgba(255,255,255,.08) 0)` }} />
+                {scoreValue}%
+                {delta !== null && delta !== 0 && (
+                  <small style={{ color: delta > 0 ? '#22c55e' : '#ef4444' }}>{delta > 0 ? '▲' : '▼'} {Math.abs(delta)}</small>
+                )}
+              </div>
+            )}
+            <button className="dn-icon" data-tip={`Copy last ${copyDays} days`} aria-label={`Copy last ${copyDays} days`} onClick={onCopyData}>
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+            </button>
+            <button className={`dn-icon ${settingsOpen ? 'on' : ''}`} data-tip="Settings" aria-label="Settings" onClick={onOpenSettings}>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" /></svg>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Layer 2: what am I looking at (left) → what can I do (right) */}
+      <div className="dn-context">
+        <div className="dn-wrap">
+          {activeTab !== 'insights' && (
+            <>
+              <div className="dn-step">
+                <button aria-label="Previous day" onClick={() => changeDate(-1)}><Chevron points="15 18 9 12 15 6" /></button>
+                <button
+                  className="dn-date"
+                  title="Open calendar"
+                  onClick={() => {
+                    setCalendarMonth(new Date(selectedDate));
+                    setShowCalendar(true);
+                  }}
+                >
+                  {relativeLabel}
+                  {relativeLabel !== fullDate && <small>{fullDate}</small>}
+                </button>
+                <button aria-label="Next day" disabled={!canGoForward} onClick={() => changeDate(1)}><Chevron points="9 18 15 12 9 6" /></button>
+              </div>
+              {!isToday && (
+                <button
+                  className="dn-btn ghost"
+                  onClick={() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    setShowCalendar(false);
+                    changeDate(Math.round((today - new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())) / (1000 * 60 * 60 * 24)));
+                  }}
+                >
+                  Today
+                </button>
+              )}
+            </>
+          )}
+          <div className="dn-slot" ref={slotRef} />
+        </div>
+      </div>
+    </>
   );
 }

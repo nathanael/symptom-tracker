@@ -1,0 +1,43 @@
+/* Mobile navigation — same rules as desktop, flipped for thumbs:
+   top bar = what am I looking at → what can I do; bottom dock = where am I */
+.mn-top, .mn-dock, .mn-sheet { color: #f3f4f6; font-size: 13px; }
+.mn-top button, .mn-dock button, .mn-sheet button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.mn-top svg, .mn-dock svg, .mn-sheet svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.mn-top { flex-shrink: 0; z-index: 100; padding: 6px 12px 8px; background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
+.mn-top svg { width: 16px; height: 16px; }
+.mn-r1 { display: flex; align-items: center; gap: 8px; height: 40px; }
+.mn-r2 { height: 32px; margin-top: 4px; }
+.mn-top .dn-step { height: 36px; border-radius: 11px; }
+.mn-top .dn-step button { min-width: 36px; }
+.mn-top .dn-step .dn-date { min-width: 0; padding: 0 10px; gap: 6px; font-size: 14px; }
+.mn-top .dn-score { height: 36px; border-radius: 11px; flex: none; }
+.mn-top .dn-ring::after { background: #0e0f11; }
+.mn-top .dn-btn { height: 30px; font-size: 12.5px; flex: none; }
+.mn-top .dn-btn.ghost { padding: 0 6px; }
+.mn-top .dn-progress i { width: 44px; }
+.mn-top .dn-seg button { padding: 5px 11px; font-size: 12.5px; }
+
+/* Dock: floating tab pill + one separate overflow button */
+.mn-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 200; pointer-events: none; padding: 28px 14px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, #08090a 62%, transparent); }
+.mn-dock-in { max-width: 472px; margin: 0 auto; display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+.mn-tabs { flex: 1; display: flex; padding: 4px; border-radius: 22px; background: rgba(23,25,28,.94); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.mn-tabs button { flex: 1; height: 46px; border: 0; border-radius: 18px; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #6b7280; font-size: 10.5px; font-weight: 500; }
+.mn-tabs button svg { width: 18px; height: 18px; }
+.mn-tabs button.on { background: rgba(255,255,255,.08); color: #f3f4f6; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
+.mn-more { width: 54px; height: 54px; flex: none; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: rgba(23,25,28,.94); color: #9ca3af; display: grid; place-items: center; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.mn-more svg { width: 20px; height: 20px; }
+.mn-more.on { color: #f3f4f6; background: rgba(139,92,246,.25); border-color: rgba(139,92,246,.5); }
+
+/* Action sheet: this tab's actions, then app-level, then destructive */
+.mn-dim { position: fixed; inset: 0; z-index: 199; background: rgba(0,0,0,.55); }
+.mn-sheet { position: fixed; left: 8px; right: 8px; bottom: calc(82px + env(safe-area-inset-bottom)); z-index: 201; max-width: 484px; margin: 0 auto; padding: 6px; border-radius: 22px; background: #17191c; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 50px rgba(0,0,0,.7); animation: mnSheetIn .16s ease-out; }
+@keyframes mnSheetIn { from { opacity: 0; transform: translateY(8px); } }
+.mn-sheet h6 { margin: 8px 12px 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+.mn-sheet button { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px; border: 0; border-radius: 14px; background: none; color: #f3f4f6; font-size: 15px; text-align: left; }
+.mn-sheet button:active { background: rgba(255,255,255,.06); }
+.mn-sheet button svg { width: 18px; height: 18px; color: #9ca3af; }
+.mn-sheet button small { margin-left: auto; color: #6b7280; font-size: 12.5px; }
+.mn-sheet button.danger, .mn-sheet button.danger svg { color: #f87171; }
+.mn-sheet hr { border: 0; border-top: 1px solid rgba(255,255,255,.07); margin: 4px 8px; }
+.mn-sheet footer { padding: 6px 12px 4px; text-align: center; color: #4b5563; font-size: 11px; }

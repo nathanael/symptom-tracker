@@ -1,7 +1,13 @@
+import './mobileNav.css';
 import QuickActionsMenu from './QuickActionsMenu';
-import { useHealthScore } from '../hooks/useHealthScore';
-import { getScoreColor } from '../utils/healthScore';
 
+const TABS = [
+  { id: 'symptoms', label: 'Symptoms', icon: <path d="M3 12h4l3-8 4 16 3-8h4" /> },
+  { id: 'stack', label: 'Protocol', icon: <path d="m12 2 9 5-9 5-9-5zM3 12l9 5 9-5M3 17l9 5 9-5" /> },
+  { id: 'insights', label: 'Insights', icon: <path d="M6 20v-6M12 20V4M18 20v-9" /> },
+];
+
+// Mobile dock: three real destinations in a pill, plus one overflow button beside it
 export default function BottomNav({
   appMode,
   setAppMode,
@@ -9,223 +15,71 @@ export default function BottomNav({
   setShowInsights,
   showSettings,
   setShowSettings,
-  showExport,
   setShowExport,
   showQuickActions,
   setShowQuickActions,
+  selectedDate,
   // Action handlers
   onCopyData,
   copyDays,
   onEditNote,
   onEditSymptoms,
-  onCheckAll,
+  onClearSymptoms,
   onClear,
   onMatchYesterday,
   onEditProtocol,
-  // Health score
-  symptoms,
-  entries,
-  trackingMode,
-  selectedDate,
 }) {
-  const isViewOpen = showInsights || showSettings || showExport;
-  const { score } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
+  const activeTab = showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'stack';
 
-  // Mobile: standard bottom navigation
+  const goTo = (tab) => {
+    if (tab === 'insights') {
+      setShowInsights(true);
+    } else {
+      setAppMode(tab);
+      setShowInsights(false);
+    }
+    setShowSettings(false);
+    setShowExport(false);
+    setShowQuickActions(false);
+  };
+
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      background: 'rgba(8, 9, 10, 0.95)',
-      borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-      zIndex: 200,
-      paddingBottom: '20px',
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        padding: '4px 0',
-        maxWidth: '500px',
-        margin: '0 auto',
-      }}>
-        {/* Symptoms Tab */}
-        <button
-          onClick={() => {
-            setAppMode('symptoms');
-            setShowInsights(false);
-            setShowSettings(false);
-            setShowExport(false);
-            setShowQuickActions(false);
-          }}
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            padding: '8px',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-            position: 'relative',
-          }}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={appMode === 'symptoms' && !isViewOpen ? '#8b5cf6' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-          </svg>
-          {score !== null && (
-            <div style={{
-              position: 'absolute',
-              top: 2,
-              right: 4,
-              background: getScoreColor(score),
-              color: '#000',
-              fontSize: 8,
-              fontWeight: 700,
-              borderRadius: 8,
-              padding: '1px 4px',
-              lineHeight: '10px',
-            }}>
-              {score}%
-            </div>
-          )}
-          <span style={{
-            fontSize: '11px',
-            color: appMode === 'symptoms' && !isViewOpen ? '#8b5cf6' : '#64748b',
-            fontWeight: appMode === 'symptoms' && !isViewOpen ? '600' : '400',
-          }}>
-            Symptoms
-          </span>
-        </button>
-
-        {/* Stack Tab */}
-        <button
-          onClick={() => {
-            setAppMode('stack');
-            setShowInsights(false);
-            setShowSettings(false);
-            setShowExport(false);
-            setShowQuickActions(false);
-          }}
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            padding: '8px',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={appMode === 'stack' && !isViewOpen ? '#8b5cf6' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-            <path d="M2 17l10 5 10-5"/>
-            <path d="M2 12l10 5 10-5"/>
-          </svg>
-          <span style={{
-            fontSize: '11px',
-            color: appMode === 'stack' && !isViewOpen ? '#8b5cf6' : '#64748b',
-            fontWeight: appMode === 'stack' && !isViewOpen ? '600' : '400',
-          }}>
-            Protocol
-          </span>
-        </button>
-
-        {/* Insights Tab */}
-        <button
-          onClick={() => {
-            setShowInsights(!showInsights);
-            setShowSettings(false);
-            setShowExport(false);
-            setShowQuickActions(false);
-          }}
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            padding: '8px',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={showInsights ? '#8b5cf6' : '#64748b'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"/>
-            <line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-          </svg>
-          <span style={{
-            fontSize: '11px',
-            color: showInsights ? '#8b5cf6' : '#64748b',
-            fontWeight: showInsights ? '600' : '400',
-          }}>
-            Insights
-          </span>
-        </button>
-
-        {/* Actions Tab - hidden when Settings is open */}
-        <button
-          onClick={() => {
-            if (showSettings) return;
-            setShowQuickActions(!showQuickActions);
-          }}
-          disabled={showSettings}
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            padding: '8px',
-            cursor: showSettings ? 'default' : 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-            opacity: showSettings ? 0.3 : 1,
-          }}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill={showQuickActions ? '#8b5cf6' : '#64748b'}>
-            <circle cx="12" cy="12" r="2"/>
-            <circle cx="5" cy="12" r="2"/>
-            <circle cx="19" cy="12" r="2"/>
-          </svg>
-          <span style={{
-            fontSize: '11px',
-            color: showQuickActions ? '#8b5cf6' : '#64748b',
-            fontWeight: showQuickActions ? '600' : '400',
-          }}>
-            More
-          </span>
-        </button>
+    <>
+      <div className="mn-dock">
+        <div className="mn-dock-in">
+          <div className="mn-tabs" role="tablist">
+            {TABS.map((tab) => (
+              <button key={tab.id} role="tab" aria-selected={activeTab === tab.id} className={activeTab === tab.id ? 'on' : ''} onClick={() => goTo(tab.id)}>
+                <svg viewBox="0 0 24 24">{tab.icon}</svg>{tab.label}
+              </button>
+            ))}
+          </div>
+          <button className={`mn-more ${showQuickActions ? 'on' : ''}`} aria-label="More actions" aria-haspopup="menu" onClick={() => setShowQuickActions(!showQuickActions)}>
+            <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></svg>
+          </button>
+        </div>
       </div>
 
-      {/* Quick Actions Menu */}
       {showQuickActions && !showSettings && (
         <QuickActionsMenu
           appMode={appMode}
           showInsights={showInsights}
+          selectedDate={selectedDate}
           onClose={() => setShowQuickActions(false)}
           onCopyData={onCopyData}
           copyDays={copyDays}
           onEditNote={onEditNote}
           onEditSymptoms={onEditSymptoms}
-          onCheckAll={onCheckAll}
+          onClearSymptoms={onClearSymptoms}
           onClear={onClear}
           onMatchYesterday={onMatchYesterday}
           onEditProtocol={onEditProtocol}
           onOpenSettings={() => {
             setShowSettings(true);
             setShowQuickActions(false);
-            setShowInsights(false);
           }}
         />
       )}
-    </div>
+    </>
   );
 }

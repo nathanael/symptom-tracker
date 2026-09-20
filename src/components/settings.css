@@ -1,0 +1,103 @@
+/* Settings page — shares tokens and controls (dn-btn, dn-seg) with desktopNav.css */
+.st { position: fixed; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; background: #08090a; color: #f3f4f6; font-size: 13px; }
+.st.desktop { top: 54px; z-index: 195; } /* sits under the global top bar, over the context bar */
+.st.mobile { top: 0; z-index: 250; padding-top: env(safe-area-inset-top); }
+.st button { font-family: inherit; cursor: pointer; }
+.st svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* Header: scope left, status + the one primary right */
+.st-bar { flex: none; background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
+.st-bar .dn-wrap { height: 52px; }
+.st-bar h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.st-back { width: 32px; height: 32px; border: 0; border-radius: 9px; background: none; color: #9ca3af; display: grid; place-items: center; margin-left: -8px; }
+.st-back:hover { background: rgba(255,255,255,.06); color: #f3f4f6; }
+.st-status { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 12px; color: #9ca3af; white-space: nowrap; }
+.st-status i { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.15); }
+.st-status.busy i { background: #fbbf24; box-shadow: 0 0 0 3px rgba(251,191,36,.15); }
+.st-status.err i { background: #f87171; box-shadow: 0 0 0 3px rgba(248,113,113,.15); }
+
+.st-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.st-grid { max-width: 1080px; margin: 0 auto; padding: 24px 24px 80px; display: grid; grid-template-columns: 190px minmax(0,1fr); gap: 40px; align-items: start; }
+.st-rail { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 2px; }
+.st-rail button { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border: 0; border-radius: 8px; background: none; color: #9ca3af; font-size: 13px; font-weight: 500; text-align: left; }
+.st-rail button:hover { color: #f3f4f6; background: rgba(255,255,255,.04); }
+.st-rail button.on { color: #f3f4f6; background: rgba(255,255,255,.07); }
+.st-about { color: #6b7280; font-size: 12px; line-height: 1.7; }
+.st-rail .st-about { margin-top: 18px; padding: 12px 10px 0; border-top: 1px solid rgba(255,255,255,.07); }
+.st-about button { padding: 0; border: 0; background: none; color: #9ca3af; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
+
+.st-section { margin-bottom: 36px; scroll-margin-top: 24px; }
+/* The last section can always scroll to the top, so every rail click lands on its section */
+.st.desktop .st-section:last-child { min-height: calc(100vh - 54px - 52px - 48px); margin-bottom: 0; }
+.st-section > h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.st-section > p { margin: 0 0 12px; color: #6b7280; }
+.st-sub { margin: 18px 2px 8px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: #6b7280; }
+.st-sub.danger { color: #f87171; }
+.st-group, .st-details { border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: #0e0f11; overflow: hidden; }
+.st-group + .st-group, .st-group + .st-details, .st-details + .st-group, .st-details + .st-details { margin-top: 12px; }
+.st-group.danger, .st-details.danger { border-color: rgba(248,113,113,.2); }
+
+.st-row { display: flex; align-items: center; gap: 16px; padding: 13px 16px; min-height: 58px; }
+.st-row + .st-row, .st-block + .st-row, .st-row + .st-block { border-top: 1px solid rgba(255,255,255,.07); }
+.st-row.link { width: 100%; border-left: 0; border-right: 0; border-bottom: 0; background: none; color: inherit; font-size: inherit; text-align: left; }
+.st-row.link:first-child { border-top: 0; }
+.st-row.link:hover { background: rgba(255,255,255,.03); }
+.st-txt { flex: 1; min-width: 0; }
+.st-txt b { display: block; font-size: 13.5px; font-weight: 500; }
+.st-txt small { display: block; margin-top: 1px; color: #6b7280; font-size: 12.5px; }
+.st-txt small.warn { color: #fbbf24; }
+.st-row.danger .st-txt b { color: #f87171; }
+.st-ctl { display: flex; align-items: center; gap: 8px; flex: none; }
+.st-val { color: #6b7280; display: flex; align-items: center; gap: 4px; flex: none; }
+.st-block { padding: 14px 16px; }
+.st-err { color: #f87171; font-size: 12.5px; margin-top: 8px; }
+.st-avatar { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; flex: none; display: grid; place-items: center; background: linear-gradient(135deg,#60a5fa,#2563eb); font-size: 13px; font-weight: 600; }
+.st-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.st-tag { margin-left: 6px; padding: 1px 8px; border-radius: 99px; font-size: 11px; font-weight: 500; border: 1px solid rgba(255,255,255,.12); color: #9ca3af; }
+.st-tag.ok { border-color: rgba(74,222,128,.3); color: #4ade80; background: rgba(74,222,128,.08); }
+.st-tag.wait { border-color: rgba(251,191,36,.3); color: #fbbf24; background: rgba(251,191,36,.08); }
+
+.st .dn-btn.danger { color: #f87171; border-color: rgba(248,113,113,.25); }
+.st .dn-btn.danger:hover { background: rgba(248,113,113,.08); border-color: rgba(248,113,113,.45); }
+.st .dn-btn.danger.solid { background: #ef4444; border-color: transparent; color: #fff; }
+.st .dn-btn:disabled { opacity: .5; cursor: default; }
+
+.st-details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 13px 16px; font-size: 13.5px; font-weight: 500; color: #9ca3af; }
+.st-details > summary::-webkit-details-marker { display: none; }
+.st-details > summary:hover { color: #f3f4f6; }
+.st-details > summary small { color: #6b7280; font-weight: 400; font-size: 12.5px; }
+.st-details > summary svg { margin-left: auto; transition: transform .15s; }
+.st-details[open] > summary { border-bottom: 1px solid rgba(255,255,255,.07); }
+.st-details[open] > summary svg { transform: rotate(90deg); }
+.st-details.danger > summary { color: #f87171; }
+
+.st-form { display: flex; flex-direction: column; gap: 8px; max-width: 360px; }
+.st-input { height: 36px; padding: 0 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); color: #f3f4f6; font: inherit; outline: none; }
+.st-input:focus { border-color: rgba(139,92,246,.6); }
+.st-linkbtn { padding: 0; border: 0; background: none; color: #9ca3af; font-size: 12.5px; text-align: left; text-decoration: underline; text-underline-offset: 2px; }
+.st-table { width: 100%; margin: 8px 0 12px; border-collapse: collapse; font-size: 12.5px; color: #9ca3af; }
+.st-table th { text-align: left; font-weight: 500; color: #6b7280; padding-bottom: 4px; }
+.st-table td, .st-table th { padding-right: 12px; } .st-table .n { text-align: right; }
+.st-table tr.loss { color: #f87171; }
+
+/* Mobile: one grouped list, drill-in pages, bigger targets */
+.st.mobile .st-bar .dn-wrap { height: 48px; padding: 0 12px 0 8px; gap: 6px; }
+.st.mobile .st-bar h2 { font-size: 16px; }
+.st.mobile .st-back { width: 40px; height: 40px; margin-left: 0; }
+.st.mobile .st-grid { display: block; padding: 4px 12px calc(40px + env(safe-area-inset-bottom)); }
+.st.mobile .st-section { margin-bottom: 0; }
+.st.mobile .st-section > h3 { margin: 16px 6px 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+.st.mobile .st-section > p { display: none; }
+.st.mobile .st-sub { margin: 16px 6px 6px; font-size: 10.5px; }
+.st.mobile .st-group { border-radius: 14px; }
+.st.mobile .st-row { padding: 11px 12px; min-height: 52px; gap: 10px; }
+.st.mobile .st-row.stack { flex-direction: column; align-items: stretch; gap: 8px; }
+.st.mobile .st-row.stack .st-ctl { flex-wrap: wrap; }
+.st.mobile .st-row.stack .dn-seg { display: flex; flex: 1; }
+.st.mobile .st-row.stack .dn-seg button { flex: 1; padding: 7px 0; font-size: 13px; }
+.st.mobile .st-row.stack .st-ctl > .dn-btn { flex: 1; justify-content: center; height: 38px; }
+.st.mobile .st-txt b { font-size: 14.5px; }
+.st.mobile .st-input { height: 42px; font-size: 16px; }
+.st.mobile .st-form { max-width: none; }
+.st.mobile .st-about { text-align: center; margin-top: 18px; }
+.st.mobile #st-data > h3 { display: none; }

@@ -8,7 +8,6 @@ export const STORAGE_KEY_STACK_ITEMS = 'symptomTracker_stackItems';
 export const STORAGE_KEY_STACK_ENTRIES = 'symptomTracker_stackEntries';
 export const STORAGE_KEY_PINNED = 'symptomTracker_pinned';
 export const STORAGE_KEY_COPY_DAYS = 'symptomTracker_copyDays';
-export const STORAGE_KEY_TREND_WINDOW = 'symptomTracker_trendWindow';
 export const STORAGE_KEY_LOCAL_UPDATED_AT = 'symptomTracker_localUpdatedAt';
 export const STORAGE_KEY_INPUT_ITEMS = 'symptomTracker_inputItems';
 export const STORAGE_KEY_INPUT_ENTRIES = 'symptomTracker_inputEntries';

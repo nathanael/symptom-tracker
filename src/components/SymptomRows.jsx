@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import './listUi.css';
 import { NA_SEVERITY } from '../utils/constants';
 import { getDateKey, haptic } from '../utils/helpers';
-import { isTyping, DraftInput, useReorderDrag, ChangeLog } from './listParts';
+import { isTyping, DraftInput, useReorderDrag, ChangeLog, BarMenu } from './listParts';
 import { isApplicable, getStripDateKeys, getSeverityStrip, stepIndex, reorder, makeId } from '../utils/listHelpers';
 import {
   createSymptomHistoryEntry,
@@ -37,13 +38,13 @@ export default function SymptomRows({
   setEditing,
   keyboardEnabled,
   isDesktop,
+  barSlot,
 }) {
   const dateKey = getDateKey(selectedDate);
   const defaultPeriod = () =>
     timePeriods.length === 1 ? timePeriods[0].id : (new Date().getHours() < 12 ? 'morning' : 'evening');
 
   const [focus, setFocus] = useState(() => ({ id: null, period: defaultPeriod() }));
-  const [menuOpen, setMenuOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [showHidden, setShowHidden] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -60,12 +61,6 @@ export default function SymptomRows({
     }
   }, [isDesktop, activeSymptoms, focus.id]);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = () => setMenuOpen(false);
-    document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, [menuOpen]);
 
   const stripKeys = useMemo(() => getStripDateKeys(selectedDate, 14), [dateKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const strips = useMemo(() => {
@@ -272,23 +267,23 @@ export default function SymptomRows({
   const rootClass = `lr ${isDesktop ? 'desktop' : 'mobile'} ${editing ? 'edit' : ''}`;
   const rootStyle = { '--lr-periods': timePeriods.length };
 
-  const bar = (
-    <div className={`lr-bar ${menuOpen ? 'menu' : ''}`}>
-      {isDesktop && !editing && (
-        <input className="lr-search" type="text" value={symptomSearch} placeholder="Search…" onChange={(e) => setSymptomSearch(e.target.value)} />
-      )}
-      <span className="lr-count">
-        {editing ? `${orderedActive.length} active` : counts.map((c) => `${timePeriods.length > 1 ? c.label + ' ' : ''}${c.done}/${c.total}`).join(' · ')}
-      </span>
+  // Scope + actions live in the nav's context bar (desktop) or the second row of the mobile top bar
+  const toggleEdit = () => { setEditing(!editing); setExpandedId(null); };
+  const bar = barSlot ? createPortal(
+    <>
+      {editing ? <span className="dn-progress"><b>{orderedActive.length}</b> active</span> : counts.map((c) => (
+        <span className="dn-progress" key={c.label}>
+          {timePeriods.length > 1 ? c.label : 'Logged'} <b>{c.done}/{c.total}</b>
+          <i style={{ '--p': `${c.total ? (c.done / c.total) * 100 : 0}%` }} />
+        </span>
+      ))}
       <span className="lr-spacer" />
-      <div className="lr-actions">
-        {!editing && <button className="lr-btn" onClick={onEditNote}>Today's Notes</button>}
-        {!editing && hasEntriesToday && <button className="lr-btn" onClick={onClearDay}>Clear day</button>}
-        <button className={`lr-btn ${editing ? 'primary' : ''}`} onClick={() => { setEditing(!editing); setExpandedId(null); }}>{editing ? 'Done' : 'Edit symptoms'}</button>
-      </div>
-      <button className="lr-btn lr-more" onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o); }}>⋯</button>
-    </div>
-  );
+      {isDesktop && !editing && <button className="dn-btn" onClick={onEditNote}>Day notes</button>}
+      {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={toggleEdit}>{editing ? 'Done' : 'Edit symptoms'}</button>}
+      {isDesktop && !editing && <BarMenu label="⋯" ariaLabel="More actions" items={[hasEntriesToday && { label: 'Clear day', danger: true, onClick: onClearDay }]} />}
+    </>,
+    barSlot
+  ) : null;
 
   if (editing) {
     return (

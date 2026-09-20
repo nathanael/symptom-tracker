@@ -33,6 +33,35 @@ export function DraftInput({ value, onCommit, onAbandon, className, placeholder,
   );
 }
 
+// Desktop context-bar dropdown. items: { label, onClick, danger } — danger items sit below a divider
+export function BarMenu({ label, ariaLabel, className = 'dn-btn', items }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [open]);
+  const shown = items.filter(Boolean);
+  if (shown.length === 0) return null;
+  const firstDanger = shown.findIndex((it) => it.danger);
+  return (
+    <span className="dn-menu-wrap">
+      <button className={className} aria-label={ariaLabel} aria-haspopup="menu" aria-expanded={open} onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{label}</button>
+      {open && (
+        <div className="dn-menu" role="menu">
+          {shown.map((it, i) => (
+            <span key={it.label} style={{ display: 'contents' }}>
+              {i === firstDanger && i > 0 && <hr />}
+              <button role="menuitem" className={it.danger ? 'danger' : ''} onClick={it.onClick}>{it.label}</button>
+            </span>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
+
 // Pointer-based drag reorder (mouse + touch). Rows opt in with data-reorder-id and data-reorder-group.
 export function useReorderDrag(onCommit) {
   const [drag, setDrag] = useState(null); // { id, group, overId }
