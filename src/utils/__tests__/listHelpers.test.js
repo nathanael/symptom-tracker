@@ -19,7 +19,7 @@ describe('getStripDateKeys', () => {
 });
 
 describe('getSeverityStrip', () => {
-  it('takes the max across periods, ignores N/A, and returns null for gaps', () => {
+  it('averages across periods, ignores N/A, and returns null for gaps', () => {
     const entries = {
       '2026-09-01-a-morning': { severity: 1 },
       '2026-09-01-a-evening': { severity: 3 },
@@ -28,7 +28,16 @@ describe('getSeverityStrip', () => {
       '2026-09-01-b-morning': { severity: 5 },
     };
     expect(getSeverityStrip(entries, 'a', ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04'], periods))
-      .toEqual([3, null, 0, null]);
+      .toEqual([2, null, 0, null]);
+  });
+
+  it('reads every tracking mode by default, so AM/PM history shows in Simple mode and vice versa', () => {
+    const entries = {
+      '2026-09-01-a-morning': { severity: 2 },
+      '2026-09-01-a-evening': { severity: 4 },
+      '2026-09-02-a-daily': { severity: 1 },
+    };
+    expect(getSeverityStrip(entries, 'a', ['2026-09-01', '2026-09-02'])).toEqual([3, 1]);
   });
 });
 

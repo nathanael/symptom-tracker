@@ -28,9 +28,6 @@
 .is-score .bar i { display: block; height: 100%; border-radius: 4px; }
 .is-score .delta { flex: none; font-size: 11px; }
 
-/* Insight sentence: a quiet footer under the series list / chart */
-.is-note { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07); font-size: 12px; line-height: 1.6; color: #9ca3af; }
-.is-note b { font-weight: 600; }
 
 /* Mobile range controls: same segmented control + date stepper as desktop, stretched full width */
 .is-mhead { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -41,7 +38,6 @@
 .is-mhead svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .is:not(.desktop) .is-row { min-height: 44px; font-size: 14px; }
 .is:not(.desktop) .is-add { height: 36px; }
-.is:not(.desktop) .is-note { font-size: 13px; margin: 12px 0 0; padding: 12px 2px 0; }
 
 /* Series picker modal: single-column rows, neutral chrome */
 .is-pick-back { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: center; align-items: flex-start; padding: calc(72px + env(safe-area-inset-top)) 20px 20px; background: rgba(0,0,0,.7); }

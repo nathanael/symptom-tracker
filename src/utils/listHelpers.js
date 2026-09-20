@@ -1,5 +1,5 @@
 import { getDateKey } from './helpers';
-import { NA_SEVERITY } from './constants';
+import { NA_SEVERITY, trackingModes } from './constants';
 
 // Whether a symptom is tracked in a given period (null applicablePeriods = all)
 export const isApplicable = (symptom, periodId) =>
@@ -16,16 +16,22 @@ export const getStripDateKeys = (endDate, days = 14) => {
   return keys;
 };
 
-// Max logged severity per day for one symptom; null = nothing logged (N/A counts as nothing)
-export const getSeverityStrip = (entries, symptomId, dateKeys, periods) =>
+// Every period id any tracking mode can log under (daily, morning, evening)
+const ALL_PERIODS = Object.values(trackingModes).flatMap((mode) => mode.periods);
+
+// Average logged severity per day for one symptom; null = nothing logged (N/A counts as nothing).
+// Reads every mode's periods by default, so history stays visible after switching Simple <-> AM/PM.
+export const getSeverityStrip = (entries, symptomId, dateKeys, periods = ALL_PERIODS) =>
   dateKeys.map((dateKey) => {
-    let max = null;
+    let sum = 0;
+    let count = 0;
     for (const period of periods) {
       const entry = entries[`${dateKey}-${symptomId}-${period.id}`];
       if (!entry || entry.severity === NA_SEVERITY || entry.severity == null) continue;
-      if (max === null || entry.severity > max) max = entry.severity;
+      sum += entry.severity;
+      count++;
     }
-    return max;
+    return count ? sum / count : null;
   });
 
 // Remove every entry whose `date` is dateKey. Returns the new map plus what was removed (for undo).

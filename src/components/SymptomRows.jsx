@@ -66,9 +66,9 @@ export default function SymptomRows({
   const strips = useMemo(() => {
     if (!isDesktop) return {};
     const out = {};
-    activeSymptoms.forEach((s) => { out[s.id] = getSeverityStrip(entries, s.id, stripKeys, timePeriods); });
+    activeSymptoms.forEach((s) => { out[s.id] = getSeverityStrip(entries, s.id, stripKeys); });
     return out;
-  }, [isDesktop, activeSymptoms, entries, stripKeys, timePeriods]);
+  }, [isDesktop, activeSymptoms, entries, stripKeys]);
 
   const entryFor = (symptom, periodId) => entries[`${dateKey}-${symptom.id}-${periodId}`];
 
@@ -376,7 +376,7 @@ export default function SymptomRows({
                 {isDesktop && !(open && isApplicable(symptom, focus.period)) && (
                   <div className="lr-strip" title="Open history" onClick={(e) => { e.stopPropagation(); onOpenGraph?.(symptom.id); }}>
                     {(strips[symptom.id] || []).map((v, i) => (
-                      <i key={i} style={v === null ? undefined : { height: 3 + v * 3, background: STRIP_COLOR[v] }} />
+                      <i key={i} style={v === null ? undefined : { height: 3 + v * 3, background: STRIP_COLOR[Math.round(v)] }} />
                     ))}
                   </div>
                 )}
@@ -419,7 +419,14 @@ export default function SymptomRows({
               <span><kbd>0</kbd>–<kbd>5</kbd> rate</span>
               <span><kbd>N</kbd> n/a</span>
               <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
-              {timePeriods.length > 1 && <span><kbd>←</kbd><kbd>→</kbd> {timePeriods.map((p) => p.label).join('/')}</span>}
+              {timePeriods.length > 1 ? (
+                <>
+                  <span><kbd>←</kbd><kbd>→</kbd> {timePeriods.map((p) => p.label).join('/')}</span>
+                  <span><kbd>[</kbd><kbd>]</kbd> day</span>
+                </>
+              ) : (
+                <span><kbd>←</kbd><kbd>→</kbd> day</span>
+              )}
               <span><kbd>⌫</kbd> clear</span>
               <span><kbd>E</kbd> edit</span>
             </div>

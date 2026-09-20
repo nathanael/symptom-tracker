@@ -544,20 +544,10 @@ function App() {
         setShowInsights(true);
       } else if (e.key === 'ArrowLeft' || e.key === '[') {
         e.preventDefault();
-        setSelectedDate(prev => {
-          const d = new Date(prev);
-          d.setDate(d.getDate() - 1);
-          return d;
-        });
+        changeDate(-1);
       } else if (e.key === 'ArrowRight' || e.key === ']') {
         e.preventDefault();
-        setSelectedDate(prev => {
-          const d = new Date(prev);
-          d.setDate(d.getDate() + 1);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          return d > today ? prev : d;
-        });
+        changeDate(1); // same guard as the toolbar arrows: stops at today
       } else if (e.key === 't' || e.key === 'T') {
         setSelectedDate(new Date());
       } else if (e.key === 'Escape') {

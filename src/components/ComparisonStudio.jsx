@@ -12,7 +12,7 @@ import {
   getHealthScoreSeries,
   getSleepDailySeries,
 } from '../utils/correlationHelpers';
-import { computeLevels, computeInsight, getLevelColor } from '../utils/insightHelpers';
+import { computeLevels, getLevelColor } from '../utils/insightHelpers';
 import HealthScoreCompact from './HealthScoreCompact';
 import SeriesPicker from './SeriesPicker';
 import { useHealthScore } from '../hooks/useHealthScore';
@@ -278,7 +278,7 @@ export default function ComparisonStudio({
     const residual = roughStep / mag;
     const niceStep = residual <= 1.5 ? mag : residual <= 3 ? 2 * mag : residual <= 7 ? 5 * mag : 10 * mag;
     const labels = [];
-    for (let v = 0; v <= suppYMax; v += niceStep) labels.push(Math.round(v));
+    for (let v = 0; v <= suppYMax; v += niceStep) labels.push(+v.toFixed(2)); // keep fractional steps (0.5, 1, 1.5…) distinct
     return labels;
   }, [suppYMax]);
 
@@ -391,62 +391,6 @@ export default function ComparisonStudio({
     if (!primaryDailyValues || primaryIsSupplement) return [];
     return computeLevels(primaryDailyValues, dates, timeframe);
   }, [primaryDailyValues, primaryIsSupplement, dates, timeframe]);
-
-  const extendedDates = useMemo(() => {
-    const result = [];
-    const end = new Date();
-    end.setDate(end.getDate() - startOffset);
-    for (let i = (timeframe * 2) - 1; i >= 0; i--) {
-      const d = new Date(end);
-      d.setDate(d.getDate() - i);
-      result.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-    }
-    return result;
-  }, [timeframe, startOffset]);
-
-  const insightData = useMemo(() => {
-    if (!primarySeriesId || (!hasAnySeries && healthScoreVisible)) return null;
-
-    const buildStats = (id, isSymptom) => {
-      const isSleep = selectedSleepMetrics.includes(id);
-      const sleepMetric = isSleep ? SLEEP_METRICS.find(m => m.key === id) : null;
-      let extSeries;
-      if (selectedSupplements.includes(id)) {
-        extSeries = getSupplementDoseSeries(stackEntries, stackItems, id, extendedDates).map(v => v === null ? 0 : v);
-      } else if (isSleep) {
-        extSeries = interpolateSmallGaps(getSleepDailySeries(sleepDays, id, extendedDates));
-        extSeries = smooth(extSeries, windowSize);
-      } else {
-        extSeries = interpolateSmallGaps(getSymptomDailySeries(entries, id, extendedDates, trackingMode));
-        extSeries = smooth(extSeries, windowSize);
-      }
-      const mid = extSeries.length / 2;
-      const prior = extSeries.slice(0, mid).filter(v => v !== null && v !== undefined);
-      const current = extSeries.slice(mid).filter(v => v !== null && v !== undefined);
-      const priorAvg = prior.length > 0 ? prior.reduce((s, v) => s + v, 0) / prior.length : 0;
-      const currentAvg = current.length > 0 ? current.reduce((s, v) => s + v, 0) / current.length : 0;
-      const item = isSymptom
-        ? symptoms.find(s => s.id === id)
-        : (isSleep ? sleepMetric : stackItems.find(i => i.id === id));
-      const unit = isSymptom
-        ? '/5'
-        : (isSleep ? (sleepMetric?.unit || '') : (item?.unit || 'mg'));
-      const name = isSleep ? (sleepMetric?.label || '') : (item?.name || '');
-      // higherIsBetter semantics: symptom→false, sleep→metric.higherIsBetter, supplement→true
-      const higherIsBetter = isSymptom ? false : (isSleep ? (sleepMetric?.higherIsBetter ?? true) : true);
-      return { name, average: currentAvg, priorAverage: priorAvg, unit, higherIsBetter };
-    };
-
-    const primaryStats = buildStats(primarySeriesId, primaryIsSymptom);
-    const secondaryIds = [...selectedSupplements, ...selectedSymptoms, ...selectedSleepMetrics].filter(id => id && id !== primarySeriesId);
-    const secondaryStats = secondaryIds.map(id => buildStats(id, selectedSymptoms.includes(id)));
-
-    const tfLabel = timeframe <= 7 ? 'week' : timeframe <= 30 ? 'month' : '6 months';
-    const insight = computeInsight(primaryStats, secondaryStats, { timeframeLabel: tfLabel });
-    return insight ? { ...insight, secondaryStats } : null;
-  }, [primarySeriesId, primaryIsSymptom, selectedSupplements, selectedSymptoms, selectedSleepMetrics,
-      stackEntries, stackItems, entries, symptoms, trackingMode, sleepDays,
-      extendedDates, timeframe, windowSize, hasAnySeries, healthScoreVisible]);
 
   // ── Chart points ──
 
@@ -1206,15 +1150,6 @@ export default function ComparisonStudio({
     />
   );
 
-  const insightNote = insightData && (
-    <div className="is-note">
-      {insightData.insightSegments.map((seg, i) => seg.color
-        ? <b key={i} style={{ color: seg.color }}>{seg.text}</b>
-        : seg.text
-      )}
-    </div>
-  );
-
   // ── Render ──
 
   return (
@@ -1232,7 +1167,6 @@ export default function ComparisonStudio({
             {healthScoreTile}
             <div className="is-gap" />
             {seriesChips}
-            {insightNote}
           </div>
           <div ref={chartContainerRef} style={{ flex: 1, minWidth: 0, touchAction: 'none', paddingLeft: '12px', height: '100%' }}>
             <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}
@@ -1263,7 +1197,6 @@ export default function ComparisonStudio({
               {chartSVGContent}
             </svg>
           </div>
-          {insightNote}
         </div>
       )}
     </div>
