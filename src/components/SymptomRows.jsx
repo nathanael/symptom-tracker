@@ -659,7 +659,7 @@ export default function SymptomRows({
                           key={n}
                           className={`${n === NA_SEVERITY ? 'na' : ''} ${selected ? 'on' : lastSeverity === n ? 'last' : ''}`}
                           style={n === NA_SEVERITY ? undefined : { '--c': STRIP_COLOR[n], '--bg': SEV_BG[n], '--fg': SEV_FG[n] }}
-                          title={selected ? 'Click again to clear' : undefined}
+                          title={selected ? 'Click again to clear' : lastSeverity === n ? 'Last time' : undefined}
                           onClick={() => (selected ? clearEntry(symptom, focus.period) : rate(symptom, focus.period, n, { stay: true }))}
                         >
                           {n === NA_SEVERITY ? 'N/A' : n}
@@ -711,6 +711,7 @@ export default function SymptomRows({
           })}
           {isDesktop && (
             <div className="lr-hintbar">
+              <span><i className="lr-lastdot" />last time</span>
               <span><kbd>0</kbd>–<kbd>5</kbd> rate</span>
               <span><kbd>N</kbd> n/a</span>
               <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
