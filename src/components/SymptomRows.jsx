@@ -652,9 +652,9 @@ export default function SymptomRows({
                   </div>
                 )}
                 {isDesktop && !(open && isApplicable(symptom, focus.period)) && (
-                  <div className="lr-strip" title="Open history" onClick={(e) => { e.stopPropagation(); onOpenGraph?.(symptom.id); }}>
+                  <div className="lr-strip sev" title="Open history" onClick={(e) => { e.stopPropagation(); onOpenGraph?.(symptom.id); }}>
                     {(strips[symptom.id] || []).map((v, i) => (
-                      <i key={i} style={v === null ? undefined : { height: 3 + v * 3, background: STRIP_COLOR[Math.round(v)] }} />
+                      <i key={i} className={v === null ? '' : 'v'} style={v === null ? undefined : { background: STRIP_COLOR[Math.round(v)] }} />
                     ))}
                   </div>
                 )}
