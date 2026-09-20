@@ -1,10 +1,11 @@
 import './mobileNav.css';
 import QuickActionsMenu from './QuickActionsMenu';
+import { solar } from './solarIcons';
 
 const TABS = [
-  { id: 'symptoms', label: 'Symptoms', icon: <path d="M3 12h4l3-8 4 16 3-8h4" /> },
-  { id: 'stack', label: 'Protocol', icon: <path d="m12 2 9 5-9 5-9-5zM3 12l9 5 9-5M3 17l9 5 9-5" /> },
-  { id: 'insights', label: 'Progress', icon: <path d="M6 20v-6M12 20V4M18 20v-9" /> },
+  { id: 'symptoms', label: 'Symptoms', icon: solar.symptoms },
+  { id: 'stack', label: 'Protocol', icon: solar.protocol },
+  { id: 'insights', label: 'Progress', icon: solar.progress },
 ];
 
 // Mobile dock: three real destinations in a pill, plus one overflow button beside it
@@ -56,7 +57,7 @@ export default function BottomNav({
             ))}
           </div>
           <button className={`mn-more ${showQuickActions ? 'on' : ''}`} aria-label="More actions" aria-haspopup="menu" onClick={() => setShowQuickActions(!showQuickActions)}>
-            <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></svg>
+            <svg viewBox="0 0 24 24">{solar.more}</svg>
           </button>
         </div>
       </div>
