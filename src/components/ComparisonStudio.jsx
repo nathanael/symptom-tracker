@@ -1173,7 +1173,7 @@ export default function ComparisonStudio({
 
       {isDesktop ? (
         /* ── Desktop: series panel (left) + chart (right) ── */
-        <div style={{ display: 'flex', height: 'calc(95vh - 180px)', minHeight: '300px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', height: 'calc(71vh - 135px)', minHeight: '260px', marginBottom: '16px' }}>
           <div style={{ width: '300px', flexShrink: 0, paddingRight: '20px', borderRight: '1px solid rgba(255,255,255,0.07)', overflowY: 'auto' }}>
             {valuesCaption}
             {healthScoreTile}
