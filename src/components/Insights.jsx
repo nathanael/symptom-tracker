@@ -3,10 +3,12 @@ import { createPortal } from 'react-dom';
 import './desktopNav.css';
 import ComparisonStudio from './ComparisonStudio';
 import SleepAnalyzer from './SleepAnalyzer';
+import { SLEEP_ENABLED } from '../utils/constants';
 
 const VIEW_KEY = 'insightsView';
 
 function readInitialView() {
+  if (!SLEEP_ENABLED) return 'comparison';
   try {
     const v = localStorage.getItem(VIEW_KEY);
     return v === 'sleep' ? 'sleep' : 'comparison';
@@ -29,13 +31,14 @@ export default function Insights({
   const [view, setView] = useState(readInitialView);
 
   useEffect(() => {
+    if (!SLEEP_ENABLED) return;
     try { localStorage.setItem(VIEW_KEY, view); } catch {}
   }, [view]);
 
   return (
     <div style={isDesktop ? {} : { padding: '12px 12px 0' }}>
       <div style={{ maxWidth: isDesktop ? '100%' : '700px', margin: '0 auto' }}>
-        {barSlot && createPortal(<ViewToggle value={view} onChange={setView} />, barSlot)}
+        {SLEEP_ENABLED && barSlot && createPortal(<ViewToggle value={view} onChange={setView} />, barSlot)}
         {view === 'comparison' ? (
           <ComparisonStudio
             entries={entries}
@@ -46,6 +49,7 @@ export default function Insights({
             isDesktop={isDesktop}
             setStackItems={setStackItems}
             user={user}
+            barSlot={SLEEP_ENABLED ? null : barSlot}
           />
         ) : (
           <SleepAnalyzer user={user} isDesktop={isDesktop} />

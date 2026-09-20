@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getFirebaseDb } from '../utils/firebase';
+import { SLEEP_ENABLED } from '../utils/constants';
 
 const GARMY_BASE = 'http://localhost:8484';
 const SYNC_INTERVAL = 10 * 60 * 1000; // 10 minutes
@@ -212,10 +213,11 @@ export function useGarminSync(user) {
   }, []);
 
   // Check server on mount
-  useEffect(() => { checkServer(); }, [checkServer]);
+  useEffect(() => { if (SLEEP_ENABLED) checkServer(); }, [checkServer]);
 
   // Auto-sync interval (check server + sync every 10 min)
   useEffect(() => {
+    if (!SLEEP_ENABLED) return;
     const id = setInterval(async () => {
       const status = await checkServer();
       if (status.available && status.authenticated && user?.uid) {

@@ -107,3 +107,7 @@ export const DRAG_SENSITIVITY = 19;
 export const HOLD_DELAY = 600;
 export const SWIPE_THRESHOLD = 50;
 export const SWIPE_TIME_LIMIT = 300;
+
+// Sleep / Garmin integration is switched off for now. Flip to true to restore
+// the Sleep view, chart metrics, Settings integration, export rows and sync polling.
+export const SLEEP_ENABLED = false;

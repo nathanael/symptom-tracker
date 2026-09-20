@@ -1,0 +1,79 @@
+/* Insights tab: flat neutral surfaces. Colour lives on the series dot, the values and the chart. */
+.is { color: #e5e7eb; font-size: 13px; }
+.is button { font-family: inherit; cursor: pointer; }
+
+/* Series rows (left panel on desktop, above the chart on mobile) */
+.is-rows { display: flex; flex-direction: column; gap: 6px; }
+.is-row { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 4px 0 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); color: #9ca3af; cursor: pointer; transition: background .15s, border-color .15s; }
+.is-row:hover { border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.03); }
+.is-row.on { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #f3f4f6; font-weight: 500; }
+.is-row .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.is-row .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.is-row .val { flex: none; color: #d1d5db; font-weight: 500; font-variant-numeric: tabular-nums; }
+.is-row small { flex: none; color: #6b7280; font-size: 11px; font-weight: 400; }
+.is-row .x { flex: none; width: 28px; height: 28px; border: 0; border-radius: 7px; background: none; color: #6b7280; font-size: 15px; line-height: 1; display: grid; place-items: center; }
+.is-row .x:hover { background: rgba(255,255,255,.06); color: #f3f4f6; }
+.is-add { align-self: flex-start; }
+.is-gap { height: 8px; }
+
+/* Health score row */
+.is-score { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); cursor: pointer; transition: background .15s, border-color .15s; }
+.is-score:hover { border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.03); }
+.is-score.on { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); }
+.is-score .num { flex: none; font-size: 22px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.is-score .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.is-score .cap { display: flex; justify-content: space-between; font-size: 11px; color: #6b7280; letter-spacing: .4px; }
+.is-score .cap b { font-weight: 400; text-transform: uppercase; }
+.is-score .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
+.is-score .bar i { display: block; height: 100%; border-radius: 4px; }
+.is-score .delta { flex: none; font-size: 11px; }
+
+/* Insight sentence: a quiet footer under the series list / chart */
+.is-note { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07); font-size: 12px; line-height: 1.6; color: #9ca3af; }
+.is-note b { font-weight: 600; }
+
+/* Mobile range controls: same segmented control + date stepper as desktop, stretched full width */
+.is-mhead { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.is-mhead .dn-seg, .is-mhead .dn-step { display: flex; height: 36px; }
+.is-mhead .dn-seg button { flex: 1; padding: 0; }
+.is-mhead .dn-step button { padding: 0 12px; }
+.is-mhead .dn-step .dn-date { flex: 1; min-width: 0; }
+.is-mhead svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.is:not(.desktop) .is-row { min-height: 44px; font-size: 14px; }
+.is:not(.desktop) .is-add { height: 36px; }
+.is:not(.desktop) .is-note { font-size: 13px; margin: 12px 0 0; padding: 12px 2px 0; }
+
+/* Series picker modal: single-column rows, neutral chrome */
+.is-pick-back { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: center; align-items: flex-start; padding: calc(72px + env(safe-area-inset-top)) 20px 20px; background: rgba(0,0,0,.7); }
+.is-pick { width: 100%; max-width: 440px; max-height: calc(100vh - 140px); display: flex; flex-direction: column; overflow: hidden; border-radius: 12px; background: #17191c; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 16px 40px rgba(0,0,0,.6); color: #e5e7eb; }
+.is-pick svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.is-pick-head { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 18px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.is-pick-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: #f3f4f6; letter-spacing: -.01em; }
+.is-pick-head small { margin-right: auto; font-size: 12px; color: #6b7280; }
+.is-pick-search { flex: none; margin: 10px 10px 4px; }
+.is-pick-list { overflow-y: auto; padding: 4px 6px 8px; }
+.is-pick-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 4px 12px; border: 0; border-radius: 10px; background: none; color: #9ca3af; font-size: 14px; text-align: left; }
+.is-pick-row:hover:not(:disabled) { background: rgba(255,255,255,.04); color: #f3f4f6; }
+.is-pick-row.on { color: #f3f4f6; background: rgba(255,255,255,.06); }
+.is-pick-row:disabled { opacity: .35; cursor: default; }
+.is-pick-row .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: rgba(255,255,255,.14); }
+.is-pick-row .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.is-pick-row .name small { margin-left: 8px; font-size: 12px; color: #6b7280; }
+.is-pick-row .check { color: #9ca3af; }
+.is-pick-empty { padding: 32px 16px; text-align: center; color: #6b7280; font-size: 13px; line-height: 1.6; }
+.is-pick-back.mobile { padding: env(safe-area-inset-top) 0 0; }
+.is-pick-back.mobile .is-pick { max-width: none; max-height: calc(100dvh - env(safe-area-inset-top)); border-radius: 0 0 16px 16px; border-width: 0 0 1px; }
+.is-pick-back.mobile .is-pick-search { height: 38px; flex-basis: auto; }
+.is-pick-back.mobile .is-pick-row { min-height: 46px; }
+.is-pick-back.mobile .is-pick-list { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+
+/* What the tile numbers are: the window average, or the day under the crosshair */
+.is-cap { padding: 0 2px 8px; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: #6b7280; }
+.is-cap.on { color: #f3f4f6; }
+.is-row .val small { margin-left: 1px; }
+
+/* Mobile scrub readout, directly above the chart where the thumb can't cover it */
+.is-scrub { display: flex; align-items: center; gap: 12px; min-height: 32px; margin-top: 12px; padding: 0 2px; font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
+.is-scrub b { margin-right: auto; font-size: 14px; font-weight: 600; color: #f3f4f6; }
+.is-scrub span { display: inline-flex; align-items: center; gap: 5px; color: #d1d5db; font-weight: 500; }
+.is-scrub i { width: 6px; height: 6px; border-radius: 50%; }

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { haptic } from '../utils/helpers';
 import {
   TIMEFRAMES, SMOOTH_WINDOWS,
@@ -12,35 +13,21 @@ import {
   getSleepDailySeries,
 } from '../utils/correlationHelpers';
 import { computeLevels, computeInsight, getLevelColor } from '../utils/insightHelpers';
-import HealthScoreCard from './HealthScoreCard';
 import HealthScoreCompact from './HealthScoreCompact';
+import SeriesPicker from './SeriesPicker';
 import { useHealthScore } from '../hooks/useHealthScore';
 import { useGarminSleep } from '../hooks/useGarminSleep';
 import { METRICS as SLEEP_METRICS } from '../utils/sleepMetrics';
+import { SLEEP_ENABLED } from '../utils/constants';
+import './desktopNav.css';
+import './insights.css';
 
-const SYMPTOM_STYLES = [
-  { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
-  { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
-  { color: '#ff8a9e', chipBg: 'rgba(255,138,158,0.12)', chipBorder: 'rgba(255,138,158,0.35)' },
-];
+// One hue family per series type; shades tell the (max 3) series of a type apart
+const SYMPTOM_STYLES = [{ color: '#ff8a9e' }, { color: '#f472b6' }, { color: '#fecdd3' }];
+const SUPPLEMENT_STYLES = [{ color: '#8b5cf6' }, { color: '#a78bfa' }, { color: '#c4b5fd' }];
+const SLEEP_STYLES = [{ color: '#22d3ee' }, { color: '#06b6d4' }, { color: '#0ea5e9' }];
 
-const SUPP_COLOR = '#8b5cf6';
-
-const SUPPLEMENT_STYLES = [
-  { color: '#8b5cf6', chipBg: 'rgba(139,92,246,0.12)', chipBorder: 'rgba(139,92,246,0.35)' },
-  { color: '#7c3aed', chipBg: 'rgba(124,58,237,0.12)', chipBorder: 'rgba(124,58,237,0.35)' },
-  { color: '#a78bfa', chipBg: 'rgba(167,139,250,0.12)', chipBorder: 'rgba(167,139,250,0.35)' },
-];
-
-const SLEEP_STYLES = [
-  { color: '#22d3ee', chipBg: 'rgba(34,211,238,0.12)', chipBorder: 'rgba(34,211,238,0.35)' },
-  { color: '#06b6d4', chipBg: 'rgba(6,182,212,0.12)', chipBorder: 'rgba(6,182,212,0.35)' },
-  { color: '#0ea5e9', chipBg: 'rgba(14,165,233,0.12)', chipBorder: 'rgba(14,165,233,0.35)' },
-];
-const SLEEP_BORDER_RGBA = 'rgba(34,211,238,0.4)';
-const SLEEP_PRIMARY = '#22d3ee';
-
-const HEALTH_SCORE_COLOR = '#10b981';
+const HEALTH_SCORE_COLOR = '#86efac';
 
 export default function ComparisonStudio({
   entries,
@@ -51,8 +38,9 @@ export default function ComparisonStudio({
   isDesktop,
   setStackItems,
   user,
+  barSlot,
 }) {
-  const { days: sleepDays } = useGarminSleep(user);
+  const { days: sleepDays } = useGarminSleep(SLEEP_ENABLED ? user : null);
   const todayStr = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -83,7 +71,7 @@ export default function ComparisonStudio({
         const validSymptoms = (saved.symptoms || []).filter(
           id => (symptoms || []).some(s => s.id === id && s.active)
         );
-        const validSleep = (saved.sleepMetrics || []).filter(k => SLEEP_METRICS.some(m => m.key === k));
+        const validSleep = SLEEP_ENABLED ? (saved.sleepMetrics || []).filter(k => SLEEP_METRICS.some(m => m.key === k)) : [];
         return {
           supplements,
           symptoms: validSymptoms,
@@ -105,12 +93,6 @@ export default function ComparisonStudio({
   const [showSymptomPicker, setShowSymptomPicker] = useState(false);
   const [showSleepPicker, setShowSleepPicker] = useState(false);
   const [showHealthScore, setShowHealthScore] = useState(initialSelections.showHealthScore);
-  const [suppSearch, setSuppSearch] = useState('');
-  const [symSearch, setSymSearch] = useState('');
-  const [sleepSearch, setSleepSearch] = useState('');
-  const suppSearchRef = useRef(null);
-  const symSearchRef = useRef(null);
-  const sleepSearchRef = useRef(null);
   const [timeframe, setTimeframe] = useState(30);
   const [startOffset, setStartOffset] = useState(0);
   const [touchX, setTouchX] = useState(null);
@@ -120,9 +102,6 @@ export default function ComparisonStudio({
   const healthScoreVisible = showHealthScore || !hasAnySeries;
 
   // Auto-focus search inputs when pickers open
-  useEffect(() => { if (showSupplementPicker) { setSuppSearch(''); setTimeout(() => suppSearchRef.current?.focus(), 50); } }, [showSupplementPicker]);
-  useEffect(() => { if (showSymptomPicker) { setSymSearch(''); setTimeout(() => symSearchRef.current?.focus(), 50); } }, [showSymptomPicker]);
-  useEffect(() => { if (showSleepPicker) { setSleepSearch(''); setTimeout(() => sleepSearchRef.current?.focus(), 50); } }, [showSleepPicker]);
 
   // Persist selections to localStorage
   useEffect(() => {
@@ -252,7 +231,7 @@ export default function ComparisonStudio({
   const H = isDesktop ? desktopChartDims.h : H_MOBILE;
   // Scale factor for fonts/strokes — designed for 500-unit base
   const s = W / 500;
-  const padLeft = (isDesktop ? 36 : 32) * s, padRight = (isDesktop ? 20 : 28) * s, padTop = (isDesktop ? 14 : 10) * s, padBottom = (isDesktop ? 22 : 30) * s;
+  const padLeft = (isDesktop ? 36 : 32) * s, padRight = 28 * s, padTop = (isDesktop ? 14 : 28) * s, padBottom = (isDesktop ? 22 : 30) * s;
   const chartW = W - padLeft - padRight;
   const chartH = H - padTop - padBottom;
 
@@ -358,11 +337,6 @@ export default function ComparisonStudio({
     const v = hsInspectValues[touchX];
     return v !== null && v !== undefined ? Math.round(v) : null;
   }, [touchX, hsInspectValues]);
-
-  const hsInspectLabel = useMemo(() => {
-    if (touchX === null || !dates[touchX]) return null;
-    return formatXLabel(dates[touchX], timeframe);
-  }, [touchX, dates, timeframe]);
 
   // Dynamic Y-axis range for health score (rounded to nearest 10)
   const hsYRange = useMemo(() => {
@@ -626,6 +600,7 @@ export default function ComparisonStudio({
       const daily = suppDoseSeries[idx];
       const val = daily ? daily[touchX] : null;
       items.push({
+        id: suppId,
         name: item?.name,
         color: SUPPLEMENT_STYLES[idx].color,
         val,
@@ -636,6 +611,7 @@ export default function ComparisonStudio({
     selectedSymptoms.forEach((symId, idx) => {
       const sym = symptoms.find(s => s.id === symId);
       items.push({
+        id: symId,
         name: sym ? sym.name + (sym.description ? ` (${sym.description})` : '') : undefined,
         color: SYMPTOM_STYLES[idx].color,
         val: symptomVals[idx]?.val ?? null,
@@ -648,6 +624,7 @@ export default function ComparisonStudio({
       const sd = sleepTransformed[idx];
       const val = sd?.transformed.values[touchX];
       items.push({
+        id: key,
         name: m?.label,
         color: SLEEP_STYLES[idx].color,
         val: val ?? null,
@@ -685,7 +662,7 @@ export default function ComparisonStudio({
       if (st) {
         const vals = st.values.filter(v => v !== null && v > 0);
         const suppAvg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-        items.push({ name: item?.name, color: SUPPLEMENT_STYLES[idx].color, val: suppAvg, unit: item?.unit || 'mg' });
+        items.push({ id: suppId, name: item?.name, color: SUPPLEMENT_STYLES[idx].color, val: suppAvg, unit: item?.unit || 'mg' });
       }
     });
     // All selected symptoms
@@ -694,6 +671,7 @@ export default function ComparisonStudio({
       if (sd) {
         const sym = symptoms.find(s => s.id === symId);
         items.push({
+          id: symId,
           name: sym ? sym.name + (sym.description ? ` (${sym.description})` : '') : undefined,
           color: SYMPTOM_STYLES[idx].color,
           val: avg(sd.smoothed),
@@ -707,6 +685,7 @@ export default function ComparisonStudio({
       const sd = sleepTransformed[idx];
       if (sd) {
         items.push({
+          id: key,
           name: m?.label,
           color: SLEEP_STYLES[idx].color,
           val: avg(sd.smoothed),
@@ -786,488 +765,56 @@ export default function ComparisonStudio({
 
   const showDots = timeframe <= 7;
 
-  // ── Supplement picker panel ──
-  const supplementPickerPanel = showSupplementPicker ? (
-    <div
-      onClick={() => setShowSupplementPicker(false)}
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.92)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        padding: isDesktop ? '20px' : '0',
-        paddingTop: isDesktop ? 'calc(60px + env(safe-area-inset-top))' : 'env(safe-area-inset-top)',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: isDesktop ? '820px' : 'none',
-          background: 'rgba(15,17,21,0.95)',
-          borderRadius: isDesktop ? '12px' : '0 0 16px 16px',
-          border: '1px solid rgba(139,92,246,0.3)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          overflow: 'hidden',
-          maxHeight: isDesktop ? 'calc(100vh - 120px)' : 'calc(100dvh - env(safe-area-inset-top))',
-          display: 'flex', flexDirection: 'column',
-          ...(isDesktop ? {} : { paddingBottom: 'env(safe-area-inset-bottom)' }),
-        }}
-      >
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '16px 20px',
-          borderBottom: '1px solid rgba(100,116,139,0.2)',
-          flexShrink: 0,
-        }}>
-          <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
-            Select Supplements
-          </h3>
-          <button
-            onClick={() => {
-              if (suppSearch) {
-                const filtered = allSupplements.filter(s => s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
-                if (filtered.length === 1 && !selectedSupplements.includes(filtered[0].id)) {
-                  toggleSupplement(filtered[0].id);
-                }
-              }
-              setShowSupplementPicker(false);
-            }}
-            style={{
-              background: 'none', border: 'none', color: '#8b5cf6',
-              fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '4px 8px',
-            }}
-          >
-            Done
-          </button>
-        </div>
-        <div style={{ overflowY: 'auto', padding: '12px 16px', paddingBottom: isDesktop ? '12px' : '80px' }}>
-          <input
-            ref={suppSearchRef}
-            value={suppSearch}
-            onChange={(e) => setSuppSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') { e.stopPropagation(); if (suppSearch) setSuppSearch(''); else setShowSupplementPicker(false); }
-              if (e.key === 'Enter') {
-                if (suppSearch) {
-                  const filtered = allSupplements.filter(s => s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
-                  if (filtered.length === 1 && !selectedSupplements.includes(filtered[0].id)) { toggleSupplement(filtered[0].id); }
-                }
-                setShowSupplementPicker(false);
-              }
-            }}
-            placeholder="Search supplements..."
-            style={{
-              width: '100%', padding: '8px 12px', marginBottom: '10px',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-          {selectedSupplements.length >= 3 && (
-            <div style={{
-              padding: '0 0 10px', color: '#6b7280', fontSize: '12px', textAlign: 'center',
-            }}>
-              Max 3 supplements selected
-            </div>
-          )}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : '1fr',
-            gap: '8px',
-          }}>
-            {(() => {
-              const filtered = allSupplements.filter(s => !suppSearch || s.name.toLowerCase().includes(suppSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(suppSearch.toLowerCase()));
-              const autoSelected = filtered.length === 1;
-              return filtered.map(supp => {
-                const isSelected = selectedSupplements.includes(supp.id);
-                const styleIdx = selectedSupplements.indexOf(supp.id);
-                const atMax = selectedSupplements.length >= 3 && !isSelected;
-                const highlighted = isSelected || autoSelected;
-                const dotColor = isSelected ? SUPPLEMENT_STYLES[styleIdx].color : autoSelected ? SUPP_COLOR : '#4b5563';
-                const borderColor = isSelected ? SUPPLEMENT_STYLES[styleIdx].chipBorder : autoSelected ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.06)';
-                return (
-                  <button
-                    key={supp.id}
-                    onClick={() => toggleSupplement(supp.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      padding: '10px 12px', minWidth: 0,
-                      borderRadius: '8px',
-                      background: highlighted ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
-                      border: `1px solid ${borderColor}`,
-                      cursor: atMax ? 'default' : 'pointer',
-                      opacity: atMax ? 0.35 : 1,
-                      textAlign: 'left',
-                    }}
-                  >
-                    <span style={{
-                      width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                      background: dotColor,
-                    }} />
-                    <span style={{
-                      flex: 1, minWidth: 0,
-                      display: 'flex', flexDirection: 'column',
-                    }}>
-                      <span style={{
-                        color: highlighted ? '#e5e7eb' : '#9ca3af',
-                        fontSize: '13px', fontWeight: highlighted ? '500' : '400',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {supp.name}
-                      </span>
-                      {supp.description && (
-                        <span style={{
-                          color: highlighted ? '#9ca3af' : '#6b7280',
-                          fontSize: '11px', fontWeight: '400',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {supp.description}
-                        </span>
-                      )}
-                    </span>
-                    {highlighted && (
-                      <span style={{ color: isSelected ? SUPPLEMENT_STYLES[styleIdx].color : SUPP_COLOR, fontSize: '14px', flexShrink: 0 }}>✓</span>
-                    )}
-                  </button>
-                );
-              });
-            })()}
-          </div>
-        </div>
-      </div>
-    </div>
-  ) : null;
+  // ── Series pickers ──
+  const supplementPickerPanel = showSupplementPicker && (
+    <SeriesPicker
+      title="Supplements" noun="supplements" isDesktop={isDesktop}
+      items={allSupplements}
+      selectedIds={selectedSupplements}
+      colors={SUPPLEMENT_STYLES.map(st => st.color)}
+      onToggle={toggleSupplement}
+      onClose={() => setShowSupplementPicker(false)}
+    />
+  );
+  const symptomPickerPanel = showSymptomPicker && (
+    <SeriesPicker
+      title="Symptoms" noun="symptoms" isDesktop={isDesktop}
+      items={activeSymptoms}
+      selectedIds={selectedSymptoms}
+      colors={SYMPTOM_STYLES.map(st => st.color)}
+      onToggle={toggleSymptom}
+      onClose={() => setShowSymptomPicker(false)}
+    />
+  );
+  const sleepPickerPanel = showSleepPicker && (
+    <SeriesPicker
+      title="Sleep metrics" noun="sleep metrics" isDesktop={isDesktop}
+      items={SLEEP_METRICS.map(m => ({ id: m.key, name: m.label }))}
+      selectedIds={selectedSleepMetrics}
+      colors={SLEEP_STYLES.map(st => st.color)}
+      onToggle={toggleSleep}
+      onClose={() => setShowSleepPicker(false)}
+      emptyState={sleepDays.length === 0 && (
+        <div className="is-pick-empty">No Garmin sleep data connected.<br />Connect Garmin in Settings to see sleep metrics here.</div>
+      )}
+    />
+  );
 
-  // ── Symptom picker panel ──
-  const symptomPickerPanel = showSymptomPicker ? (
-    <div
-      onClick={() => setShowSymptomPicker(false)}
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.92)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        padding: isDesktop ? '20px' : '0',
-        paddingTop: isDesktop ? 'calc(60px + env(safe-area-inset-top))' : 'env(safe-area-inset-top)',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: isDesktop ? '820px' : 'none',
-          background: 'rgba(15,17,21,0.95)',
-          borderRadius: isDesktop ? '12px' : '0 0 16px 16px',
-          border: '1px solid rgba(99,102,241,0.3)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          overflow: 'hidden',
-          maxHeight: isDesktop ? 'calc(100vh - 120px)' : 'calc(100dvh - env(safe-area-inset-top))',
-          display: 'flex', flexDirection: 'column',
-          ...(isDesktop ? {} : { paddingBottom: 'env(safe-area-inset-bottom)' }),
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '16px 20px',
-          borderBottom: '1px solid rgba(100,116,139,0.2)',
-          flexShrink: 0,
-        }}>
-          <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
-            Select Symptoms
-          </h3>
-          <button
-            onClick={() => {
-              if (symSearch) {
-                const filtered = activeSymptoms.filter(s => s.name.toLowerCase().includes(symSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(symSearch.toLowerCase()));
-                if (filtered.length === 1 && !selectedSymptoms.includes(filtered[0].id)) {
-                  toggleSymptom(filtered[0].id);
-                }
-              }
-              setShowSymptomPicker(false);
-            }}
-            style={{
-              background: 'none', border: 'none', color: '#8b5cf6',
-              fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '4px 8px',
-            }}
-          >
-            Done
-          </button>
-        </div>
-
-        {/* Body */}
-        <div style={{ overflowY: 'auto', padding: '12px 16px', paddingBottom: isDesktop ? '12px' : '80px' }}>
-          <input
-            ref={symSearchRef}
-            value={symSearch}
-            onChange={(e) => setSymSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') { e.stopPropagation(); if (symSearch) setSymSearch(''); else setShowSymptomPicker(false); }
-              if (e.key === 'Enter') {
-                if (symSearch) {
-                  const filtered = activeSymptoms.filter(s => s.name.toLowerCase().includes(symSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(symSearch.toLowerCase()));
-                  if (filtered.length === 1 && !selectedSymptoms.includes(filtered[0].id)) { toggleSymptom(filtered[0].id); }
-                }
-                setShowSymptomPicker(false);
-              }
-            }}
-            placeholder="Search symptoms..."
-            style={{
-              width: '100%', padding: '8px 12px', marginBottom: '10px',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-          {selectedSymptoms.length >= 3 && (
-            <div style={{
-              padding: '0 0 10px', color: '#6b7280', fontSize: '12px', textAlign: 'center',
-            }}>
-              Max 3 symptoms selected
-            </div>
-          )}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : '1fr',
-            gap: '8px',
-          }}>
-          {(() => {
-            const filtered = activeSymptoms.filter(s => !symSearch || s.name.toLowerCase().includes(symSearch.toLowerCase()) || (s.description || '').toLowerCase().includes(symSearch.toLowerCase()));
-            const autoSelected = filtered.length === 1;
-            const autoColor = '#8b5cf6';
-            return filtered.map(sym => {
-            const isSelected = selectedSymptoms.includes(sym.id);
-            const styleIdx = selectedSymptoms.indexOf(sym.id);
-            const atMax = selectedSymptoms.length >= 3 && !isSelected;
-            const highlighted = isSelected || autoSelected;
-            const dotColor = isSelected ? SYMPTOM_STYLES[styleIdx].color : autoSelected ? autoColor : '#4b5563';
-            const borderColor = isSelected ? SYMPTOM_STYLES[styleIdx].chipBorder : autoSelected ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.06)';
-            return (
-              <button
-                key={sym.id}
-                onClick={() => toggleSymptom(sym.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '10px 12px', minWidth: 0,
-                  borderRadius: '8px',
-                  background: highlighted ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
-                  border: `1px solid ${borderColor}`,
-                  cursor: atMax ? 'default' : 'pointer',
-                  opacity: atMax ? 0.35 : 1,
-                  textAlign: 'left',
-                }}
-              >
-                <span style={{
-                  width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                  background: dotColor,
-                }} />
-                <span style={{
-                  flex: 1, minWidth: 0,
-                  display: 'flex', flexDirection: 'column',
-                }}>
-                  <span style={{
-                    color: highlighted ? '#e5e7eb' : '#9ca3af',
-                    fontSize: '13px', fontWeight: highlighted ? '500' : '400',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {sym.name}
-                  </span>
-                  {sym.description && (
-                    <span style={{
-                      color: highlighted ? '#9ca3af' : '#6b7280',
-                      fontSize: '11px', fontWeight: '400',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {sym.description}
-                    </span>
-                  )}
-                </span>
-                {highlighted && (
-                  <span style={{ color: isSelected ? SYMPTOM_STYLES[styleIdx].color : autoColor, fontSize: '14px', flexShrink: 0 }}>✓</span>
-                )}
-              </button>
-            );
-            });
-          })()}
-          </div>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
-  // ── Sleep picker panel ──
-  const sleepPickerPanel = showSleepPicker ? (
-    <div
-      onClick={() => setShowSleepPicker(false)}
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.92)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        padding: isDesktop ? '20px' : '0',
-        paddingTop: isDesktop ? 'calc(60px + env(safe-area-inset-top))' : 'env(safe-area-inset-top)',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: isDesktop ? '820px' : 'none',
-          background: 'rgba(15,17,21,0.95)',
-          borderRadius: isDesktop ? '12px' : '0 0 16px 16px',
-          border: `1px solid ${SLEEP_BORDER_RGBA}`,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          overflow: 'hidden',
-          maxHeight: isDesktop ? 'calc(100vh - 120px)' : 'calc(100dvh - env(safe-area-inset-top))',
-          display: 'flex', flexDirection: 'column',
-          ...(isDesktop ? {} : { paddingBottom: 'env(safe-area-inset-bottom)' }),
-        }}
-      >
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '16px 20px',
-          borderBottom: '1px solid rgba(100,116,139,0.2)',
-          flexShrink: 0,
-        }}>
-          <h3 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: '600', margin: 0 }}>
-            Select Sleep Metrics
-          </h3>
-          <button
-            onClick={() => {
-              if (sleepSearch) {
-                const filtered = SLEEP_METRICS.filter(m => m.label.toLowerCase().includes(sleepSearch.toLowerCase()));
-                if (filtered.length === 1 && !selectedSleepMetrics.includes(filtered[0].key)) {
-                  toggleSleep(filtered[0].key);
-                }
-              }
-              setShowSleepPicker(false);
-            }}
-            style={{
-              background: 'none', border: 'none', color: SLEEP_PRIMARY,
-              fontSize: '16px', fontWeight: '600', cursor: 'pointer', padding: '4px 8px',
-            }}
-          >
-            Done
-          </button>
-        </div>
-
-        <div style={{ overflowY: 'auto', padding: '12px 16px', paddingBottom: isDesktop ? '12px' : '80px' }}>
-          {sleepDays.length === 0 ? (
-            <div style={{
-              padding: '40px 20px', textAlign: 'center',
-              color: '#9ca3af', fontSize: '14px', lineHeight: 1.6,
-            }}>
-              No Garmin sleep data connected.
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
-                Connect Garmin in Settings to see sleep metrics here.
-              </div>
-            </div>
-          ) : (
-            <>
-              <input
-                ref={sleepSearchRef}
-                value={sleepSearch}
-                onChange={(e) => setSleepSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') { e.stopPropagation(); if (sleepSearch) setSleepSearch(''); else setShowSleepPicker(false); }
-                  if (e.key === 'Enter') {
-                    if (sleepSearch) {
-                      const filtered = SLEEP_METRICS.filter(m => m.label.toLowerCase().includes(sleepSearch.toLowerCase()));
-                      if (filtered.length === 1 && !selectedSleepMetrics.includes(filtered[0].key)) { toggleSleep(filtered[0].key); }
-                    }
-                    setShowSleepPicker(false);
-                  }
-                }}
-                placeholder="Search sleep metrics..."
-                style={{
-                  width: '100%', padding: '8px 12px', marginBottom: '10px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px', color: '#e5e7eb', fontSize: '14px', outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-              {selectedSleepMetrics.length >= 3 && (
-                <div style={{
-                  padding: '0 0 10px', color: '#6b7280', fontSize: '12px', textAlign: 'center',
-                }}>
-                  Max 3 sleep metrics selected
-                </div>
-              )}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: isDesktop ? 'repeat(3, 1fr)' : '1fr',
-                gap: '8px',
-              }}>
-                {(() => {
-                  const filtered = SLEEP_METRICS.filter(m => !sleepSearch || m.label.toLowerCase().includes(sleepSearch.toLowerCase()));
-                  const autoSelected = filtered.length === 1;
-                  return filtered.map(metric => {
-                    const isSelected = selectedSleepMetrics.includes(metric.key);
-                    const styleIdx = selectedSleepMetrics.indexOf(metric.key);
-                    const atMax = selectedSleepMetrics.length >= 3 && !isSelected;
-                    const highlighted = isSelected || autoSelected;
-                    const dotColor = isSelected ? SLEEP_STYLES[styleIdx].color : autoSelected ? SLEEP_PRIMARY : '#4b5563';
-                    const borderColor = isSelected ? SLEEP_STYLES[styleIdx].chipBorder : autoSelected ? SLEEP_BORDER_RGBA : 'rgba(255,255,255,0.06)';
-                    return (
-                      <button
-                        key={metric.key}
-                        onClick={() => toggleSleep(metric.key)}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '8px',
-                          padding: '10px 12px', minWidth: 0,
-                          borderRadius: '8px',
-                          background: highlighted ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
-                          border: `1px solid ${borderColor}`,
-                          cursor: atMax ? 'default' : 'pointer',
-                          opacity: atMax ? 0.35 : 1,
-                          textAlign: 'left',
-                        }}
-                      >
-                        <span style={{
-                          width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                          background: dotColor,
-                        }} />
-                        <span style={{
-                          flex: 1, minWidth: 0,
-                          display: 'flex', flexDirection: 'column',
-                        }}>
-                          <span style={{
-                            color: highlighted ? '#e5e7eb' : '#9ca3af',
-                            fontSize: '13px', fontWeight: highlighted ? '500' : '400',
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          }}>
-                            {metric.label}
-                          </span>
-                          {metric.unit && (
-                            <span style={{
-                              color: highlighted ? '#9ca3af' : '#6b7280',
-                              fontSize: '11px', fontWeight: '400',
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            }}>
-                              {metric.unit}
-                            </span>
-                          )}
-                        </span>
-                        {highlighted && (
-                          <span style={{ color: isSelected ? SLEEP_STYLES[styleIdx].color : SLEEP_PRIMARY, fontSize: '14px', flexShrink: 0 }}>✓</span>
-                        )}
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  ) : null;
+  // Day under the crosshair, e.g. "Fri, Sep 11"
+  const scrubDate = touchX !== null && dates[touchX]
+    ? new Date(dates[touchX] + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    : null;
 
   // ── SVG chart content (shared between desktop/mobile) ──
+  // Primary series is a solid, full-strength line; everything else is dashed and recedes (dose steps most of all)
+  const axisNum = (v) => (v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : v); // keeps 4-digit doses inside the gutter
+  const lineProps = (isPrimary, isStep = false) => isPrimary
+    ? { strokeWidth: (isDesktop ? 1.3 : 2.5) * s, opacity: 1 }
+    : {
+        strokeWidth: (isDesktop ? (isStep ? 0.7 : 0.9) : (isStep ? 1.4 : 1.8)) * s,
+        strokeDasharray: isStep ? `${3 * s},${3 * s}` : `${6 * s},${4 * s}`,
+        opacity: isStep ? 0.4 : 0.55,
+      };
   const chartSVGContent = (
     <>
       {/* Grid lines — follow primary series scale */}
@@ -1279,30 +826,30 @@ export default function ComparisonStudio({
           for (let v = yMin; v <= yMax; v += step) labels.push(v);
           return labels.map(val => {
             const y = padTop + chartH - ((val - yMin) / (yMax - yMin)) * chartH;
-            return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
+            return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
           });
         })()
       ) : primaryIsSleep && selectedSleepMetrics.length > 0 ? (
         sleepYLabels.map(val => {
           const y = padTop + chartH - (val / sleepYMax) * chartH;
-          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
+          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
         })
       ) : primaryIsSupplement && selectedSupplements.length > 0 ? (
         suppYLabels.map(val => {
           const y = padTop + chartH - (val / suppYMax) * chartH;
-          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
+          return <line key={val} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
         })
       ) : (
         [0, 1, 2, 3, 4, 5].map(sev => {
           const y = padTop + chartH - (sev / 5) * chartH;
-          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke={isDesktop ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.15)"} strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
+          return <line key={sev} x1={padLeft} y1={y} x2={W - padRight} y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth={(isDesktop ? 0.5 : 0.8) * s} />;
         })
       )}
 
       {/* Axis lines — left and bottom edges (desktop only) */}
       {isDesktop && <>
-        <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + chartH} stroke="rgba(255,255,255,0.2)" strokeWidth={0.7 * s} />
-        <line x1={padLeft} y1={padTop + chartH} x2={W - padRight} y2={padTop + chartH} stroke="rgba(255,255,255,0.2)" strokeWidth={0.7 * s} />
+        <line x1={padLeft} y1={padTop} x2={padLeft} y2={padTop + chartH} stroke="rgba(255,255,255,0.12)" strokeWidth={0.5 * s} />
+        <line x1={padLeft} y1={padTop + chartH} x2={W - padRight} y2={padTop + chartH} stroke="rgba(255,255,255,0.12)" strokeWidth={0.5 * s} />
       </>}
 
       {/* Left Y-axis — primary series scale */}
@@ -1316,7 +863,7 @@ export default function ComparisonStudio({
             const y = padTop + chartH - ((val - yMin) / (yMax - yMin)) * chartH;
             return (
               <text key={`l-${val}`} x={padLeft - 6 * s} y={y + 3.5 * s} textAnchor="end"
-                fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{val}%</text>
+                fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="inherit" fontWeight={isDesktop ? 'normal' : '500'}>{val}%</text>
             );
           });
         })()
@@ -1325,7 +872,7 @@ export default function ComparisonStudio({
           const y = padTop + chartH - (val / sleepYMax) * chartH;
           return (
             <text key={`l-${val}`} x={padLeft - 6 * s} y={y + 3.5 * s} textAnchor="end"
-              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{val}</text>
+              fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="inherit" fontWeight={isDesktop ? 'normal' : '500'}>{axisNum(val)}</text>
           );
         })
       ) : primaryIsSupplement && selectedSupplements.length > 0 ? (
@@ -1333,7 +880,7 @@ export default function ComparisonStudio({
           const y = padTop + chartH - (val / suppYMax) * chartH;
           return (
             <text key={`l-${val}`} x={padLeft - 6 * s} y={y + 3.5 * s} textAnchor="end"
-              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{val}</text>
+              fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="inherit" fontWeight={isDesktop ? 'normal' : '500'}>{axisNum(val)}</text>
           );
         })
       ) : (
@@ -1341,7 +888,7 @@ export default function ComparisonStudio({
           const y = padTop + chartH - (sev / 5) * chartH;
           return (
             <text key={`l-${sev}`} x={padLeft - 6 * s} y={y + 3.5 * s} textAnchor="end"
-              fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{sev}</text>
+              fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="inherit" fontWeight={isDesktop ? 'normal' : '500'}>{sev}</text>
           );
         })
       )}
@@ -1349,19 +896,19 @@ export default function ComparisonStudio({
       {/* Right Y-axis: secondary scale (only when dual-axis mode) */}
       {selectedSupplements.length > 0 && selectedSymptoms.length > 0 && (
         primaryIsSupplement ? (
-          [0, 2.5, 5].map(sev => {
+          [0, 2.5, 5].map((sev, i) => {
             const y = padTop + chartH - (sev / 5) * chartH;
             return (
-              <text key={`r-${sev}`} x={W - padRight + 6 * s} y={y + 3.5 * s} textAnchor="start"
-                fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '500'}>{sev}</text>
+              <text key={`r-${i}`} x={W - padRight + 6 * s} y={y + 3.5 * s} textAnchor="start"
+                fill="#6b7280" fontSize={(isDesktop ? 7 : 11) * s} fontFamily="inherit" fontWeight={isDesktop ? 'normal' : '500'}>{sev}</text>
             );
           })
         ) : (
-          suppYLabels.map(val => {
+          suppYLabels.map((val, i) => {
             const y = padTop + chartH - (val / suppYMax) * chartH;
             return (
-              <text key={`r-${val}`} x={W - padRight + 6 * s} y={y + 3.5 * s} textAnchor="start"
-                fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '500'}>{val}</text>
+              <text key={`r-${i}`} x={W - padRight + 6 * s} y={y + 3.5 * s} textAnchor="start"
+                fill="#6b7280" fontSize={(isDesktop ? 7 : 11) * s} fontFamily="inherit" fontWeight={isDesktop ? 'normal' : '500'}>{axisNum(val)}</text>
             );
           })
         )
@@ -1370,7 +917,7 @@ export default function ComparisonStudio({
       {/* X-axis */}
       {xLabels.map((lbl, i) => (
         <text key={i} x={lbl.x} y={H - 6 * s} textAnchor="middle"
-          fill={isDesktop ? '#6b7280' : '#d1d5db'} fontSize={(isDesktop ? 7 : 12) * s} fontFamily="system-ui" fontWeight={isDesktop ? 'normal' : '600'}>{lbl.label}</text>
+          fill={isDesktop ? '#6b7280' : '#9ca3af'} fontSize={(isDesktop ? 7 : 11) * s} fontFamily="inherit" fontWeight={isDesktop ? 'normal' : '500'}>{lbl.label}</text>
       ))}
 
       {/* Supplement lines */}
@@ -1378,9 +925,7 @@ export default function ComparisonStudio({
         <g key={`supp-${idx}`}>
           <path d={buildStepPath(pts, 4 * s)} fill="none"
             stroke={SUPPLEMENT_STYLES[idx].color}
-            strokeWidth={(isDesktop ? 0.9 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round"
-            strokeDasharray={selectedSupplements[idx] === primarySeriesId ? 'none' : `${6 * s},${4 * s}`}
-            opacity={selectedSupplements[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
+            strokeLinecap="round" strokeLinejoin="round" {...lineProps(selectedSupplements[idx] === primarySeriesId, true)} />
           {showDots && selectedSupplements[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`sd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.8 * s}
               fill="rgb(15,17,21)" stroke={SUPPLEMENT_STYLES[idx].color} strokeWidth={0.8 * s} />
@@ -1391,9 +936,7 @@ export default function ComparisonStudio({
       {/* Symptom lines */}
       {symptomPointSets.map((pts, idx) => (
         <g key={`sym-${idx}`}>
-          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round"
-            strokeDasharray={selectedSymptoms[idx] === primarySeriesId ? 'none' : `${6 * s},${4 * s}`}
-            opacity={selectedSymptoms[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
+          <path d={buildPath(pts)} fill="none" stroke={SYMPTOM_STYLES[idx].color} strokeLinecap="round" strokeLinejoin="round" {...lineProps(selectedSymptoms[idx] === primarySeriesId)} />
           {showDots && selectedSymptoms[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`syd-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SYMPTOM_STYLES[idx].color} strokeWidth={0.7 * s} />
           ))}
@@ -1403,9 +946,7 @@ export default function ComparisonStudio({
       {/* Sleep lines */}
       {sleepPointSets.map((pts, idx) => (
         <g key={`sleep-${idx}`}>
-          <path d={buildPath(pts)} fill="none" stroke={SLEEP_STYLES[idx].color} strokeWidth={(isDesktop ? 1.0 : 2.5) * s} strokeLinecap="round" strokeLinejoin="round"
-            strokeDasharray={selectedSleepMetrics[idx] === primarySeriesId ? 'none' : `${6 * s},${4 * s}`}
-            opacity={selectedSleepMetrics[idx] === primarySeriesId ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)} />
+          <path d={buildPath(pts)} fill="none" stroke={SLEEP_STYLES[idx].color} strokeLinecap="round" strokeLinejoin="round" {...lineProps(selectedSleepMetrics[idx] === primarySeriesId)} />
           {showDots && selectedSleepMetrics[idx] === primarySeriesId && pts.map((pt, i) => (
             pt.y !== null && <circle key={`sld-${idx}-${i}`} cx={pt.x} cy={pt.y} r={1.2 * s} fill="rgb(15,17,21)" stroke={SLEEP_STYLES[idx].color} strokeWidth={0.7 * s} />
           ))}
@@ -1418,11 +959,9 @@ export default function ComparisonStudio({
           d={buildPath(healthScorePoints)}
           fill="none"
           stroke={HEALTH_SCORE_COLOR}
-          strokeWidth={(isDesktop ? 1.0 : 2.5) * s}
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeDasharray={primarySeriesId === '__healthScore__' || !hasAnySeries ? 'none' : `${6 * s},${4 * s}`}
-          opacity={primarySeriesId === '__healthScore__' || !hasAnySeries ? (isDesktop ? 0.8 : 1.0) : (isDesktop ? 0.45 : 0.6)}
+          {...lineProps(primarySeriesId === '__healthScore__' || !hasAnySeries)}
         />
       )}
 
@@ -1488,12 +1027,12 @@ export default function ComparisonStudio({
         return (
           <g key={`level-text-${i}`}>
             <text x={xMid} y={y - 6 * s} textAnchor="middle"
-              fill={isDesktop ? color : '#fff'} fontSize={avgFs} fontWeight={isDesktop ? '600' : '700'} fontFamily="system-ui">
+              fill={isDesktop ? color : '#fff'} fontSize={avgFs} fontWeight={isDesktop ? '600' : '700'} fontFamily="inherit">
               {avgLabel}
             </text>
             {hasPct && (
               <text x={xMid} y={y + 13 * s} textAnchor="middle"
-                fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="system-ui">
+                fill={color} fontSize={pctFs} fontWeight={isDesktop ? 'normal' : '600'} fontFamily="inherit">
                 {level.percentChange > 0 ? '+' : ''}{Math.round(level.percentChange)}%
               </text>
             )}
@@ -1504,7 +1043,17 @@ export default function ComparisonStudio({
       {/* Crosshair + tooltip */}
       {crosshairData && (
         <>
-          <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth={0.5 * s} />
+          <line x1={crosshairData.x} y1={padTop} x2={crosshairData.x} y2={padTop + chartH} stroke="rgba(255,255,255,0.3)" strokeWidth={(isDesktop ? 0.5 : 1) * s} />
+          {!isDesktop && scrubDate && (() => {
+            const w = (scrubDate.length * 6.6 + 16) * s, h = 20 * s;
+            const x = Math.max(padLeft, Math.min(crosshairData.x - w / 2, W - padRight - w));
+            return (
+              <g pointerEvents="none">
+                <rect x={x} y={padTop - h - 4 * s} width={w} height={h} rx={6 * s} fill="#f3f4f6" />
+                <text x={x + w / 2} y={padTop - 4 * s - h / 2 + 4 * s} textAnchor="middle" fill="#08090a" fontSize={11.5 * s} fontWeight="600" fontFamily="inherit">{scrubDate}</text>
+              </g>
+            );
+          })()}
           {isDesktop && mouseY !== null && (() => {
             const tooltipW = 140 * s;
             const tooltipH = (28 + crosshairData.items.length * 20) * s;
@@ -1514,18 +1063,15 @@ export default function ComparisonStudio({
             return (
               <foreignObject x={tx} y={ty} width={tooltipW} height={tooltipH}>
                 <div xmlns="http://www.w3.org/1999/xhtml" style={{
-                  background: 'rgba(20,22,28,0.95)',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: '#17191c',
+                  border: '1px solid rgba(255,255,255,0.12)',
                   borderRadius: `${6 * s}px`,
                   padding: `${6 * s}px ${8 * s}px`,
-                  fontFamily: 'system-ui',
+                  fontFamily: 'inherit',
                   pointerEvents: 'none',
                 }}>
                   <div style={{ color: '#9ca3af', fontSize: `${7 * s}px`, marginBottom: `${4 * s}px`, fontWeight: '500' }}>
-                    {(() => {
-                      const d = new Date(dates[touchX] + 'T12:00:00');
-                      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                    })()}
+                    {scrubDate}
                   </div>
                   {crosshairData.items.map((item, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: `${4 * s}px`, marginTop: `${2 * s}px` }}>
@@ -1550,470 +1096,188 @@ export default function ComparisonStudio({
     </>
   );
 
-  // ── Series chips with inline stats (shared between desktop/mobile) ──
-  const chipPad = isDesktop ? '10px 12px' : '11px 12px';
-  const chipText = isDesktop ? '13px' : '12px';
-  const chipUnitText = isDesktop ? '11px' : '10px';
-  const chipDot = isDesktop ? '6px' : '6px';
-  const chipBorderW = isDesktop ? '1px' : '1.5px';
-  const chipRadius = isDesktop ? '8px' : '8px';
-  const chipCloseOpacity = isDesktop ? 0.5 : 0.85;
-  const chipCloseSize = isDesktop ? '14px' : '14px';
-  const chipCloseMargin = isDesktop ? '0' : '3px';
-  const addBtnPad = isDesktop ? '10px 12px' : '11px 12px';
-  const addBtnText = isDesktop ? '13px' : '11px';
-  const addBtnBorderW = isDesktop ? '1px' : '1.5px';
+  // ── Series rows with inline stats (shared between desktop/mobile) ──
+  const fmtVal = (val, fixed) => (val === null || val === undefined || !isFinite(val))
+    ? '--'
+    : (fixed || !Number.isInteger(val) ? val.toFixed(1) : val);
+  const seriesRow = ({ id, color, name, val, unit, onRemove }) => (
+    <div key={id} className={`is-row${id === primarySeriesId ? ' on' : ''}`} onClick={() => makePrimary(id)}>
+      <span className="dot" style={{ background: color }} />
+      <span className="name">{name}</span>
+      <span className="val">{val}{unit && val !== '--' && <small> {unit}</small>}</span>
+      <button className="x" aria-label={`Remove ${name}`} onClick={(e) => { e.stopPropagation(); onRemove(); }}>&times;</button>
+    </div>
+  );
+  const legendVal = (id) => legendItems.items.find(it => it.id === id)?.val ?? null;
   const seriesChips = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {/* Supplement chips */}
-      {selectedSupplements.map((suppId, idx) => {
-        const supp = allSupplements.find(s => s.id === suppId);
-        const st = SUPPLEMENT_STYLES[idx];
-        const isPrimary = suppId === primarySeriesId;
-        const suppLegendItem = legendItems.items.find(it => it.color === st.color);
-        const val = suppLegendItem?.val ?? null;
-        const suppUnit = suppItems[idx]?.unit || 'mg';
-        const pctChange = isPrimary && insightData ? insightData.percentChange : null;
-        return (
-          <div
-            key={suppId}
-            onClick={() => makePrimary(suppId)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: chipPad, borderRadius: chipRadius,
-              background: isPrimary ? `${st.color}45` : st.chipBg,
-              border: isPrimary ? `2px solid ${st.color}90` : `${chipBorderW} solid ${st.chipBorder}`,
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: st.color, flexShrink: 0 }} />
-            <span style={{
-              color: isPrimary ? st.color : '#9ca3af',
-              fontSize: chipText, fontWeight: isPrimary ? '600' : '400', flex: 1,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {supp?.name}
-            </span>
-            <span style={{
-              color: '#b0b5be', fontSize: chipText,
-              fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
-            }}>
-              {val !== null && val !== undefined && isFinite(val)
-                ? (Number.isInteger(val) ? val : val.toFixed(1))
-                : '--'}
-            </span>
-            <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>{suppUnit}</span>
-            {pctChange !== null && Math.abs(pctChange) >= 2 && (
-              <span style={{
-                padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
-                background: getLevelColor(pctChange, true) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-                color: getLevelColor(pctChange, true),
-                border: `1px solid ${getLevelColor(pctChange, true)}40`,
-              }}>
-                {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
-              </span>
-            )}
-            <span
-              onClick={(e) => { e.stopPropagation(); removeSupplement(suppId); }}
-              style={{ color: st.color, fontSize: chipCloseSize, lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer', marginLeft: chipCloseMargin, padding: '4px' }}
-            >&times;</span>
-          </div>
-        );
-      })}
+    <div className="is-rows">
+      {selectedSupplements.map((suppId, idx) => seriesRow({
+        id: suppId,
+        color: SUPPLEMENT_STYLES[idx].color,
+        name: allSupplements.find(s => s.id === suppId)?.name,
+        val: fmtVal(legendVal(suppId)),
+        unit: suppItems[idx]?.unit || 'mg',
+        onRemove: () => removeSupplement(suppId),
+      }))}
+      {selectedSupplements.length < 3 && (
+        <button className="dn-btn is-add" onClick={() => { setShowSupplementPicker(true); haptic('light'); }}>+ Supplement</button>
+      )}
 
-      {/* + Supplement button (if room) */}
-      {selectedSupplements.length < 3 ? (
-        <div
-          onClick={() => { setShowSupplementPicker(true); haptic('light'); }}
-          style={{
-            display: 'flex', alignItems: 'center',
-            padding: addBtnPad, borderRadius: chipRadius,
-            border: `${addBtnBorderW} dashed rgba(139,92,246,0.4)`,
-            background: 'transparent',
-            color: 'rgba(139,92,246,0.7)', fontSize: addBtnText, fontWeight: '500',
-            cursor: 'pointer',
-          }}
-        >
-          + Supplement
-        </div>
-      ) : null}
+      <div className="is-gap" />
 
-      {/* Spacer between supplements and symptoms */}
-      <div style={{ height: '4px' }} />
-
-      {/* Symptom chips with stats */}
       {selectedSymptoms.map((symId, idx) => {
         const sym = activeSymptoms.find(s => s.id === symId);
-        const st = SYMPTOM_STYLES[idx];
-        const isPrimary = symId === primarySeriesId;
-        const symLegendItem = legendItems.items.find(it => it.color === st.color);
-        const val = symLegendItem?.val ?? null;
-        const pctChange = isPrimary && insightData ? insightData.percentChange : null;
-        return (
-          <div
-            key={symId}
-            onClick={() => makePrimary(symId)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: chipPad, borderRadius: chipRadius,
-              background: isPrimary ? `${st.color}45` : st.chipBg,
-              border: isPrimary ? `2px solid ${st.color}90` : `${chipBorderW} solid ${st.chipBorder}`,
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: st.color, flexShrink: 0 }} />
-            <span style={{
-              color: isPrimary ? st.color : '#9ca3af',
-              fontSize: chipText, fontWeight: isPrimary ? '600' : '400', flex: 1,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {sym?.name}{sym?.description ? ` (${sym.description})` : ''}
-            </span>
-            <span style={{
-              color: '#b0b5be', fontSize: chipText,
-              fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
-            }}>
-              {val !== null && val !== undefined && isFinite(val) ? val.toFixed(1) : '--'}
-            </span>
-            <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>/5</span>
-            {pctChange !== null && Math.abs(pctChange) >= 2 && (
-              <span style={{
-                padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
-                background: getLevelColor(pctChange, false) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-                color: getLevelColor(pctChange, false),
-                border: `1px solid ${getLevelColor(pctChange, false)}40`,
-              }}>
-                {pctChange > 0 ? '\u25B2' : '\u25BC'} {Math.abs(Math.round(pctChange))}%
-              </span>
-            )}
-            <span
-              onClick={(e) => { e.stopPropagation(); removeSymptom(symId); }}
-              style={{ color: st.color, fontSize: chipCloseSize, lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer', marginLeft: chipCloseMargin, padding: '4px' }}
-            >&times;</span>
-          </div>
-        );
+        return seriesRow({
+          id: symId,
+          color: SYMPTOM_STYLES[idx].color,
+          name: `${sym?.name ?? ''}${sym?.description ? ` (${sym.description})` : ''}`,
+          val: fmtVal(legendVal(symId), true),
+          onRemove: () => removeSymptom(symId),
+        });
       })}
-
-      {/* + Symptom button (if room) */}
       {selectedSymptoms.length < 3 && (
-        <div
-          onClick={() => { setShowSymptomPicker(true); haptic('light'); }}
-          style={{
-            display: 'flex', alignItems: 'center',
-            padding: addBtnPad, borderRadius: chipRadius,
-            border: `${addBtnBorderW} dashed rgba(251,113,133,0.4)`,
-            background: 'transparent',
-            color: 'rgba(251,113,133,0.7)', fontSize: addBtnText, fontWeight: '500',
-            cursor: 'pointer',
-          }}
-        >
-          + Symptom
-        </div>
+        <button className="dn-btn is-add" onClick={() => { setShowSymptomPicker(true); haptic('light'); }}>+ Symptom</button>
       )}
 
-      {/* Spacer between symptoms and sleep */}
-      <div style={{ height: '4px' }} />
-
-      {/* Sleep chips with stats */}
-      {selectedSleepMetrics.map((metricKey, idx) => {
-        const metric = SLEEP_METRICS.find(m => m.key === metricKey);
-        const st = SLEEP_STYLES[idx];
-        const isPrimary = metricKey === primarySeriesId;
-        const sleepLegendItem = legendItems.items.find(it => it.color === st.color);
-        const val = sleepLegendItem?.val ?? null;
-        const unit = metric?.unit || '';
-        const pctChange = isPrimary && insightData ? insightData.percentChange : null;
-        return (
-          <div
-            key={metricKey}
-            onClick={() => makePrimary(metricKey)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: chipPad, borderRadius: chipRadius,
-              background: isPrimary ? `${st.color}45` : st.chipBg,
-              border: isPrimary ? `2px solid ${st.color}90` : `${chipBorderW} solid ${st.chipBorder}`,
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ width: chipDot, height: chipDot, borderRadius: '50%', background: st.color, flexShrink: 0 }} />
-            <span style={{
-              color: isPrimary ? st.color : '#9ca3af',
-              fontSize: chipText, fontWeight: isPrimary ? '600' : '400', flex: 1,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {metric?.label}
-            </span>
-            <span style={{
-              color: '#b0b5be', fontSize: chipText,
-              fontWeight: '500', fontVariantNumeric: 'tabular-nums', flexShrink: 0,
-            }}>
-              {val !== null && val !== undefined && isFinite(val)
-                ? (Number.isInteger(val) ? val : val.toFixed(1))
-                : '--'}
-            </span>
-            {unit && <span style={{ color: '#6b7280', fontSize: chipUnitText, flexShrink: 0 }}>{unit}</span>}
-            {pctChange !== null && Math.abs(pctChange) >= 2 && (
-              <span style={{
-                padding: '1px 5px', borderRadius: '4px', fontSize: '9px', fontWeight: '600', flexShrink: 0,
-                background: getLevelColor(pctChange, metric?.higherIsBetter ?? true) === '#34d399' ? 'rgba(52,211,153,0.15)' : 'rgba(212,160,23,0.15)',
-                color: getLevelColor(pctChange, metric?.higherIsBetter ?? true),
-                border: `1px solid ${getLevelColor(pctChange, metric?.higherIsBetter ?? true)}40`,
-              }}>
-                {pctChange > 0 ? '▲' : '▼'} {Math.abs(Math.round(pctChange))}%
-              </span>
-            )}
-            <span
-              onClick={(e) => { e.stopPropagation(); removeSleep(metricKey); }}
-              style={{ color: st.color, fontSize: chipCloseSize, lineHeight: 1, opacity: chipCloseOpacity, flexShrink: 0, cursor: 'pointer', marginLeft: chipCloseMargin, padding: '4px' }}
-            >&times;</span>
-          </div>
-        );
-      })}
-
-      {/* + Sleep button (if room) */}
-      {selectedSleepMetrics.length < 3 && (
-        <div
-          onClick={() => { setShowSleepPicker(true); haptic('light'); }}
-          style={{
-            display: 'flex', alignItems: 'center',
-            padding: addBtnPad, borderRadius: chipRadius,
-            border: `${addBtnBorderW} dashed ${SLEEP_BORDER_RGBA}`,
-            background: 'transparent',
-            color: 'rgba(34,211,238,0.7)', fontSize: addBtnText, fontWeight: '500',
-            cursor: 'pointer',
-          }}
-        >
-          + Sleep
-        </div>
+      {SLEEP_ENABLED && (
+        <>
+          <div className="is-gap" />
+          {selectedSleepMetrics.map((metricKey, idx) => {
+            const metric = SLEEP_METRICS.find(m => m.key === metricKey);
+            return seriesRow({
+              id: metricKey,
+              color: SLEEP_STYLES[idx].color,
+              name: metric?.label,
+              val: fmtVal(legendVal(metricKey)),
+              unit: metric?.unit || '',
+              onRemove: () => removeSleep(metricKey),
+            });
+          })}
+          {selectedSleepMetrics.length < 3 && (
+            <button className="dn-btn is-add" onClick={() => { setShowSleepPicker(true); haptic('light'); }}>+ Sleep</button>
+          )}
+        </>
       )}
+    </div>
+  );
 
+  // ── Range controls: timeframe + date window (context bar on desktop, above the chart on mobile) ──
+  const stepBack = () => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); };
+  const stepForward = () => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); };
+  const rangeControls = (
+    <>
+      <div className="dn-seg">
+        {TIMEFRAMES.map(tf => (
+          <button key={tf.days} className={timeframe === tf.days ? 'on' : ''} onClick={() => { setTimeframe(tf.days); haptic('light'); }}>{tf.label}</button>
+        ))}
+      </div>
+      <div className="dn-step">
+        <button onClick={stepBack} disabled={startOffset >= maxOffset} aria-label="Earlier"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg></button>
+        <span className="dn-date">{dateWindowLabel}</span>
+        <button onClick={stepForward} disabled={startOffset === 0} aria-label="Later"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg></button>
+      </div>
+    </>
+  );
+
+  const valuesCaption = (
+    <div className={`is-cap${scrubDate ? ' on' : ''}`}>{scrubDate || `${timeframe}-day average`}</div>
+  );
+
+  // Mobile: the thumb hides the crosshair, so the day and its values read out above the chart
+  const scrubReadout = (
+    <div className="is-scrub">
+      {scrubDate ? (
+        <>
+          <b>{scrubDate}</b>
+          {crosshairData?.items.map((item, i) => (
+            <span key={i}><i style={{ background: item.color }} />{fmtVal(item.val, item.unit === '/5')}{item.unit === '%' ? '%' : ''}</span>
+          ))}
+        </>
+      ) : 'Drag across the chart to read a day'}
+    </div>
+  );
+
+  const healthScoreTile = (
+    <HealthScoreCompact
+      score={null}
+      rollingAvg={healthScore.rollingAvg}
+      delta={null}
+      inspectValue={hsInspectValue}
+      showOnGraph={healthScoreVisible}
+      onToggleGraph={() => {
+        if (healthScoreVisible && primarySeriesId !== '__healthScore__') {
+          setPrimarySeriesId('__healthScore__');
+        } else if (healthScoreVisible && primarySeriesId === '__healthScore__') {
+          setShowHealthScore(false);
+        } else {
+          setShowHealthScore(true);
+          setPrimarySeriesId('__healthScore__');
+        }
+        haptic('light');
+      }}
+    />
+  );
+
+  const insightNote = insightData && (
+    <div className="is-note">
+      {insightData.insightSegments.map((seg, i) => seg.color
+        ? <b key={i} style={{ color: seg.color }}>{seg.text}</b>
+        : seg.text
+      )}
     </div>
   );
 
   // ── Render ──
 
   return (
-    <div>
+    <div className={`is${isDesktop ? ' desktop' : ''}`}>
       {supplementPickerPanel}
       {symptomPickerPanel}
       {sleepPickerPanel}
+      {isDesktop && barSlot && createPortal(rangeControls, barSlot)}
 
-      {/* ── Mobile header (above chart card) ── */}
-      {!isDesktop && (
-        <div style={{ marginBottom: '12px' }}>
-          {/* Centered timeframe pills */}
-          <div style={{ display: 'flex', marginBottom: '7px' }}>
-            <div style={{ display: 'flex', gap: '2px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', padding: '2px', flex: 1 }}>
-              {TIMEFRAMES.map(tf => (
-                <button key={tf.days} onClick={() => { setTimeframe(tf.days); haptic('light'); }}
-                  style={{
-                    padding: '5px 0', fontSize: '13px', borderRadius: '6px',
-                    border: 'none', cursor: 'pointer', flex: 1,
-                    color: timeframe === tf.days ? '#fff' : '#9ca3af',
-                    background: timeframe === tf.days ? 'rgba(255,255,255,0.15)' : 'transparent',
-                    fontWeight: timeframe === tf.days ? '600' : '500',
-                  }}>
-                  {tf.label}
-                </button>
-              ))}
-            </div>
+      {isDesktop ? (
+        /* ── Desktop: series panel (left) + chart (right) ── */
+        <div style={{ display: 'flex', height: 'calc(95vh - 180px)', minHeight: '300px', marginBottom: '16px' }}>
+          <div style={{ width: '300px', flexShrink: 0, paddingRight: '20px', borderRight: '1px solid rgba(255,255,255,0.07)', overflowY: 'auto' }}>
+            {valuesCaption}
+            {healthScoreTile}
+            <div className="is-gap" />
+            {seriesChips}
+            {insightNote}
           </div>
-
-          {/* Bold date range navigator */}
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '14px' }}>
-            <button onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
-              disabled={startOffset >= maxOffset}
-              style={{ background: 'none', border: 'none', color: startOffset >= maxOffset ? 'rgba(107,114,128,0.3)' : '#e5e7eb', fontSize: '28px', fontWeight: '300', cursor: startOffset >= maxOffset ? 'default' : 'pointer', padding: '4px 8px' }}>{'\u2039'}</button>
-            <span style={{ flex: 1, textAlign: 'center', color: '#f3f4f6', fontSize: '17px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{dateWindowLabel}</span>
-            <button onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
-              disabled={startOffset === 0}
-              style={{ background: 'none', border: 'none', color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#e5e7eb', fontSize: '28px', fontWeight: '300', cursor: startOffset === 0 ? 'default' : 'pointer', padding: '4px 8px' }}>{'\u203A'}</button>
+          <div ref={chartContainerRef} style={{ flex: 1, minWidth: 0, touchAction: 'none', paddingLeft: '12px', height: '100%' }}>
+            <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}
+              onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
+              style={{ display: 'block' }}
+            >
+              {chartSVGContent}
+            </svg>
           </div>
-
-          {/* Compact Health Score tile (mobile) */}
-          <div style={{ marginBottom: 8 }}>
-            <HealthScoreCompact
-              score={null}
-              rollingAvg={healthScore.rollingAvg}
-              delta={null}
-              rollingDays={timeframe}
-              inspectValue={hsInspectValue}
-              inspectLabel={hsInspectLabel}
-              showOnGraph={healthScoreVisible}
-              onToggleGraph={() => {
-                if (healthScoreVisible && primarySeriesId !== '__healthScore__') {
-                  setPrimarySeriesId('__healthScore__');
-                } else if (healthScoreVisible && primarySeriesId === '__healthScore__') {
-                  setShowHealthScore(false);
-                } else {
-                  setShowHealthScore(true);
-                  setPrimarySeriesId('__healthScore__');
-                }
-                haptic('light');
-              }}
-            />
-          </div>
-
-          {/* Series chips */}
+        </div>
+      ) : (
+        /* ── Mobile: vertical stack ── */
+        <div style={{ marginBottom: '16px' }}>
+          <div className="is-mhead">{rangeControls}</div>
+          {valuesCaption}
+          {healthScoreTile}
+          <div className="is-gap" />
           {seriesChips}
+          {scrubReadout}
+          <div style={{ touchAction: 'none' }}>
+            <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
+              onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
+              onTouchStart={e => { e.preventDefault(); const t = e.touches[0]; setTouchX(getSnappedIndex(t.clientX)); }}
+              onTouchMove={e => { e.preventDefault(); const t = e.touches[0]; setTouchX(getSnappedIndex(t.clientX)); }}
+              onTouchEnd={() => setTouchX(null)}
+              style={{ display: 'block' }}
+            >
+              {chartSVGContent}
+            </svg>
+          </div>
+          {insightNote}
         </div>
       )}
-
-          {/* ── Chart card ── */}
-          <div style={{
-            ...(isDesktop ? {
-              background: 'rgba(15,17,21,0.6)',
-              borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.06)',
-              padding: '14px 14px 10px',
-              height: 'calc(95vh - 180px)', minHeight: '300px',
-            } : {
-              padding: '0',
-            }),
-            marginBottom: '16px',
-          }}>
-            {isDesktop ? (
-              /* ── Desktop: Legend (left) + Chart (right) ── */
-              <div style={{ display: 'flex', gap: '0', height: '100%' }}>
-                {/* Legend panel — left side */}
-                <div style={{
-                  width: '330px', flexShrink: 0,
-                  paddingRight: '14px',
-                  display: 'flex', flexDirection: 'column',
-                  borderRight: '1px solid rgba(255,255,255,0.04)',
-                }}>
-                  <div style={{
-                    display: 'flex', gap: '0',
-                    borderRadius: '7px',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    background: 'rgba(255,255,255,0.04)',
-                    padding: '2px',
-                    marginBottom: '8px',
-                  }}>
-                    {TIMEFRAMES.map(tf => (
-                      <button key={tf.days}
-                        onClick={() => { setTimeframe(tf.days); haptic('light'); }}
-                        style={{
-                          padding: '7px 0',
-                          flex: 1,
-                          borderRadius: '5px', border: 'none',
-                          background: timeframe === tf.days ? 'rgba(255,255,255,0.12)' : 'transparent',
-                          color: timeframe === tf.days ? '#fff' : '#6b7280',
-                          fontSize: '15px', fontWeight: '500', cursor: 'pointer',
-                        }}
-                      >
-                        {tf.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Arrow nav row */}
-                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0', padding: '4px 0' }}>
-                    <button
-                      onClick={() => { setStartOffset(prev => Math.min(prev + Math.round(timeframe / 2), maxOffset)); haptic('light'); }}
-                      disabled={startOffset >= maxOffset}
-                      style={{
-                        background: 'none', border: 'none',
-                        color: startOffset >= maxOffset ? 'rgba(107,114,128,0.3)' : '#6b7280',
-                        fontSize: '24px', cursor: startOffset >= maxOffset ? 'default' : 'pointer',
-                        padding: '0 4px',
-                      }}
-                    >‹</button>
-                    <span style={{ flex: 1, textAlign: 'center', color: '#9ca3af', fontSize: '15px', fontWeight: '500', whiteSpace: 'nowrap' }}>
-                      {dateWindowLabel}
-                    </span>
-                    <button
-                      onClick={() => { setStartOffset(prev => Math.max(prev - Math.round(timeframe / 2), 0)); haptic('light'); }}
-                      disabled={startOffset === 0}
-                      style={{
-                        background: 'none', border: 'none',
-                        color: startOffset === 0 ? 'rgba(107,114,128,0.3)' : '#6b7280',
-                        fontSize: '24px', cursor: startOffset === 0 ? 'default' : 'pointer',
-                        padding: '0 4px',
-                      }}
-                    >›</button>
-                  </div>
-
-                  {/* Health Score Card */}
-                  <div style={{ marginTop: 16 }}>
-                    <HealthScoreCard
-                      score={null}
-                      rollingAvg={healthScore.rollingAvg}
-                      delta={null}
-                      rollingDays={timeframe}
-                      inspectValue={hsInspectValue}
-                      inspectLabel={hsInspectLabel}
-                      showOnGraph={healthScoreVisible}
-                      onToggleGraph={() => {
-                        if (healthScoreVisible && primarySeriesId !== '__healthScore__') {
-                          setPrimarySeriesId('__healthScore__');
-                        } else if (healthScoreVisible && primarySeriesId === '__healthScore__') {
-                          setShowHealthScore(false);
-                        } else {
-                          setShowHealthScore(true);
-                          setPrimarySeriesId('__healthScore__');
-                        }
-                        haptic('light');
-                      }}
-                    />
-                  </div>
-
-                  {/* Series chips */}
-                  <div style={{ marginTop: 12 }}>
-                    {seriesChips}
-                  </div>
-
-                  {/* Divider + Insight text */}
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '20px 0' }} />
-                  {insightData && (
-                    <div style={{ fontSize: '11px', color: '#9ca3af', lineHeight: '1.6' }}>
-                      {insightData.insightSegments.map((seg, i) => seg.color
-                        ? <span key={i} style={{ color: seg.color, fontWeight: '600' }}>{seg.text}</span>
-                        : seg.text
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* SVG chart — right side */}
-                <div ref={chartContainerRef} style={{ flex: 1, minWidth: 0, touchAction: 'none', paddingLeft: '6px', height: '100%' }}>
-                  <svg ref={svgRef} width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}
-                    onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
-                    style={{ display: 'block' }}
-                  >
-                    {chartSVGContent}
-                  </svg>
-                </div>
-              </div>
-            ) : (
-              /* ── Mobile: vertical stack ── */
-              <div>
-                {/* Full-width SVG chart */}
-                <div style={{ touchAction: 'none' }}>
-                  <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
-                    onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}
-                    onTouchStart={e => { e.preventDefault(); const t = e.touches[0]; setTouchX(getSnappedIndex(t.clientX)); }}
-                    onTouchMove={e => { e.preventDefault(); const t = e.touches[0]; setTouchX(getSnappedIndex(t.clientX)); }}
-                    onTouchEnd={() => setTouchX(null)}
-                    style={{ display: 'block' }}
-                  >
-                    {chartSVGContent}
-                  </svg>
-                </div>
-
-                {/* Insight text */}
-                {insightData && (
-                  <div style={{ marginTop: '14px', fontSize: '15px', color: '#9ca3af', lineHeight: '1.7', padding: '10px 4px' }}>
-                    {insightData.insightSegments.map((seg, i) => seg.color
-                      ? <span key={i} style={{ color: seg.color, fontWeight: '600' }}>{seg.text}</span>
-                      : seg.text
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
     </div>
   );
 }

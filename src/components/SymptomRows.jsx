@@ -354,7 +354,26 @@ export default function SymptomRows({
                   {pinnedSymptoms?.has(symptom.id) && <span className="lr-pin">⊙</span>}
                   {symptom.name}{symptom.description && <small>{symptom.description}</small>}
                 </div>
-                {isDesktop && (
+                {/* Desktop: while a row is open, the rating keys take the chart's place on the same row */}
+                {isDesktop && open && isApplicable(symptom, focus.period) && (
+                  <div className="lr-ikeys" onClick={(e) => e.stopPropagation()}>
+                    {[...SEVERITIES, NA_SEVERITY].map((n) => {
+                      const selected = current?.severity === n;
+                      return (
+                        <button
+                          key={n}
+                          className={`${n === NA_SEVERITY ? 'na' : ''} ${selected ? 'on' : lastSeverity === n ? 'last' : ''}`}
+                          style={n === NA_SEVERITY ? undefined : { '--c': n === 0 ? '#9ca3af' : STRIP_COLOR[n], '--bg': SEV_BG[n], '--fg': SEV_FG[n] }}
+                          title={selected ? 'Click again to clear' : undefined}
+                          onClick={() => (selected ? clearEntry(symptom, focus.period) : rate(symptom, focus.period, n))}
+                        >
+                          {n === NA_SEVERITY ? 'N/A' : n}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {isDesktop && !(open && isApplicable(symptom, focus.period)) && (
                   <div className="lr-strip" title="Open history" onClick={(e) => { e.stopPropagation(); onOpenGraph?.(symptom.id); }}>
                     {(strips[symptom.id] || []).map((v, i) => (
                       <i key={i} style={v === null ? undefined : { height: 3 + v * 3, background: STRIP_COLOR[v] }} />
@@ -374,7 +393,7 @@ export default function SymptomRows({
                     </button>
                   );
                 })}
-                {open && currentPeriod && isApplicable(symptom, focus.period) && (
+                {!isDesktop && open && currentPeriod && isApplicable(symptom, focus.period) && (
                   <div className="lr-keys" onClick={(e) => e.stopPropagation()}>
                     {timePeriods.length > 1 && <span className="lr-tag">{currentPeriod.label}</span>}
                     {SEVERITIES.map((n) => (
@@ -389,13 +408,22 @@ export default function SymptomRows({
                     ))}
                     <button className="lr-key wide" onClick={() => rate(symptom, focus.period, NA_SEVERITY)}>N/A</button>
                     {current && <button className="lr-key wide" onClick={() => clearEntry(symptom, focus.period)}>Clear</button>}
-                    <button className="lr-key wide mobile-only" onClick={() => onOpenGraph?.(symptom.id)}>History</button>
-                    <span className="lr-hint"><kbd>0</kbd>–<kbd>5</kbd> rate · <kbd>←</kbd><kbd>→</kbd> {timePeriods.map((p) => p.label).join('/')} · <kbd>⌫</kbd> clear</span>
+                    <button className="lr-key wide" onClick={() => onOpenGraph?.(symptom.id)}>History</button>
                   </div>
                 )}
               </div>
             );
           })}
+          {isDesktop && (
+            <div className="lr-hintbar">
+              <span><kbd>0</kbd>–<kbd>5</kbd> rate</span>
+              <span><kbd>N</kbd> n/a</span>
+              <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
+              {timePeriods.length > 1 && <span><kbd>←</kbd><kbd>→</kbd> {timePeriods.map((p) => p.label).join('/')}</span>}
+              <span><kbd>⌫</kbd> clear</span>
+              <span><kbd>E</kbd> edit</span>
+            </div>
+          )}
         </>
       )}
     </div>

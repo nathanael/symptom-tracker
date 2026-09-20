@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Row entry proposal — desktop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #08090a; --panel: #0e0f11; --line: rgba(255,255,255,.07); --line2: rgba(255,255,255,.12); --text: #f3f4f6; --mute: #9ca3af; --dim: #6b7280; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #050506; color: var(--text); font: 14px/1.45 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; }
+  .page { max-width: 1160px; margin: 0 auto; padding: 28px 20px 64px; }
+  .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .head p { margin: 2px 0 0; color: var(--dim); font-size: 13px; }
+  .seg { display: inline-flex; height: 32px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { padding: 0 16px; color: var(--mute); font-size: 13px; font-weight: 500; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: rgba(255,255,255,.1); color: var(--text); }
+
+  .window { border: 1px solid var(--line2); border-radius: 14px; overflow: hidden; background: var(--bg); box-shadow: 0 30px 80px rgba(0,0,0,.6); padding: 22px 24px 18px; }
+  .lr { max-width: 1032px; margin: 0 auto; color: #e5e7eb; }
+  .cols { display: grid; grid-template-columns: minmax(0,1fr) 170px 56px 56px; gap: 16px; align-items: center; }
+  .lhead { padding: 0 14px 8px; font-size: 11px; color: var(--dim); letter-spacing: .4px; }
+  .lhead .c { text-align: center; }
+  .row { padding: 0 14px; min-height: 40px; border-radius: 10px; cursor: pointer; }
+  .row:hover { background: rgba(255,255,255,.03); }
+  .row.open { background: rgba(99,102,241,.08); }
+  .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name small { color: var(--dim); font-size: 12px; margin-left: 8px; }
+  .strip { display: flex; gap: 3px; align-items: flex-end; height: 18px; }
+  .strip i { width: 9px; border-radius: 2px; background: rgba(255,255,255,.06); height: 3px; }
+  .pill { justify-self: center; width: 30px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-weight: 600; font-size: 13px; border: 1px dashed rgba(255,255,255,.14); color: transparent; }
+  .pill.cur { outline: 2px solid #818cf8; outline-offset: 2px; }
+  .pill.set { border: 0; }
+
+  /* BEFORE: second line inside the row */
+  .before .row.open { padding: 7px 14px 12px; row-gap: 8px; }
+  .keys { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; }
+  .tag { font-size: 11px; font-weight: 600; color: #a5b4fc; letter-spacing: .5px; width: 26px; }
+  .key { width: 52px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); display: grid; place-items: center; font-weight: 600; font-size: 15px; color: #d1d5db; }
+  .key.wide { width: auto; padding: 0 14px; font-size: 12px; font-weight: 500; color: var(--dim); }
+  .key:hover { border-color: #fff; }
+  .key.last { border-color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
+  .hint { margin-left: auto; font-size: 12px; color: var(--dim); white-space: nowrap; }
+  kbd { border: 1px solid var(--line2); border-radius: 4px; padding: 1px 5px; font: 11px ui-monospace, monospace; color: var(--mute); }
+
+  /* AFTER: keys take the chart's place on the same row — no height change */
+  .after .row.open .cols-inner, .after .row.open { grid-template-columns: minmax(0,1fr) auto 56px 56px; }
+  .ikeys { display: inline-flex; height: 28px; border: 1px solid var(--line2); border-radius: 8px; overflow: hidden; justify-self: end; background: var(--bg); }
+  .ikeys button { width: 34px; height: 100%; font-weight: 600; font-size: 13px; color: #d1d5db; display: grid; place-items: center; }
+  .ikeys button + button { border-left: 1px solid var(--line); }
+  .ikeys button:hover { background: rgba(255,255,255,.08); color: #fff; }
+  .ikeys button.na { width: 40px; font-size: 11px; font-weight: 500; color: var(--dim); }
+  .ikeys button.last { background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); box-shadow: inset 0 -2px 0 var(--c); }
+  .ikeys button.on { background: var(--bgc); color: var(--fgc); }
+  .hintbar { display: flex; justify-content: flex-end; gap: 14px; font-size: 12px; color: var(--dim); padding: 12px 14px 0; border-top: 1px solid var(--line); margin-top: 10px; }
+
+  .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 22px; }
+  .note { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; background: var(--panel); }
+  .note h3 { margin: 0 0 10px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  .note ul, .note ol { margin: 0; padding-left: 18px; color: var(--mute); font-size: 13px; }
+  .note li { margin-bottom: 7px; } .note li b { color: var(--text); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="head">
+    <div><h1>Symptom row — entry state (desktop)</h1><p>Click any row. Toggle Before / After to compare. In After, click a number to rate; click it again to clear.</p></div>
+    <div class="seg" id="toggle"><button data-v="before">Before</button><button data-v="after" class="on">After</button></div>
+  </div>
+
+  <div class="window after" id="win"><div class="lr" id="list"></div></div>
+
+  <div class="notes">
+    <div class="note"><h3>What’s busy today</h3><ol>
+      <li><b>The row doubles in height</b> when opened, so everything below it jumps as you move down the list.</li>
+      <li><b>Two things compete on one row:</b> the 14-day chart stays visible above a second line of seven large keys.</li>
+      <li><b>The “PM” tag repeats</b> what the ringed pill on the right already says.</li>
+      <li><b>A separate Clear key</b> appears and disappears, shifting the keys beside it.</li>
+      <li><b>The shortcut hint is repeated inside every open row,</b> right-aligned against the keys — the noisiest part.</li>
+    </ol></div>
+    <div class="note"><h3>Proposal</h3><ul>
+      <li><b>Keys replace the chart, same row.</b> While a row is open its 14-day strip swaps for one flat 0–5 · N/A control (same style as the new toggles). Row height never changes — nothing jumps.</li>
+      <li><b>The chart isn’t lost:</b> it’s back the moment you move on, and rating auto-advances, so you see each strip again right after you answer.</li>
+      <li><b>Last time’s value</b> keeps its highlight, as a tinted cell with a colored underline.</li>
+      <li><b>No PM tag, no Clear key.</b> The ringed pill shows the period; click the selected number again (or press <kbd>⌫</kbd>) to clear — same as Rapid entry.</li>
+      <li><b>Shortcuts move to one quiet line under the list</b> — where Protocol already keeps its hints — instead of inside the row. My recommendation over removing them: they cost nothing down there, and the arrow/AM-PM keys aren’t guessable. If you’d rather drop them entirely, a <kbd>?</kbd> popover is the fallback.</li>
+      <li><b>Mobile is unchanged</b> — big keys under the row still make sense for thumbs.</li>
+    </ul></div>
+  </div>
+</div>
+
+<script>
+const SEV_BG = ['rgba(255,255,255,.08)', 'rgba(132,204,22,.25)', 'rgba(234,179,8,.28)', 'rgba(234,179,8,.4)', 'rgba(249,115,22,.4)', 'rgba(239,68,68,.45)'];
+const SEV_FG = ['#9ca3af', '#d9f99d', '#fef08a', '#fef9c3', '#ffedd5', '#fee2e2'];
+const STRIP = ['rgba(255,255,255,.14)', '#3f6212', '#a3a635', '#eab308', '#f97316', '#ef4444'];
+const rows = [
+  { n: 'Flushing', d: 'Red chest and blotchy skin', s: '1110100010100', last: 1 },
+  { n: 'Penile retraction', s: '2010000100000', last: 0 },
+  { n: 'Urinary urgency', s: '0002020002000', last: 2 },
+  { n: 'Social withdrawal', s: '0000004000000', last: 0 },
+  { n: 'Anxiety', d: 'Physical', s: '0100000101000', last: 1 },
+  { n: 'Neuropathy', d: 'Sharp or electrical pulse, peripheral finger', s: '0001000100000', last: 1 },
+  { n: 'Headache', s: '1000010000000', last: 0 },
+  { n: 'Fascial tightness', s: '0010000020000', last: 2 },
+];
+const state = rows.map(() => ({ am: null, pm: null }));
+let open = 2, mode = 'after';
+
+const strip = (s) => `<div class="strip">${[...s].map(c => `<i style="${+c ? `height:${4 + c * 3}px;background:${STRIP[c]}` : ''}"></i>`).join('')}<i></i></div>`;
+const pill = (v, cur) => `<span class="pill ${cur ? 'cur' : ''} ${v !== null ? 'set' : ''}" style="${v !== null ? `background:${SEV_BG[v]};color:${SEV_FG[v]}` : ''}">${v ?? ''}</span>`;
+
+function render() {
+  document.getElementById('win').className = 'window ' + mode;
+  document.getElementById('list').innerHTML =
+    `<div class="lhead cols"><div></div><div>LAST 14 DAYS</div><div class="c">AM</div><div class="c">PM</div></div>` +
+    rows.map((r, i) => {
+      const isOpen = i === open, v = state[i].pm;
+      const name = `<div class="name">${r.n}${r.d ? `<small>${r.d}</small>` : ''}</div>`;
+      const pills = pill(state[i].am, false) + pill(v, isOpen);
+      if (mode === 'before') {
+        return `<div class="row cols ${isOpen ? 'open' : ''}" data-i="${i}">${name}${strip(r.s)}${pills}${isOpen ? `
+          <div class="keys"><span class="tag">PM</span>${[0,1,2,3,4,5].map(k => `<span class="key ${v === null && r.last === k ? 'last' : ''}" style="--c:${STRIP[k]}" data-k="${k}">${k}</span>`).join('')}
+          <span class="key wide">N/A</span>${v !== null ? '<span class="key wide">Clear</span>' : ''}
+          <span class="hint"><kbd>0</kbd>–<kbd>5</kbd> rate · <kbd>←</kbd><kbd>→</kbd> AM/PM · <kbd>⌫</kbd> clear</span></div>` : ''}</div>`;
+      }
+      const mid = isOpen
+        ? `<div class="ikeys">${[0,1,2,3,4,5].map(k => `<button class="${v === k ? 'on' : v === null && r.last === k ? 'last' : ''}" style="--c:${STRIP[k] === STRIP[0] ? '#9ca3af' : STRIP[k]};--bgc:${SEV_BG[k]};--fgc:${SEV_FG[k]}" data-k="${k}">${k}</button>`).join('')}<button class="na">N/A</button></div>`
+        : strip(r.s);
+      return `<div class="row cols ${isOpen ? 'open' : ''}" data-i="${i}">${name}${mid}${pills}</div>`;
+    }).join('') +
+    (mode === 'after' ? `<div class="hintbar"><span><kbd>0</kbd>–<kbd>5</kbd> rate</span><span><kbd>N</kbd> n/a</span><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>←</kbd><kbd>→</kbd> AM/PM</span><span><kbd>⌫</kbd> clear</span></div>` : '');
+}
+document.getElementById('list').onclick = (e) => {
+  const k = e.target.closest('[data-k]'), row = e.target.closest('.row');
+  if (!row) return;
+  const i = +row.dataset.i;
+  if (k) {
+    const val = +k.dataset.k;
+    if (state[i].pm === val) state[i].pm = null;
+    else { state[i].pm = val; open = Math.min(rows.length - 1, i + 1); }
+  } else open = i;
+  render();
+};
+document.querySelectorAll('#toggle button').forEach(b => b.onclick = () => {
+  mode = b.dataset.v;
+  document.querySelectorAll('#toggle button').forEach(x => x.classList.toggle('on', x === b));
+  render();
+});
+render();
+</script>
+</body>
+</html>

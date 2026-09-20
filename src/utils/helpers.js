@@ -1,4 +1,4 @@
-import { trackingModes, severityColors, NA_SEVERITY } from './constants';
+import { trackingModes, severityColors, NA_SEVERITY, SLEEP_ENABLED } from './constants';
 import { computeHealthScore } from './healthScore';
 import { METRICS as SLEEP_METRICS, valueForRow } from './sleepMetrics';
 
@@ -10,6 +10,7 @@ export function noteText(note) {
 }
 
 function readSleepCache() {
+  if (!SLEEP_ENABLED) return [];
   try {
     const raw = localStorage.getItem('garminSleepCache');
     if (!raw) return [];
