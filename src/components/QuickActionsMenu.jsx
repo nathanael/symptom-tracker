@@ -43,7 +43,7 @@ export default function QuickActionsMenu({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const currentVersion = 'v6.4.6';
+  const currentVersion = 'v6.4.7';
 
   const tab = showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'protocol';
   const Item = ({ icon, label, hint, danger, primary, onClick }) => (
@@ -57,7 +57,7 @@ export default function QuickActionsMenu({
       <div className="mn-dim" onClick={onClose} />
       <div className="mn-sheet" role="menu">
         <h6>
-          {tab === 'insights' ? 'Insights' : `${tab === 'symptoms' ? 'Symptoms' : 'Protocol'} · ${formatDate(selectedDate)}`}
+          {tab === 'insights' ? 'Progress' : `${tab === 'symptoms' ? 'Symptoms' : 'Protocol'} · ${formatDate(selectedDate)}`}
           <span>{currentVersion}</span>
         </h6>
         {tab !== 'insights' && <Item icon="trash" label="Clear day" danger onClick={tab === 'symptoms' ? onClearSymptoms : onClear} />}

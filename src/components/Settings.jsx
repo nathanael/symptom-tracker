@@ -517,7 +517,7 @@ export default function Settings({
   const garminConnected = garminSync.serverAvailable && garminSync.authenticated && !garminSync.mfaRequired;
   const integrations = SLEEP_ENABLED && (
     <section className="st-section" id="st-integrations">
-      <h3>Integrations</h3><p>Sources that feed Insights.</p>
+      <h3>Integrations</h3><p>Sources that feed Progress.</p>
       <div className="st-group">
         <Row
           stack={garminConnected}
@@ -591,7 +591,7 @@ export default function Settings({
 
   const about = (
     <div className="st-about">
-      v6.4.6 · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
+      v6.4.7 · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
       <button onClick={checkForUpdates} disabled={checkingForUpdates}>{checkingForUpdates ? 'Checking…' : 'Check for updates'}</button>
     </div>
   );
