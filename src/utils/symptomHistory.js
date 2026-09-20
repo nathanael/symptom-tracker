@@ -26,6 +26,7 @@ export const applySymptomPatch = (symptom, patch) => {
   const next = { ...symptom, ...patch };
   if ('description' in patch && !patch.description) next.description = undefined;
   if ('applicablePeriods' in patch && !patch.applicablePeriods) delete next.applicablePeriods;
+  if ('group' in patch && !patch.group) { delete next.group; delete next.groupOrder; }
   const historyEntry = recordSymptomHistoryChange(symptom, next);
   const history = symptom.history || [];
   next.history = historyEntry ? [...history, historyEntry] : history;

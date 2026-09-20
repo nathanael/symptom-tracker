@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Symptom grouping — mockup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08090a; --panel: #0e0f11; --line: rgba(255,255,255,.07); --line2: rgba(255,255,255,.12);
+    --text: #f3f4f6; --soft: #d1d5db; --mute: #9ca3af; --dim: #6b7280; --violet: #8b5cf6;
+    --gut: #fb923c; --mood: #a78bfa; --nerve: #38bdf8; --skin: #f472b6; --none: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #050506; color: var(--text); font: 13px/1.45 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .lede { margin: 4px 0 0; color: var(--dim); max-width: 780px; }
+  .label { margin: 32px 0 12px; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: var(--dim); }
+  .label b { color: var(--soft); font-weight: 600; }
+
+  .window { border: 1px solid var(--line2); border-radius: 14px; overflow: hidden; background: var(--bg); box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .topbar { height: 54px; border-bottom: 1px solid var(--line); }
+  .topbar .wrap { height: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; }
+  .logo { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, #a78bfa, #6d28d9); }
+  .context { min-height: 52px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .context .wrap { min-height: 52px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+  .spacer { margin-left: auto; }
+  .seg { display: inline-flex; height: 32px; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; flex: none; }
+  .seg button { padding: 0 13px; color: var(--mute); font-weight: 500; white-space: nowrap; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button:hover { color: var(--text); background: rgba(255,255,255,.04); }
+  .seg button.on { background: rgba(255,255,255,.1); color: var(--text); }
+  .step { display: inline-flex; align-items: center; height: 32px; border: 1px solid var(--line); border-radius: 9px; color: var(--mute); }
+  .step span { padding: 0 10px; }
+  .step b { padding: 0 14px; height: 100%; display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); color: var(--text); font-weight: 600; }
+  .step b small { color: var(--dim); font-weight: 400; }
+  .btn { height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--mute); font-weight: 500; }
+  .seglabel { color: var(--dim); font-size: 12px; }
+
+  .body { padding: 18px 0 26px; }
+  .why { margin: 0 14px 14px; color: var(--dim); font-size: 12px; }
+  .why b { color: var(--mute); font-weight: 500; }
+  .cols { display: grid; grid-template-columns: minmax(0,1fr) 170px 56px 56px; gap: 16px; align-items: center; }
+  .head { padding: 0 14px 6px; font-size: 11px; letter-spacing: .4px; color: var(--dim); }
+  .head .c { text-align: center; }
+
+  .ghead { display: flex; align-items: center; gap: 8px; padding: 18px 14px 6px; font-size: 11px; letter-spacing: .4px; color: var(--dim); cursor: pointer; }
+  .ghead:first-of-type { padding-top: 4px; }
+  .ghead i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+  .ghead b { color: var(--soft); font-weight: 600; text-transform: uppercase; }
+  .ghead em { font-style: normal; }
+  .ghead .badge { margin-left: 4px; padding: 1px 7px; border-radius: 6px; font-size: 11px; color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); background: color-mix(in srgb, var(--c) 12%, transparent); }
+  .ghead .count { margin-left: auto; }
+  .ghead svg { width: 13px; height: 13px; stroke: var(--dim); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .row { padding: 0 14px; min-height: 40px; border-radius: 10px; font-size: 14px; }
+  .row:hover { background: rgba(255,255,255,.03); }
+  .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name small { color: var(--dim); font-size: 12px; margin-left: 8px; }
+  .strip { display: flex; gap: 3px; align-items: flex-end; height: 18px; }
+  .strip i { width: 9px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.06); }
+  .pill { justify-self: center; width: 30px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-weight: 600; font-size: 13px; }
+  .pill.e { border: 1px dashed rgba(255,255,255,.14); color: transparent; }
+  .s0 { background: rgba(255,255,255,.06); color: var(--mute); } .s1 { background: rgba(63,98,18,.45); color: #bef264; }
+  .s2 { background: rgba(163,166,53,.3); color: #e4e669; } .s3 { background: rgba(234,179,8,.28); color: #fde047; } .s4 { background: rgba(249,115,22,.3); color: #fdba74; }
+
+  .btn.primary { background: var(--violet); border-color: transparent; color: #fff; }
+  .ecols { display: grid; grid-template-columns: 18px minmax(0,1.1fr) minmax(0,1.4fr) 120px 96px; gap: 14px; align-items: center; }
+  .erow { padding: 0 14px; min-height: 40px; border-radius: 10px; font-size: 14px; }
+  .erow:hover { background: rgba(255,255,255,.03); }
+  .erow.drag { background: #1c1e22; box-shadow: 0 0 0 1px var(--line2), 0 12px 30px rgba(0,0,0,.5); transform: translate(12px, -10px); position: relative; z-index: 1; }
+  .grip { color: var(--dim); letter-spacing: -2px; cursor: grab; }
+  .erow .desc { color: var(--mute); font-size: 13px; }
+  .sel { height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--soft); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .sel i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+  .sel span { flex: 1; }
+  .acts { color: var(--dim); font-size: 12px; display: flex; gap: 14px; justify-content: flex-end; }
+  .eghead { display: flex; align-items: center; gap: 10px; padding: 18px 14px 6px; }
+  .eghead .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 20%, transparent); cursor: pointer; }
+  .eghead input { background: none; border: 1px solid transparent; border-radius: 7px; padding: 3px 6px; margin-left: -6px; color: var(--text); font: 600 13px Inter, sans-serif; width: 160px; }
+  .eghead input:hover, .eghead input:focus { border-color: var(--line2); outline: none; }
+  .eghead em { font-style: normal; color: var(--dim); font-size: 12px; }
+  .eghead .acts { margin-left: auto; }
+  .drop { margin: 2px 14px; height: 2px; border-radius: 2px; background: var(--violet); }
+  .newrow { border: 1px solid var(--line2); background: rgba(255,255,255,.03); }
+  .newrow .typed { border-right: 2px solid var(--violet); padding-right: 2px; }
+  .newrow .desc { color: var(--dim); }
+  .sel.sug { border-color: color-mix(in srgb, var(--violet) 55%, transparent); }
+  .sugtag { color: #c4b5fd; }
+  .add { margin: 16px 0 0; padding: 0 14px; min-height: 40px; display: flex; align-items: center; gap: 14px; border: 1px dashed var(--line2); border-radius: 10px; color: var(--mute); }
+  @media (max-width: 900px) { .ecols { grid-template-columns: 18px minmax(0,1fr) 110px; } .erow .desc, .erow .acts { display: none; } }
+
+  /* phone */
+  .phones { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+  .phone { width: 375px; max-width: 100%; border: 1px solid var(--line2); border-radius: 28px; overflow: hidden; background: var(--bg); box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .phone .pad { padding: 14px 14px 22px; }
+  .phone .seg { display: flex; width: 100%; height: 36px; }
+  .phone .seg button { flex: 1; padding: 0; font-size: 12px; }
+  .phone .cols { grid-template-columns: minmax(0,1fr) 38px 38px; gap: 8px; }
+  .phone .strip, .phone .head .s { display: none; }
+  .phone .row { min-height: 46px; padding: 0 4px; font-size: 15px; }
+  .phone .ghead { padding-left: 4px; padding-right: 4px; }
+  .phone .name small { display: block; margin: 0; }
+  .phone .pill { width: 34px; height: 30px; border-radius: 9px; }
+  .phone .why { margin: 10px 4px 4px; }
+  .side { flex: 1; min-width: 280px; max-width: 520px; }
+  .side h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+  .side p, .side li { color: var(--mute); }
+  .side ul { margin: 0 0 18px; padding-left: 18px; }
+  .side li { margin: 4px 0; }
+  .side li b { color: var(--soft); font-weight: 500; }
+
+  @media (max-width: 900px) {
+    .topbar .wrap { grid-template-columns: 1fr; } .topbar .seg { display: none; }
+    .cols { grid-template-columns: minmax(0,1fr) 44px 44px; } .strip, .head .s { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Symptoms tab — "Group by"</h1>
+  <p class="lede">One control that re-organises the same list three ways. Click the options below to switch; the desktop and phone mockups change together. Groups, badges and numbers are illustrative.</p>
+
+  <div class="label"><b>Desktop</b> · Symptoms</div>
+  <div class="window">
+    <div class="topbar"><div class="wrap">
+      <div class="brand"><div class="logo"></div>Symptom Tracker</div>
+      <div class="seg"><button class="on">Symptoms</button><button>Protocol</button><button>Insights</button></div>
+      <div></div>
+    </div></div>
+    <div class="context"><div class="wrap">
+      <div class="step"><span>‹</span><b>Today <small>Sun, Sep 20</small></b><span>›</span></div>
+      <span class="seglabel">Group by</span>
+      <div class="seg modes"></div>
+      <div class="spacer"></div>
+      <button class="btn">Edit symptoms</button>
+    </div></div>
+    <div class="wrap body">
+      <p class="why" id="why-d"></p>
+      <div class="cols head"><div></div><div class="s">LAST 14 DAYS</div><div class="c">AM</div><div class="c">PM</div></div>
+      <div id="list-d"></div>
+    </div>
+  </div>
+
+  <div class="label"><b>Managing My groups</b> · Edit symptoms</div>
+  <div class="window">
+    <div class="context"><div class="wrap">
+      <div class="step"><span>‹</span><b>Today <small>Sun, Sep 20</small></b><span>›</span></div>
+      <span class="seglabel">14 active · 4 groups</span>
+      <div class="spacer"></div>
+      <button class="btn">Start from Intelligent</button>
+      <button class="btn primary">Done</button>
+    </div></div>
+    <div class="wrap body" id="edit"></div>
+  </div>
+  <div class="phones" style="margin-top:20px">
+    <div class="side" style="max-width:none">
+      <ul>
+        <li><b>Groups are section headers</b>, the same pattern as Supplements / Other factors in Protocol. Click a name to rename it, click the dot to change colour, drag the header to reorder groups.</li>
+        <li><b>Drag a symptom by its handle</b> into another section to move it (shown mid-drag above). Order inside a group is your order.</li>
+        <li><b>On the phone</b>, where long drags are awkward, each symptom has a Group menu instead. It is on desktop too.</li>
+        <li><b>+ Add group</b> at the bottom. Deleting a group never deletes symptoms; they drop into <b>Ungrouped</b>, which only shows when something is in it.</li>
+        <li><b>New symptoms get a suggested group</b> from whatever name the person typed ("Bloating after meals" → Gut). A built-in word list handles the common ones instantly and offline; a small AI model handles anything it does not recognise. It is only ever a suggestion, marked ✦, and one tap changes it.</li>
+        <li><b>Few groups, on purpose.</b> Four ship by default: Gut, Mood, Nerve &amp; pain, Skin. Anything that fits none of them stays Ungrouped. Suggestions only ever pick from the groups you already have and never invent a new one, so the list stays short unless you add to it yourself.</li>
+        <li><b>Start from Intelligent</b> copies the automatic groups in as a first draft for you to rename and correct, so you never start from a blank page. No AI call needed.</li>
+        <li>One symptom belongs to one group. There is still a single order underneath, so My order and My groups never disagree.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="label"><b>Mobile</b> · the same control above the list</div>
+  <div class="phones">
+    <div class="phone"><div class="pad">
+      <div class="seg modes"></div>
+      <p class="why" id="why-m"></p>
+      <div class="cols head"><div></div><div class="c">AM</div><div class="c">PM</div></div>
+      <div id="list-m"></div>
+    </div></div>
+
+    <div class="side">
+      <h3>The three groupings</h3>
+      <ul>
+        <li><b>My order</b> — stays. The flat list you have today, in the order you set.</li>
+        <li><b>My groups</b> — sections you define (Gut, Mood…), managed in Edit symptoms (above).</li>
+        <li><b>Intelligent</b> — automatic, from your last 90 days: symptoms whose bad days overlap are grouped, and a group gets a "flaring" badge when most of it is up.</li>
+      </ul>
+      <h3>How it behaves</h3>
+      <ul>
+        <li>Group headers collapse, and show how many are logged (2/3).</li>
+        <li>Rating, ↑/↓, jump-to-next-blank and the thumb scroll all follow whatever order is on screen.</li>
+        <li>Your choice is remembered. Nothing about the data changes; it is only a different sort of the same list.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const COLORS = ['rgba(255,255,255,.14)', '#3f6212', '#a3a635', '#eab308', '#f97316', '#ef4444'];
+
+// name, description, my-group, flare-group, am, pm, today-state, base severity for the strip
+const S = [
+  ['Flushing', 'Red chest and blotchy skin', 'Skin', 'Nerve & skin', null, 1, 'normal', 1],
+  ['Urinary urgency', '', 'Other', 'solo', null, 3, 'above', 1],
+  ['Social withdrawal', '', 'Mood', 'Mood', null, 2, 'above', 1],
+  ['Anxiety', 'Physical', 'Mood', 'solo', null, 0, 'quiet', 0],
+  ['Anxiety', 'Mental', 'Mood', 'Mood', null, 0, 'quiet', 1],
+  ['Neuropathy', 'Peripheral finger', 'Nerve', 'Nerve & skin', null, 0, 'quiet', 0],
+  ['Headache', '', 'Nerve', 'solo', null, 0, 'quiet', 0],
+  ['Fascial tightness', '', 'Nerve', 'Nerve & skin', null, 0, 'normal', 1],
+  ['Malassezia flare', '', 'Skin', 'solo', null, 0, 'quiet', 1],
+  ['Heartburn / bile reflux', '', 'Gut', 'Gut', null, 0, 'quiet', 0],
+  ['Farting, burping', '', 'Gut', 'Gut', 3, 3, 'above', 1],
+  ['Diarrhea / Loose stool', '', 'Gut', 'Gut', 3, 4, 'above', 2],
+  ['Brain fog', '', 'Mood', 'Gut', null, 1, 'normal', 1],
+  ['Irritability', '', 'Mood', 'Mood', null, 3, 'above', 1],
+].map(([name, desc, mine, flare, am, pm, today, base]) => ({
+  name, desc, mine, flare, am, pm, today,
+  strip: Array.from({ length: 14 }, (_, i) => rnd() < .25 ? null : Math.max(0, Math.min(5, Math.round(base + (rnd() - .4) * 2 + (i > 11 && today === 'above' ? 1.5 : 0))))),
+}));
+
+const C = { Gut: 'var(--gut)', Mood: 'var(--mood)', Nerve: 'var(--nerve)', 'Nerve & skin': 'var(--nerve)', Skin: 'var(--skin)' };
+const MODES = {
+  'My order': { why: '<b>My order.</b> The list exactly as you arranged it. No sections.', groups: () => [{ rows: S }] },
+  'My groups': { why: '<b>My groups.</b> Sections you define. Assign symptoms in Edit symptoms; AI can suggest a first pass.',
+    groups: () => ['Gut', 'Mood', 'Nerve', 'Skin', 'Other'].map((g) => ({ name: g === 'Other' ? 'Ungrouped' : g, c: C[g], rows: S.filter((s) => s.mine === g) })) },
+  'Intelligent': { why: '<b>Intelligent.</b> Automatic, from the last 90 days. Symptoms whose bad days overlap sit together; a group is badged when most of it is up.',
+    groups: () => [
+      { name: 'Gut', c: C.Gut, badge: 'flaring · 3 of 4 up', rows: S.filter((s) => s.flare === 'Gut') },
+      { name: 'Mood', c: C.Mood, badge: 'flaring · 2 of 3 up', rows: S.filter((s) => s.flare === 'Mood') },
+      { name: 'Nerve & skin', c: C['Nerve & skin'], rows: S.filter((s) => s.flare === 'Nerve & skin') },
+      { name: 'On their own', rows: S.filter((s) => s.flare === 'solo') },
+    ] },
+};
+
+const pill = (v) => `<div class="pill ${v === null ? 'e' : 's' + v}">${v ?? '·'}</div>`;
+const row = (s) => `<div class="row cols"><div class="name">${s.name}${s.desc ? `<small>${s.desc}</small>` : ''}</div>
+  <div class="strip">${s.strip.map((v) => `<i${v === null ? '' : ` style="height:${3 + v * 3}px;background:${COLORS[v]}"`}></i>`).join('')}</div>${pill(s.am)}${pill(s.pm)}</div>`;
+const chevron = '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+const group = (g) => (g.name ? `<div class="ghead" style="--c:${g.c || 'var(--none)'}"><i></i><b>${g.name}</b>${g.badge ? `<span class="badge">${g.badge}</span>` : ''}
+  <em class="count">${g.rows.filter((r) => r.pm !== null).length}/${g.rows.length} logged</em>${chevron}</div>` : '') + g.rows.map(row).join('');
+
+// ── Edit mode: managing My groups (static; Brain fog is shown mid-drag from Mood into Gut) ──
+const dots = '<span class="grip">⋮⋮</span>';
+const caret = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>';
+const erow = (s, g, drag) => `<div class="erow ecols ${drag ? 'drag' : ''}">${dots}<div class="name">${s.name}</div><div class="desc">${s.desc}</div>
+  <div class="sel" style="--c:${C[g] || 'var(--none)'}"><i></i><span>${g}</span>${caret}</div>
+  <div class="acts"><span>More</span><span>Hide</span></div></div>`;
+document.getElementById('edit').innerHTML = ['Gut', 'Mood', 'Nerve', 'Skin'].map((g) => {
+  const rows = S.filter((s) => s.mine === g);
+  return `<div class="eghead" style="--c:${C[g]}">${dots}<span class="dot"></span><input value="${g}"><em>${rows.length} symptoms</em><div class="acts"><span>Delete group</span></div></div>`
+    + rows.map((s) => erow(s, g, s.name === 'Brain fog')).join('')
+    + (g === 'Gut' ? '<div class="drop"></div>' : '');
+}).join('')
+  + `<div class="eghead" style="--c:var(--none)">${dots}<span class="dot"></span><input value="Ungrouped" disabled><em>shows only when something is in it</em></div>`
+  + S.filter((s) => s.mine === 'Other').map((s) => erow(s, 'Ungrouped')).join('')
+  + `<div class="eghead" style="--c:var(--none)"><em>ADDING A SYMPTOM — the group is suggested from the name, you can change it before saving</em></div>
+     <div class="erow ecols newrow"><span></span><div class="name"><span class="typed">Bloating after meals</span></div><div class="desc">Description (optional)</div>
+     <div class="sel sug" style="--c:${C.Gut}"><i></i><span>Gut</span>${caret}</div><div class="acts"><span class="sugtag">✦ suggested</span></div></div>`
+  + '<div class="add"><span>+</span>Add group</div>';
+
+// #intelligent or #my-order in the URL opens that grouping directly
+const fromHash = Object.keys(MODES).find((m) => m.toLowerCase().replace(' ', '-') === (typeof location === 'undefined' ? '' : location.hash.slice(1)));
+let mode = fromHash || 'My groups';
+function render() {
+  document.querySelectorAll('.modes').forEach((el) => {
+    el.innerHTML = Object.keys(MODES).map((m) => `<button class="${m === mode ? 'on' : ''}" data-m="${m}">${m}</button>`).join('');
+  });
+  const html = MODES[mode].groups().map(group).join('');
+  for (const id of ['d', 'm']) {
+    document.getElementById('list-' + id).innerHTML = html;
+    document.getElementById('why-' + id).innerHTML = MODES[mode].why;
+  }
+}
+document.addEventListener('click', (e) => { const m = e.target.dataset?.m; if (m) { mode = m; render(); } });
+render();
+</script>
+</body>
+</html>

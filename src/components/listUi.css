@@ -203,3 +203,31 @@
 
 /* Mobile: room below the last rows so the rating keys can always scroll up to thumb height */
 .lr.sym.mobile:not(.edit) { padding-bottom: 45vh; }
+
+/* Symptom groups ("My groups") */
+.lr-ghead { display: flex; align-items: center; gap: 8px; padding: 18px 14px 6px; font-size: 11px; letter-spacing: .4px; color: #6b7280; cursor: pointer; user-select: none; }
+.lr-ghead > i, .lr-ghead-in > i, .lr-gselect > i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+.lr-ghead b { color: #d1d5db; font-weight: 600; text-transform: uppercase; }
+.lr-ghead > span { margin-left: auto; }
+.lr-ghead svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+.lr-ghead.folded svg { transform: rotate(-90deg); }
+.lr-ghead:hover b { color: #f3f4f6; }
+.lr-gnote { padding: 4px 14px 10px; font-size: 12px; color: #6b7280; }
+.lr-ghead.edit { cursor: default; padding: 16px 14px 4px; border-top: 1px solid transparent; }
+.lr-ghead.edit.over, .lr-ghead.edit:has(.over) { border-top-color: #818cf8; }
+.lr-ghead.edit.dragging { opacity: .35; }
+.lr-ghead-in { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 !important; }
+.lr-ghead-in small { font-size: 12px; letter-spacing: 0; color: #6b7280; }
+.lr-ghead-in .lr-link { margin-left: auto; }
+.lr-input.lr-gname { width: 170px; font-weight: 600; font-size: 13px; letter-spacing: 0; color: #f3f4f6; }
+.lr.sym.desktop.edit .lr-cols { grid-template-columns: 22px minmax(0,1fr) 160px repeat(var(--lr-periods, 2), 56px) 140px; }
+.lr-gselect { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 4px 0 9px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; min-width: 0; max-width: 100%; }
+.lr-gselect:hover { border-color: rgba(255,255,255,.2); }
+.lr-gselect select { flex: 1; min-width: 0; appearance: none; -webkit-appearance: none; background: none; border: 0; outline: none; color: #d1d5db; font: inherit; font-size: 12px; cursor: pointer; padding-right: 14px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right center; background-size: 11px; }
+.lr-gselect select option { background: #17191c; color: #e5e7eb; }
+.lr-gselect em { font-style: normal; color: #c4b5fd; font-size: 12px; padding-right: 4px; cursor: help; }
+.lr.mobile .lr-groupby { display: flex; height: 36px; margin: 0 2px 10px; }
+.lr.mobile .lr-groupby button { flex: 1; padding: 0; font-family: inherit; }
+.lr.mobile .lr-ghead { padding: 18px 10px 4px; }
+.lr.mobile .lr-gselect { height: 38px; flex: 1; }
+.lr.mobile .lr-gselect select { font-size: 15px; }

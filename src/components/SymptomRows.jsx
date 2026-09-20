@@ -5,6 +5,7 @@ import { NA_SEVERITY } from '../utils/constants';
 import { getDateKey, haptic } from '../utils/helpers';
 import { isTyping, DraftInput, useReorderDrag, ChangeLog } from './listParts';
 import { isApplicable, getStripDateKeys, getSeverityStrip, getLastSeverity, stepIndex, nextIndexBelow, reorder, makeId } from '../utils/listHelpers';
+import { suggestGroup, groupNames, groupSymptoms, availableGroups, nextGroupOrder, groupColor } from '../utils/symptomGroups';
 import {
   createSymptomHistoryEntry,
   applySymptomPatch,
@@ -16,6 +17,15 @@ const SEVERITIES = [0, 1, 2, 3, 4, 5];
 const SEV_BG = ['rgba(255,255,255,.05)', 'rgba(132,204,22,.22)', 'rgba(202,210,40,.30)', 'rgba(234,179,8,.38)', 'rgba(249,115,22,.45)', 'rgba(239,68,68,.55)'];
 const SEV_FG = ['#6b7280', '#d9f99d', '#fef08a', '#fef9c3', '#ffedd5', '#fee2e2'];
 const STRIP_COLOR = ['rgba(255,255,255,.14)', '#3f6212', '#a3a635', '#eab308', '#f97316', '#ef4444'];
+
+// Per-device view preferences (how the list is grouped, which groups are folded)
+const GROUP_BY_KEY = 'symptomGroupBy';
+const COLLAPSED_KEY = 'symptomGroupsCollapsed';
+const readPref = (key, fallback) => {
+  try { const raw = localStorage.getItem(key); return raw === null ? fallback : JSON.parse(raw); } catch { return fallback; }
+};
+const writePref = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode */ } };
+const NEW_GROUP = '__new__';
 
 export default function SymptomRows({
   symptoms,
@@ -51,6 +61,32 @@ export default function SymptomRows({
   const [showHidden, setShowHidden] = useState(true);
   const [adding, setAdding] = useState(false);
 
+  // Grouping: 'order' = the flat list, 'groups' = sections the person defined
+  const [groupBy, setGroupByState] = useState(() => (readPref(GROUP_BY_KEY, 'order') === 'groups' ? 'groups' : 'order'));
+  const setGroupBy = (value) => { setGroupByState(value); writePref(GROUP_BY_KEY, value); };
+  const [collapsed, setCollapsed] = useState(() => new Set(readPref(COLLAPSED_KEY, [])));
+  const toggleCollapsed = (name) => setCollapsed((prev) => {
+    const next = new Set(prev);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    writePref(COLLAPSED_KEY, [...next]);
+    return next;
+  });
+  const [draftGroups, setDraftGroups] = useState([]); // named in Edit but still empty, so not on any symptom yet
+  const [namingFor, setNamingFor] = useState(null); // symptom id whose Group menu chose "New group…"
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [suggestedIds, setSuggestedIds] = useState(() => new Set()); // grouped by suggestion this session
+  const grouped = groupBy === 'groups';
+
+  // What is on screen, in on-screen order. Rating, arrows and hover all walk this list.
+  const sections = useMemo(
+    () => (grouped ? groupSymptoms(activeSymptoms) : [{ name: undefined, rows: activeSymptoms }]),
+    [grouped, activeSymptoms]
+  );
+  const rows = useMemo(
+    () => sections.flatMap((sec) => (grouped && collapsed.has(sec.name ?? '')) ? [] : sec.rows),
+    [sections, grouped, collapsed]
+  );
+
   // Keep the focused period valid when tracking mode changes
   useEffect(() => {
     if (!timePeriods.some((p) => p.id === focus.period)) setFocus((f) => ({ ...f, period: defaultPeriod() }));
@@ -58,10 +94,10 @@ export default function SymptomRows({
 
   // Desktop starts with the first row focused so the keyboard works immediately
   useEffect(() => {
-    if (isDesktop && focus.id === null && activeSymptoms.length > 0) {
-      setFocus((f) => ({ ...f, id: activeSymptoms[0].id }));
+    if (isDesktop && focus.id === null && rows.length > 0) {
+      setFocus((f) => ({ ...f, id: rows[0].id }));
     }
-  }, [isDesktop, activeSymptoms, focus.id]);
+  }, [isDesktop, rows, focus.id]);
 
 
   const stripKeys = useMemo(() => getStripDateKeys(selectedDate, 14), [dateKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -81,10 +117,10 @@ export default function SymptomRows({
   const hasEntriesToday = counts.some((c) => c.done > 0);
 
   const advance = useCallback((fromId, periodId, dir = 1) => {
-    const from = activeSymptoms.findIndex((s) => s.id === fromId);
-    const idx = stepIndex(activeSymptoms, from, dir, (s) => isApplicable(s, periodId));
-    if (idx >= 0) setFocus({ id: activeSymptoms[idx].id, period: periodId });
-  }, [activeSymptoms]);
+    const from = rows.findIndex((s) => s.id === fromId);
+    const idx = stepIndex(rows, from, dir, (s) => isApplicable(s, periodId));
+    if (idx >= 0) setFocus({ id: rows[idx].id, period: periodId });
+  }, [rows]);
 
   const rate = (symptom, periodId, severity, { stay = false } = {}) => {
     // Mobile: remember where the rating keys sit on screen so the next row's keys can be scrolled to the same spot
@@ -96,9 +132,9 @@ export default function SymptomRows({
     const wasBlank = !entryFor(symptom, periodId);
     quickLog(symptom.id, severity, periodId);
     if (stay || !wasBlank) return;
-    const from = activeSymptoms.findIndex((s) => s.id === symptom.id);
-    const idx = nextIndexBelow(activeSymptoms, from, (s) => isApplicable(s, periodId) && !entryFor(s, periodId));
-    if (idx >= 0) setFocus({ id: activeSymptoms[idx].id, period: periodId });
+    const from = rows.findIndex((s) => s.id === symptom.id);
+    const idx = nextIndexBelow(rows, from, (s) => isApplicable(s, periodId) && !entryFor(s, periodId));
+    if (idx >= 0) setFocus({ id: rows[idx].id, period: periodId });
   };
 
   // After a mobile rating advances to the next row, scroll so its keys land under the thumb
@@ -131,7 +167,7 @@ export default function SymptomRows({
     if (!isDesktop || editing || !keyboardEnabled) return;
     const onKey = (e) => {
       if (isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
-      const symptom = activeSymptoms.find((s) => s.id === focus.id);
+      const symptom = rows.find((s) => s.id === focus.id);
       if (e.key === 'e' || e.key === 'E') { setEditing(true); e.preventDefault(); return; }
       if (!symptom) return;
       if (/^[0-5]$/.test(e.key)) {
@@ -182,6 +218,78 @@ export default function SymptomRows({
     patchSymptom(symptom.id, { applicablePeriods: next.length === all.length ? null : next });
   };
 
+  // ---- Groups ----
+  // A group lives on its symptoms (`group` + `groupOrder`), so every change here is a patch to symptoms
+  const groupOrderOf = (name) => {
+    const member = symptoms.find((s) => s.group === name && typeof s.groupOrder === 'number');
+    return member ? member.groupOrder : nextGroupOrder(symptoms);
+  };
+  const setGroup = (ids, name, { suggested = false } = {}) => {
+    const idSet = new Set(ids);
+    const patch = name ? { group: name, groupOrder: groupOrderOf(name) } : { group: null };
+    setSymptoms((prev) => prev.map((s) => (idSet.has(s.id) ? applySymptomPatch(s, patch) : s)));
+    if (name) setDraftGroups((prev) => prev.filter((g) => g !== name));
+    setSuggestedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (suggested ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  };
+  const groupExists = (name) => [...groupNames(symptoms), ...draftGroups].some((g) => g.toLowerCase() === name.toLowerCase());
+  const renameGroup = (from, raw) => {
+    const to = raw.trim();
+    if (!to || to === from) return;
+    if (groupExists(to) && to.toLowerCase() !== from.toLowerCase()) { setLastAction(`A group called ${to} already exists`); return; }
+    if (draftGroups.includes(from)) { setDraftGroups((prev) => prev.map((g) => (g === from ? to : g))); return; }
+    setSymptoms((prev) => prev.map((s) => (s.group === from ? applySymptomPatch(s, { group: to }) : s)));
+    setLastAction(`Renamed ${from} to ${to}`);
+  };
+  const deleteGroup = (name) => {
+    setDraftGroups((prev) => prev.filter((g) => g !== name));
+    const members = symptoms.filter((s) => s.group === name).map((s) => s.id);
+    if (members.length > 0) { setGroup(members, null); setLastAction(`${name} removed. Its symptoms are ungrouped, nothing was deleted`); }
+  };
+  const addGroup = (raw) => {
+    setAddingGroup(false);
+    const name = raw.trim();
+    if (!name) return;
+    if (groupExists(name)) { setLastAction(`A group called ${name} already exists`); return; }
+    setDraftGroups((prev) => [...prev, name]);
+  };
+  const commitGroupReorder = (fromName, toName) => {
+    const names = reorder(groupNames(symptoms), fromName, toName);
+    setSymptoms((prev) => prev.map((s) => {
+      const i = names.indexOf(s.group);
+      return i === -1 || s.groupOrder === i ? s : applySymptomPatch(s, { groupOrder: i });
+    }));
+    haptic('medium');
+  };
+  // Word-list suggestions for everything still ungrouped; only ever picks from groups on offer
+  const ungroupedSuggestions = () => {
+    const offer = availableGroups(symptoms, draftGroups);
+    return symptoms.filter((s) => s.active && !s.group)
+      .map((s) => [s.id, suggestGroup(s.name, s.description, offer)])
+      .filter(([, g]) => g);
+  };
+  const applySuggestions = () => {
+    const found = ungroupedSuggestions();
+    const byGroup = new Map();
+    found.forEach(([id, g]) => byGroup.set(g, [...(byGroup.get(g) || []), id]));
+    // One pass so each new group gets its own order slot
+    let order = nextGroupOrder(symptoms);
+    const orderFor = new Map();
+    [...byGroup.keys()].forEach((g) => {
+      const member = symptoms.find((s) => s.group === g && typeof s.groupOrder === 'number');
+      orderFor.set(g, member ? member.groupOrder : order++);
+    });
+    const target = new Map(found);
+    setSymptoms((prev) => prev.map((s) => (target.has(s.id)
+      ? applySymptomPatch(s, { group: target.get(s.id), groupOrder: orderFor.get(target.get(s.id)) }) : s)));
+    setSuggestedIds((prev) => new Set([...prev, ...target.keys()]));
+    setGroupBy('groups');
+    setLastAction(`Grouped ${found.length} symptom${found.length === 1 ? '' : 's'}. Change any of them from its Group menu`);
+  };
+
   // Nothing is written until a name is committed, so an abandoned row leaves no trace
   const addSymptom = (raw) => {
     setAdding(false);
@@ -195,9 +303,17 @@ export default function SymptomRows({
     }
     const maxOrder = Math.max(-1, ...orderedActive.map((s) => s.order || 0));
     const symptom = { id: makeId(name), name, active: true, order: maxOrder + 1 };
+    // Once groups are in use, a new symptom is filed by its name. It is only a suggestion (marked ✦).
+    const suggestion = groupNames(symptoms).length > 0 ? suggestGroup(name, '', availableGroups(symptoms, draftGroups)) : null;
+    if (suggestion) {
+      symptom.group = suggestion;
+      symptom.groupOrder = groupOrderOf(suggestion);
+      setDraftGroups((prev) => prev.filter((g) => g !== suggestion));
+      setSuggestedIds((prev) => new Set([...prev, symptom.id]));
+    }
     symptom.history = [createSymptomHistoryEntry(symptom)];
     setSymptoms((prev) => [...prev, symptom]);
-    setLastAction('Symptom added');
+    setLastAction(suggestion ? `Symptom added to ${suggestion} (suggested)` : 'Symptom added');
   };
 
   const revertTo = (symptom, historyIndex) => {
@@ -207,16 +323,47 @@ export default function SymptomRows({
     setLastAction(`Reverted ${symptom.name}`);
   };
 
-  const commitReorder = (fromId, toId) => {
-    const ids = reorder(orderedActive.map((s) => s.id), fromId, toId);
-    setSymptoms((prev) => prev.map((s) => {
-      const i = ids.indexOf(s.id);
-      return i === -1 || s.order === i ? s : { ...s, order: i };
-    }));
+  const commitReorder = (fromId, toId, dragGroup) => {
+    if (dragGroup === 'groups') { commitGroupReorder(fromId, toId); return; }
+    // Dropped on a group header: join that group (at its end). Dropped on a symptom: join its group, next to it.
+    const header = toId.startsWith('group:') ? toId.slice(6) : null;
+    const target = header === null ? symptoms.find((s) => s.id === toId) : null;
+    if (grouped) {
+      const name = header !== null ? (header || null) : (target?.group || null);
+      if ((symptoms.find((s) => s.id === fromId)?.group || null) !== name) setGroup([fromId], name);
+    }
+    if (target) {
+      const ids = reorder(orderedActive.map((s) => s.id), fromId, toId);
+      setSymptoms((prev) => prev.map((s) => {
+        const i = ids.indexOf(s.id);
+        return i === -1 || s.order === i ? s : { ...s, order: i };
+      }));
+    }
     haptic('medium');
   };
 
   const { gripProps, rowClass: dragClass } = useReorderDrag(commitReorder);
+
+  // Group menu on every edit row: groups in use, unused defaults, New group…, Ungrouped
+  const renderGroupSelect = (symptom) => (namingFor === symptom.id ? (
+    <DraftInput className="lr-input boxed lr-gname" value="" placeholder="Group name" autoFocus
+      onCommit={(v) => { setNamingFor(null); const name = v.trim(); if (name) setGroup([symptom.id], groupNames(symptoms).find((g) => g.toLowerCase() === name.toLowerCase()) || name); }}
+      onAbandon={() => setNamingFor(null)} />
+  ) : (
+    <span className="lr-gselect" style={{ '--c': groupColor(symptom.group) }}>
+      <i />
+      <select
+        value={symptom.group || ''}
+        aria-label={`Group for ${symptom.name}`}
+        onChange={(e) => (e.target.value === NEW_GROUP ? setNamingFor(symptom.id) : setGroup([symptom.id], e.target.value || null))}
+      >
+        {availableGroups(symptoms, draftGroups).map((g) => <option key={g} value={g}>{g}</option>)}
+        <option value="">Ungrouped</option>
+        <option value={NEW_GROUP}>New group…</option>
+      </select>
+      {suggestedIds.has(symptom.id) && <em title="Suggested from the name. Change it here if it is wrong.">✦</em>}
+    </span>
+  ));
 
   const periodSummary = (symptom) => {
     if (timePeriods.length === 1) return '';
@@ -263,6 +410,7 @@ export default function SymptomRows({
         {isDesktop ? (
           <>
             {fields}
+            {hidden ? <span /> : renderGroupSelect(symptom)}
             {toggles}
             <div className="lr-rowacts">
               <button className="lr-link" onClick={toggleExpand}>{expanded ? 'Close' : 'History'}</button>
@@ -279,6 +427,7 @@ export default function SymptomRows({
         {expanded && (
           <div className="lr-panel">
             {!isDesktop && fields}
+            {!isDesktop && !hidden && <div className="lr-prow"><span>Group</span>{renderGroupSelect(symptom)}</div>}
             {!isDesktop && timePeriods.length > 1 && <div className="lr-prow"><span>Tracked in</span>{toggles}</div>}
             {renderLog(symptom)}
             {!isDesktop && <div className="lr-prow">{actions}</div>}
@@ -293,7 +442,14 @@ export default function SymptomRows({
   const rootStyle = { '--lr-periods': timePeriods.length };
 
   // Scope + actions live in the nav's context bar (desktop) or the second row of the mobile top bar
-  const toggleEdit = () => { setEditing(!editing); setExpandedId(null); };
+  const toggleEdit = () => { setEditing(!editing); setExpandedId(null); setNamingFor(null); setAddingGroup(false); };
+  const suggestCount = editing ? ungroupedSuggestions().length : 0;
+  const groupByControl = (
+    <div className="dn-seg lr-groupby" role="group" aria-label="Group symptoms by">
+      <button className={grouped ? '' : 'on'} onClick={() => setGroupBy('order')}>My order</button>
+      <button className={grouped ? 'on' : ''} onClick={() => setGroupBy('groups')}>My groups</button>
+    </div>
+  );
   const bar = barSlot ? createPortal(
     <>
       {editing ? <span className="dn-progress"><b>{orderedActive.length}</b> active</span> : counts.map((c) => (
@@ -302,7 +458,9 @@ export default function SymptomRows({
           <i style={{ '--p': `${c.total ? (c.done / c.total) * 100 : 0}%` }} />
         </span>
       ))}
+      {isDesktop && groupByControl}
       <span className="lr-spacer" />
+      {editing && suggestCount > 0 && <button className="dn-btn" onClick={applySuggestions} title="Files ungrouped symptoms into Gut, Mood, Nerve & pain or Skin by their names. You can change any of them.">Suggest groups · {suggestCount}</button>}
       {isDesktop && !editing && hasEntriesToday && <button className="dn-btn ghost" onClick={onClearDay}>Clear day</button>}
       {isDesktop && !editing && <button className="dn-btn" onClick={onEditNote}>Day notes</button>}
       {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={toggleEdit}>{editing ? 'Done' : 'Edit symptoms'}</button>}
@@ -316,12 +474,49 @@ export default function SymptomRows({
         {bar}
         {isDesktop && (
           <div className="lr-head lr-cols">
-            <div /><div>NAME AND DESCRIPTION</div>
+            <div /><div>NAME AND DESCRIPTION</div><div>GROUP</div>
             {timePeriods.length > 1 ? <div className="c" style={{ gridColumn: `span ${timePeriods.length}` }}>TRACKED IN</div> : <div />}
             <div />
           </div>
         )}
-        {orderedActive.map((s) => renderEditRow(s, false))}
+        {!isDesktop && groupByControl}
+        {grouped ? groupSymptoms(orderedActive, draftGroups).map((sec) => {
+          const key = sec.name ?? '';
+          const draft = sec.name !== null && sec.rows.length === 0;
+          return (
+            <div key={`g-${key}`}>
+              <div
+                className={`lr-ghead edit ${sec.name !== null && !draft ? dragClass(sec.name) : ''}`}
+                style={{ '--c': groupColor(sec.name) }}
+                data-reorder-id={`group:${key}`} data-reorder-group="default"
+              >
+                {/* a second, inner target so group headers can also be reordered among themselves */}
+                <span className="lr-ghead-in" data-reorder-id={sec.name !== null && !draft ? sec.name : undefined} data-reorder-group={sec.name !== null && !draft ? 'groups' : undefined}>
+                  {sec.name !== null && !draft ? <span className="lr-grip" {...gripProps(sec.name, 'groups')}>⠿</span> : <span className="lr-grip" style={{ visibility: 'hidden' }}>⠿</span>}
+                  <i />
+                  {sec.name === null
+                    ? <b>Ungrouped</b>
+                    : <DraftInput className="lr-input lr-gname" value={sec.name} placeholder="Group name" onCommit={(v) => renameGroup(sec.name, v)} />}
+                  <small>{draft ? 'Empty. Drag a symptom here, or pick it from a symptom\'s Group menu' : `${sec.rows.length} symptom${sec.rows.length === 1 ? '' : 's'}`}</small>
+                  {sec.name !== null && <button className="lr-link" onClick={() => deleteGroup(sec.name)}>{draft ? 'Remove' : 'Delete group'}</button>}
+                </span>
+              </div>
+              {sec.rows.map((s) => renderEditRow(s, false))}
+            </div>
+          );
+        }) : orderedActive.map((s) => renderEditRow(s, false))}
+        {grouped && (addingGroup ? (
+          <div className="lr-row lr-cols lr-add">
+            <span className="lr-grip" style={{ cursor: 'default' }}>+</span>
+            <div className="lr-fields">
+              <DraftInput className="lr-input name" value="" placeholder="New group name" autoFocus onCommit={addGroup} onAbandon={() => setAddingGroup(false)} />
+            </div>
+          </div>
+        ) : (
+          <div className="lr-row lr-cols lr-add" onClick={() => setAddingGroup(true)}>
+            <span className="lr-grip" style={{ cursor: 'pointer' }}>+</span><div>Add group</div>
+          </div>
+        ))}
         {adding ? (
           <div className="lr-row lr-cols lr-add">
             <span className="lr-grip" style={{ cursor: 'default' }}>+</span>
@@ -353,12 +548,27 @@ export default function SymptomRows({
         <div className="lr-empty">{symptomSearch ? `No symptoms match "${symptomSearch}"` : 'No symptoms yet. Use Edit symptoms to add one.'}</div>
       ) : (
         <>
+          {!isDesktop && groupByControl}
           <div className="lr-head lr-cols">
             <div />
             {isDesktop && <div className="strip-h">LAST 14 DAYS</div>}
             {timePeriods.map((p) => <div className="c" key={p.id}>{timePeriods.length > 1 ? p.label : 'TODAY'}</div>)}
           </div>
-          {activeSymptoms.map((symptom) => {
+          {grouped && groupNames(activeSymptoms).length === 0 && (
+            <div className="lr-gnote">No groups yet. Open Edit symptoms and use Suggest groups, or pick a group for each symptom.</div>
+          )}
+          {sections.map((sec) => {
+            const key = sec.name ?? '';
+            const folded = grouped && collapsed.has(key);
+            const slots = sec.rows.filter((s) => isApplicable(s, focus.period));
+            const header = grouped && (
+              <div key={`h-${key}`} className={`lr-ghead ${folded ? 'folded' : ''}`} style={{ '--c': groupColor(sec.name) }} onClick={() => toggleCollapsed(key)}>
+                <i /><b>{sec.name ?? 'Ungrouped'}</b>
+                <span>{slots.filter((s) => entryFor(s, focus.period)).length}/{slots.length} logged</span>
+                <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg>
+              </div>
+            );
+            return [header, ...(folded ? [] : sec.rows.map((symptom) => {
             const open = focus.id === symptom.id;
             const done = timePeriods.every((p) => !isApplicable(symptom, p.id) || entryFor(symptom, p.id));
             const currentPeriod = timePeriods.find((p) => p.id === focus.period);
@@ -444,6 +654,7 @@ export default function SymptomRows({
                 )}
               </div>
             );
+            }))];
           })}
           {isDesktop && (
             <div className="lr-hintbar">
