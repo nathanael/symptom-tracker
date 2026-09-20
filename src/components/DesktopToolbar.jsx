@@ -7,7 +7,7 @@ import { useHealthScore } from '../hooks/useHealthScore';
 const TABS = [
   { id: 'symptoms', label: 'Symptoms' },
   { id: 'stack', label: 'Protocol' },
-  { id: 'insights', label: 'Insights' },
+  { id: 'insights', label: 'Progress' },
 ];
 
 const Chevron = ({ points }) => <svg viewBox="0 0 24 24"><polyline points={points} /></svg>;

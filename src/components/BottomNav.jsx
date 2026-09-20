@@ -4,7 +4,7 @@ import QuickActionsMenu from './QuickActionsMenu';
 const TABS = [
   { id: 'symptoms', label: 'Symptoms', icon: <path d="M3 12h4l3-8 4 16 3-8h4" /> },
   { id: 'stack', label: 'Protocol', icon: <path d="m12 2 9 5-9 5-9-5zM3 12l9 5 9-5M3 17l9 5 9-5" /> },
-  { id: 'insights', label: 'Insights', icon: <path d="M6 20v-6M12 20V4M18 20v-9" /> },
+  { id: 'insights', label: 'Progress', icon: <path d="M6 20v-6M12 20V4M18 20v-9" /> },
 ];
 
 // Mobile dock: three real destinations in a pill, plus one overflow button beside it
