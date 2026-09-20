@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import './listUi.css';
 import { NA_SEVERITY } from '../utils/constants';
 import { getDateKey, haptic } from '../utils/helpers';
-import { isTyping, DraftInput, useReorderDrag, ChangeLog, BarMenu } from './listParts';
+import { isTyping, DraftInput, useReorderDrag, ChangeLog } from './listParts';
 import { isApplicable, getStripDateKeys, getSeverityStrip, getLastSeverity, stepIndex, reorder, makeId } from '../utils/listHelpers';
 import {
   createSymptomHistoryEntry,
@@ -278,9 +278,9 @@ export default function SymptomRows({
         </span>
       ))}
       <span className="lr-spacer" />
+      {isDesktop && !editing && hasEntriesToday && <button className="dn-btn ghost" onClick={onClearDay}>Clear day</button>}
       {isDesktop && !editing && <button className="dn-btn" onClick={onEditNote}>Day notes</button>}
       {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={toggleEdit}>{editing ? 'Done' : 'Edit symptoms'}</button>}
-      {isDesktop && !editing && <BarMenu label="⋯" ariaLabel="More actions" items={[hasEntriesToday && { label: 'Clear day', danger: true, onClick: onClearDay }]} />}
     </>,
     barSlot
   ) : null;

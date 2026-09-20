@@ -412,7 +412,7 @@ export default function Settings({
         <Row stack title="Tracking mode" desc="Log each symptom once a day, or separately for AM and PM.">
           <Seg options={Object.entries(trackingModes).map(([key, mode]) => [key, mode.label])} value={trackingMode} onChange={setTrackingMode} />
         </Row>
-        <Row stack title="Copy range" desc="Days included by the Copy button.">
+        <Row stack title="Days of data to copy" desc={isDesktop ? 'How many days of data the Copy button in the top bar puts on your clipboard.' : 'How many days of data “Copy for AI” in the ⋯ menu puts on your clipboard.'}>
           <Seg options={[1, 7, 14, 30, 60].map((d) => [d, String(d)])} value={copyDays} onChange={setCopyDays} />
         </Row>
       </div>
@@ -591,7 +591,7 @@ export default function Settings({
 
   const about = (
     <div className="st-about">
-      v6.2.1 · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
+      v6.2.2 · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
       <button onClick={checkForUpdates} disabled={checkingForUpdates}>{checkingForUpdates ? 'Checking…' : 'Check for updates'}</button>
     </div>
   );
@@ -601,7 +601,7 @@ export default function Settings({
       <h3>Data</h3><p>Everything that gets data out, brings it back, or removes it.</p>
       <div className="st-sub">Export</div>
       <div className="st-group">
-        <Row stack title="Copy for AI chat" desc="Longer ranges than the Copy button, formatted for pasting into an AI chat.">
+        <Row stack title="Copy for AI chat" desc="Copies a longer range of data right now, formatted for pasting into an AI chat.">
           {[30, 60, 90].map(days => <button key={days} className="dn-btn" onClick={() => copyForAI(days)}>{days}d</button>)}
         </Row>
         <Row title="Custom export" desc="Pick date range, sections and format.">

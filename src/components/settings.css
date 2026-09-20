@@ -1,5 +1,5 @@
 /* Settings page — shares tokens and controls (dn-btn, dn-seg) with desktopNav.css */
-.st { position: fixed; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; background: #08090a; color: #f3f4f6; font-size: 13px; }
+.st { position: fixed; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; background: #08090a; color: #f3f4f6; font-size: 13px; line-height: 1.45; }
 .st.desktop { top: 54px; z-index: 195; } /* sits under the global top bar, over the context bar */
 .st.mobile { top: 0; z-index: 250; padding-top: env(safe-area-inset-top); }
 .st button { font-family: inherit; cursor: pointer; }
@@ -26,25 +26,25 @@
 .st-rail .st-about { margin-top: 18px; padding: 12px 10px 0; border-top: 1px solid rgba(255,255,255,.07); }
 .st-about button { padding: 0; border: 0; background: none; color: #9ca3af; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
 
-.st-section { margin-bottom: 36px; scroll-margin-top: 24px; }
+.st-section { margin-bottom: 40px; scroll-margin-top: 24px; }
 /* The last section can always scroll to the top, so every rail click lands on its section */
 .st.desktop .st-section:last-child { min-height: calc(100vh - 54px - 52px - 48px); margin-bottom: 0; }
-.st-section > h3 { margin: 0 0 2px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
-.st-section > p { margin: 0 0 12px; color: #6b7280; }
-.st-sub { margin: 18px 2px 8px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: #6b7280; }
+.st-section > h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; line-height: 1.3; }
+.st-section > p { margin: 0 0 16px; color: #6b7280; line-height: 1.5; }
+.st-sub { margin: 24px 2px 10px; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: #6b7280; }
 .st-sub.danger { color: #f87171; }
 .st-group, .st-details { border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: #0e0f11; overflow: hidden; }
 .st-group + .st-group, .st-group + .st-details, .st-details + .st-group, .st-details + .st-details { margin-top: 12px; }
 .st-group.danger, .st-details.danger { border-color: rgba(248,113,113,.2); }
 
-.st-row { display: flex; align-items: center; gap: 16px; padding: 13px 16px; min-height: 58px; }
+.st-row { display: flex; align-items: center; gap: 20px; padding: 15px 16px; min-height: 64px; }
 .st-row + .st-row, .st-block + .st-row, .st-row + .st-block { border-top: 1px solid rgba(255,255,255,.07); }
 .st-row.link { width: 100%; border-left: 0; border-right: 0; border-bottom: 0; background: none; color: inherit; font-size: inherit; text-align: left; }
 .st-row.link:first-child { border-top: 0; }
 .st-row.link:hover { background: rgba(255,255,255,.03); }
 .st-txt { flex: 1; min-width: 0; }
-.st-txt b { display: block; font-size: 13.5px; font-weight: 500; }
-.st-txt small { display: block; margin-top: 1px; color: #6b7280; font-size: 12.5px; }
+.st-txt b { display: block; font-size: 13.5px; font-weight: 500; line-height: 1.35; }
+.st-txt small { display: block; margin-top: 4px; color: #6b7280; font-size: 12.5px; line-height: 1.45; }
 .st-txt small.warn { color: #fbbf24; }
 .st-row.danger .st-txt b { color: #f87171; }
 .st-ctl { display: flex; align-items: center; gap: 8px; flex: none; }
@@ -62,7 +62,7 @@
 .st .dn-btn.danger.solid { background: #ef4444; border-color: transparent; color: #fff; }
 .st .dn-btn:disabled { opacity: .5; cursor: default; }
 
-.st-details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 13px 16px; font-size: 13.5px; font-weight: 500; color: #9ca3af; }
+.st-details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 15px 16px; font-size: 13.5px; font-weight: 500; color: #9ca3af; }
 .st-details > summary::-webkit-details-marker { display: none; }
 .st-details > summary:hover { color: #f3f4f6; }
 .st-details > summary small { color: #6b7280; font-weight: 400; font-size: 12.5px; }
@@ -86,15 +86,15 @@
 .st.mobile .st-back { width: 40px; height: 40px; margin-left: 0; }
 .st.mobile .st-grid { display: block; padding: 4px 12px calc(40px + env(safe-area-inset-bottom)); }
 .st.mobile .st-section { margin-bottom: 0; }
-.st.mobile .st-section > h3 { margin: 16px 6px 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+.st.mobile .st-section > h3 { margin: 20px 6px 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
 .st.mobile .st-section > p { display: none; }
-.st.mobile .st-sub { margin: 16px 6px 6px; font-size: 10.5px; }
+.st.mobile .st-sub { margin: 20px 6px 8px; font-size: 10.5px; }
 .st.mobile .st-group { border-radius: 14px; }
-.st.mobile .st-row { padding: 11px 12px; min-height: 52px; gap: 10px; }
-.st.mobile .st-row.stack { flex-direction: column; align-items: stretch; gap: 8px; }
+.st.mobile .st-row { padding: 13px 14px; min-height: 56px; gap: 12px; }
+.st.mobile .st-row.stack { flex-direction: column; align-items: stretch; gap: 12px; }
 .st.mobile .st-row.stack .st-ctl { flex-wrap: wrap; }
-.st.mobile .st-row.stack .dn-seg { display: flex; flex: 1; }
-.st.mobile .st-row.stack .dn-seg button { flex: 1; padding: 7px 0; font-size: 13px; }
+.st.mobile .st-row.stack .dn-seg { display: flex; flex: 1; height: 38px; border-radius: 10px; }
+.st.mobile .st-row.stack .dn-seg button { flex: 1; padding: 0; font-size: 13px; }
 .st.mobile .st-row.stack .st-ctl > .dn-btn { flex: 1; justify-content: center; height: 38px; }
 .st.mobile .st-txt b { font-size: 14.5px; }
 .st.mobile .st-input { height: 42px; font-size: 16px; }

@@ -9,7 +9,8 @@
 .re-close { width: 40px; height: 40px; border: 0; border-radius: 11px; background: none; color: #9ca3af; display: grid; place-items: center; }
 .re-close:active { background: rgba(255,255,255,.06); }
 .re-bar .dn-seg { margin-left: auto; }
-.re-bar .dn-seg button { padding: 5px 14px; font-size: 12.5px; }
+.re-bar .dn-seg { height: 32px; }
+.re-bar .dn-seg button { padding: 0 16px; font-size: 13px; }
 
 .re-progress { flex: none; padding: 14px 16px 0; }
 .re-count { display: flex; justify-content: space-between; color: #9ca3af; font-size: 12px; margin-bottom: 8px; }

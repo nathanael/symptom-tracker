@@ -16,7 +16,8 @@
 .mn-top .dn-btn { height: 30px; font-size: 12.5px; flex: none; }
 .mn-top .dn-btn.ghost { padding: 0 6px; }
 .mn-top .dn-progress i { width: 44px; }
-.mn-top .dn-seg button { padding: 5px 11px; font-size: 12.5px; }
+.mn-top .dn-seg { height: 36px; border-radius: 11px; }
+.mn-top .dn-seg button { padding: 0 14px; font-size: 13px; }
 
 /* Dock: floating tab pill + one separate overflow button */
 .mn-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 200; pointer-events: none; padding: 28px 14px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, #08090a 62%, transparent); }
