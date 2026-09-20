@@ -668,10 +668,10 @@ function App() {
         bottom: 0,
       }}
     >
-    {/* Desktop max-width wrapper */}
+    {/* Desktop is full-bleed so the nav rows run edge to edge; their contents and the page centre themselves */}
     <div
       style={{
-        maxWidth: isDesktop ? '1400px' : '500px',
+        maxWidth: isDesktop ? 'none' : '500px',
         width: '100%',
         margin: '0 auto',
         height: '100%',
