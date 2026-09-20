@@ -79,7 +79,7 @@ export default function DesktopToolbar({
       <div className="dn-top">
         <div className="dn-wrap">
           <div className="dn-brand">
-            <span className="dn-logo"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4" /></svg></span>
+            <span className="dn-logo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><circle className="pupil" cx="15.5" cy="11" r="3" /></svg></span>
             Glimpse
           </div>
 

@@ -10,7 +10,8 @@
 .dn-logo { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, #a78bfa, #6d28d9); display: grid; place-items: center; flex: none; }
 .dn-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .dn-top svg, .dn-context svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-.dn-logo svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 2.6; }
+.dn-logo svg { width: 15px; height: 15px; stroke: #fff; stroke-width: 2.8; }
+.dn-logo svg .pupil { fill: #fff; stroke: none; }
 
 /* Segmented control */
 /* One box, hairline dividers; the active segment is a highlighted section of it, not a button inside it */
