@@ -212,7 +212,8 @@
 .lr-ghead svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
 .lr-ghead.folded svg { transform: rotate(-90deg); }
 .lr-ghead:hover b { color: #f3f4f6; }
-.lr-gnote { padding: 4px 14px 10px; font-size: 12px; color: #6b7280; }
+.lr-ghead .lr-gbadge { font-style: normal; margin-left: 2px; padding: 1px 7px; border-radius: 6px; font-size: 11px; letter-spacing: 0; color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); background: color-mix(in srgb, var(--c) 12%, transparent); }
+.lr-gnote {padding: 4px 14px 10px; font-size: 12px; color: #6b7280; }
 .lr-ghead.edit { cursor: default; padding: 16px 14px 4px; border-top: 1px solid transparent; }
 .lr-ghead.edit.over, .lr-ghead.edit:has(.over) { border-top-color: #818cf8; }
 .lr-ghead.edit.dragging { opacity: .35; }
