@@ -2,7 +2,7 @@ import { NA_SEVERITY } from '../../utils/constants';
 import { getLastSeverity } from '../../utils/listHelpers';
 import { entryKey, listFor, otherIncomplete } from '../checkinQueue';
 
-export { GREETING, INSTRUCTIONS, LIVE_GUIDANCE, TOOLS } from '../../../supabase/functions/voice/dailyCheckinSpec.js';
+export { GREETING, INSTRUCTIONS, LIVE_GUIDANCE, TOOLS } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
 
 const normalize = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -32,10 +32,20 @@ export const matchSymptom = (symptoms, spoken) => {
   return scored[0].s;
 };
 
+// Small listening sounds for a bare number, so it feels heard without slowing things down.
+// Repeats on purpose: weighted toward the quietest ones.
+export const ACKS = ['Mm-hm.', 'Uh-huh.', 'Okay.', 'Got it.', 'Mm-hm.', 'Alright.', 'Okay.', 'Thanks.'];
+
+// How the voice should acknowledge what was just saved. It rides in the tool result because that
+// is the one thing a live model reads fresh every turn; session-level style guidance fades.
+const acknowledgement = (note, random) => (note
+  ? { reflect_note: note, how: "FIRST acknowledge this note out loud by reflecting it back in one short, natural sentence in your own words (for example: 'Got it, the coffee seemed to help a little.'). Never skip this. THEN ask the next symptom." }
+  : { say: ACKS[Math.floor(random() * ACKS.length)], how: 'Say this small acknowledgement, then ask the next symptom.' });
+
 // What to tell a live model after the user taps a rating on screen. Deliberately leaves out the
 // saved value: given it, the model has copied that number onto the next symptom.
 export const handEntryMessage = (result) => {
-  const { saved, ...rest } = result;
+  const { saved, acknowledge, ...rest } = result;
   return `The user entered ${saved?.name || 'that symptom'} on the screen themselves. It is already saved: do not call any tool for it. Carry on from this state by asking the next symptom and waiting for their answer: ${JSON.stringify(rest)}`;
 };
 
@@ -106,7 +116,8 @@ export const createCheckin = (ctx) => {
       const value = parseSeverity(severity);
       if (value === null) return { error: 'severity must be an integer 0 to 5, or -1 for not applicable. Ask the user again.' };
       write(symptom, value, note);
-      return { saved: { name: symptom.name, severity: value, ...(note?.trim() ? { note: note.trim() } : {}) }, ...describe() };
+      const text = note?.trim();
+      return { saved: { name: symptom.name, severity: value, ...(text ? { note: text } : {}) }, acknowledge: acknowledgement(text, ctx.random || Math.random), ...describe() };
     },
     skip_symptom: ({ symptom_id }) => {
       if (symptom_id) skipped.add(symptom_id);
@@ -121,11 +132,12 @@ export const createCheckin = (ctx) => {
       if (value === undefined || value === null) return { error: `${match.name} has no rating yet. Ask for a number from 0 to 5.` };
       write(match, value, note);
       skipped.delete(match.id);
+      const acknowledge = acknowledgement(note?.trim(), ctx.random || Math.random);
       // Stay on the symptom that was being asked, unless that is the one just revised
       const pendingId = currentId;
       const current = pendingId && pendingId !== match.id && ctx.symptoms.find((s) => s.id === pendingId);
-      if (current) return { saved: { name: match.name, severity: value }, next: { symptom_id: current.id, name: current.name }, note: 'Continue with the symptom you were asking about.' };
-      return { saved: { name: match.name, severity: value }, ...describe() };
+      if (current) return { saved: { name: match.name, severity: value }, acknowledge, next: { symptom_id: current.id, name: current.name }, note: 'Continue with the symptom you were asking about.' };
+      return { saved: { name: match.name, severity: value }, acknowledge, ...describe() };
     },
     switch_period: ({ period_id }) => {
       if (!ctx.timePeriods.some((p) => p.id === period_id)) return { error: 'Unknown period_id.' };

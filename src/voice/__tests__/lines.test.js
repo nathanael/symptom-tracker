@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseUtterance, lineFor, stateFor, LINES } from '../lines';
+import { parseUtterance, lineFor, linesFor, stateFor, LINES } from '../lines';
 
 const asking = { asking: { symptom_id: 'headache', name: 'Headache' } };
 const record = (severity, note) => ({ name: 'record_symptom', args: { symptom_id: 'headache', severity, ...(note ? { note } : {}) } });
@@ -52,7 +52,9 @@ describe('lineFor / stateFor', () => {
     const result = { saved: {}, next: { symptom_id: 'brain-fog', name: 'Brain fog', last_time: 2 }, remaining: 3 };
     expect(lineFor(result)).toBe('Brain fog. Last time was a two.');
     expect(lineFor({ next: { symptom_id: 'x', name: 'Nausea' }, remaining: 1 })).toBe('Nausea.');
-    expect(lineFor({ saved: { note: 'after coffee' }, next: { symptom_id: 'x', name: 'Nausea', last_time: 0 } })).toBe("Got it, I've noted that. Nausea. Last time was zero.");
+    expect(linesFor({ acknowledge: { reflect_note: 'after coffee' }, next: { symptom_id: 'x', name: 'Nausea', last_time: 0 } })).toEqual(["Got it, I've noted that.", 'Nausea. Last time was zero.']);
+    expect(linesFor({ acknowledge: { say: 'Mm-hm.' }, next: { symptom_id: 'x', name: 'Nausea' } })).toEqual(['Mm-hm.', 'Nausea.']);
+    expect(linesFor({ paused: true, acknowledge: { say: 'Okay.' } })).toEqual([LINES.paused]);
     expect(stateFor(result)).toEqual({ asking: { symptom_id: 'brain-fog', name: 'Brain fog' } });
   });
 

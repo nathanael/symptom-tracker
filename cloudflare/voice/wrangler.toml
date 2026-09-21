@@ -1,0 +1,18 @@
+name = "glimpse-voice"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "VOICE_USAGE"
+id = "a80c317ad22a46828b6465f6bff84375"
+
+[observability]
+enabled = true
+
+# Optional overrides (defaults live in src/index.js):
+# [vars]
+# TALK_GEMINI_VOICE = "Despina"
+# TALK_GEMINI_MODEL = "gemini-3.8-live"
+# TALK_GEMINI_TRIGGER_TOKENS = "4000"

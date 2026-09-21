@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createCheckin, parseSeverity, matchSymptom, handEntryMessage, TOOLS } from '../scripts/dailyCheckin';
+import { createCheckin, parseSeverity, matchSymptom, handEntryMessage, ACKS, TOOLS } from '../scripts/dailyCheckin';
 import { initialPeriod, nextUnlogged, otherIncomplete, unloggedIn } from '../checkinQueue';
 
 const periods = [{ id: 'morning', label: 'AM' }, { id: 'evening', label: 'PM' }];
@@ -82,9 +82,15 @@ describe('createCheckin', () => {
     expect(ctx.log).toHaveBeenCalledWith('headache', 2, 'morning', 'worse after coffee');
     // The note rides along so the voice can acknowledge it
     expect(result.saved).toEqual({ name: 'Headache', severity: 2, note: 'worse after coffee' });
+    expect(result.acknowledge.reflect_note).toBe('worse after coffee');
+    expect(result.acknowledge.how).toMatch(/FIRST acknowledge/);
     expect(result.next.symptom_id).toBe('brain-fog');
     expect(result.next.description).toBe('Trouble focusing');
     expect(result.remaining).toBe(2);
+    // A bare number gets one of the small listening sounds
+    const bare = checkin.handle('record_symptom', { symptom_id: 'brain-fog', severity: 1 });
+    expect(ACKS).toContain(bare.acknowledge.say);
+    expect(bare.acknowledge.reflect_note).toBeUndefined();
   });
 
   it('maps not-applicable to -1 and rejects out-of-range severities without advancing', () => {

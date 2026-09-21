@@ -1,6 +1,6 @@
-// Client for the talk mode backend (supabase/functions/voice). Every call carries the user's
+// Client for the talk mode backend (cloudflare/voice). Every call carries the user's
 // Firebase ID token; the function holds the provider keys.
-const BASE = 'https://sqfcqokeoprxcmdejsjb.supabase.co/functions/v1/voice';
+const BASE = 'https://glimpse-voice.glimpse-voice.workers.dev';
 
 export class VoiceApiError extends Error {
   constructor(status, message) {

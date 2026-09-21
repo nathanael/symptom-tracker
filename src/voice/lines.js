@@ -19,7 +19,14 @@ export const LINES = {
   again: "Sorry, I didn't catch that.",
 };
 
-// The line to speak for a tool result from scripts/dailyCheckin.js
+// The acknowledgement for what was just saved, as its own short clip so the handful of sounds
+// cache once instead of once per symptom
+const ackFor = (result) => (result.acknowledge?.reflect_note ? "Got it, I've noted that." : result.acknowledge?.say || '');
+
+// Everything to speak for a tool result, in order
+export const linesFor = (result) => [result.paused || result.finished ? '' : ackFor(result), lineFor(result)].filter(Boolean);
+
+// The main line to speak for a tool result from scripts/dailyCheckin.js
 export const lineFor = (result) => {
   if (result.paused) return LINES.paused;
   if (result.finished) return LINES.finished;
@@ -29,12 +36,12 @@ export const lineFor = (result) => {
     return LINES.notFound;
   }
   if (result.done) {
-    if (result.other_period) return `${result.saved?.note ? "Got it, I've noted that. " : ''}That's everything for now. Want to do the ${spokenPeriod(result.other_period)} ones too?`;
+    if (result.other_period) return `That's everything for now. Want to do the ${spokenPeriod(result.other_period)} ones too?`;
     return LINES.finished;
   }
-  // A note gets an acknowledgement so the user knows it was captured; the last rating is the prior
+  // The last rating is the prior
   const ask = result.next.last_time === undefined ? `${result.next.name}.` : `${result.next.name}. Last time was ${NUMBER_WORDS[result.next.last_time]}.`;
-  return result.saved?.note ? `Got it, I've noted that. ${ask}` : ask;
+  return ask;
 };
 
 // What the model (or local parser) needs to know to interpret the next utterance

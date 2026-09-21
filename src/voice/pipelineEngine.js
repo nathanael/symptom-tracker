@@ -1,8 +1,8 @@
-import { GREETING } from './scripts/dailyCheckin';
+import { GREETING, ACKS } from './scripts/dailyCheckin';
 import { mintToken, talkTurn } from './voiceApi';
 import { connect } from './webrtcConnection';
 import { createSpeaker } from './ttsCache';
-import { lineFor, stateFor, parseUtterance, LINES, SHORT_GREETING } from './lines';
+import { lineFor, linesFor, stateFor, parseUtterance, LINES, SHORT_GREETING } from './lines';
 
 const GREETED_KEY = 'symptomTracker_talkModeGreeted';
 
@@ -44,7 +44,10 @@ export const createPipelineEngine = ({ checkin, warmLines = [], onState, onCapti
   const respond = async (result) => {
     state = stateFor(result, state);
     if (result.paused || result.finished) ending = true;
-    await say(lineFor(result));
+    for (const line of linesFor(result)) {
+      if (stopped) return;
+      await say(line);
+    }
     if (ending) return end(result.paused ? 'paused' : 'finished');
     // Nothing left anywhere: no question to wait on, so close out
     if (result.done && !result.other_period) {
@@ -95,7 +98,7 @@ export const createPipelineEngine = ({ checkin, warmLines = [], onState, onCapti
       onState('connecting');
       const opening = checkin.start();
       state = stateFor(opening);
-      speaker.warm([localStorage.getItem(GREETED_KEY) ? SHORT_GREETING : GREETING, ...Object.values(LINES), ...warmLines]);
+      speaker.warm([localStorage.getItem(GREETED_KEY) ? SHORT_GREETING : GREETING, ...Object.values(LINES), ...new Set(ACKS), "Got it, I've noted that.", ...warmLines]);
       // Listening is optional: without a connection the session still runs on typed/tapped input
       try {
         const { secret } = await mintToken('pipeline');
