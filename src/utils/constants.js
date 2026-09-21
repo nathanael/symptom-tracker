@@ -9,6 +9,7 @@ export const STORAGE_KEY_STACK_ENTRIES = 'symptomTracker_stackEntries';
 export const STORAGE_KEY_PINNED = 'symptomTracker_pinned';
 export const STORAGE_KEY_COPY_DAYS = 'symptomTracker_copyDays';
 export const STORAGE_KEY_TALK_ENGINE = 'symptomTracker_talkEngine';
+export const STORAGE_KEY_TALK_SHOW_COST = 'symptomTracker_talkShowCost';
 export const STORAGE_KEY_LOCAL_UPDATED_AT = 'symptomTracker_localUpdatedAt';
 export const STORAGE_KEY_INPUT_ITEMS = 'symptomTracker_inputItems';
 export const STORAGE_KEY_INPUT_ENTRIES = 'symptomTracker_inputEntries';

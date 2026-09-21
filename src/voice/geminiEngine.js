@@ -1,6 +1,7 @@
 import { mintToken } from './voiceApi';
 import { handEntryMessage, LIVE_GUIDANCE } from './scripts/dailyCheckin';
 import { createMic, createPlayer } from './pcmAudio';
+import { geminiCost } from './pricing';
 
 // Gemini Live: one speech-to-speech model over a WebSocket. Model, voice, instructions and tools
 // are locked into the single-use token server-side; here we stream the mic up, play audio back,
@@ -16,7 +17,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
   let endTimer = null;
   let turnDone = true;
   let captions = { app: '', user: '' };
-  let lastUsage = null;
+  const usages = []; // one per model turn, for the cost estimate
   let quietUntil = 0;
   const startedAt = Date.now();
 
@@ -27,9 +28,9 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
     player?.flush();
     mic?.close();
     try { session?.close(); } catch { /* already closed */ }
-    // For checking real cost against the estimate: the Live API reports running token totals
-    console.info('[voice] gemini session', { seconds: Math.round((Date.now() - startedAt) / 1000), usage: lastUsage });
-    onEnd(reason);
+    const stats = { engine: 'Gemini', usd: geminiCost(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
+    console.info('[voice] gemini session', stats, usages);
+    onEnd(reason, stats);
   };
 
   const fail = (message) => {
@@ -60,7 +61,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
 
   const onMessage = (message) => {
     if (stopped) return;
-    if (message.usageMetadata) lastUsage = message.usageMetadata;
+    if (message.usageMetadata) usages.push(message.usageMetadata);
     if (message.toolCall?.functionCalls?.length) {
       onState('thinking');
       runTools(message.toolCall.functionCalls);

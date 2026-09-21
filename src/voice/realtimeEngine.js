@@ -1,6 +1,7 @@
 import { mintToken } from './voiceApi';
 import { handEntryMessage, LIVE_GUIDANCE } from './scripts/dailyCheckin';
 import { connect } from './webrtcConnection';
+import { realtimeCost } from './pricing';
 
 // The natural engine: one speech-to-speech model hears, decides and talks. Instructions and tools
 // are fixed server-side when the token is minted; here we run its tool calls and feed back results.
@@ -12,13 +13,17 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
   let ending = null; // 'paused' | 'finished' once the model has been told to wrap up
   let endTimer = null;
   let appCaption = '';
+  const usages = []; // one per model response, for the cost estimate
+  const startedAt = Date.now();
 
   const end = (reason) => {
     if (stopped) return;
     stopped = true;
     clearTimeout(endTimer);
     connection?.close();
-    onEnd(reason);
+    const stats = { engine: 'OpenAI', usd: realtimeCost(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
+    console.info('[voice] openai session', stats, usages);
+    onEnd(reason, stats);
   };
 
   const fail = (message) => {
@@ -71,6 +76,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
         else onState('listening');
         break;
       case 'response.done': {
+        if (event.response?.usage) usages.push(event.response.usage);
         const calls = (event.response?.output || []).filter((item) => item.type === 'function_call');
         if (calls.length > 0) runTools(calls);
         break;

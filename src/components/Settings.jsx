@@ -65,6 +65,8 @@ export default function Settings({
   setCopyDays,
   talkEngine,
   setTalkEngine,
+  talkShowCost,
+  setTalkShowCost,
   setLastAction,
   setCopyToastMessage,
   setShowExport,
@@ -420,6 +422,9 @@ export default function Settings({
         </Row>
         <Row stack title="Talk mode voice" desc="Which live voice runs the conversation in talk mode.">
           <Seg options={[['gemini', 'Gemini'], ['realtime', 'OpenAI']]} value={talkEngine} onChange={setTalkEngine} />
+        </Row>
+        <Row stack title="Show talk mode cost" desc="After each conversation, show an estimate of what it cost, with its length and number of turns.">
+          <Seg options={[[true, 'On'], [false, 'Off']]} value={talkShowCost} onChange={setTalkShowCost} />
         </Row>
       </div>
     </section>

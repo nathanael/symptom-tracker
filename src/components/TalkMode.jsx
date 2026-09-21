@@ -9,6 +9,7 @@ import { entryKey, initialPeriod, listFor } from '../voice/checkinQueue';
 import { createCheckin } from '../voice/scripts/dailyCheckin';
 import { createRealtimeEngine } from '../voice/realtimeEngine';
 import { createGeminiEngine } from '../voice/geminiEngine';
+import { costSummary } from '../voice/pricing';
 
 const ENGINES = { realtime: createRealtimeEngine, gemini: createGeminiEngine };
 
@@ -26,6 +27,7 @@ export default function TalkMode({
   timePeriods,
   quickLog,
   engineKind, // 'gemini' | 'realtime'
+  showCost, // append the estimated cost of the conversation to the closing toast
   setCopyToastMessage,
   onClose,
 }) {
@@ -41,14 +43,14 @@ export default function TalkMode({
 
   // The engine outlives renders; give it the latest values through refs
   const live = useRef({});
-  live.current = { entries, quickLog, onClose, setCopyToastMessage };
+  live.current = { entries, quickLog, onClose, setCopyToastMessage, showCost };
   const session = useRef(null);
 
   useEffect(() => {
     let disposed = false;
-    const toast = (message) => {
+    const toast = (message, ms = 3000) => {
       live.current.setCopyToastMessage(message);
-      setTimeout(() => live.current.setCopyToastMessage(''), 3000);
+      setTimeout(() => live.current.setCopyToastMessage(''), ms);
     };
     const checkin = createCheckin({
       symptoms,
@@ -70,13 +72,15 @@ export default function TalkMode({
       onCaption: ({ who, text }) => !disposed && setCaptions((prev) => ({ ...prev, [who]: text })),
       onLevel: (value) => !disposed && setLevel(value),
       onError: (message) => !disposed && setError(message),
-      onEnd: (reason) => {
+      onEnd: (reason, stats) => {
         if (disposed) return;
+        // A session that never reached the model reports no turns: nothing to price
+        const cost = live.current.showCost && stats?.turns > 0 ? ` · ${costSummary(stats)}` : '';
         if (reason === 'finished') {
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-          toast('✓ Check-in complete');
+          toast(`✓ Check-in complete${cost}`, cost ? 8000 : 3000);
         } else {
-          toast('Paused. Your progress is saved');
+          toast(`Paused. Your progress is saved${cost}`, cost ? 8000 : 3000);
         }
         live.current.onClose();
       },

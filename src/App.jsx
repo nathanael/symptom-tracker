@@ -15,6 +15,7 @@ import {
   STORAGE_KEY_PINNED,
   STORAGE_KEY_COPY_DAYS,
   STORAGE_KEY_TALK_ENGINE,
+  STORAGE_KEY_TALK_SHOW_COST,
   STORAGE_KEY_INPUT_ITEMS,
   STORAGE_KEY_INPUT_ENTRIES,
   severityColors,
@@ -115,6 +116,7 @@ function App() {
   );
   const [copyDays, setCopyDays] = useLocalStorage(STORAGE_KEY_COPY_DAYS, 7);
   const [talkEngine, setTalkEngine] = useLocalStorage(STORAGE_KEY_TALK_ENGINE, 'gemini');
+  const [talkShowCost, setTalkShowCost] = useLocalStorage(STORAGE_KEY_TALK_SHOW_COST, true);
 
   // Normalize legacy bare-string daily notes → { text } records, once, so the
   // sync diff never spreads a bare string (which would corrupt the record).
@@ -939,6 +941,7 @@ function App() {
           timePeriods={timePeriods}
           quickLog={quickLog}
           engineKind={talkEngine}
+          showCost={talkShowCost}
           setCopyToastMessage={setCopyToastMessage}
           onClose={() => setShowTalkMode(false)}
         />
@@ -1265,6 +1268,8 @@ function App() {
           setCopyDays={setCopyDays}
           talkEngine={talkEngine}
           setTalkEngine={setTalkEngine}
+          talkShowCost={talkShowCost}
+          setTalkShowCost={setTalkShowCost}
           setLastAction={setLastAction}
           setCopyToastMessage={setCopyToastMessage}
           setShowExport={setShowExport}
