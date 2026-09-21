@@ -111,6 +111,7 @@
 .is-effect .movers b { font-weight: 500; color: #f3f4f6; }
 .is-effect .delta { font-size: 12px; }
 .is-effect .since { font-size: 12px; }
+.is-effect .since small { font-size: inherit; color: #6b7280; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .is-effect .next { flex: none; width: 48px; display: grid; place-items: center; border-left: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.03); color: #d1d5db; }
 .is-effect:not(:disabled):hover .next, .is-effect:active .next { background: rgba(255,255,255,.08); }
 .is-effect .next svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }

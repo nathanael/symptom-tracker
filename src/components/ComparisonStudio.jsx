@@ -225,6 +225,7 @@ export default function ComparisonStudio({
 
   // SVG dimensions
   const H_MOBILE = 418;
+  const MAX_MARKERS = isDesktop ? 8 : 5; // protocol-change lines drawn on the chart at once
   const chartContainerRef = useRef(null);
   const [desktopChartDims, setDesktopChartDims] = useState({ w: 500, h: 420 });
   useEffect(() => {
@@ -432,30 +433,34 @@ export default function ComparisonStudio({
     });
     return [...byDate.values()].map(m => ({ ...m, label: m.events.length === 1 ? m.events[0].label : `${m.events.length} changes` }));
   }, [stackItems, stackEntries, todayStr]);
-  const protocolMarkers = useMemo(
-    () => allMarkers.map(m => ({ ...m, idx: dates.indexOf(m.date) })).filter(m => m.idx >= 0),
-    [allMarkers, dates]
-  );
+  // What every active symptom did after each change inside the window, judged only against stretches free of other
+  // changes. Movers are the symptoms that clearly moved, biggest first; strength ranks one change against another.
+  const windowMarkers = useMemo(() => {
+    const strengthOf = (e) => Math.abs(e.delta) / Math.max(e.noise, 0.5);
+    return allMarkers.map((m, i) => ({ m, i, idx: dates.indexOf(m.date) })).filter(x => x.idx >= 0).map(({ m, i, idx }) => {
+      const bounds = { prevChange: allMarkers[i - 1]?.date || null, nextChange: allMarkers[i + 1]?.date || null };
+      const effects = activeSymptoms.map(sym => ({
+        sym,
+        ...changeEffect((ds) => getSymptomDailySeries(entries, sym.id, ds, trackingMode), m.date, todayStr, bounds),
+      }));
+      const judged = effects.filter(e => e.status === 'ok');
+      const movers = judged.filter(e => e.meaningful).sort((a, b) => strengthOf(b) - strengthOf(a));
+      const status = judged.length > 0 ? 'ok' : effects.some(e => e.status === 'crowded') ? 'crowded' : 'early';
+      return { ...m, idx, effect: { status, movers }, strength: movers.slice(0, 3).reduce((sum, e) => sum + strengthOf(e), 0) };
+    });
+  }, [allMarkers, dates, activeSymptoms, entries, trackingMode, todayStr]);
+
+  // The chart draws at most MAX_MARKERS lines, strongest shift first. Up to a month, changes with no clear shift
+  // (or too recent to judge) fill any lines left over, newest first; zoomed out further, only clear shifts are drawn.
+  const protocolMarkers = useMemo(() => {
+    const ranked = [...windowMarkers].sort((a, b) => b.strength - a.strength || (a.date < b.date ? 1 : -1));
+    const eligible = timeframe > 30 ? ranked.filter(m => m.strength > 0) : ranked;
+    return eligible.slice(0, MAX_MARKERS).sort((a, b) => a.idx - b.idx);
+  }, [windowMarkers, timeframe, MAX_MARKERS]);
 
   const [pickedMarkerDate, setPickedMarkerDate] = useState(null);
   const activeMarker = protocolMarkers.find(m => m.date === pickedMarkerDate) || protocolMarkers[protocolMarkers.length - 1] || null;
-
-  // Which symptoms clearly moved after the picked change, biggest first. Every active symptom is
-  // checked, not just the ones on the chart, and only against stretches free of other changes.
-  const markerEffect = useMemo(() => {
-    if (!activeMarker) return null;
-    const i = allMarkers.findIndex(m => m.date === activeMarker.date);
-    const bounds = { prevChange: allMarkers[i - 1]?.date || null, nextChange: allMarkers[i + 1]?.date || null };
-    const effects = activeSymptoms.map(sym => ({
-      sym,
-      ...changeEffect((ds) => getSymptomDailySeries(entries, sym.id, ds, trackingMode), activeMarker.date, todayStr, bounds),
-    }));
-    const judged = effects.filter(e => e.status === 'ok');
-    const movers = judged.filter(e => e.meaningful)
-      .sort((a, b) => Math.abs(b.delta) / Math.max(b.noise, 0.5) - Math.abs(a.delta) / Math.max(a.noise, 0.5));
-    const status = judged.length > 0 ? 'ok' : effects.some(e => e.status === 'crowded') ? 'crowded' : 'early';
-    return { status, movers };
-  }, [activeMarker, allMarkers, activeSymptoms, entries, trackingMode, todayStr]);
+  const markerEffect = activeMarker?.effect || null;
 
   // ── Chart points ──
 
@@ -1190,7 +1195,6 @@ export default function ComparisonStudio({
       <span className="body">
         <span className="mark" />
         <span className="txt">
-          <span className="head">Insights{protocolMarkers.length > 1 && <small>{markerIndex + 1} of {protocolMarkers.length}</small>}</span>
           <span className="movers">
             {markerEffect.status === 'early' ? <span>Too early to tell</span>
               : markerEffect.status === 'crowded' ? <span>Too close to another change to tell</span>
@@ -1199,7 +1203,7 @@ export default function ComparisonStudio({
                 <b key={e.sym.id}>{e.sym.name} {deltaTag(e.delta)}</b>
               ))}
           </span>
-          <span className="since">since {sinceText} · {markerDay}</span>
+          <span className="since">since {sinceText} · {markerDay}{protocolMarkers.length > 1 && <small> · {markerIndex + 1} of {protocolMarkers.length}</small>}</span>
         </span>
       </span>
       {protocolMarkers.length > 1 && <span className="next"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg></span>}
@@ -1212,7 +1216,7 @@ export default function ComparisonStudio({
       rollingAvg={healthScore.rollingAvg}
       delta={healthScoreDelta}
       deltaLabel={`vs prev ${timeframe}`}
-      caption={isDesktop ? null : (scrubDate || `${timeframe}-day average`)}
+      caption={isDesktop ? null : scrubDate}
       inspectValue={hsInspectValue}
       showOnGraph={healthScoreVisible}
       onToggleGraph={() => {
