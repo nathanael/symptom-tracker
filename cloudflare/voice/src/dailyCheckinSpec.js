@@ -7,7 +7,7 @@
 // short one after that, a bare one once they are an old hand, and none at all when they are
 // picking a check-in back up.
 export const GREETING =
-  "Let's walk through today's symptoms. I'll name a symptom and you give me a number from zero to five, or say not applicable. If you want to add anything, like what made it better or worse, just say it and I'll save it as a note. Say pause any time and we'll pick up later.";
+  "Let's walk through today's symptoms. I'll name a symptom and you give me a number from zero to five, or say not applicable. If you want to add anything, like what made it better or worse, just say it and I'll save it as a note.";
 export const SHORT_GREETING = "Alright, let's dive right in. If you ever want to know what else I can do, just ask.";
 export const BARE_GREETING = "Alright, let's dive right in.";
 
