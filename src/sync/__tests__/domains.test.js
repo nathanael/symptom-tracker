@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { DOMAINS, MAP_DOMAINS, DEFINITION_DOMAINS, storageKeyFor, isMonthSharded } from '../domains';
 
 describe('domains config', () => {
-  it('lists all nine sync domains', () => {
+  it('lists all ten sync domains', () => {
     expect(Object.keys(DOMAINS).sort()).toEqual([
-      'dailyNotes','entries','inputEntries','inputItems','pinnedSymptoms',
+      'dailyNotes','entries','inputEntries','inputItems','meals','pinnedSymptoms',
       'stackEntries','stackItems','symptoms','trackingMode',
     ]);
   });

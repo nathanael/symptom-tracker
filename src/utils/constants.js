@@ -13,6 +13,7 @@ export const STORAGE_KEY_TALK_SHOW_COST = 'symptomTracker_talkShowCost';
 export const STORAGE_KEY_LOCAL_UPDATED_AT = 'symptomTracker_localUpdatedAt';
 export const STORAGE_KEY_INPUT_ITEMS = 'symptomTracker_inputItems';
 export const STORAGE_KEY_INPUT_ENTRIES = 'symptomTracker_inputEntries';
+export const STORAGE_KEY_MEALS = 'symptomTracker_meals';
 
 // Input Categories
 export const INPUT_CATEGORIES = [
