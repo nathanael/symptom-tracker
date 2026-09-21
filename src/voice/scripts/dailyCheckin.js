@@ -130,8 +130,11 @@ export const createCheckin = (ctx) => {
       name: symptom.name,
       ...(symptom.description ? { description: symptom.description } : {}),
       ...(last !== null ? { last_time: last } : {}),
-      // The first question of a period names the period, so they know which slot they are filling
-      say: `${spokenName(symptom)}.${lastTime}${opened ? '' : ` How about ${spokenPeriod(period)}?`}`,
+      // The first question of a period says where in the list they are and names the period, so
+      // they know which slot they are filling
+      say: opened
+        ? `${spokenName(symptom)}.${lastTime}`
+        : `${listFor(ctx.symptoms, period).some((s) => all[key(s.id)]) ? "Let's continue with" : "Let's start with the first symptom,"} ${spokenName(symptom)}.${lastTime} How about ${spokenPeriod(period)}?`,
     };
   };
 

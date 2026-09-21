@@ -94,14 +94,16 @@ export function useReorderDrag(onCommit) {
     if (!d) return;
     active.current = null;
     cancelAnimationFrame(d.frame);
+    d.unlisten();
     document.body.classList.remove('lr-reordering');
     const reset = () => {
       d.items.forEach(({ el }) => {
         el.style.transition = '';
         el.style.transform = '';
+        el.style.willChange = '';
         el.classList.remove('over');
       });
-      Object.assign(d.row.style, { transition: '', transform: '', zIndex: '', position: '', boxShadow: '', background: '', borderRadius: '' });
+      Object.assign(d.row.style, { transition: '', transform: '', zIndex: '', position: '', boxShadow: '', background: '', borderRadius: '', willChange: '' });
     };
     if (!drop || d.index === d.from) {
       // Back where it came from
@@ -127,7 +129,7 @@ export function useReorderDrag(onCommit) {
     const target = d.items[d.index];
     const settle = d.index > d.from ? target.top + target.height - d.items[d.from].height : target.top;
     d.row.style.transition = 'transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .16s';
-    d.row.style.transform = `translateY(${settle - d.items[d.from].top}px)`;
+    d.row.style.transform = `translate3d(0, ${settle - d.items[d.from].top}px, 0)`;
     d.row.style.boxShadow = '0 2px 8px rgba(0,0,0,.3)';
     setTimeout(land, 165);
   };
@@ -135,7 +137,7 @@ export function useReorderDrag(onCommit) {
   const place = () => {
     const d = active.current;
     const dy = d.pointerY - d.startY + (d.scroller.scrollTop - d.startScroll);
-    d.row.style.transform = `translateY(${dy}px) scale(1.02)`;
+    d.row.style.transform = `translate3d(0, ${dy}px, 0) scale(1.03)`;
     const self = d.items[d.from];
     // A row gives way once the dragged row's leading edge is past its middle: half a row of travel
     const top = self.top + dy;
@@ -152,7 +154,7 @@ export function useReorderDrag(onCommit) {
       if (i === d.from) return;
       if (!d.contiguous) return item.el.classList.toggle('over', i === index);
       const shift = i > d.from && i <= index ? -d.slot : i < d.from && i >= index ? d.slot : 0;
-      item.el.style.transform = shift ? `translateY(${shift}px)` : '';
+      item.el.style.transform = shift ? `translate3d(0, ${shift}px, 0)` : '';
     });
   };
 
@@ -187,21 +189,32 @@ export function useReorderDrag(onCommit) {
       const gaps = items.slice(1).map((item, i) => item.top - (items[i].top + items[i].height));
       const contiguous = gaps.every((gap) => gap < 24);
       const gap = contiguous && gaps.length ? Math.max(0, gaps[Math.min(from, gaps.length - 1)]) : 0;
-      active.current = { id, group, row, items, from, index: from, contiguous, slot: items[from].height + gap, scroller, startScroll: scroller.scrollTop, startY: e.clientY, pointerY: e.clientY, frame: 0 };
-      items.forEach((item, i) => { if (i !== from) item.el.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)'; });
-      Object.assign(row.style, { position: 'relative', zIndex: 60, transition: 'box-shadow .15s, background .15s', boxShadow: '0 14px 36px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08)', background: '#1a1c22', borderRadius: '12px', transform: 'scale(1.02)' });
+      // Listen on the window, not the grip: a phone can drop pointer capture mid-drag, and any
+      // scroll it manages to start cancels the pointer outright, so touchmove is blocked too
+      const pointerId = e.pointerId;
+      const mine = (fn) => (ev) => { if (ev.pointerId === pointerId) fn(ev); };
+      const move = mine((ev) => { active.current.pointerY = ev.clientY; place(); });
+      const up = mine(() => { haptic('medium'); finish(true); });
+      const cancel = mine(() => finish(false));
+      const block = (ev) => ev.preventDefault();
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', cancel);
+      document.addEventListener('touchmove', block, { passive: false });
+      const unlisten = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', cancel);
+        document.removeEventListener('touchmove', block);
+      };
+      active.current = { id, group, row, items, from, index: from, contiguous, slot: items[from].height + gap, scroller, startScroll: scroller.scrollTop, startY: e.clientY, pointerY: e.clientY, frame: 0, unlisten };
+      // Each moving row gets its own compositor layer, or a phone repaints the text every frame
+      items.forEach((item, i) => { if (i !== from) Object.assign(item.el.style, { transition: 'transform .22s cubic-bezier(.2,.8,.2,1)', willChange: 'transform' }); });
+      Object.assign(row.style, { position: 'relative', zIndex: 60, willChange: 'transform', transition: 'box-shadow .15s, background .15s', boxShadow: '0 16px 40px rgba(0,0,0,.7), 0 0 0 1px rgba(129,140,248,.45)', background: '#1d2030', borderRadius: '12px', transform: 'scale(1.03)' });
       document.body.classList.add('lr-reordering');
       active.current.frame = requestAnimationFrame(tick);
       haptic('medium');
     },
-    onPointerMove: (e) => {
-      const d = active.current;
-      if (!d || d.id !== id) return;
-      d.pointerY = e.clientY;
-      place();
-    },
-    onPointerUp: () => { if (active.current?.id === id) { haptic('medium'); finish(true); } },
-    onPointerCancel: () => { if (active.current?.id === id) finish(false); },
   });
 
   useEffect(() => () => finish(false), []); // eslint-disable-line react-hooks/exhaustive-deps
