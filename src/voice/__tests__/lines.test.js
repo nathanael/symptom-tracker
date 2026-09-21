@@ -48,9 +48,11 @@ describe('parseUtterance', () => {
 });
 
 describe('lineFor / stateFor', () => {
-  it('asks the next symptom by name only, so the clip is cacheable', () => {
+  it('asks the next symptom with its last rating when there is one', () => {
     const result = { saved: {}, next: { symptom_id: 'brain-fog', name: 'Brain fog', last_time: 2 }, remaining: 3 };
-    expect(lineFor(result)).toBe('Brain fog.');
+    expect(lineFor(result)).toBe('Brain fog. Last time was a two.');
+    expect(lineFor({ next: { symptom_id: 'x', name: 'Nausea' }, remaining: 1 })).toBe('Nausea.');
+    expect(lineFor({ saved: { note: 'after coffee' }, next: { symptom_id: 'x', name: 'Nausea', last_time: 0 } })).toBe("Got it, I've noted that. Nausea. Last time was zero.");
     expect(stateFor(result)).toEqual({ asking: { symptom_id: 'brain-fog', name: 'Brain fog' } });
   });
 

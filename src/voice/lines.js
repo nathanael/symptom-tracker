@@ -6,6 +6,8 @@ import { NA_SEVERITY } from '../utils/constants';
 const SPOKEN_PERIOD = { morning: 'morning', evening: 'evening' };
 const spokenPeriod = (other) => SPOKEN_PERIOD[other.period_id] || other.label;
 
+const NUMBER_WORDS = ['zero', 'a one', 'a two', 'a three', 'a four', 'a five'];
+
 export const SHORT_GREETING = "Okay, let's go.";
 
 export const LINES = {
@@ -30,8 +32,9 @@ export const lineFor = (result) => {
     if (result.other_period) return `${result.saved?.note ? "Got it, I've noted that. " : ''}That's everything for now. Want to do the ${spokenPeriod(result.other_period)} ones too?`;
     return LINES.finished;
   }
-  // A note gets an acknowledgement so the user knows it was captured
-  return result.saved?.note ? `Got it, I've noted that. ${result.next.name}.` : `${result.next.name}.`;
+  // A note gets an acknowledgement so the user knows it was captured; the last rating is the prior
+  const ask = result.next.last_time === undefined ? `${result.next.name}.` : `${result.next.name}. Last time was ${NUMBER_WORDS[result.next.last_time]}.`;
+  return result.saved?.note ? `Got it, I've noted that. ${ask}` : ask;
 };
 
 // What the model (or local parser) needs to know to interpret the next utterance

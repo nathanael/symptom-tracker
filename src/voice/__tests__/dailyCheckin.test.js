@@ -71,7 +71,7 @@ describe('matchSymptom', () => {
 describe('createCheckin', () => {
   it('opens with the first unlogged symptom and its last rating', () => {
     const { checkin, ctx } = setup({ '2026-09-20-headache-morning': entry(2), [`${dateKey}-headache-evening`]: entry(1) });
-    expect(checkin.start()).toEqual({ period: 'AM', next: { symptom_id: 'headache', name: 'Headache', last_time: 2 }, remaining: 3 });
+    expect(checkin.start()).toEqual({ period: 'AM', next: { symptom_id: 'headache', name: 'Headache', last_time: 2, say: 'Headache. Last time was a two.' }, remaining: 3 });
     expect(ctx.onCurrent).toHaveBeenCalledWith(symptoms[0], 'morning');
   });
 

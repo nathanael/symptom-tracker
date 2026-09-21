@@ -84,7 +84,8 @@ export const createCheckin = (ctx) => {
         symptom_id: next.id,
         name: next.name,
         ...(next.description ? { description: next.description } : {}),
-        ...(last !== null ? { last_time: last } : {}),
+        // `say` rides in every result because guidance given once fades over a long live session
+        ...(last !== null ? { last_time: last, say: `${next.name}. Last time was ${last === 0 ? 'zero' : `a ${['one', 'two', 'three', 'four', 'five'][last - 1]}`}.` } : {}),
       },
       remaining: list.filter(pending).length,
     };
