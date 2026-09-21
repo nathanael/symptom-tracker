@@ -27,6 +27,8 @@ const DEFAULTS = {
   TALK_GEMINI_TRIGGER_TOKENS: '4000',
   TALK_REALTIME_MODEL: 'gpt-realtime-2.1-mini',
   TALK_TRANSCRIBE_MODEL: 'gpt-live-transcribe',
+  // The pipeline needs the server to mark where each utterance ends, which the live model can't do
+  TALK_PIPELINE_TRANSCRIBE_MODEL: 'gpt-transcribe',
   TALK_TEXT_MODEL: 'gpt-5.4-mini',
   TALK_TTS_MODEL: 'gpt-4o-mini-tts',
   TALK_VOICE: 'marin',
@@ -150,7 +152,10 @@ const openaiSession = (env, engine) => {
       audio: { input: { ...input, turn_detection: { type: 'semantic_vad', eagerness: 'low' } }, output: { voice: setting(env, 'TALK_VOICE') } },
     };
   }
-  return { type: 'transcription', audio: { input: { ...input, turn_detection: { type: 'server_vad', silence_duration_ms: 1100 } } } };
+  return {
+    type: 'transcription',
+    audio: { input: { ...input, transcription: { model: setting(env, 'TALK_PIPELINE_TRANSCRIBE_MODEL') }, turn_detection: { type: 'server_vad', silence_duration_ms: 1100 } } },
+  };
 };
 
 const openaiToken = async (env, uid, body) => {
