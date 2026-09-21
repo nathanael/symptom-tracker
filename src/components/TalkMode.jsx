@@ -13,6 +13,8 @@ import { createCheckin } from '../voice/scripts/dailyCheckin';
 import { createRealtimeEngine } from '../voice/realtimeEngine';
 import { createGeminiEngine } from '../voice/geminiEngine';
 import { createDemoEngine } from '../voice/demoEngine';
+import { createSessionLog } from '../voice/sessionLog';
+import { APP_VERSION } from '../version';
 import VoiceOrb from './VoiceOrb';
 import SpokenWords from './SpokenWords';
 
@@ -80,14 +82,23 @@ export default function TalkMode({
       },
       onCurrent: (symptom, period) => !disposed && setCurrent({ symptom, period }),
     });
+    // Timeline of the conversation, saved to the voice backend while diagnostics (the cost card) is on
+    const record = createSessionLog({ enabled: !DEMO && !!live.current.onCost, meta: { engine: engineKind, version: APP_VERSION, sessions: sessionsSoFar(), agent: navigator.userAgent } });
+    const logged = {
+      ...checkin,
+      start: () => { const opening = checkin.start(); record.log('opening', opening); return opening; },
+      handle: (name, args) => { const result = checkin.handle(name, args); record.log('tool', { name, args, result }); return result; },
+    };
     const create = DEMO ? createDemoEngine : ENGINES[engineKind] || createGeminiEngine;
     const engine = create({
-      checkin,
-      onState: (next) => !disposed && setStatus(next),
-      onCaption: ({ who, text }) => !disposed && setCaptions((prev) => ({ ...prev, [who]: text })),
+      checkin: logged,
+      log: record.log,
+      onState: (next) => { record.log('state', next); if (!disposed) setStatus(next); },
+      onCaption: ({ who, text }) => { record.caption(who, text); if (!disposed) setCaptions((prev) => ({ ...prev, [who]: text })); },
       onLevel: (value) => { levelRef.current = value; },
-      onError: (message) => !disposed && setError(message),
+      onError: (message) => { record.log('error', message); if (!disposed) setError(message); },
       onEnd: (reason, stats) => {
+        record.close(reason, stats);
         if (disposed) return;
         // A session that never reached the model reports no turns: nothing to price
         if (stats?.turns > 0) {
@@ -103,7 +114,7 @@ export default function TalkMode({
         live.current.onClose();
       },
     });
-    session.current = { checkin, engine };
+    session.current = { checkin: logged, engine };
     engine.start();
     return () => {
       disposed = true;

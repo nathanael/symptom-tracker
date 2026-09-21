@@ -160,7 +160,18 @@ const openaiToken = async (env, uid) => {
   return Response.json({ secret: data.value, expiresAt: data.expires_at, model: session.model, engine: 'realtime' });
 };
 
-const routes = { 'gemini-token': geminiToken, token: openaiToken };
+// A conversation's timeline from the app, kept two weeks for debugging. The same id is written
+// repeatedly as the session goes on; read them back with
+//   npx wrangler kv key list --binding VOICE_USAGE --remote --prefix log:
+const saveLog = async (env, uid, body) => {
+  const id = String(body?.id || '').slice(0, 40);
+  const text = JSON.stringify(body || {});
+  if (!id || text.length > 400000) throw new HttpError(400, 'Bad log.');
+  await env.VOICE_USAGE.put(`log:${uid}:${id}`, text, { expirationTtl: 14 * 24 * 60 * 60 });
+  return Response.json({ ok: true });
+};
+
+const routes = { 'gemini-token': geminiToken, token: openaiToken, log: saveLog };
 
 const cors = (req) => {
   const origin = req.headers.get('Origin') || '';

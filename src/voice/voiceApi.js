@@ -30,6 +30,9 @@ const post = async (url, body) => {
   return res;
 };
 
+// A conversation's timeline, for reading back an odd session (see sessionLog.js)
+export const saveLog = (payload) => post(`${BASE}/log`, payload);
+
 // engine: 'gemini' | 'realtime' -> { secret, engine, ... }
 export const mintToken = async (engine) => (await post(`${BASE}/${engine === 'gemini' ? 'gemini-token' : 'token'}`, { engine })).json();
 

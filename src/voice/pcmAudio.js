@@ -1,7 +1,13 @@
 import { micErrorMessage } from './webrtcConnection';
+import { createResampler } from './resample';
 
 // Raw PCM in and out for engines that speak over a WebSocket rather than WebRTC (Gemini Live):
 // the mic as 16 kHz 16-bit chunks, and a gapless player for the 24 kHz chunks that come back.
+//
+// Both run on ONE AudioContext at the device's own rate. An iPhone has a single hardware rate, and
+// a second context asking for a different one (16 kHz to capture beside 24 kHz to play) can leave
+// the first frozen: its clock stops, nothing plays, and the conversation hangs on her first word.
+// So the mic is resampled down in JS, and playback buffers carry their own 24 kHz rate.
 
 const MIC_RATE = 16000;
 const PLAY_RATE = 24000;
@@ -14,7 +20,7 @@ class PcmCapture extends AudioWorkletProcessor {
     if (!input) return true;
     this.buffer.push(new Float32Array(input));
     this.size += input.length;
-    if (this.size >= 1600) { // ~100 ms at 16 kHz
+    if (this.size >= sampleRate / 10) { // ~100 ms
       const out = new Float32Array(this.size);
       let offset = 0;
       for (const chunk of this.buffer) { out.set(chunk, offset); offset += chunk.length; }
@@ -47,8 +53,24 @@ export const primePlayback = ({ fresh = false } = {}) => {
     playContext.close().catch(() => {});
     playContext = null;
   }
-  playContext = playContext || new Ctx({ sampleRate: PLAY_RATE });
+  playContext = playContext || new Ctx();
   playContext.resume().catch(() => {});
+};
+
+// The shared context, checked: running with its clock advancing. One that is not (iOS can freeze it
+// when capture starts) is replaced, which the browser allows without a tap while the mic is live.
+const workletLoaded = new WeakSet();
+const healthyContext = async () => {
+  primePlayback();
+  await playContext.resume().catch(() => {});
+  const before = playContext.currentTime;
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  if (playContext.state !== 'running' || playContext.currentTime === before) {
+    console.warn('[voice] audio context stalled, replacing it', playContext.state);
+    primePlayback({ fresh: true });
+    await playContext.resume().catch(() => {});
+  }
+  return playContext;
 };
 
 // onChunk(base64 PCM16 @ 16 kHz), onLevel(0..1)
@@ -59,36 +81,36 @@ export const createMic = async ({ onChunk, onLevel }) => {
   } catch (err) {
     throw new Error(micErrorMessage(err));
   }
-  const context = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: MIC_RATE });
-  const url = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
-  try {
-    await context.audioWorklet.addModule(url);
-  } finally {
-    URL.revokeObjectURL(url);
+  // After capture has started: that is the moment iOS may stall a context made before it
+  const context = await healthyContext();
+  if (!workletLoaded.has(context)) {
+    const url = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
+    try {
+      await context.audioWorklet.addModule(url);
+      workletLoaded.add(context);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
   const node = new AudioWorkletNode(context, 'pcm-capture');
+  const source = context.createMediaStreamSource(stream);
   let muted = false;
+  // Down from the device rate to the 16 kHz the model takes
+  const resample = createResampler(context.sampleRate, MIC_RATE);
   node.port.onmessage = (e) => {
-    const samples = e.data;
-    let peak = 0;
-    const pcm = new Int16Array(samples.length);
-    for (let i = 0; i < samples.length; i++) {
-      const v = Math.max(-1, Math.min(1, samples[i]));
-      peak = Math.max(peak, Math.abs(v));
-      pcm[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
-    }
+    const { pcm, peak } = resample(e.data);
     onLevel?.(muted ? 0 : Math.min(1, peak * 2));
-    if (!muted) onChunk(toBase64(new Uint8Array(pcm.buffer)));
+    if (!muted && pcm.length) onChunk(toBase64(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength)));
   };
-  context.createMediaStreamSource(stream).connect(node);
+  source.connect(node);
 
   return {
-    mimeType: `audio/pcm;rate=${context.sampleRate}`,
+    mimeType: `audio/pcm;rate=${MIC_RATE}`,
     setMuted: (value) => { muted = value; },
     close: () => {
       node.port.onmessage = null;
+      try { source.disconnect(); } catch { /* already gone */ }
       stream.getTracks().forEach((track) => track.stop());
-      context.close().catch(() => {});
     },
   };
 };
@@ -96,13 +118,14 @@ export const createMic = async ({ onChunk, onLevel }) => {
 // Plays base64 PCM16 @ 24 kHz chunks back to back. onIdle fires when the queue runs dry.
 export const createPlayer = ({ onIdle } = {}) => {
   primePlayback();
-  const context = playContext;
   const sources = new Set();
   let nextStart = 0;
   let turnStart = 0; // context time this run of audio began
 
   return {
     play: (data) => {
+      // Looked up each time: the mic may have replaced a stalled context since this player was made
+      const context = playContext;
       if (!context) return;
       // Opening the mic can suspend or interrupt the context on iOS
       if (context.state !== 'running') context.resume().catch(() => {});
@@ -138,6 +161,7 @@ export const createPlayer = ({ onIdle } = {}) => {
     // How far through the audio queued for this turn we are, 0..1. More audio arriving extends the
     // queue, so this eases forward rather than jumping; 1 once everything queued has played.
     get progress() {
+      const context = playContext;
       if (!context || sources.size === 0) return 1;
       const total = nextStart - turnStart;
       return total > 0 ? Math.min(1, Math.max(0, (context.currentTime - turnStart) / total)) : 0;

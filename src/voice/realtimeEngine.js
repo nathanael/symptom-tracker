@@ -8,7 +8,7 @@ import { totalWeight } from './speechPace';
 // are fixed server-side when the token is minted; here we run its tool calls and feed back results.
 // Interface: createXEngine({ checkin, onState, onCaption, onLevel, onError, onEnd })
 // -> { start(), stop(), setMuted(bool), sendText(text), advance(toolResult) }.
-export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onError, onEnd }) => {
+export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onError, onEnd, log }) => {
   let connection = null;
   let stopped = false;
   let ending = null; // 'paused' | 'finished' once the model has been told to wrap up
@@ -23,12 +23,14 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
   let modelBusy = true; // from connect until the greeting has finished playing
   let audioPlaying = false;
   let audioStartedAt = 0;
+  let audioFinished = true; // this response's speech has played out (or it had none)
   // Syllables per second, corrected after every utterance she finishes
   let pace = 4.4;
   let releaseTimer = null;
   const applyMic = () => connection?.setMuted(userMuted || modelBusy);
   const holdMic = () => {
     clearTimeout(releaseTimer);
+    if (!modelBusy) log?.('mic', 'held');
     modelBusy = true;
     applyMic();
   };
@@ -36,6 +38,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
   const releaseMic = (delay = 350) => {
     clearTimeout(releaseTimer);
     releaseTimer = setTimeout(() => {
+      log?.('mic', 'open');
       modelBusy = false;
       applyMic();
     }, delay);
@@ -84,12 +87,14 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
   const onEvent = (event) => {
     switch (event.type) {
       case 'input_audio_buffer.speech_started':
+        log?.('vad', 'speech_started');
         onState('listening');
         break;
       case 'conversation.item.input_audio_transcription.completed':
         if (event.transcript?.trim()) onCaption({ who: 'user', text: event.transcript.trim() });
         break;
       case 'response.created':
+        audioFinished = false;
         appCaption = '';
         holdMic();
         onState('thinking');
@@ -113,6 +118,8 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
           if (seconds > 0.8 && said > 3) pace += ((said / seconds) - pace) * 0.5;
         }
         audioPlaying = false;
+        audioFinished = true;
+        log?.('audio', event.type);
         if (ending) return end(ending);
         releaseMic();
         onState('listening');
@@ -120,13 +127,19 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
       case 'response.done': {
         if (event.response?.usage) usages.push(event.response.usage);
         const calls = (event.response?.output || []).filter((item) => item.type === 'function_call');
+        const spoke = (event.response?.output || []).some((item) => item.type === 'message');
+        log?.('response.done', { spoke, calls: calls.map((call) => call.name), status: event.response?.status, audioFinished });
         if (calls.length > 0) runTools(calls);
-        // A response with no speech (a tool call) never fires the audio events; one with speech
-        // releases the mic when playback stops, with a fallback in case that event is missed
-        else releaseMic(audioPlaying ? 20000 : 0);
+        // A short reply is fully generated before its audio even starts playing. Opening the mic
+        // here let her hear herself on the speaker, take it for the user, and answer her own echo
+        // by saying the same line again. So with speech, the mic waits for playback to stop; the
+        // timer is only a fallback for a missed event, sized to the words she has to say.
+        else if (spoke && !audioFinished) releaseMic(Math.max(4000, (totalWeight(appCaption.split(/\s+/).filter(Boolean)) / pace) * 1000 + 2500));
+        else releaseMic(spoke ? 350 : 0);
         break;
       }
       case 'error':
+        log?.('error', event.error);
         console.error('[voice] realtime error', event.error);
         break;
       default:

@@ -11,7 +11,7 @@ import { geminiCost, geminiParts } from './pricing';
 // are locked into the single-use token server-side; here we stream the mic up, play audio back,
 // and run its tool calls. Interface: createXEngine({ checkin, onState, onCaption, onLevel, onError, onEnd })
 // -> { start(), stop(), setMuted(bool), sendText(text), advance(toolResult) }.
-export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onError, onEnd }) => {
+export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onError, onEnd, log }) => {
   let session = null;
   let mic = null;
   let player = null;
@@ -78,6 +78,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
     const content = message.serverContent;
     if (!content) return;
     if (content.interrupted) {
+      log?.('interrupted');
       // Barge-in: the user spoke over the model
       player.flush();
       captions.app = '';
@@ -99,6 +100,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
       }
     }
     if (content.turnComplete) {
+      log?.('turnComplete', { playing: player.playing });
       turnDone = true;
       captions = { app: '', user: '' };
       settle();
@@ -125,6 +127,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
             onerror: (e) => console.error('[voice] gemini error', e?.message || e),
             onclose: (e) => {
               if (stopped || closing) return;
+              log?.('closed', { code: e?.code, reason: e?.reason });
               console.warn('[voice] gemini closed', e?.code, e?.reason);
               fail('The voice connection dropped.');
             },

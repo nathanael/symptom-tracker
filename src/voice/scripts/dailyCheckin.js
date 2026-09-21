@@ -44,6 +44,25 @@ export const matchSymptom = (symptoms, spoken) => {
   return scored[0].s;
 };
 
+// Every line she is scripted to say, apart from the greetings (GREETING, SHORT_GREETING and
+// BARE_GREETING in cloudflare/voice/src/dailyCheckinSpec.js). Edit the wording here.
+// `period` arrives as "this morning" / "this afternoon" / "this evening" / "today".
+export const LINES = {
+  // The first question of a fresh period, and of one being picked back up
+  startWith: (symptom) => `Let's start with the first symptom, ${symptom}.`,
+  continueWith: (symptom) => `Let's continue with ${symptom}.`,
+  // Every other question is just the symptom ("Anxiety, Physical."), followed by:
+  lastTime: (rating) => `Last time was ${rating}.`, // rating: "zero", "a one" ... "a five"
+  howAbout: (period) => `How about ${period}?`, // first question of a period only
+  // After the greeting, when the day has a morning and an evening (otherWord: "morning" ...)
+  switchHintFull: (period, other, otherWord) => `We're recording symptoms for ${period}. To record for ${other} instead, just say switch to ${otherWord}.`,
+  switchHintShort: (period, otherWord) => `Recording for ${period}. Say switch to ${otherWord} to change.`,
+  // The end of a period
+  periodDone: (period, other) => `That's everything for ${period}. Nice work. Would you like to carry on with ${other}, or stop there?`,
+  allDone: "Congratulations, that's all of them. You're done for now.",
+  goodbye: "You're done for now. Well done.", // only if she reaches the end without having said one of the two above
+};
+
 // Conversations before the full introduction gives way to the short one, and the short to the bare
 export const FULL_INTRO_SESSIONS = 3;
 export const SHORT_INTRO_SESSIONS = 8;
@@ -101,8 +120,8 @@ export const createCheckin = (ctx) => {
         done: true,
         // The check-in ends on her voice, not on the screen closing under them
         say: other
-          ? `That's everything for ${spokenPeriod(period)}. Nice work. Would you like to carry on with ${spokenPeriod(other.id)}, or stop there?`
-          : "Congratulations, that's all of them. You're done for now.",
+          ? LINES.periodDone(spokenPeriod(period), spokenPeriod(other.id))
+          : LINES.allDone,
         period: periodLabel(period),
         skipped: list.filter((s) => skipped.has(s.id) && !all[key(s.id)]).length,
         other_period: other ? { period_id: other.id, label: other.label || other.id, left: other.left } : null,
@@ -120,7 +139,7 @@ export const createCheckin = (ctx) => {
   // long live session.
   const ask = (symptom, all) => {
     const last = getLastSeverity(all, symptom.id, period, ctx.selectedDate);
-    const lastTime = last === null ? '' : ` Last time was ${last === 0 ? 'zero' : `a ${['one', 'two', 'three', 'four', 'five'][last - 1]}`}.`;
+    const lastTime = last === null ? '' : ` ${LINES.lastTime(last === 0 ? 'zero' : `a ${['one', 'two', 'three', 'four', 'five'][last - 1]}`)}`;
     return {
       symptom_id: symptom.id,
       name: symptom.name,
@@ -130,7 +149,7 @@ export const createCheckin = (ctx) => {
       // they know which slot they are filling
       say: opened
         ? `${spokenName(symptom)}.${lastTime}`
-        : `${listFor(ctx.symptoms, period).some((s) => all[key(s.id)]) ? "Let's continue with" : "Let's start with the first symptom,"} ${spokenName(symptom)}.${lastTime} How about ${spokenPeriod(period)}?`,
+        : `${(listFor(ctx.symptoms, period).some((s) => all[key(s.id)]) ? LINES.continueWith : LINES.startWith)(spokenName(symptom))}${lastTime} ${LINES.howAbout(spokenPeriod(period))}`,
     };
   };
 
@@ -192,7 +211,7 @@ export const createCheckin = (ctx) => {
     },
     finish: () => {
       ctx.onFinish?.();
-      return { finished: true, note: "If you have not said a closing line yet, say: \"You're done for now. Well done.\" Otherwise say nothing more." };
+      return { finished: true, note: `If you have not said a closing line yet, say: "${LINES.goodbye}" Otherwise say nothing more.` };
     },
   };
 
@@ -205,8 +224,8 @@ export const createCheckin = (ctx) => {
       const resuming = listFor(ctx.symptoms, period).some((s) => entries()[key(s.id)]);
       const greeting = resuming ? '' : sessions < FULL_INTRO_SESSIONS ? GREETING : sessions < SHORT_INTRO_SESSIONS ? SHORT_GREETING : BARE_GREETING;
       const hint = resuming || sessions >= SHORT_INTRO_SESSIONS ? ''
-        : sessions < FULL_INTRO_SESSIONS ? `We're recording symptoms for ${spokenPeriod(period)}. To record for ${spokenPeriod(other?.id)} instead, just say switch to ${periodWord(other?.id)}.`
-          : `Recording for ${spokenPeriod(period)}. Say switch to ${periodWord(other?.id)} to change.`;
+        : sessions < FULL_INTRO_SESSIONS ? LINES.switchHintFull(spokenPeriod(period), spokenPeriod(other?.id), periodWord(other?.id))
+          : LINES.switchHintShort(spokenPeriod(period), periodWord(other?.id));
       return {
         ...(greeting ? { greeting } : {}),
         period: periodLabel(period),
