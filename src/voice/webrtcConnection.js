@@ -8,6 +8,22 @@ export const micErrorMessage = (err) => {
   return "Couldn't start the microphone.";
 };
 
+// iOS Safari only plays an <audio> element without a tap if it has already played inside one (or
+// while the page is capturing the mic, which is not something to lean on). The launch tap creates
+// and primes this shared element; connect() then attaches the model's audio to it.
+let remoteAudio = null;
+const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+export const primeRemoteAudio = () => {
+  if (!remoteAudio) {
+    remoteAudio = new Audio();
+    remoteAudio.autoplay = true;
+    remoteAudio.playsInline = true;
+  }
+  remoteAudio.srcObject = null;
+  remoteAudio.src = SILENCE;
+  remoteAudio.play().catch(() => {});
+};
+
 export const connect = async ({ secret, onEvent, onLevel, onClosed, playRemoteAudio = false }) => {
   let stream;
   try {
@@ -17,13 +33,18 @@ export const connect = async ({ secret, onEvent, onLevel, onClosed, playRemoteAu
   }
 
   const pc = new RTCPeerConnection();
-  stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+  const micTrack = stream.getAudioTracks()[0];
+  const sender = pc.addTrack(micTrack, stream);
 
   let audioEl = null;
   if (playRemoteAudio) {
-    audioEl = new Audio();
-    audioEl.autoplay = true;
-    pc.ontrack = (e) => { audioEl.srcObject = e.streams[0]; };
+    if (!remoteAudio) primeRemoteAudio();
+    audioEl = remoteAudio;
+    pc.ontrack = (e) => {
+      audioEl.removeAttribute('src');
+      audioEl.srcObject = e.streams[0];
+      audioEl.play().catch((err) => console.warn('[voice] remote audio blocked', err?.name));
+    };
   }
 
   const channel = pc.createDataChannel('oai-events');
@@ -88,7 +109,10 @@ export const connect = async ({ secret, onEvent, onLevel, onClosed, playRemoteAu
 
   return {
     send: (event) => channel.readyState === 'open' && channel.send(JSON.stringify(event)),
-    setMuted: (muted) => stream.getAudioTracks().forEach((track) => { track.enabled = !muted; }),
+    // Stop or resume SENDING the mic without touching the capture itself. Disabling the track
+    // (track.enabled = false) makes iOS Safari treat the page as no longer capturing: it then
+    // blocks the model's audio and the mic does not come back cleanly.
+    setMuted: (muted) => sender.replaceTrack(muted ? null : micTrack).catch((err) => console.warn('[voice] mic switch failed', err?.name)),
     close,
   };
 };

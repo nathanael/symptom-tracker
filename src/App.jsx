@@ -51,6 +51,7 @@ import RapidEntry from './components/RapidEntry';
 import TalkMode from './components/TalkMode';
 import TalkCostCard from './components/TalkCostCard';
 import { primePlayback } from './voice/pcmAudio';
+import { primeRemoteAudio } from './voice/webrtcConnection';
 import SymptomRows from './components/SymptomRows';
 import UndoToast from './components/UndoToast';
 import ProtocolRows from './components/ProtocolRows';
@@ -626,6 +627,7 @@ function App() {
   // Called from the launch tap itself: iOS only lets talk mode play audio if it starts inside a gesture
   const openTalkMode = useCallback(() => {
     primePlayback();
+    primeRemoteAudio();
     setTalkCost(null);
     setAppMode('symptoms');
     setShowInsights(false);
