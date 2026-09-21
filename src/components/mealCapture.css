@@ -1,9 +1,9 @@
 /* Meal capture: full-screen sheet, three stages (capture / analyzing / review). Shares the app's
    one dark visual language — colours and geometry lifted from talkMode.css / rapidEntry.css / settings.css
    rather than invented fresh. */
+/* This is a modal capture flow, not a navigable page — it always covers the whole viewport,
+   including the desktop top bar, at the same layer as the talk mode sheet (rapidEntry.css `.re`). */
 .mc-root { position: fixed; inset: 0; z-index: 260; display: flex; flex-direction: column; background: #08090a; color: #f3f4f6; font-size: 13px; padding-top: env(safe-area-inset-top); }
-/* Desktop has no bottom nav to clear; sit under the persistent top bar instead, same as Settings */
-.mc-root.desktop { top: 54px; left: 0; right: 0; bottom: 0; inset: auto; z-index: 195; padding-top: 0; }
 .mc-root button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
 .mc-head { flex: none; height: 48px; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
@@ -13,6 +13,8 @@
 .mc-save { margin-left: auto; height: 32px; padding: 0 14px; border-radius: 9px; border: 0; background: #8b5cf6; color: #fff; font-size: 13px; font-weight: 600; }
 .mc-save:hover { background: #7c4df0; }
 .mc-save:active { background: #6d3fe0; }
+.mc-save:disabled { opacity: .5; cursor: default; }
+.mc-save:disabled:hover, .mc-save:disabled:active { background: #8b5cf6; }
 
 .mc-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; max-width: 500px; width: 100%; margin: 0 auto; box-sizing: border-box; }
 .mc-body.mc-centered { flex: 1; align-items: center; justify-content: center; text-align: center; gap: 16px; }

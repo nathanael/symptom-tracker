@@ -84,6 +84,9 @@ export default function MealCapture({ existing, onSave, onDelete, onClose, isDes
 
   const remove = (index) => setIngredients((prev) => prev.filter((_, i) => i !== index));
 
+  // Nothing to persist yet: keeps the Save button visibly disabled instead of silently no-op'ing.
+  const canSave = name.trim().length > 0 || ingredients.some((i) => i.trim().length > 0);
+
   const save = () => {
     const clean = ingredients.map((i) => i.trim().toLowerCase()).filter(Boolean);
     if (clean.length === 0 && !name.trim()) return;
@@ -105,7 +108,7 @@ export default function MealCapture({ existing, onSave, onDelete, onClose, isDes
       <header className="mc-head">
         <button className="mc-x" onClick={onClose} aria-label="Cancel">✕</button>
         <h4>{existing ? 'Edit meal' : 'Log a meal'}</h4>
-        {stage === 'review' && <button className="mc-save" onClick={save}>Save</button>}
+        {stage === 'review' && <button className="mc-save" onClick={save} disabled={!canSave}>Save</button>}
       </header>
 
       {stage === 'capture' && (
