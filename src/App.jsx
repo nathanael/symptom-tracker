@@ -28,6 +28,7 @@ import {
 } from './utils/constants';
 import {
   getDateKey,
+  noteText,
   formatDate,
   getCurrentTimePeriod,
   isMobile,
@@ -624,6 +625,15 @@ function App() {
     setLastAction(`${symptom?.name}: ${severityLabel} (${period?.label || timeId})`);
   }, [selectedDate, timePeriods, symptoms]);
 
+  // Talk mode: "make a note that I slept badly" goes on the end of the selected day's note
+  const addDayNote = useCallback((text) => {
+    const dateKey = getDateKey(selectedDate);
+    setDailyNotes((prev) => {
+      const existing = noteText(prev[dateKey]);
+      return { ...prev, [dateKey]: { text: existing ? `${existing}\n${text}` : text } };
+    });
+  }, [selectedDate, setDailyNotes]);
+
   // Called from the launch tap itself: iOS only lets talk mode play audio if it starts inside a gesture
   const openTalkMode = useCallback(() => {
     // Only the engine in use: each one's priming touches the phone's audio session
@@ -946,6 +956,7 @@ function App() {
           trackingMode={trackingMode}
           timePeriods={timePeriods}
           quickLog={quickLog}
+          addDayNote={addDayNote}
           engineKind={talkEngine}
           onCost={talkShowCost ? setTalkCost : undefined}
           setCopyToastMessage={setCopyToastMessage}

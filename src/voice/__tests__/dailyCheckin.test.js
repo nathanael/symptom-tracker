@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createCheckin, parseSeverity, matchSymptom, handEntryMessage, ACKS, NOTE_ACKS, TOOLS } from '../scripts/dailyCheckin';
+import { createCheckin, parseSeverity, matchSymptom, handEntryMessage, GREETING, SHORT_GREETING, BARE_GREETING, TOOLS } from '../scripts/dailyCheckin';
 import { initialPeriod, nextUnlogged, otherIncomplete, unloggedIn } from '../checkinQueue';
 
 const periods = [{ id: 'morning', label: 'AM' }, { id: 'evening', label: 'PM' }];
@@ -94,17 +94,38 @@ describe('createCheckin', () => {
     expect(ctx.log).toHaveBeenCalledWith('headache', 2, 'morning', 'worse after coffee');
     // The note rides along so the voice can acknowledge it
     expect(result.saved).toEqual({ name: 'Headache', severity: 2, note: 'worse after coffee' });
-    // One line to speak: a plain fixed hand-off (never a paraphrase of what they said), then the
-    // next symptom with its description, so she cannot say "next" and leave the symptom unnamed
-    expect(NOTE_ACKS.map((ack) => `${ack} Brain fog, Trouble focusing.`)).toContain(result.next.say);
-    expect(result.next.say).not.toContain('coffee');
+    // The result carries only the next question: an acknowledgement in it as well made her
+    // acknowledge the same answer twice ("okay next ... okay next")
+    expect(result.next.say).toBe('Brain fog, Trouble focusing.');
     expect(result.acknowledge).toBeUndefined();
     expect(result.next.symptom_id).toBe('brain-fog');
     expect(result.next.description).toBe('Trouble focusing');
     expect(result.remaining).toBe(2);
-    // A bare number gets the plain hand-off
-    const bare = checkin.handle('record_symptom', { symptom_id: 'brain-fog', severity: 1 });
-    expect(ACKS.some((ack) => bare.next.say.startsWith(`${ack} `))).toBe(true);
+  });
+
+  it('shrinks the introduction with use, and drops it when picking a check-in back up', () => {
+    const open = (sessions, initial) => { const { ctx } = setup(initial); return createCheckin({ ...ctx, sessions }).start(); };
+    expect(open(0).greeting).toBe(GREETING);
+    expect(GREETING).toMatch(/not applicable/);
+    expect(open(3).greeting).toBe(SHORT_GREETING);
+    expect(open(3).switch_hint).toMatch(/^Recording for/);
+    expect(open(8).greeting).toBe(BARE_GREETING);
+    expect(open(8).switch_hint).toBeUndefined();
+    const resumed = open(0, { [`${dateKey}-headache-morning`]: entry(1) });
+    expect(resumed.greeting).toBeUndefined();
+    expect(resumed.switch_hint).toBeUndefined();
+    expect(resumed.next.say).toMatch(/^Let's continue with/);
+  });
+
+  it('adds a note about the day and stays on the symptom being asked', () => {
+    const { ctx } = setup();
+    const addDayNote = vi.fn();
+    const checkin = createCheckin({ ...ctx, addDayNote });
+    checkin.start();
+    const result = checkin.handle('add_day_note', { text: ' slept badly ' });
+    expect(addDayNote).toHaveBeenCalledWith('slept badly');
+    expect(result.next.symptom_id).toBe('headache');
+    expect(checkin.handle('add_day_note', { text: '' }).error).toBeTruthy();
   });
 
   it('maps not-applicable to -1 and rejects out-of-range severities without advancing', () => {

@@ -18,8 +18,7 @@ import SpokenWords from './SpokenWords';
 
 const ENGINES = { realtime: createRealtimeEngine, gemini: createGeminiEngine };
 
-// After this many conversations on this device the long introduction stops
-const INTRO_SESSIONS = 2;
+// Conversations finished on this device: the introduction shrinks as they add up
 const SESSIONS_KEY = 'talkModeSessions';
 const sessionsSoFar = () => { try { return Number(localStorage.getItem(SESSIONS_KEY)) || 0; } catch { return 0; } };
 
@@ -38,6 +37,7 @@ export default function TalkMode({
   trackingMode,
   timePeriods,
   quickLog,
+  addDayNote, // (text) appends to the selected day's note
   engineKind, // 'gemini' | 'realtime'
   onCost, // called with the conversation's cost stats when it ends (omit to not report)
   setCopyToastMessage,
@@ -54,7 +54,7 @@ export default function TalkMode({
 
   // The engine outlives renders; give it the latest values through refs
   const live = useRef({});
-  live.current = { ...live.current, entries, quickLog, onClose, setCopyToastMessage, onCost };
+  live.current = { ...live.current, entries, quickLog, addDayNote, onClose, setCopyToastMessage, onCost };
   // Ratings that were already there when talk mode opened: only new ones pulse
   const before = useRef(entries);
   const session = useRef(null);
@@ -72,7 +72,8 @@ export default function TalkMode({
       dateKey,
       period: initialPeriod(symptoms, entries, dateKey, timePeriods, getCurrentTimePeriod(trackingMode)),
       getEntries: () => live.current.entries,
-      seasoned: sessionsSoFar() >= INTRO_SESSIONS,
+      sessions: sessionsSoFar(),
+      addDayNote: (text) => !DEMO && live.current.addDayNote?.(text),
       log: (symptomId, severity, periodId, note) => {
         if (DEMO) setDemoEntries((prev) => ({ ...prev, [entryKey(dateKey, symptomId, periodId)]: { severity, note } }));
         else live.current.quickLog(symptomId, severity, periodId, note);

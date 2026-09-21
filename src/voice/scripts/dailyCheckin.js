@@ -2,9 +2,9 @@ import { NA_SEVERITY } from '../../utils/constants';
 import { getLastSeverity } from '../../utils/listHelpers';
 import { entryKey, listFor, otherIncomplete } from '../checkinQueue';
 
-import { GREETING, SHORT_GREETING } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
+import { GREETING, SHORT_GREETING, BARE_GREETING } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
 
-export { GREETING, SHORT_GREETING, INSTRUCTIONS, TOOLS } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
+export { GREETING, SHORT_GREETING, BARE_GREETING, INSTRUCTIONS, TOOLS } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
 
 const normalize = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -44,21 +44,9 @@ export const matchSymptom = (symptoms, spoken) => {
   return scored[0].s;
 };
 
-// What the voice says after saving an answer: short, plain, and fixed. Reflecting the user's note
-// back in her own words came across as awkward; a simple hand-off to the next symptom does not.
-export const ACKS = ['Okay, next.', 'Got it. Next.', 'Okay, next.', 'Alright, next.'];
-export const NOTE_ACKS = ['Noted. Next.', 'Got it, noted. Next.'];
-
-// Rides in the tool result because that is the one thing a live model reads fresh every turn;
-// session-level style guidance fades over a long conversation.
-const acknowledgement = (note, random) => {
-  const phrases = note ? NOTE_ACKS : ACKS;
-  return phrases[Math.floor(random() * phrases.length)];
-};
-
-// A saved answer and the next question, as the single line to speak. Handed over as two fields,
-// the model has said the "next" hand-off and then left the symptom itself unnamed.
-const spoken = (ack, state) => (state.next ? { ...state, next: { ...state.next, say: `${ack} ${state.next.say}` } } : { ...state, acknowledge: ack });
+// Conversations before the full introduction gives way to the short one, and the short to the bare
+export const FULL_INTRO_SESSIONS = 3;
+export const SHORT_INTRO_SESSIONS = 8;
 
 // What to tell a live model after the user taps a rating on screen. Deliberately leaves out the
 // saved value: given it, the model has copied that number onto the next symptom.
@@ -72,7 +60,8 @@ export const handEntryMessage = (result) => {
 //   getEntries()                       live entries map
 //   log(symptomId, severity, periodId, note)   writes a rating (App's quickLog)
 //   onCurrent(symptom, periodId), onPause(), onFinish()   UI hooks, all optional
-//   seasoned                           they have heard the introduction before: keep the opening short
+//   sessions                           conversations finished on this device: the introduction shrinks with them
+//   addDayNote(text)                   appends to the day's note
 export const createCheckin = (ctx) => {
   let period = ctx.period;
   let currentId = null;
@@ -157,7 +146,7 @@ export const createCheckin = (ctx) => {
       if (value === null) return { error: 'severity must be an integer 0 to 5, or -1 for not applicable. Ask the user again.' };
       write(symptom, value, note);
       const text = note?.trim();
-      return { saved: { name: symptom.name, severity: value, ...(text ? { note: text } : {}) }, ...spoken(acknowledgement(text, ctx.random || Math.random), describe()) };
+      return { saved: { name: symptom.name, severity: value, ...(text ? { note: text } : {}) }, ...describe() };
     },
     skip_symptom: ({ symptom_id }) => {
       if (symptom_id) skipped.add(symptom_id);
@@ -172,12 +161,11 @@ export const createCheckin = (ctx) => {
       if (value === undefined || value === null) return { error: `${match.name} has no rating yet. Ask for a number from 0 to 5.` };
       write(match, value, note);
       skipped.delete(match.id);
-      const acknowledge = acknowledgement(note?.trim(), ctx.random || Math.random);
       // Stay on the symptom that was being asked, unless that is the one just revised
       const pendingId = currentId;
       const current = pendingId && pendingId !== match.id && ctx.symptoms.find((s) => s.id === pendingId);
-      if (current) return { saved: { name: match.name, severity: value }, ...spoken(acknowledge, { next: ask(current, entries()) }), note: 'Continue with the symptom you were asking about.' };
-      return { saved: { name: match.name, severity: value }, ...spoken(acknowledge, describe()) };
+      if (current) return { saved: { name: match.name, severity: value }, next: ask(current, entries()), note: 'Continue with the symptom you were asking about.' };
+      return { saved: { name: match.name, severity: value }, ...describe() };
     },
     switch_period: ({ period_id }) => {
       if (!ctx.timePeriods.some((p) => p.id === period_id)) return { error: 'Unknown period_id.' };
@@ -186,6 +174,13 @@ export const createCheckin = (ctx) => {
       opened = false;
       skipped.clear();
       return { period: periodLabel(period), ...describe() };
+    },
+    add_day_note: ({ text }) => {
+      const words = String(text || '').trim();
+      if (!words) return { error: 'Nothing to note. Ask what they would like noted.' };
+      ctx.addDayNote?.(words);
+      const current = currentId && ctx.symptoms.find((s) => s.id === currentId);
+      return { saved_day_note: true, ...(current ? { next: ask(current, entries()) } : describe()), note: 'Say "Noted", then continue with the symptom you were asking about.' };
     },
     pause_session: () => {
       ctx.onPause?.();
@@ -201,14 +196,18 @@ export const createCheckin = (ctx) => {
     // Opening state for the model: which period, how to move to another one, the first symptom
     start: () => {
       const other = ctx.timePeriods.find((p) => p.id !== period);
-      const hint = ctx.seasoned
-        ? `Recording for ${spokenPeriod(period)}. Say switch to ${periodWord(other?.id)} to change.`
-        : `We're recording symptoms for ${spokenPeriod(period)}. To record for ${spokenPeriod(other?.id)} instead, just say switch to ${periodWord(other?.id)}.`;
+      const sessions = ctx.sessions || 0;
+      // Picking a check-in back up gets no introduction at all, only "Let's continue with…"
+      const resuming = listFor(ctx.symptoms, period).some((s) => entries()[key(s.id)]);
+      const greeting = resuming ? '' : sessions < FULL_INTRO_SESSIONS ? GREETING : sessions < SHORT_INTRO_SESSIONS ? SHORT_GREETING : BARE_GREETING;
+      const hint = resuming || sessions >= SHORT_INTRO_SESSIONS ? ''
+        : sessions < FULL_INTRO_SESSIONS ? `We're recording symptoms for ${spokenPeriod(period)}. To record for ${spokenPeriod(other?.id)} instead, just say switch to ${periodWord(other?.id)}.`
+          : `Recording for ${spokenPeriod(period)}. Say switch to ${periodWord(other?.id)} to change.`;
       return {
-        greeting: ctx.seasoned ? SHORT_GREETING : GREETING,
+        ...(greeting ? { greeting } : {}),
         period: periodLabel(period),
         periods: ctx.timePeriods.map((p) => ({ period_id: p.id, when: spokenPeriod(p.id) })),
-        ...(other ? { switch_hint: hint } : {}),
+        ...(other && hint ? { switch_hint: hint } : {}),
         ...describe(),
       };
     },
