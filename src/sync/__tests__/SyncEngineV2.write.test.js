@@ -148,15 +148,15 @@ describe('SyncEngineV2 — granular write path', () => {
     });
   });
 
-  it('Test 3: a removed key produces a delete field path', async () => {
+  it('Test 3: a removed map-domain key is written as a tombstone, not a field delete', async () => {
     makeEngine({ entries: { '2026-03-15-a': { v: 1, _t: 1 }, '2026-03-16-b': { v: 2, _t: 1 } } });
     engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1, _t: 1 } });
     await engine.flushNow();
 
     const call = callForMonth('2026-03');
     expect(call).toBeTruthy();
-    expect(call[1].deletes).toContain('entries.2026-03-16-b');
-    expect(call[1].updates).toEqual({});
+    expect(call[1].deletes).toEqual([]);
+    expect(call[1].updates).toEqual({ 'entries.2026-03-16-b': { _deleted: true, _t: FIXED_NOW } });
   });
 
   it('Test 4: edits spanning two months → one write per month doc', async () => {
@@ -340,9 +340,13 @@ describe('SyncEngineV2 — granular write path', () => {
     await engine.flushNow();
 
     const call = callForMonth('2026-03');
-    expect(call[1].deletes).toContain('entries.2026-03-16-b');
-    // Deleted from shadow.
-    expect('2026-03-16-b' in engine._shadow.entries).toBe(false);
+    expect(call[1].updates['entries.2026-03-16-b']).toEqual({ _deleted: true, _t: FIXED_NOW });
+    // The shadow remembers the delete, so the key's absence locally is not re-reported...
+    expect(engine._shadow.entries['2026-03-16-b']).toEqual({ _deleted: true, _t: FIXED_NOW });
+    writeFieldUpdates.mockClear();
+    engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1, _t: 1 } });
+    await engine.flushNow();
+    expect(writeFieldUpdates).not.toHaveBeenCalled();
   });
 
   it('Fix2(b): a newer remote write after the delete decision SKIPS the delete', async () => {
@@ -355,10 +359,11 @@ describe('SyncEngineV2 — granular write path', () => {
 
     await engine.flushNow();
 
-    // The delete must be skipped: either no write, or a write without the delete.
+    // The delete must be skipped: either no write, or a write without the delete/tombstone.
     const call = callForMonth('2026-03');
     if (call) {
       expect(call[1].deletes || []).not.toContain('entries.2026-03-16-b');
+      expect(call[1].updates['entries.2026-03-16-b']).toBeUndefined();
     }
     // And b must NOT have been removed from the shadow.
     expect(engine._shadow.entries['2026-03-16-b']).toEqual({ v: 999, _t: 50 });

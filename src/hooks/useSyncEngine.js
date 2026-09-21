@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import SyncEngineV2 from '../sync/SyncEngineV2';
 import { mergeMapByTime, mergeIdArrayByTime } from '../sync/merge';
+import { applyTombstones } from '../sync/tombstones';
 import { readLocalDomains } from '../sync/migrationV2';
 import { saveSnapshot, listSnapshots, restoreSnapshot, bootSnapshotIfStale } from '../utils/snapshots';
 
@@ -39,7 +40,8 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
 
   // Apply cloud data to React state, driven by SyncEngineV2's emit contract:
   //   onCloudUpdate(domains, isInitial, opts)
-  // where opts may carry { deletes: { domain: [keys] } } (remote deletes) or
+  // where opts may carry { deletes: { domain: [keys] } } (remote deletes),
+  // { tombstones: { domain: { key: _t } } } (deletes to apply by `_t`), or
   // { replace: true } (destructive forcePull — replace state, don't merge).
   //
   // Sets isApplyingCloudRef=true around ALL state setters (merges, deletes,
@@ -57,6 +59,7 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
     const setters = settersRef.current;
     const replace = !!(opts && opts.replace);
     const deletes = (opts && opts.deletes) || null;
+    const tombstones = (opts && opts.tombstones) || null;
 
     if (domains && typeof domains === 'object') {
       // --- Map domains: merge per-key by _t (or replace wholesale). ---
@@ -117,6 +120,15 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
           const next = prev.filter(it => !(it && idSet.has(it.id)));
           return next.length === prev.length ? prev : next;
         });
+      }
+    }
+
+    // --- TOMBSTONES: deletes made on another device (or another tab). Each one removes the local
+    // record unless that record is newer. Same cloudRef flag window, so nothing echoes back.
+    if (tombstones && !replace) {
+      for (const domain of MAP_DOMAINS) {
+        if (!tombstones[domain] || !setters[domain]) continue;
+        setters[domain](prev => applyTombstones(prev, tombstones[domain]));
       }
     }
 

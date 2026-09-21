@@ -14,6 +14,7 @@
 
 import { idMapToArray } from './definitionShape.js';
 import { MAP_DOMAINS } from './domains.js';
+import { splitTombstones } from './tombstones.js';
 
 // The month-doc field name for daily notes is `notes`, but the app domain is
 // `dailyNotes`. Every other map domain shares its field name with its domain.
@@ -43,6 +44,8 @@ export function assembleDomainsFromDocs(definitionsDoc, monthDocs) {
 
   const domains = {};
   const shadow = {};
+  // { domain: { key: _t } } — deletes made on some device, to be applied by `_t` (see tombstones.js)
+  const tombstones = {};
 
   // Map domains: flatten the per-month maps across every month doc.
   for (const domain of MAP_DOMAINS) {
@@ -56,8 +59,10 @@ export function assembleDomainsFromDocs(definitionsDoc, monthDocs) {
         }
       }
     }
-    domains[domain] = flat;
-    shadow[domain] = flat; // same flat map (with _t) for diffing
+    const split = splitTombstones(flat);
+    domains[domain] = split.live; // the app never sees tombstones
+    shadow[domain] = flat; // the diff does: a tombstoned key must not read as "absent"
+    if (Object.keys(split.tombstones).length > 0) tombstones[domain] = split.tombstones;
   }
 
   // Definition id-array domains: app shape = array, shadow shape = id-map.
@@ -81,5 +86,5 @@ export function assembleDomainsFromDocs(definitionsDoc, monthDocs) {
     shadow.trackingMode = raw;
   }
 
-  return { domains, shadow };
+  return { domains, shadow, tombstones };
 }

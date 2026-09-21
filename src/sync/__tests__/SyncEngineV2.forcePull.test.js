@@ -93,7 +93,7 @@ describe('SyncEngineV2 — forcePull', () => {
     expect(cloudUpdates.length).toBe(1);
     const { isInitial, opts } = cloudUpdates[0];
     expect(isInitial).toBe(false);
-    expect(opts).toEqual({ deletes: {} });
+    expect(opts).toEqual({ deletes: {}, tombstones: {} });
     expect(opts.replace).toBeUndefined();
 
     // Shadow advanced to the freshly-read cloud (id-map shape for symptoms).
@@ -119,6 +119,6 @@ describe('SyncEngineV2 — forcePull', () => {
     createEngine();
     const result = await engine.forcePull();
     expect(result.destructive).toBe(false);
-    expect(cloudUpdates[0].opts).toEqual({ deletes: {} });
+    expect(cloudUpdates[0].opts).toEqual({ deletes: {}, tombstones: {} });
   });
 });
