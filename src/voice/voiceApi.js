@@ -1,6 +1,6 @@
 // Client for the talk mode backend (cloudflare/voice). Every call carries the user's
 // Firebase ID token; the function holds the provider keys.
-const BASE = 'https://glimpse-voice.glimpse-voice.workers.dev';
+export const BASE = 'https://glimpse-voice.glimpse-voice.workers.dev';
 
 export class VoiceApiError extends Error {
   constructor(status, message) {
@@ -9,7 +9,9 @@ export class VoiceApiError extends Error {
   }
 }
 
-const post = async (url, body) => {
+// Shared by every caller of this worker (talk mode, meal analysis): attaches the Firebase ID
+// token and turns a non-2xx into a VoiceApiError carrying the worker's user-facing message.
+export const post = async (url, body) => {
   const user = window.firebase?.auth?.().currentUser;
   if (!user) throw new VoiceApiError(401, 'Sign in to use talk mode.');
   const token = await user.getIdToken();
