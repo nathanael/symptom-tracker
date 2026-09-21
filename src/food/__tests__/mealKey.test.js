@@ -9,6 +9,19 @@ describe('mealKey', () => {
     expect(key).toBe('2026-09-21T12:41:07-ab12');
   });
 
+  it('reads local-time getters, never UTC (passes regardless of the runner timezone)', () => {
+    // Local getters say 21 Sep 12:41:07; every UTC accessor says a different day entirely.
+    // An implementation built on toISOString()/getUTC* would produce the 22nd and fail here.
+    const localOnly = {
+      getFullYear: () => 2026, getMonth: () => 8, getDate: () => 21,
+      getHours: () => 12, getMinutes: () => 41, getSeconds: () => 7,
+      getUTCFullYear: () => 2026, getUTCMonth: () => 8, getUTCDate: () => 22,
+      getUTCHours: () => 2, getUTCMinutes: () => 0, getUTCSeconds: () => 0,
+      toISOString: () => '2026-09-22T02:00:00.000Z',
+    };
+    expect(mealKey(localOnly, () => 'ab12')).toBe('2026-09-21T12:41:07-ab12');
+  });
+
   it('zero-pads every field', () => {
     const key = mealKey(new Date(2026, 0, 5, 7, 3, 9), () => 'cd34');
     expect(key).toBe('2026-01-05T07:03:09-cd34');
