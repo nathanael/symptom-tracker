@@ -159,6 +159,8 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
     },
     stop: () => end('stopped'),
     setMuted: (muted) => mic?.setMuted(muted),
+    // Where her voice is in the sentence, for the captions
+    speechProgress: () => (player ? player.progress : 1),
     sendText: (text) => tell(text),
     // The user tapped a rating instead of speaking
     advance: (result) => tell(handEntryMessage(result)),

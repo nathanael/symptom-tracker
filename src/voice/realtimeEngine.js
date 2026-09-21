@@ -21,6 +21,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
   let userMuted = false;
   let modelBusy = true; // from connect until the greeting has finished playing
   let audioPlaying = false;
+  let audioStartedAt = 0;
   let releaseTimer = null;
   const applyMic = () => connection?.setMuted(userMuted || modelBusy);
   const holdMic = () => {
@@ -92,6 +93,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
         break;
       case 'output_audio_buffer.started':
         audioPlaying = true;
+        audioStartedAt = Date.now();
         holdMic();
         break;
       case 'response.output_audio_transcript.delta':
@@ -140,6 +142,12 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
       tell(`Opening state from the app (not the user speaking): ${JSON.stringify(opening)}`);
     },
     stop: () => end('stopped'),
+    // No timing from a remote audio track: estimate from an ordinary speaking pace
+    speechProgress: () => {
+      if (!audioPlaying) return 1;
+      const seconds = appCaption.split(/\s+/).filter(Boolean).length / 2.9;
+      return seconds > 0 ? Math.min(0.99, (Date.now() - audioStartedAt) / 1000 / seconds) : 0;
+    },
     setMuted: (muted) => {
       userMuted = muted;
       applyMic();

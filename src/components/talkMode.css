@@ -10,6 +10,10 @@
 .tm-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding: 28px 0 60px; -webkit-mask-image: linear-gradient(transparent, #000 36px, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(transparent, #000 36px, #000 calc(100% - 56px), transparent); }
 .tm-list::-webkit-scrollbar { display: none; }
 .tm-list .lr-row { cursor: default; transition: background .3s; }
+/* A note stays on one line here: the row must not grow while she is working down the list */
+.tm-list .lr-noted { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-list .lr-name { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 4px; }
+.tm-list .lr-name small { margin-left: 0; }
 .tm-list .lr-pill { cursor: default; }
 .tm-list .lr-key:disabled { opacity: .4; }
 /* A rating landing: two quick pulses, so it reads as chosen before the list moves on */
@@ -28,10 +32,12 @@
 .tm-orb { flex: 1 1 0; min-height: 0; width: 100%; pointer-events: none; }
 .tm-captions { flex: none; height: 96px; overflow: hidden; padding: 8px 20px 0; text-align: center; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
 .tm-captions p { margin: 0; }
-.tm-words { min-height: 34px; font-size: 27px; font-weight: 600; letter-spacing: -.02em; line-height: 1.25; color: #4b5563; white-space: nowrap; animation: tm-in .25s ease-out; }
-.tm-words span { transition: color .18s; }
-.tm-words .said { color: #a5b4fc; }
-.tm-words .now { color: #fff; }
+.tm-words { position: relative; height: 38px; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent); }
+.tm-words-in { position: absolute; left: 50%; top: 0; white-space: nowrap; font-size: 27px; font-weight: 600; letter-spacing: -.02em; line-height: 38px; transition: transform .3s cubic-bezier(.22,1,.36,1); }
+.tm-words-in span { display: inline-block; padding: 0 .22em; color: #374151; transition: color .2s; }
+.tm-words-in .said { color: #6366f1; }
+.tm-words-in .now { color: #fff; }
+
 .tm-captions .user { min-height: 18px; color: #6b7280; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tm-captions .tm-error { color: #fca5a5; font-size: 14.5px; line-height: 1.35; }
 @keyframes tm-in { from { opacity: 0; transform: translateY(6px); } }

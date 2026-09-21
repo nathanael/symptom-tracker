@@ -1,53 +1,59 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-const WORDS_PER_LINE = 4;
-const CHARS_PER_LINE = 24;
+// Roughly a word every 340ms when the engine cannot tell us where the audio is
+const FALLBACK_MS = 340;
 
-// Her words a few at a time: short lines that end at punctuation where they can
-const toLines = (words) => {
-  const lines = [];
-  let line = [];
-  let chars = 0;
-  words.forEach((word, index) => {
-    if (line.length && (line.length >= WORDS_PER_LINE || chars + word.length > CHARS_PER_LINE)) {
-      lines.push(line);
-      line = [];
-      chars = 0;
-    }
-    line.push({ word, index });
-    chars += word.length + 1;
-    if (/[.?!,]$/.test(word) && line.length > 1) {
-      lines.push(line);
-      line = [];
-      chars = 0;
-    }
-  });
-  if (line.length) lines.push(line);
-  return lines;
-};
-
-// What she is saying, large and a few words at a time, each word lighting up at about speaking
-// pace. The transcript arrives in bursts ahead of the audio and carries no timings, so the pace is
-// ours: steady, a little quicker when the transcript has run ahead.
-export default function SpokenWords({ text }) {
+// What she is saying, as a ribbon of words sliding past: the word being spoken sits in the middle,
+// a couple either side for context. `progress` is how far through the current utterance the audio
+// actually is (0..1, null when unknown), so the words track her voice rather than a guessed pace.
+export default function SpokenWords({ text, progress }) {
   const words = useMemo(() => (text || '').split(/\s+/).filter(Boolean), [text]);
-  const [spoken, setSpoken] = useState({ count: 0, first: '' });
-  // A new turn starts the transcript over
-  const count = spoken.first === words[0] && spoken.count <= words.length ? spoken.count : 0;
+  const [count, setCount] = useState(0);
+  const live = useRef({ count: 0, first: '', started: 0 });
+  live.current.words = words;
+  live.current.progress = progress;
 
   useEffect(() => {
-    if (count >= words.length) return undefined;
-    const behind = words.length - count;
-    const timer = setTimeout(() => setSpoken({ count: count + 1, first: words[0] }), count === 0 ? 0 : behind > 8 ? 190 : 300);
-    return () => clearTimeout(timer);
+    let frame = requestAnimationFrame(function tick(now) {
+      frame = requestAnimationFrame(tick);
+      const state = live.current;
+      const all = state.words;
+      if (!all.length) return;
+      // Her next turn starts the ribbon over
+      if (state.first !== all[0]) {
+        state.first = all[0];
+        state.started = now;
+        state.count = 0;
+        setCount(0);
+      }
+      const fraction = state.progress?.();
+      const target = fraction === null || fraction === undefined
+        ? Math.floor((now - state.started) / FALLBACK_MS) + 1
+        : Math.round(fraction * all.length);
+      // Only ever forwards: late transcript makes the fraction jump back, and rereading is worse
+      const next = Math.min(all.length, Math.max(state.count, target));
+      if (next !== state.count) {
+        state.count = next;
+        setCount(next);
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const innerRef = useRef(null);
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    const word = innerRef.current?.children[Math.max(0, count - 1)];
+    if (word) setShift(word.offsetLeft + word.offsetWidth / 2);
   }, [count, words]);
 
-  const lines = useMemo(() => toLines(words), [words]);
-  const line = lines.find((l) => l[l.length - 1].index >= count - 1) || lines[lines.length - 1];
-  if (!line) return <p className="tm-words" />;
   return (
-    <p className="tm-words" key={line[0].index}>
-      {line.map(({ word, index }) => <span key={index} className={index < count - 1 ? 'said' : index === count - 1 ? 'now' : ''}>{word} </span>)}
-    </p>
+    <div className="tm-words">
+      <div className="tm-words-in" ref={innerRef} style={{ transform: `translateX(${-shift}px)` }}>
+        {words.map((word, index) => (
+          <span key={index} className={index < count - 1 ? 'said' : index === count - 1 ? 'now' : ''}>{word}</span>
+        ))}
+      </div>
+    </div>
   );
 }

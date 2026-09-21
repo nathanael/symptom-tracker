@@ -99,6 +99,7 @@ export const createPlayer = ({ onIdle } = {}) => {
   const context = playContext;
   const sources = new Set();
   let nextStart = 0;
+  let turnStart = 0; // context time this run of audio began
 
   return {
     play: (data) => {
@@ -113,6 +114,7 @@ export const createPlayer = ({ onIdle } = {}) => {
       const source = context.createBufferSource();
       source.buffer = buffer;
       source.connect(context.destination);
+      if (sources.size === 0) turnStart = Math.max(nextStart, context.currentTime + 0.03);
       nextStart = Math.max(nextStart, context.currentTime + 0.03);
       source.start(nextStart);
       nextStart += buffer.duration;
@@ -130,7 +132,15 @@ export const createPlayer = ({ onIdle } = {}) => {
       });
       sources.clear();
       nextStart = 0;
+      turnStart = 0;
     },
     get playing() { return sources.size > 0; },
+    // How far through the audio queued for this turn we are, 0..1. More audio arriving extends the
+    // queue, so this eases forward rather than jumping; 1 once everything queued has played.
+    get progress() {
+      if (!context || sources.size === 0) return 1;
+      const total = nextStart - turnStart;
+      return total > 0 ? Math.min(1, Math.max(0, (context.currentTime - turnStart) / total)) : 0;
+    },
   };
 };

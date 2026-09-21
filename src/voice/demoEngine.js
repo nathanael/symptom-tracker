@@ -14,6 +14,7 @@ export const createDemoEngine = ({ checkin, onState, onCaption, onLevel, onEnd }
       return;
     }
     onState('speaking');
+    spokeAt = Date.now();
     onCaption({ who: 'app', text: result.next.say });
     onCaption({ who: 'user', text: '' });
     later(3400, () => {
@@ -33,6 +34,7 @@ export const createDemoEngine = ({ checkin, onState, onCaption, onLevel, onEnd }
     onEnd(reason, { turns: 0 });
   };
 
+  let spokeAt = 0;
   const wave = setInterval(() => onLevel(Math.random() * 0.6), 90);
 
   return {
@@ -44,6 +46,7 @@ export const createDemoEngine = ({ checkin, onState, onCaption, onLevel, onEnd }
       clearInterval(wave);
       stop();
     },
+    speechProgress: () => Math.min(1, (Date.now() - spokeAt) / 3400),
     setMuted: () => {},
     sendText: () => {},
     advance: () => {},

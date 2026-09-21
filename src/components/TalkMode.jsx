@@ -127,6 +127,7 @@ export default function TalkMode({
   const complete = !loading && list.length > 0 && loggedCount === list.length;
   live.current.complete = complete;
   const stop = () => session.current?.engine.stop();
+  const speechProgress = () => session.current?.engine.speechProgress?.() ?? null;
 
   // The open row trails the conversation by a moment, so a rating is seen landing in its slot
   // before the list moves on, the way it does when you fill the list in by hand
@@ -216,7 +217,7 @@ export default function TalkMode({
         <div className="tm-stage">
           {/* A fixed band: what she says never pushes the voice around */}
           <div className="tm-captions" aria-live="polite">
-            {error ? <p className="tm-error">{error}</p> : <SpokenWords text={captions.app} />}
+            {error ? <p className="tm-error">{error}</p> : <SpokenWords text={captions.app} progress={speechProgress} />}
             <p className="user">{captions.user && `“${captions.user}”`}</p>
           </div>
           <VoiceOrb status={status} levelRef={levelRef} />
