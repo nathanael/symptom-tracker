@@ -82,18 +82,17 @@ describe('createCheckin', () => {
     expect(ctx.log).toHaveBeenCalledWith('headache', 2, 'morning', 'worse after coffee');
     // The note rides along so the voice can acknowledge it
     expect(result.saved).toEqual({ name: 'Headache', severity: 2, note: 'worse after coffee' });
-    // A note gets a plain fixed acknowledgement, never a paraphrase of what they said
-    expect(NOTE_ACKS).toContain(result.acknowledge.say);
-    expect(JSON.stringify(result.acknowledge)).not.toContain('coffee');
+    // One line to speak: a plain fixed hand-off (never a paraphrase of what they said), then the
+    // next symptom with its description, so she cannot say "next" and leave the symptom unnamed
+    expect(NOTE_ACKS.map((ack) => `${ack} Brain fog, Trouble focusing.`)).toContain(result.next.say);
+    expect(result.next.say).not.toContain('coffee');
+    expect(result.acknowledge).toBeUndefined();
     expect(result.next.symptom_id).toBe('brain-fog');
     expect(result.next.description).toBe('Trouble focusing');
-    // She says the description too, even with no last rating to add
-    expect(result.next.say).toBe('Brain fog, Trouble focusing.');
     expect(result.remaining).toBe(2);
-    // A bare number gets a plain hand-off to the next symptom
+    // A bare number gets the plain hand-off
     const bare = checkin.handle('record_symptom', { symptom_id: 'brain-fog', severity: 1 });
-    expect(ACKS).toContain(bare.acknowledge.say);
-    expect(bare.acknowledge.say).toMatch(/[Nn]ext\.$/);
+    expect(ACKS.some((ack) => bare.next.say.startsWith(`${ack} `))).toBe(true);
   });
 
   it('maps not-applicable to -1 and rejects out-of-range severities without advancing', () => {

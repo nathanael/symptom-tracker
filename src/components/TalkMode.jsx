@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import './desktopNav.css';
 import './rapidEntry.css';
+import './listUi.css';
 import './talkMode.css';
-import { severityColors, NA_SEVERITY } from '../utils/constants';
+import { NA_SEVERITY } from '../utils/constants';
+import { isApplicable, getLastSeverity } from '../utils/listHelpers';
+import { SEVERITIES, SEV_BG, SEV_FG, STRIP_COLOR } from './severityStyle';
 import { getDateKey, getCurrentTimePeriod, formatDate } from '../utils/helpers';
 import { entryKey, initialPeriod, listFor } from '../voice/checkinQueue';
 import { createCheckin } from '../voice/scripts/dailyCheckin';
@@ -15,15 +18,13 @@ import VoiceOrb from './VoiceOrb';
 const ENGINES = { realtime: createRealtimeEngine, gemini: createGeminiEngine };
 
 const STATUS = { connecting: 'Connecting', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking', error: 'Not listening' };
-const ROW = 40; // px, a reel row; the current one is CUR tall
-const CUR = 92;
 // Silent walk-through of the screen for checking layout, dev server only
 const DEMO = import.meta.env.DEV && new URLSearchParams(window.location.search).has('talkdemo');
 const SHOW_TEXT_INPUT = import.meta.env.DEV || new URLSearchParams(window.location.search).has('talkdebug');
 
 // Full-screen spoken check-in: the app names each symptom, the user answers with a number and
-// anything else they want noted. Tapping a rating works too. The voice fills the lower half of the
-// screen (all of it while connecting); above it the symptom list scrolls by as she works through it. Progress lives in `entries`, so
+// anything else they want noted. Tapping a rating works too. The voice fills the lower part of the
+// screen (all of it while connecting); above it is the ordinary symptom list, filling itself in. Progress lives in `entries`, so
 // stopping at any point loses nothing and reopening resumes at the next unlogged symptom.
 export default function TalkMode({
   symptoms, // active symptoms in list order
@@ -132,10 +133,36 @@ export default function TalkMode({
   const period = current.period;
   const list = useMemo(() => (period ? listFor(symptoms, period) : []), [symptoms, period]);
   const loggedCount = list.filter((s) => entries[entryKey(dateKey, s.id, period)]).length;
-  const periodLabel = timePeriods.length > 1 ? timePeriods.find((p) => p.id === period)?.label : '';
-  const index = list.findIndex((s) => s.id === current.symptom?.id);
   const loading = status === 'connecting' && !error;
   const stop = () => session.current?.engine.stop();
+
+  // The open row trails the conversation by a moment, so a rating is seen landing in its slot
+  // before the list moves on, the way it does when you fill the list in by hand
+  const [shown, setShown] = useState(null);
+  const currentId = current.symptom?.id ?? null;
+  useEffect(() => {
+    const timer = setTimeout(() => setShown(currentId), shown && currentId ? 650 : 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentId]);
+  const settled = shown === currentId;
+
+  // Keep the open row centred: when it changes, and while the window itself changes size (the
+  // voice shrinking from full screen once connected)
+  const listRef = useRef(null);
+  const centre = (behavior) => {
+    const box = listRef.current;
+    const row = box?.querySelector('.lr-row.open');
+    if (row) box.scrollTo({ top: row.offsetTop - box.offsetTop - (box.clientHeight - row.offsetHeight) / 2, behavior });
+  };
+  useEffect(() => centre('smooth'), [shown, period]);
+  useEffect(() => {
+    const observer = new ResizeObserver(() => centre('auto'));
+    observer.observe(listRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const lastSeverity = shown && settled ? getLastSeverity(entries, shown, period, selectedDate) : null;
 
   return (
     <div className={`re tm${loading ? ' loading' : ''}`}>
@@ -143,54 +170,63 @@ export default function TalkMode({
         <div className="re-bar">
           <button className="re-close" aria-label="Stop talk mode" onClick={stop}><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
           <h2>Talk me through it</h2>
-          {!loading && <span className="tm-count">{formatDate(selectedDate)}{periodLabel && ` · ${periodLabel}`} · <b>{loggedCount}</b> of {list.length}</span>}
+          {!loading && <span className="tm-count">{formatDate(selectedDate)} · <b>{loggedCount}</b> of {list.length}</span>}
         </div>
 
-        <div className="tm-top">
-          <div className="re-ticks">
-            {list.map((s) => {
-              const entry = entries[entryKey(dateKey, s.id, period)];
-              return <i key={s.id} className={s.id === current.symptom?.id ? 'cur' : entry ? (entry.severity === NA_SEVERITY ? 'na' : 'done') : ''} />;
-            })}
+        {/* The same list as the Symptoms tab, filled in as she goes: the row being asked is open with its keys, the answer lands in its slot, the list moves on */}
+        <div className="tm-top lr sym mobile" style={{ '--lr-periods': timePeriods.length }}>
+          <div className="lr-head lr-cols">
+            <div />
+            {timePeriods.map((p) => <div className="c" key={p.id}>{timePeriods.length > 1 ? p.label : 'TODAY'}</div>)}
           </div>
-
-          {/* The list she is working through: answered rows roll up with their rating, the one being asked sits large in the middle */}
-          <div className="tm-reel">
-            {index < 0 ? (
-              <div className="tm-reel-in" style={{ transform: `translateY(${-CUR / 2}px)` }}>
-                <div className="tm-row cur"><span className="n">{loading ? '' : 'All caught up'}</span></div>
-              </div>
-            ) : (
-              <div className="tm-reel-in" style={{ transform: `translateY(${-(index * ROW + CUR / 2)}px)` }}>
-                {list.map((s, i) => {
-                  const entry = entries[entryKey(dateKey, s.id, period)];
-                  return (
-                    <div key={s.id} className={`tm-row${i === index ? ' cur' : ''}${entry ? ' done' : ''}`}>
-                      <span className="n">{s.name}</span>
-                      {(i === index || s.description) && <span className="d">{s.description}</span>}
-                      {entry && <b className="v" style={{ color: severityColors[entry.severity] }}>{entry.severity === NA_SEVERITY ? 'N/A' : entry.severity}</b>}
-                      {entry?.note && i !== index && <em className="t">{entry.note}</em>}
+          <div className="tm-list" ref={listRef}>
+            {list.map((symptom) => {
+              const open = symptom.id === shown;
+              const entry = entries[entryKey(dateKey, symptom.id, period)];
+              const done = timePeriods.every((p) => !isApplicable(symptom, p.id) || entries[entryKey(dateKey, symptom.id, p.id)]);
+              return (
+                <div key={symptom.id} className={`lr-row lr-cols ${open ? 'open' : ''} ${done ? 'done' : ''}`}>
+                  <div className="lr-name">
+                    {symptom.name}{symptom.description && <small>{symptom.description}</small>}
+                    {entry?.note && <span className="lr-noted">{entry.note}</span>}
+                  </div>
+                  {timePeriods.map((p) => {
+                    if (!isApplicable(symptom, p.id)) return <span key={p.id} className="lr-pill none">–</span>;
+                    const slot = entries[entryKey(dateKey, symptom.id, p.id)];
+                    const cur = open && p.id === period ? ' cur' : '';
+                    if (!slot) return <span key={p.id} className={`lr-pill empty${cur}`}>·</span>;
+                    if (slot.severity === NA_SEVERITY) return <span key={p.id} className={`lr-pill na${cur}`}>N/A</span>;
+                    return <span key={`${p.id}-${slot.severity}`} className={`lr-pill tm-land${cur}`} style={{ background: SEV_BG[slot.severity], color: SEV_FG[slot.severity] }}>{slot.severity}</span>;
+                  })}
+                  {open && (
+                    <div className="lr-keys">
+                      {SEVERITIES.map((n) => (
+                        <button
+                          key={n}
+                          className={`lr-key ${lastSeverity === n && !entry ? 'last' : ''}`}
+                          style={entry?.severity === n ? { background: SEV_BG[n], color: SEV_FG[n], borderColor: 'transparent' } : lastSeverity === n ? { '--c': STRIP_COLOR[n] } : undefined}
+                          disabled={!settled}
+                          onClick={() => rate(n)}
+                        >
+                          {n}
+                        </button>
+                      ))}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="tm-keys">
-            {[0, 1, 2, 3, 4, 5].map((severity) => (
-              <button key={severity} className="re-key" style={{ '--c': severityColors[severity] }} disabled={!current.symptom} onClick={() => rate(severity)}>{severity}</button>
-            ))}
+                  )}
+                </div>
+              );
+            })}
+            {!loading && !currentId && shown === null && <div className="tm-alldone">All caught up</div>}
           </div>
         </div>
 
         <div className="tm-stage">
-          <VoiceOrb status={status} muted={muted} levelRef={levelRef} />
           <div className="tm-captions" aria-live="polite">
             {error && <p className="tm-error">{error}</p>}
             <p className="app">{captions.app}</p>
             <p className="user">{captions.user && `“${captions.user}”`}</p>
           </div>
+          <VoiceOrb status={status} muted={muted} levelRef={levelRef} />
           <div className="tm-foot">
             <p className={`tm-state ${status}`}>{muted && status === 'listening' ? 'Muted' : STATUS[status]}</p>
             {loading && <p className="tm-hint">Waking her up. This takes a few seconds.</p>}

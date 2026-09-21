@@ -10,15 +10,10 @@ const COLORS = {
   muted: [107, 114, 128],
 };
 
-const RINGS = [
-  { r: 1.5, width: 2, alpha: 0.55, speed: 0.5, arcs: [[0, 1.3], [2.1, 0.7], [3.6, 1.9]] },
-  { r: 1.78, width: 1.25, alpha: 0.34, speed: -0.32, arcs: [[0.4, 2.4], [3.4, 0.5], [4.4, 1.2]] },
-  { r: 2.08, width: 1, alpha: 0.2, speed: 0.18, arcs: [[1, 0.9], [2.6, 2.8]] },
-];
 const BARS = 84;
 
-// The voice, drawn: a glowing core, a ring of bars that moves with whoever is talking, and slow
-// instrument rings around it. Reads the mic level from a ref so audio-rate updates never re-render.
+// The voice, drawn: a glowing core and a ring of bars that moves with whoever is talking. Reads
+// the mic level from a ref so audio-rate updates never re-render.
 export default function VoiceOrb({ status, muted, levelRef }) {
   const canvasRef = useRef(null);
   const live = useRef({});
@@ -43,14 +38,10 @@ export default function VoiceOrb({ status, muted, levelRef }) {
 
     let frame = 0;
     let energy = 0;
-    let spin = 0;
-    let last = performance.now();
     const color = [...COLORS.connecting];
 
     const draw = (now) => {
       frame = requestAnimationFrame(draw);
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
       const t = now / 1000;
       const { status: state, muted: isMuted } = live.current;
       const waiting = state === 'connecting' || state === 'thinking';
@@ -59,20 +50,21 @@ export default function VoiceOrb({ status, muted, levelRef }) {
       if (state === 'listening') target = isMuted ? 0 : Math.min(1, (levelRef.current || 0) * 1.6);
       // No level for her audio on every engine, so her voice is a plausible syllable rhythm
       else if (state === 'speaking') target = 0.3 + 0.45 * Math.abs(Math.sin(t * 7.1) * Math.sin(t * 2.3 + 1)) + 0.12 * Math.sin(t * 13);
-      else if (waiting) target = 0.16 + 0.1 * Math.sin(t * 2.4);
+      // Waiting: a slow breath, so a long connect still reads as alive
+      else if (waiting) target = 0.22 + 0.16 * Math.sin(t * 2.4);
       energy += (target - energy) * (target > energy ? 0.3 : 0.1);
 
       const goal = COLORS[isMuted && state === 'listening' ? 'muted' : state] || COLORS.connecting;
       for (let i = 0; i < 3; i++) color[i] += (goal[i] - color[i]) * 0.08;
       const rgb = `${color[0] | 0},${color[1] | 0},${color[2] | 0}`;
-      spin += dt * (waiting ? 2.6 : 0.7 + energy * 1.2);
 
       ctx.clearRect(0, 0, width, height);
       const cx = width / 2;
-      const cy = height * 0.44;
-      const R = Math.max(40, Math.min(width * 0.2, height * 0.17, 120));
+      const cy = height / 2;
+      // The bars reach 1.44 R at full voice: keep them inside the canvas
+      const R = Math.max(36, Math.min(width * 0.24, height * 0.33, 130));
 
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 3.4);
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(R * 3.4, height / 2));
       glow.addColorStop(0, `rgba(${rgb},${0.2 + energy * 0.3})`);
       glow.addColorStop(0.45, `rgba(${rgb},${0.05 + energy * 0.08})`);
       glow.addColorStop(1, `rgba(${rgb},0)`);
@@ -100,29 +92,6 @@ export default function VoiceOrb({ status, muted, levelRef }) {
         const r0 = R * 1.02;
         ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
         ctx.lineTo(cx + Math.cos(a) * (r0 + len), cy + Math.sin(a) * (r0 + len));
-      }
-      ctx.stroke();
-
-      for (const ring of RINGS) {
-        ctx.lineWidth = ring.width;
-        ctx.strokeStyle = `rgba(${rgb},${ring.alpha})`;
-        for (const [start, sweep] of ring.arcs) {
-          const a = start + spin * ring.speed;
-          ctx.beginPath();
-          ctx.arc(cx, cy, R * ring.r + energy * R * 0.06, a, a + sweep);
-          ctx.stroke();
-        }
-      }
-
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = `rgba(${rgb},0.16)`;
-      ctx.beginPath();
-      for (let i = 0; i < 60; i++) {
-        const a = (i / 60) * Math.PI * 2 - spin * 0.08;
-        const r0 = R * 2.3;
-        const r1 = r0 + (i % 5 === 0 ? R * 0.09 : R * 0.04);
-        ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
-        ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
       }
       ctx.stroke();
     };

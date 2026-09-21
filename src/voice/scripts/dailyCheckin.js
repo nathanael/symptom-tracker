@@ -51,8 +51,12 @@ export const NOTE_ACKS = ['Noted. Next.', 'Got it, noted. Next.'];
 // session-level style guidance fades over a long conversation.
 const acknowledgement = (note, random) => {
   const phrases = note ? NOTE_ACKS : ACKS;
-  return { say: phrases[Math.floor(random() * phrases.length)], how: 'Say exactly this and nothing else about their answer, then ask the next symptom.' };
+  return phrases[Math.floor(random() * phrases.length)];
 };
+
+// A saved answer and the next question, as the single line to speak. Handed over as two fields,
+// the model has said the "next" hand-off and then left the symptom itself unnamed.
+const spoken = (ack, state) => (state.next ? { ...state, next: { ...state.next, say: `${ack} ${state.next.say}` } } : { ...state, acknowledge: ack });
 
 // What to tell a live model after the user taps a rating on screen. Deliberately leaves out the
 // saved value: given it, the model has copied that number onto the next symptom.
@@ -133,7 +137,7 @@ export const createCheckin = (ctx) => {
       if (value === null) return { error: 'severity must be an integer 0 to 5, or -1 for not applicable. Ask the user again.' };
       write(symptom, value, note);
       const text = note?.trim();
-      return { saved: { name: symptom.name, severity: value, ...(text ? { note: text } : {}) }, acknowledge: acknowledgement(text, ctx.random || Math.random), ...describe() };
+      return { saved: { name: symptom.name, severity: value, ...(text ? { note: text } : {}) }, ...spoken(acknowledgement(text, ctx.random || Math.random), describe()) };
     },
     skip_symptom: ({ symptom_id }) => {
       if (symptom_id) skipped.add(symptom_id);
@@ -152,8 +156,8 @@ export const createCheckin = (ctx) => {
       // Stay on the symptom that was being asked, unless that is the one just revised
       const pendingId = currentId;
       const current = pendingId && pendingId !== match.id && ctx.symptoms.find((s) => s.id === pendingId);
-      if (current) return { saved: { name: match.name, severity: value }, acknowledge, next: ask(current, entries()), note: 'Continue with the symptom you were asking about.' };
-      return { saved: { name: match.name, severity: value }, acknowledge, ...describe() };
+      if (current) return { saved: { name: match.name, severity: value }, ...spoken(acknowledge, { next: ask(current, entries()) }), note: 'Continue with the symptom you were asking about.' };
+      return { saved: { name: match.name, severity: value }, ...spoken(acknowledge, describe()) };
     },
     switch_period: ({ period_id }) => {
       if (!ctx.timePeriods.some((p) => p.id === period_id)) return { error: 'Unknown period_id.' };
