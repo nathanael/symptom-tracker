@@ -3,10 +3,11 @@ import SyncEngineV2 from '../sync/SyncEngineV2';
 import { mergeCloudMap, mergeIdArrayByTime } from '../sync/merge';
 import { readLocalDomains } from '../sync/migrationV2';
 import { saveSnapshot, listSnapshots, restoreSnapshot, bootSnapshotIfStale } from '../utils/snapshots';
-
 // Map domains arrive from the engine as flat `{ key: value+_t }` maps and live
-// in React as objects; merge them per-key by `_t`.
-const MAP_DOMAINS = ['entries', 'dailyNotes', 'stackEntries', 'inputEntries'];
+// in React as objects; merge them per-key by `_t`. Derived from domains.js so a
+// new map domain is picked up here without a second edit.
+import { MAP_DOMAINS } from '../sync/domains';
+
 // Definition id-array domains arrive as APP-shape arrays and live in React as
 // arrays; merge them by id+`_t`.
 const ID_ARRAY_DOMAINS = ['symptoms', 'stackItems', 'inputItems'];

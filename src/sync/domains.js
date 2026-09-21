@@ -1,6 +1,6 @@
 // Central sync domain configuration.
 //
-// The nine sync domains, each carrying its canonical localStorage key, data
+// The ten sync domains, each carrying its canonical localStorage key, data
 // kind, and sharding strategy. No other module should hardcode domain lists or
 // storage keys — derive everything from here.
 //
@@ -15,6 +15,7 @@ export const DOMAINS = {
   stackEntries:   { storageKey: 'symptomTracker_stackEntries', kind: 'map',     sharding: 'month' },
   inputEntries:   { storageKey: 'symptomTracker_inputEntries', kind: 'map',     sharding: 'month' },
   dailyNotes:     { storageKey: 'symptomTracker_notes',        kind: 'map',     sharding: 'month' },
+  meals:          { storageKey: 'symptomTracker_meals',       kind: 'map',     sharding: 'month' },
   symptoms:       { storageKey: 'symptomTracker_symptoms',     kind: 'idArray', sharding: 'definitions' },
   stackItems:     { storageKey: 'symptomTracker_stackItems',   kind: 'idArray', sharding: 'definitions' },
   inputItems:     { storageKey: 'symptomTracker_inputItems',   kind: 'idArray', sharding: 'definitions' },
