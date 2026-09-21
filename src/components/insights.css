@@ -27,13 +27,19 @@
 .is-score .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); overflow: hidden; }
 .is-score .bar i { display: block; height: 100%; border-radius: 4px; }
 .is-score .delta { flex: none; font-size: 11px; }
+.is-score .delta small { display: block; margin-top: 1px; font-size: 10px; font-weight: 400; color: #6b7280; }
+.is-score .delta { text-align: right; line-height: 1.2; }
 
 
 /* Mobile: the health score leads the tab at hero size, right under the range controls */
 .is:not(.desktop) .is-score { gap: 16px; padding: 14px 16px; border-radius: 12px; margin-bottom: 10px; }
 .is:not(.desktop) .is-score .num { font-size: 40px; line-height: 1; letter-spacing: -.02em; }
 .is:not(.desktop) .is-score .body { gap: 8px; }
-.is:not(.desktop) .is-score .cap { font-size: 12px; }
+.is:not(.desktop) .is-score .cap { flex-direction: column; gap: 1px; font-size: 12px; white-space: nowrap; }
+.is:not(.desktop) .is-score .cap span { letter-spacing: 0; color: #9ca3af; }
+.is:not(.desktop) .is-score .cap span.on { color: #f3f4f6; }
+.is:not(.desktop) .is-score .delta { font-size: 15px; }
+.is:not(.desktop) .is-score .delta small { font-size: 10.5px; }
 .is:not(.desktop) .is-score .bar { height: 6px; border-radius: 6px; }
 .is:not(.desktop) .is-score .bar i { border-radius: 6px; }
 

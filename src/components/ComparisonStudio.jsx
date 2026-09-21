@@ -16,6 +16,7 @@ import { getProtocolEvents, normalRange, changeEffect, addDays } from '../utils/
 import HealthScoreCompact from './HealthScoreCompact';
 import SeriesPicker from './SeriesPicker';
 import { useHealthScore } from '../hooks/useHealthScore';
+import { computeHealthScore } from '../utils/healthScore';
 import { useGarminSleep } from '../hooks/useGarminSleep';
 import { METRICS as SLEEP_METRICS } from '../utils/sleepMetrics';
 import { SLEEP_ENABLED } from '../utils/constants';
@@ -205,6 +206,17 @@ export default function ComparisonStudio({
   // Use the end date of the visible window so score updates when navigating
   const windowEndDate = dates.length > 0 ? dates[dates.length - 1] : todayStr;
   const healthScore = useHealthScore(windowEndDate, { symptoms, entries, trackingMode, rollingDays: timeframe });
+  // Health score change in points against the window before this one. Needs 3 scored days there to mean anything.
+  const healthScoreDelta = useMemo(() => {
+    if (healthScore.rollingAvg === null) return null;
+    const prior = [];
+    for (let i = 1; i <= timeframe; i++) {
+      const { score } = computeHealthScore(symptoms, entries, addDays(windowEndDate, -timeframe - i), trackingMode);
+      if (score !== null) prior.push(score);
+    }
+    if (prior.length < 3) return null;
+    return healthScore.rollingAvg - Math.round(prior.reduce((a, b) => a + b, 0) / prior.length);
+  }, [healthScore.rollingAvg, symptoms, entries, windowEndDate, timeframe, trackingMode]);
 
   const suppItems = useMemo(
     () => selectedSupplements.map(id => stackItems.find(i => i.id === id)),
@@ -1198,7 +1210,9 @@ export default function ComparisonStudio({
     <HealthScoreCompact
       score={null}
       rollingAvg={healthScore.rollingAvg}
-      delta={null}
+      delta={healthScoreDelta}
+      deltaLabel={`vs prev ${timeframe}`}
+      caption={isDesktop ? null : (scrubDate || `${timeframe}-day average`)}
       inspectValue={hsInspectValue}
       showOnGraph={healthScoreVisible}
       onToggleGraph={() => {
@@ -1249,7 +1263,6 @@ export default function ComparisonStudio({
         /* ── Mobile: vertical stack ── */
         <div style={{ marginBottom: '16px' }}>
           <div className="is-mhead">{rangeControls}</div>
-          {valuesCaption}
           {healthScoreTile}
           {markerChip}
           {scrubReadout}
