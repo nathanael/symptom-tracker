@@ -61,16 +61,18 @@ const authenticate = async (req) => {
 
 // One KV record per user per day. KV isn't transactional, so two simultaneous requests can
 // under-count by one; fine for a spending guard.
-const spend = async (env, uid, field, amount) => {
+// `limitMessage` lets a non-talk-mode caller (the meal route) report the cap in its own words;
+// talk mode's callers omit it and get the default.
+const spend = async (env, uid, field, amount, limitMessage) => {
   const key = `usage:${uid}:${new Date().toISOString().slice(0, 10)}`;
   const usage = (await env.VOICE_USAGE.get(key, 'json')) || {};
   const next = (usage[field] || 0) + amount;
-  if (next > DAILY_CAPS[field]) throw new HttpError(429, "You've hit today's talk mode limit. It resets at midnight UTC.");
+  if (next > DAILY_CAPS[field]) throw new HttpError(429, limitMessage || "You've hit today's talk mode limit. It resets at midnight UTC.");
   await env.VOICE_USAGE.put(key, JSON.stringify({ ...usage, [field]: next }), { expirationTtl: 60 * 60 * 48 });
 };
 
-const requireKey = (env, name) => {
-  if (!env[name]) throw new HttpError(503, 'This talk mode voice is not set up yet.');
+const requireKey = (env, name, missingMessage) => {
+  if (!env[name]) throw new HttpError(503, missingMessage || 'This talk mode voice is not set up yet.');
   return env[name];
 };
 
@@ -210,8 +212,8 @@ const meal = async (env, uid, body) => {
   if (image.length > IMAGE_LIMIT) throw new HttpError(400, 'That photo is too large.');
   if (text.length > TEXT_LIMIT) throw new HttpError(400, 'That description is too long.');
 
-  const apiKey = requireKey(env, 'GEMINI_API_KEY');
-  await spend(env, uid, 'meals', 1);
+  const apiKey = requireKey(env, 'GEMINI_API_KEY', 'Meal photo analysis is not set up yet.');
+  await spend(env, uid, 'meals', 1, "You've hit today's meal-logging limit. It resets at midnight UTC.");
 
   const parts = image
     ? [{ inlineData: { mimeType: 'image/jpeg', data: image } }, { text: MEAL_PROMPT }]
