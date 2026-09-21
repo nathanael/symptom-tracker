@@ -12,6 +12,7 @@ const icons = {
   trash: solar.trash,
   bolt: solar.bolt,
   mic: solar.mic,
+  camera: solar.camera,
 };
 
 // The one mobile overflow. Ordered for the thumb: rare and destructive at the top,
@@ -33,6 +34,7 @@ export default function QuickActionsMenu({
   onClear,
   onMatchYesterday,
   onEditProtocol,
+  onLogMeal,
   // Common
   onOpenSettings,
 }) {
@@ -73,6 +75,7 @@ export default function QuickActionsMenu({
           <>
             <Item icon="list" label="Edit protocol" onClick={onEditProtocol} />
             <Item icon="yesterday" label="Match yesterday" onClick={onMatchYesterday} />
+            <Item icon="camera" label="Log a meal" onClick={onLogMeal} />
           </>
         )}
         {tab !== 'insights' && (

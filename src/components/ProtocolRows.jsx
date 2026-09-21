@@ -62,6 +62,7 @@ export default function ProtocolRows({
   keyboardEnabled,
   isDesktop,
   barSlot,
+  mealsSlot,
 }) {
   const dateKey = getDateKey(selectedDate);
   const isToday = selectedDate.toDateString() === new Date().toDateString();
@@ -559,6 +560,7 @@ export default function ProtocolRows({
       <div className="lr-sec"><b>OTHER FACTORS</b> {loggedCount} of {factors.length} {isToday ? 'today' : 'logged'}</div>
       {factors.length === 0 && <div className="lr-empty">{search ? `Nothing matches "${search}"` : 'No factors yet.'}</div>}
       {factors.map(renderFactorRow)}
+      {mealsSlot}
       {isDesktop && (
         <div className="lr-hintbar">
           <span><kbd>Space</kbd> check</span>
