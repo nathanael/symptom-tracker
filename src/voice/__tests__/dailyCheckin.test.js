@@ -87,6 +87,8 @@ describe('createCheckin', () => {
     expect(JSON.stringify(result.acknowledge)).not.toContain('coffee');
     expect(result.next.symptom_id).toBe('brain-fog');
     expect(result.next.description).toBe('Trouble focusing');
+    // She says the description too, even with no last rating to add
+    expect(result.next.say).toBe('Brain fog, Trouble focusing.');
     expect(result.remaining).toBe(2);
     // A bare number gets a plain hand-off to the next symptom
     const bare = checkin.handle('record_symptom', { symptom_id: 'brain-fog', severity: 1 });

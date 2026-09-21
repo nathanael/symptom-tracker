@@ -9,14 +9,21 @@ import { entryKey, initialPeriod, listFor } from '../voice/checkinQueue';
 import { createCheckin } from '../voice/scripts/dailyCheckin';
 import { createRealtimeEngine } from '../voice/realtimeEngine';
 import { createGeminiEngine } from '../voice/geminiEngine';
+import { createDemoEngine } from '../voice/demoEngine';
+import VoiceOrb from './VoiceOrb';
 
 const ENGINES = { realtime: createRealtimeEngine, gemini: createGeminiEngine };
 
-const STATUS = { connecting: 'Connecting…', listening: 'Listening', thinking: 'Thinking…', speaking: 'Speaking', error: 'Not listening' };
+const STATUS = { connecting: 'Connecting', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking', error: 'Not listening' };
+const ROW = 40; // px, a reel row; the current one is CUR tall
+const CUR = 92;
+// Silent walk-through of the screen for checking layout, dev server only
+const DEMO = import.meta.env.DEV && new URLSearchParams(window.location.search).has('talkdemo');
 const SHOW_TEXT_INPUT = import.meta.env.DEV || new URLSearchParams(window.location.search).has('talkdebug');
 
 // Full-screen spoken check-in: the app names each symptom, the user answers with a number and
-// anything else they want noted. Tapping a rating works too. Progress lives in `entries`, so
+// anything else they want noted. Tapping a rating works too. The voice fills the lower half of the
+// screen (all of it while connecting); above it the symptom list scrolls by as she works through it. Progress lives in `entries`, so
 // stopping at any point loses nothing and reopening resumes at the next unlogged symptom.
 export default function TalkMode({
   symptoms, // active symptoms in list order
@@ -34,10 +41,9 @@ export default function TalkMode({
   const [status, setStatus] = useState('connecting');
   const [error, setError] = useState('');
   const [captions, setCaptions] = useState({ app: '', user: '' });
-  const [level, setLevel] = useState(0);
+  const levelRef = useRef(0); // mic level, read by the orb each frame
   const [muted, setMuted] = useState(false);
   const [current, setCurrent] = useState({ symptom: null, period: null });
-  const [saved, setSaved] = useState(null); // last rating written, shown briefly as confirmation
   const [draft, setDraft] = useState('');
 
   // The engine outlives renders; give it the latest values through refs
@@ -60,16 +66,15 @@ export default function TalkMode({
       getEntries: () => live.current.entries,
       log: (symptomId, severity, periodId, note) => {
         live.current.quickLog(symptomId, severity, periodId, note);
-        setSaved({ name: symptoms.find((s) => s.id === symptomId)?.name, severity, note });
       },
       onCurrent: (symptom, period) => !disposed && setCurrent({ symptom, period }),
     });
-    const create = ENGINES[engineKind] || createGeminiEngine;
+    const create = DEMO ? createDemoEngine : ENGINES[engineKind] || createGeminiEngine;
     const engine = create({
       checkin,
       onState: (next) => !disposed && setStatus(next),
       onCaption: ({ who, text }) => !disposed && setCaptions((prev) => ({ ...prev, [who]: text })),
-      onLevel: (value) => !disposed && setLevel(value),
+      onLevel: (value) => { levelRef.current = value; },
       onError: (message) => !disposed && setError(message),
       onEnd: (reason, stats) => {
         if (disposed) return;
@@ -128,57 +133,76 @@ export default function TalkMode({
   const list = useMemo(() => (period ? listFor(symptoms, period) : []), [symptoms, period]);
   const loggedCount = list.filter((s) => entries[entryKey(dateKey, s.id, period)]).length;
   const periodLabel = timePeriods.length > 1 ? timePeriods.find((p) => p.id === period)?.label : '';
-  const savedLabel = saved && (saved.severity === NA_SEVERITY ? 'N/A' : saved.severity);
+  const index = list.findIndex((s) => s.id === current.symptom?.id);
+  const loading = status === 'connecting' && !error;
+  const stop = () => session.current?.engine.stop();
 
   return (
-    <div className="re tm">
+    <div className={`re tm${loading ? ' loading' : ''}`}>
       <div className="re-in">
         <div className="re-bar">
-          <button className="re-close" aria-label="Stop talk mode" onClick={() => session.current?.engine.stop()}><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+          <button className="re-close" aria-label="Stop talk mode" onClick={stop}><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
           <h2>Talk me through it</h2>
-          <span className={`tm-status ${status}`}><i style={{ '--level': muted ? 0 : level }} />{muted && status === 'listening' ? 'Muted' : STATUS[status]}</span>
+          {!loading && <span className="tm-count">{formatDate(selectedDate)}{periodLabel && ` · ${periodLabel}`} · <b>{loggedCount}</b> of {list.length}</span>}
         </div>
 
-        <div className="re-progress">
-          <div className="re-count"><span>{formatDate(selectedDate)}{periodLabel && ` · ${periodLabel}`}</span><span><b>{loggedCount}</b> of {list.length} logged</span></div>
+        <div className="tm-top">
           <div className="re-ticks">
             {list.map((s) => {
               const entry = entries[entryKey(dateKey, s.id, period)];
               return <i key={s.id} className={s.id === current.symptom?.id ? 'cur' : entry ? (entry.severity === NA_SEVERITY ? 'na' : 'done') : ''} />;
             })}
           </div>
-        </div>
 
-        <div className="re-symptom">
-          <h1>{current.symptom ? current.symptom.name : status === 'connecting' ? 'Getting ready…' : 'All caught up'}</h1>
-          <p>{current.symptom?.description}</p>
-          {saved && (
-            <span className="tm-saved" key={`${saved.name}-${saved.severity}-${saved.note}`}>
-              ✓ {saved.name} <b style={{ color: severityColors[saved.severity] }}>{savedLabel}</b>{saved.note && <em>{saved.note}</em>}
-            </span>
-          )}
-        </div>
+          {/* The list she is working through: answered rows roll up with their rating, the one being asked sits large in the middle */}
+          <div className="tm-reel">
+            {index < 0 ? (
+              <div className="tm-reel-in" style={{ transform: `translateY(${-CUR / 2}px)` }}>
+                <div className="tm-row cur"><span className="n">{loading ? '' : 'All caught up'}</span></div>
+              </div>
+            ) : (
+              <div className="tm-reel-in" style={{ transform: `translateY(${-(index * ROW + CUR / 2)}px)` }}>
+                {list.map((s, i) => {
+                  const entry = entries[entryKey(dateKey, s.id, period)];
+                  return (
+                    <div key={s.id} className={`tm-row${i === index ? ' cur' : ''}${entry ? ' done' : ''}`}>
+                      <span className="n">{s.name}</span>
+                      {(i === index || s.description) && <span className="d">{s.description}</span>}
+                      {entry && <b className="v" style={{ color: severityColors[entry.severity] }}>{entry.severity === NA_SEVERITY ? 'N/A' : entry.severity}</b>}
+                      {entry?.note && i !== index && <em className="t">{entry.note}</em>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-        <div className="tm-captions" aria-live="polite">
-          {error && <p className="tm-error">{error}</p>}
-          <p className="app">{captions.app}</p>
-          <p className="user">{captions.user && `“${captions.user}”`}</p>
-        </div>
-
-        <div className="re-pad">
-          {SHOW_TEXT_INPUT && (
-            <div className="tm-debug">
-              <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={sendDraft} placeholder="Type what you would say" aria-label="Type instead of speaking" />
-            </div>
-          )}
           <div className="tm-keys">
             {[0, 1, 2, 3, 4, 5].map((severity) => (
               <button key={severity} className="re-key" style={{ '--c': severityColors[severity] }} disabled={!current.symptom} onClick={() => rate(severity)}>{severity}</button>
             ))}
           </div>
-          <div className="tm-actions">
-            <button className={muted ? 'on' : ''} onClick={toggleMute} aria-pressed={muted}>{muted ? 'Unmute' : 'Mute'}</button>
-            <button className="stop" onClick={() => session.current?.engine.stop()}>Stop</button>
+        </div>
+
+        <div className="tm-stage">
+          <VoiceOrb status={status} muted={muted} levelRef={levelRef} />
+          <div className="tm-captions" aria-live="polite">
+            {error && <p className="tm-error">{error}</p>}
+            <p className="app">{captions.app}</p>
+            <p className="user">{captions.user && `“${captions.user}”`}</p>
+          </div>
+          <div className="tm-foot">
+            <p className={`tm-state ${status}`}>{muted && status === 'listening' ? 'Muted' : STATUS[status]}</p>
+            {loading && <p className="tm-hint">Waking her up. This takes a few seconds.</p>}
+            {SHOW_TEXT_INPUT && !loading && (
+              <div className="tm-debug">
+                <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={sendDraft} placeholder="Type what you would say" aria-label="Type instead of speaking" />
+              </div>
+            )}
+            <div className="tm-actions">
+              {!loading && <button className={muted ? 'on' : ''} onClick={toggleMute} aria-pressed={muted}>{muted ? 'Unmute' : 'Mute'}</button>}
+              <button className="stop" onClick={stop}><i />{loading ? 'Cancel' : 'Stop'}</button>
+            </div>
           </div>
         </div>
       </div>

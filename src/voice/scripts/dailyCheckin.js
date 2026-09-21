@@ -13,6 +13,9 @@ export const parseSeverity = (value) => {
   return Number.isInteger(n) && n >= NA_SEVERITY && n <= 5 ? n : null;
 };
 
+// How a symptom is said aloud: its name, then its description when it has one
+export const spokenName = (s) => (s.description ? `${s.name}, ${s.description}` : s.name);
+
 // Best symptom for a spoken name: exact, then containment, then shared words. Null when nothing
 // matches; { ambiguous } when the top score is shared.
 export const matchSymptom = (symptoms, spoken) => {
@@ -21,13 +24,20 @@ export const matchSymptom = (symptoms, spoken) => {
   const words = new Set(target.split(' '));
   const scored = symptoms.map((s) => {
     const name = normalize(s.name);
-    if (name === target) return { s, score: 100 };
-    if (name.includes(target) || target.includes(name)) return { s, score: 50 };
-    return { s, score: name.split(' ').filter((w) => words.has(w)).length };
+    let score = name.split(' ').filter((w) => words.has(w)).length;
+    if (name === target) score = 100;
+    else if (name.includes(target) || target.includes(name)) score = 50;
+    // Symptoms can share a name and differ only by description ("Anxiety" physical / mental):
+    // once the name fits, the description's words break the tie
+    if (score > 0 && s.description) {
+      const detail = normalize(s.description);
+      score += normalize(`${s.name} ${s.description}`) === target ? 100 : detail.split(' ').filter((w) => words.has(w)).length;
+    }
+    return { s, score };
   }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
   if (scored.length === 0) return null;
   if (scored.length > 1 && scored[1].score === scored[0].score) {
-    return { ambiguous: scored.filter((x) => x.score === scored[0].score).map((x) => x.s.name) };
+    return { ambiguous: scored.filter((x) => x.score === scored[0].score).map((x) => spokenName(x.s)) };
   }
   return scored[0].s;
 };
@@ -90,16 +100,20 @@ export const createCheckin = (ctx) => {
     }
     currentId = next.id;
     ctx.onCurrent?.(next, period);
-    const last = getLastSeverity(all, next.id, period, ctx.selectedDate);
+    return { next: ask(next, all), remaining: list.filter(pending).length };
+  };
+
+  // How to ask a symptom. `say` rides in every result because guidance given once fades over a
+  // long live session.
+  const ask = (symptom, all) => {
+    const last = getLastSeverity(all, symptom.id, period, ctx.selectedDate);
+    const lastTime = last === null ? '' : ` Last time was ${last === 0 ? 'zero' : `a ${['one', 'two', 'three', 'four', 'five'][last - 1]}`}.`;
     return {
-      next: {
-        symptom_id: next.id,
-        name: next.name,
-        ...(next.description ? { description: next.description } : {}),
-        // `say` rides in every result because guidance given once fades over a long live session
-        ...(last !== null ? { last_time: last, say: `${next.name}. Last time was ${last === 0 ? 'zero' : `a ${['one', 'two', 'three', 'four', 'five'][last - 1]}`}.` } : {}),
-      },
-      remaining: list.filter(pending).length,
+      symptom_id: symptom.id,
+      name: symptom.name,
+      ...(symptom.description ? { description: symptom.description } : {}),
+      ...(last !== null ? { last_time: last } : {}),
+      say: `${spokenName(symptom)}.${lastTime}`,
     };
   };
 
@@ -138,7 +152,7 @@ export const createCheckin = (ctx) => {
       // Stay on the symptom that was being asked, unless that is the one just revised
       const pendingId = currentId;
       const current = pendingId && pendingId !== match.id && ctx.symptoms.find((s) => s.id === pendingId);
-      if (current) return { saved: { name: match.name, severity: value }, acknowledge, next: { symptom_id: current.id, name: current.name }, note: 'Continue with the symptom you were asking about.' };
+      if (current) return { saved: { name: match.name, severity: value }, acknowledge, next: ask(current, entries()), note: 'Continue with the symptom you were asking about.' };
       return { saved: { name: match.name, severity: value }, acknowledge, ...describe() };
     },
     switch_period: ({ period_id }) => {
