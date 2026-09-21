@@ -45,4 +45,36 @@ describe('normalizeMeal', () => {
     expect(normalizeMeal({})).toEqual(empty);
     expect(normalizeMeal({ name: 'x', ingredients: 'not an array' })).toEqual({ name: 'x', ingredients: [] });
   });
+
+  it('survives object with throwing name getter', () => {
+    const poisoned = {
+      get name() { throw new Error('boom'); },
+      ingredients: ['egg']
+    };
+    expect(normalizeMeal(poisoned)).toEqual({ name: '', ingredients: ['egg'] });
+  });
+
+  it('survives object with throwing ingredients getter', () => {
+    const poisoned = {
+      name: 'Salad',
+      get ingredients() { throw new Error('boom'); }
+    };
+    expect(normalizeMeal(poisoned)).toEqual({ name: 'Salad', ingredients: [] });
+  });
+
+  it('skips ingredients that throw on toString', () => {
+    const poisoned = {
+      toString() { throw new Error('boom'); }
+    };
+    const result = normalizeMeal({
+      name: 'x',
+      ingredients: [42, poisoned, 'egg']
+    });
+    expect(result).toEqual({ name: 'x', ingredients: ['42', 'egg'] });
+  });
+
+  it('handles Object.create(null)', () => {
+    const nullProto = Object.create(null);
+    expect(normalizeMeal(nullProto)).toEqual({ name: '', ingredients: [] });
+  });
 });

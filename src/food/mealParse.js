@@ -4,6 +4,11 @@
 // untrusted input: it can arrive with the wrong shape, duplicates, blanks, or
 // an unbounded list. Everything the app stores passes through here first.
 //
+// This function is total: it never throws, even on poisoned input (objects
+// with throwing getters, items whose toString() throws, etc.). Any exception
+// during normalisation degrades gracefully: bad properties fall back to empty
+// strings/arrays, and bad ingredients are skipped.
+//
 // Ingredients are lowercased so that "Egg" logged today and "egg" logged
 // tomorrow are the same thing when this data is eventually correlated.
 //
@@ -17,16 +22,38 @@ const MAX_NAME = 80;
  * @returns {{ name: string, ingredients: string[] }}
  */
 export function normalizeMeal(raw) {
-  const obj = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  let obj = {};
+  try {
+    obj = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  } catch {
+    return { name: '', ingredients: [] };
+  }
 
-  const name = typeof obj.name === 'string' ? obj.name.trim().slice(0, MAX_NAME) : '';
+  let name = '';
+  try {
+    name = typeof obj.name === 'string' ? obj.name.trim().slice(0, MAX_NAME) : '';
+  } catch {
+    // name stays ''
+  }
 
   const ingredients = [];
   const seen = new Set();
-  if (Array.isArray(obj.ingredients)) {
-    for (const item of obj.ingredients) {
+  let ingredientsList;
+  try {
+    ingredientsList = obj.ingredients;
+  } catch {
+    ingredientsList = undefined;
+  }
+
+  if (Array.isArray(ingredientsList)) {
+    for (const item of ingredientsList) {
       if (item == null) continue;
-      const value = String(item).trim().toLowerCase();
+      let value;
+      try {
+        value = String(item).trim().toLowerCase();
+      } catch {
+        continue;
+      }
       if (!value || seen.has(value)) continue;
       seen.add(value);
       ingredients.push(value);
