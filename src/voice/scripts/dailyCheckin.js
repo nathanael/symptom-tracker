@@ -2,7 +2,7 @@ import { NA_SEVERITY } from '../../utils/constants';
 import { getLastSeverity } from '../../utils/listHelpers';
 import { entryKey, listFor, otherIncomplete } from '../checkinQueue';
 
-export { GREETING, INSTRUCTIONS, LIVE_GUIDANCE, TOOLS } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
+export { GREETING, INSTRUCTIONS, TOOLS } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
 
 const normalize = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -32,15 +32,17 @@ export const matchSymptom = (symptoms, spoken) => {
   return scored[0].s;
 };
 
-// Small listening sounds for a bare number, so it feels heard without slowing things down.
-// Repeats on purpose: weighted toward the quietest ones.
-export const ACKS = ['Mm-hm.', 'Uh-huh.', 'Okay.', 'Got it.', 'Mm-hm.', 'Alright.', 'Okay.', 'Thanks.'];
+// What the voice says after saving an answer: short, plain, and fixed. Reflecting the user's note
+// back in her own words came across as awkward; a simple hand-off to the next symptom does not.
+export const ACKS = ['Okay, next.', 'Got it. Next.', 'Okay, next.', 'Alright, next.'];
+export const NOTE_ACKS = ['Noted. Next.', 'Got it, noted. Next.'];
 
-// How the voice should acknowledge what was just saved. It rides in the tool result because that
-// is the one thing a live model reads fresh every turn; session-level style guidance fades.
-const acknowledgement = (note, random) => (note
-  ? { reflect_note: note, how: "FIRST acknowledge this note out loud by reflecting it back in one short, natural sentence in your own words (for example: 'Got it, the coffee seemed to help a little.'). Never skip this. THEN ask the next symptom." }
-  : { say: ACKS[Math.floor(random() * ACKS.length)], how: 'Say this small acknowledgement, then ask the next symptom.' });
+// Rides in the tool result because that is the one thing a live model reads fresh every turn;
+// session-level style guidance fades over a long conversation.
+const acknowledgement = (note, random) => {
+  const phrases = note ? NOTE_ACKS : ACKS;
+  return { say: phrases[Math.floor(random() * phrases.length)], how: 'Say exactly this and nothing else about their answer, then ask the next symptom.' };
+};
 
 // What to tell a live model after the user taps a rating on screen. Deliberately leaves out the
 // saved value: given it, the model has copied that number onto the next symptom.

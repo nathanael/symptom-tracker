@@ -1,5 +1,5 @@
 import { mintToken } from './voiceApi';
-import { handEntryMessage, LIVE_GUIDANCE } from './scripts/dailyCheckin';
+import { handEntryMessage } from './scripts/dailyCheckin';
 import { connect } from './webrtcConnection';
 import { realtimeCost } from './pricing';
 
@@ -137,7 +137,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
       } catch (err) {
         return fail(err.message);
       }
-      tell(`${LIVE_GUIDANCE}\n\nOpening state: ${JSON.stringify(opening)}`);
+      tell(`Opening state from the app (not the user speaking): ${JSON.stringify(opening)}`);
     },
     stop: () => end('stopped'),
     setMuted: (muted) => {

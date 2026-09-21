@@ -1,5 +1,9 @@
+// Imported statically on purpose. As a lazy chunk it broke every time a new version was deployed
+// while the app was open: the old page asked for a chunk file the deploy had just replaced
+// ("Importing a module script failed").
+import { GoogleGenAI, Modality } from '@google/genai';
 import { mintToken } from './voiceApi';
-import { handEntryMessage, LIVE_GUIDANCE } from './scripts/dailyCheckin';
+import { handEntryMessage } from './scripts/dailyCheckin';
 import { createMic, createPlayer } from './pcmAudio';
 import { geminiCost } from './pricing';
 
@@ -108,7 +112,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
       const opening = checkin.start();
       try {
         player = createPlayer({ onIdle: settle });
-        const [{ secret, model }, { GoogleGenAI, Modality }] = await Promise.all([mintToken('gemini'), import('@google/genai')]);
+        const { secret, model } = await mintToken('gemini');
         if (stopped) return;
         modelId = model;
         // Ephemeral tokens are only accepted on v1alpha
@@ -151,7 +155,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
           return session.close();
         }
       }
-      tell(`${LIVE_GUIDANCE}\n\nOpening state: ${JSON.stringify(opening)}`);
+      tell(`Opening state from the app (not the user speaking): ${JSON.stringify(opening)}`);
     },
     stop: () => end('stopped'),
     setMuted: (muted) => mic?.setMuted(muted),
