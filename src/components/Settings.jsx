@@ -7,6 +7,7 @@ import { isStandalone, getDateKey, haptic, generateAIDataExport } from '../utils
 import { mergeSupplements, previewMerge } from '../utils/supplementTools';
 import { listSnapshots, restoreSnapshot, saveSnapshot } from '../utils/snapshots';
 import { APP_VERSION } from '../version';
+import { mergeBackupMeals } from '../food/mealBackup';
 
 const chevron = <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>;
 
@@ -61,6 +62,8 @@ export default function Settings({
   setInputItems,
   inputEntries,
   setInputEntries,
+  meals,
+  setMeals,
   copyDays,
   setCopyDays,
   talkEngine,
@@ -140,7 +143,7 @@ export default function Settings({
         dailyNotes: 'symptomTracker_notes', stackItems: 'symptomTracker_stackItems',
         stackEntries: 'symptomTracker_stackEntries', pinnedSymptoms: 'symptomTracker_pinned',
         trackingMode: 'symptomTracker_mode', inputItems: 'symptomTracker_inputItems',
-        inputEntries: 'symptomTracker_inputEntries',
+        inputEntries: 'symptomTracker_inputEntries', meals: 'symptomTracker_meals',
       })) {
         let cv = c[name]; try { if (typeof cv === 'string') cv = JSON.parse(cv); } catch {}
         let lv = null; try { lv = JSON.parse(localStorage.getItem(k) || 'null'); } catch {}
@@ -229,6 +232,7 @@ export default function Settings({
       pinnedSymptoms: [...pinnedSymptoms],
       inputItems,
       inputEntries,
+      meals,
     };
 
     const json = JSON.stringify(backup, null, 2);
@@ -289,6 +293,11 @@ export default function Settings({
         if (backup.inputEntries) setInputEntries(prev => {
           const merged = { ...prev };
           Object.entries(backup.inputEntries).forEach(([k, v]) => { if (!merged[k]) { merged[k] = v; addedRef.count++; } });
+          return merged;
+        });
+        if (backup.meals) setMeals(prev => {
+          const { merged, added } = mergeBackupMeals(prev, backup.meals);
+          addedRef.count += added;
           return merged;
         });
         if (backup.trackingMode) setTrackingMode(backup.trackingMode);
