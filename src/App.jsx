@@ -48,7 +48,6 @@ import BottomNav from './components/BottomNav';
 import DesktopToolbar from './components/DesktopToolbar';
 import RapidEntry from './components/RapidEntry';
 import TalkMode from './components/TalkMode';
-import { unlockAudio } from './voice/ttsCache';
 import { primePlayback } from './voice/pcmAudio';
 import SymptomRows from './components/SymptomRows';
 import UndoToast from './components/UndoToast';
@@ -620,9 +619,8 @@ function App() {
     setLastAction(`${symptom?.name}: ${severityLabel} (${period?.label || timeId})`);
   }, [selectedDate, timePeriods, symptoms]);
 
-  // Called from the launch tap itself: iOS only lets talk mode speak if audio starts inside a gesture
+  // Called from the launch tap itself: iOS only lets talk mode play audio if it starts inside a gesture
   const openTalkMode = useCallback(() => {
-    unlockAudio();
     primePlayback();
     setAppMode('symptoms');
     setShowInsights(false);

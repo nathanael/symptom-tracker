@@ -7,11 +7,10 @@ import { severityColors, NA_SEVERITY } from '../utils/constants';
 import { getDateKey, getCurrentTimePeriod, formatDate } from '../utils/helpers';
 import { entryKey, initialPeriod, listFor } from '../voice/checkinQueue';
 import { createCheckin } from '../voice/scripts/dailyCheckin';
-import { createPipelineEngine } from '../voice/pipelineEngine';
 import { createRealtimeEngine } from '../voice/realtimeEngine';
 import { createGeminiEngine } from '../voice/geminiEngine';
 
-const ENGINES = { pipeline: createPipelineEngine, realtime: createRealtimeEngine, gemini: createGeminiEngine };
+const ENGINES = { realtime: createRealtimeEngine, gemini: createGeminiEngine };
 
 const STATUS = { connecting: 'Connecting…', listening: 'Listening', thinking: 'Thinking…', speaking: 'Speaking', error: 'Not listening' };
 const SHOW_TEXT_INPUT = import.meta.env.DEV || new URLSearchParams(window.location.search).has('talkdebug');
@@ -26,7 +25,7 @@ export default function TalkMode({
   trackingMode,
   timePeriods,
   quickLog,
-  engineKind, // 'pipeline' | 'realtime' | 'gemini'
+  engineKind, // 'gemini' | 'realtime'
   setCopyToastMessage,
   onClose,
 }) {
@@ -67,7 +66,6 @@ export default function TalkMode({
     const create = ENGINES[engineKind] || createGeminiEngine;
     const engine = create({
       checkin,
-      warmLines: symptoms.map((s) => `${s.name}.`),
       onState: (next) => !disposed && setStatus(next),
       onCaption: ({ who, text }) => !disposed && setCaptions((prev) => ({ ...prev, [who]: text })),
       onLevel: (value) => !disposed && setLevel(value),

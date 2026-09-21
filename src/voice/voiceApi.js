@@ -30,11 +30,6 @@ const post = async (url, body) => {
   return res;
 };
 
-// engine: 'pipeline' | 'realtime' | 'gemini' -> { secret, engine, ... }
+// engine: 'gemini' | 'realtime' -> { secret, engine, ... }
 export const mintToken = async (engine) => (await post(`${BASE}/${engine === 'gemini' ? 'gemini-token' : 'token'}`, { engine })).json();
 
-// -> { name, args }
-export const talkTurn = async (transcript, state) => (await (await post(`${BASE}/turn`, { transcript, state })).json()).tool;
-
-// -> Blob (audio/mpeg)
-export const speak = async (text) => (await post(`${BASE}/speak`, { text })).blob();

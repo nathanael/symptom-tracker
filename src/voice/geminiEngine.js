@@ -4,7 +4,8 @@ import { createMic, createPlayer } from './pcmAudio';
 
 // Gemini Live: one speech-to-speech model over a WebSocket. Model, voice, instructions and tools
 // are locked into the single-use token server-side; here we stream the mic up, play audio back,
-// and run its tool calls. Same interface as createPipelineEngine.
+// and run its tool calls. Interface: createXEngine({ checkin, onState, onCaption, onLevel, onError, onEnd })
+// -> { start(), stop(), setMuted(bool), sendText(text), advance(toolResult) }.
 export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onError, onEnd }) => {
   let session = null;
   let mic = null;

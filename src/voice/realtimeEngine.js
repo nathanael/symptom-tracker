@@ -4,7 +4,8 @@ import { connect } from './webrtcConnection';
 
 // The natural engine: one speech-to-speech model hears, decides and talks. Instructions and tools
 // are fixed server-side when the token is minted; here we run its tool calls and feed back results.
-// Same interface as createPipelineEngine.
+// Interface: createXEngine({ checkin, onState, onCaption, onLevel, onError, onEnd })
+// -> { start(), stop(), setMuted(bool), sendText(text), advance(toolResult) }.
 export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onError, onEnd }) => {
   let connection = null;
   let stopped = false;

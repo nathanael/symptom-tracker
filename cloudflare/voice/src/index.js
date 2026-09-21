@@ -1,22 +1,18 @@
 // Talk mode backend (Cloudflare Worker). Holds the provider keys, verifies the caller's Firebase
 // login, enforces a per-user daily cap, and hands the browser short-lived session tokens.
 //
-//   POST /gemini-token              -> { secret, model }      (secret GEMINI_API_KEY)
-//   POST /token { engine }          -> { secret }             (secret OPENAI_API_KEY)
-//   POST /turn { transcript, state } -> { tool }
-//   POST /speak { text }            -> audio/mpeg
+//   POST /gemini-token   -> { secret, model }   Gemini Live   (secret GEMINI_API_KEY)
+//   POST /token          -> { secret }          OpenAI realtime (secret OPENAI_API_KEY)
 //
 // Deploy: `npx wrangler deploy` in this folder. Secrets: `npx wrangler secret put GEMINI_API_KEY`.
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { GoogleGenAI, Modality } from '@google/genai';
-import { GREETING, INSTRUCTIONS, PIPELINE_INSTRUCTIONS, TOOLS, ASK_USER_TOOL } from './dailyCheckinSpec.js';
+import { GREETING, INSTRUCTIONS, TOOLS } from './dailyCheckinSpec.js';
 
 const FIREBASE_PROJECT = 'symptoms-dae26';
 const ORIGINS = ['https://nathanael.github.io', 'http://localhost:5173'];
 // Per user, per UTC day. Generous for real use, tight enough that a leaked login can't run up a bill.
-const DAILY_CAPS = { sessions: 20, turns: 800, tts_chars: 20000 };
-const MAX_TTS_CHARS = 300;
-const MAX_TRANSCRIPT_CHARS = 1000;
+const DAILY_CAPS = { sessions: 20 };
 
 // Model ids change often: override with vars in wrangler.toml rather than in code
 const DEFAULTS = {
@@ -27,10 +23,6 @@ const DEFAULTS = {
   TALK_GEMINI_TRIGGER_TOKENS: '4000',
   TALK_REALTIME_MODEL: 'gpt-realtime-2.1-mini',
   TALK_TRANSCRIBE_MODEL: 'gpt-live-transcribe',
-  // The pipeline needs the server to mark where each utterance ends, which the live model can't do
-  TALK_PIPELINE_TRANSCRIBE_MODEL: 'gpt-transcribe',
-  TALK_TEXT_MODEL: 'gpt-5.4-mini',
-  TALK_TTS_MODEL: 'gpt-4o-mini-tts',
   TALK_VOICE: 'marin',
 };
 const setting = (env, name) => env[name] || DEFAULTS[name];
@@ -141,74 +133,29 @@ const geminiToken = async (env, uid) => {
   }
 };
 
-const openaiSession = (env, engine) => {
-  const input = { transcription: { model: setting(env, 'TALK_TRANSCRIBE_MODEL') }, noise_reduction: { type: 'near_field' } };
-  if (engine === 'realtime') {
-    return {
-      type: 'realtime',
-      model: setting(env, 'TALK_REALTIME_MODEL'),
-      instructions: `${INSTRUCTIONS}\n\n${opening}`,
-      tools: TOOLS,
-      audio: { input: { ...input, turn_detection: { type: 'semantic_vad', eagerness: 'low' } }, output: { voice: setting(env, 'TALK_VOICE') } },
-    };
-  }
-  return {
-    type: 'transcription',
-    audio: { input: { ...input, transcription: { model: setting(env, 'TALK_PIPELINE_TRANSCRIBE_MODEL') }, turn_detection: { type: 'server_vad', silence_duration_ms: 1100 } } },
-  };
-};
-
-const openaiToken = async (env, uid, body) => {
+const openaiToken = async (env, uid) => {
   requireKey(env, 'OPENAI_API_KEY');
-  const engine = body.engine === 'realtime' ? 'realtime' : 'pipeline';
   await spend(env, uid, 'sessions', 1);
-  const data = await (await openai(env, '/realtime/client_secrets', { session: openaiSession(env, engine) })).json();
-  return Response.json({ secret: data.value, expiresAt: data.expires_at, engine });
+  const session = {
+    type: 'realtime',
+    model: setting(env, 'TALK_REALTIME_MODEL'),
+    instructions: `${INSTRUCTIONS}\n\n${opening}`,
+    tools: TOOLS,
+    audio: {
+      input: {
+        transcription: { model: setting(env, 'TALK_TRANSCRIBE_MODEL') },
+        noise_reduction: { type: 'near_field' },
+        // Low eagerness: wait through mid-sentence pauses rather than jumping in
+        turn_detection: { type: 'semantic_vad', eagerness: 'low' },
+      },
+      output: { voice: setting(env, 'TALK_VOICE') },
+    },
+  };
+  const data = await (await openai(env, '/realtime/client_secrets', { session })).json();
+  return Response.json({ secret: data.value, expiresAt: data.expires_at, engine: 'realtime' });
 };
 
-// A small text model turns one transcribed utterance into exactly one tool call
-const turn = async (env, uid, body) => {
-  const transcript = String(body.transcript || '').slice(0, MAX_TRANSCRIPT_CHARS);
-  if (!transcript.trim()) throw new HttpError(400, 'Empty transcript.');
-  requireKey(env, 'OPENAI_API_KEY');
-  await spend(env, uid, 'turns', 1);
-  const data = await (await openai(env, '/responses', {
-    model: setting(env, 'TALK_TEXT_MODEL'),
-    instructions: PIPELINE_INSTRUCTIONS,
-    input: `State: ${JSON.stringify(body.state ?? {}).slice(0, 2000)}\nUser said: ${transcript}`,
-    tools: [...TOOLS, ASK_USER_TOOL],
-    tool_choice: 'required',
-    parallel_tool_calls: false,
-    store: false,
-  })).json();
-  const call = data.output?.find((item) => item.type === 'function_call');
-  if (!call) throw new HttpError(502, 'The voice service returned no action.');
-  let args = {};
-  try {
-    args = JSON.parse(call.arguments || '{}');
-  } catch {
-    // leave args empty: the client's handler reports the bad call back as an error
-  }
-  return Response.json({ tool: { name: call.name, args } });
-};
-
-// The client caches clips by text, so each line is paid for once
-const speak = async (env, uid, body) => {
-  const text = String(body.text || '').trim().slice(0, MAX_TTS_CHARS);
-  if (!text) throw new HttpError(400, 'Nothing to say.');
-  requireKey(env, 'OPENAI_API_KEY');
-  await spend(env, uid, 'tts_chars', text.length);
-  const res = await openai(env, '/audio/speech', {
-    model: setting(env, 'TALK_TTS_MODEL'),
-    voice: setting(env, 'TALK_VOICE'),
-    input: text,
-    instructions: 'Warm, calm, conversational. Like a kind nurse who has time for you.',
-    response_format: 'mp3',
-  });
-  return new Response(res.body, { headers: { 'Content-Type': 'audio/mpeg' } });
-};
-
-const routes = { 'gemini-token': geminiToken, token: openaiToken, turn, speak };
+const routes = { 'gemini-token': geminiToken, token: openaiToken };
 
 const cors = (req) => {
   const origin = req.headers.get('Origin') || '';

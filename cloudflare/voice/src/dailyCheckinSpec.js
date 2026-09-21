@@ -1,5 +1,5 @@
 // The daily check-in conversation: instructions + tool schemas. No imports — this file is
-// loaded both by the backend worker (session config, turn) and by the web client
+// loaded both by the backend worker (session config) and by the web client
 // (src/voice/scripts/dailyCheckin.js), so the two can never drift.
 
 export const GREETING =
@@ -78,17 +78,3 @@ export const TOOLS = [
     parameters: { type: 'object', properties: {} },
   },
 ];
-
-// Pipeline engine only: a small text model turns each transcribed utterance into exactly one
-// tool call. The app speaks fixed lines from the tool result, so the model never writes prose
-// except through ask_user.
-export const ASK_USER_TOOL = {
-  type: 'function',
-  name: 'ask_user',
-  description: 'Say one short sentence to the user: to clarify an ambiguous answer, or to answer a question about how this works. Use only when no other tool fits.',
-  parameters: { type: 'object', properties: { text: { type: 'string', description: 'What to say, under 20 words.' } }, required: ['text'] },
-};
-
-export const PIPELINE_INSTRUCTIONS = `${INSTRUCTIONS}
-
-You receive the app state as JSON ("asking" is the symptom currently being asked, or "done" details) followed by what the user just said, transcribed from speech, so expect homophones ("to" / "too" = 2, "for" = 4, "won" = 1, "oh" / "none" / "nothing" = 0). Respond with exactly one tool call and no text.`;
