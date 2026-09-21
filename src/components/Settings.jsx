@@ -6,6 +6,7 @@ import { trackingModes, SLEEP_ENABLED } from '../utils/constants';
 import { isStandalone, getDateKey, haptic, generateAIDataExport } from '../utils/helpers';
 import { mergeSupplements, previewMerge } from '../utils/supplementTools';
 import { listSnapshots, restoreSnapshot, saveSnapshot } from '../utils/snapshots';
+import { APP_VERSION } from '../version';
 
 const chevron = <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>;
 
@@ -213,7 +214,7 @@ export default function Settings({
 
   const backupToFile = () => {
     const backup = {
-      version: '5.2.7',
+      version: APP_VERSION,
       exportedAt: new Date().toISOString(),
       symptoms,
       entries,
@@ -591,7 +592,7 @@ export default function Settings({
 
   const about = (
     <div className="st-about">
-      v6.4.10 · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
+      v{APP_VERSION} · {isStandalone() ? 'Home Screen App' : 'Browser'}<br />
       <button onClick={checkForUpdates} disabled={checkingForUpdates}>{checkingForUpdates ? 'Checking…' : 'Check for updates'}</button>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { formatDate } from '../utils/helpers';
 import { solar } from './solarIcons';
+import { APP_VERSION } from '../version';
 
 const icons = {
   note: solar.note,
@@ -44,7 +45,7 @@ export default function QuickActionsMenu({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const currentVersion = 'v6.4.10';
+  const currentVersion = `v${APP_VERSION}`;
 
   const tab = showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'protocol';
   const Item = ({ icon, label, hint, danger, primary, onClick }) => (
