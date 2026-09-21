@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { wordAt } from '../voice/speechPace';
 
 // Roughly a word every 340ms when the engine cannot tell us where the audio is
 const FALLBACK_MS = 340;
@@ -29,7 +30,7 @@ export default function SpokenWords({ text, progress }) {
       const fraction = state.progress?.();
       const target = fraction === null || fraction === undefined
         ? Math.floor((now - state.started) / FALLBACK_MS) + 1
-        : Math.round(fraction * all.length);
+        : wordAt(all, fraction);
       // Only ever forwards: late transcript makes the fraction jump back, and rereading is worse
       const next = Math.min(all.length, Math.max(state.count, target));
       if (next !== state.count) {

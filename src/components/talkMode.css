@@ -4,10 +4,10 @@
 .tm-count b { color: #d1d5db; font-weight: 500; }
 
 /* The ordinary list (listUi.css rows), in a window that follows the row being asked */
-.tm-top { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; transition: opacity .5s .2s; }
+.tm-top { flex: none; display: flex; flex-direction: column; }
 .tm .tm-top.lr.sym.mobile { padding: 4px 8px 0; max-width: none; }
-.tm.loading .tm-top { opacity: 0; transition: none; }
-.tm-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding: 28px 0 60px; -webkit-mask-image: linear-gradient(transparent, #000 36px, #000 calc(100% - 56px), transparent); mask-image: linear-gradient(transparent, #000 36px, #000 calc(100% - 56px), transparent); }
+.tm.loading .tm-top { display: none; }
+.tm-list { height: 186px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding: 58px 0 88px; -webkit-mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent); mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent); }
 .tm-list::-webkit-scrollbar { display: none; }
 .tm-list .lr-row { cursor: default; transition: background .3s; }
 /* A note stays on one line here: the row must not grow while she is working down the list */
@@ -28,7 +28,7 @@
   100% { transform: scale(1); box-shadow: 0 0 0 11px rgba(255,255,255,0); }
 }
 
-.tm-stage { position: relative; flex: none; height: 44%; min-height: 270px; transition: height .8s cubic-bezier(.22,1,.36,1); display: flex; flex-direction: column; justify-content: space-between; }
+.tm-stage { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; }
 .tm-orb { flex: 1 1 0; min-height: 0; width: 100%; pointer-events: none; }
 .tm-captions { flex: none; height: 96px; overflow: hidden; padding: 8px 20px 0; text-align: center; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
 .tm-captions p { margin: 0; }
@@ -58,7 +58,6 @@
 .tm-actions button i { width: 4px; height: 13px; border-radius: 1px; background: currentColor; box-shadow: 7px 0 0 currentColor; margin-right: 7px; }
 .tm-actions .done { border-color: rgba(74,222,128,.45); background: rgba(74,222,128,.14); color: #bbf7d0; }
 
-.tm.loading .tm-stage { height: 100%; }
 
 /* Cost card: stays after a conversation until dismissed */
 .tm-cost { position: fixed; z-index: 1900; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: min(320px, calc(100vw - 32px)); padding: 14px 16px 12px; border-radius: 14px; background: #0e0f11; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 12px 32px rgba(0,0,0,.5); color: #e5e7eb; font-size: 13px; }

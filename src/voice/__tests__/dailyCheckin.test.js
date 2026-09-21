@@ -71,8 +71,15 @@ describe('matchSymptom', () => {
 describe('createCheckin', () => {
   it('opens with the first unlogged symptom and its last rating', () => {
     const { checkin, ctx } = setup({ '2026-09-20-headache-morning': entry(2), [`${dateKey}-headache-evening`]: entry(1) });
-    expect(checkin.start()).toEqual({ period: 'AM', next: { symptom_id: 'headache', name: 'Headache', last_time: 2, say: 'Headache. Last time was a two.' }, remaining: 3 });
+    const opening = checkin.start();
+    // The first question of a period names the period, so they know which slot they are filling
+    expect(opening).toMatchObject({ period: 'AM', next: { symptom_id: 'headache', name: 'Headache', last_time: 2, say: 'Headache. Last time was a two. How about this morning?' }, remaining: 3 });
+    // and they are told how to move to the other one by voice
+    expect(opening.switch_hint).toMatch(/switch to (afternoon|evening)/);
+    expect(opening.periods).toEqual([{ period_id: 'morning', when: 'this morning' }, { period_id: 'evening', when: expect.stringMatching(/this (afternoon|evening)/) }]);
     expect(ctx.onCurrent).toHaveBeenCalledWith(symptoms[0], 'morning');
+    // Only the first: the rest are just the symptom
+    expect(checkin.handle('skip_symptom', { symptom_id: 'headache' }).next.say).toBe('Brain fog, Trouble focusing.');
   });
 
   it('records a rating with a note and moves on before React state catches up', () => {

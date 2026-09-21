@@ -73,6 +73,7 @@ export const handEntryMessage = (result) => {
 export const createCheckin = (ctx) => {
   let period = ctx.period;
   let currentId = null;
+  let opened = false; // the first question of a period also asks about the period itself
   const skipped = new Set();
   // Ratings written this session: React state lags a write, so tool results can't wait for it
   const written = {};
@@ -80,6 +81,15 @@ export const createCheckin = (ctx) => {
   const entries = () => ({ ...ctx.getEntries(), ...written });
   const key = (symptomId, periodId = period) => entryKey(ctx.dateKey, symptomId, periodId);
   const periodLabel = (id) => ctx.timePeriods.find((p) => p.id === id)?.label || id;
+
+  // How a period is said out loud. "PM" covers the whole back half of the day, so which half it is
+  // now decides between afternoon and evening.
+  const periodWord = (id) => {
+    if (id === 'morning') return 'morning';
+    if (id === 'evening') return (ctx.now ? ctx.now() : new Date()).getHours() < 17 ? 'afternoon' : 'evening';
+    return 'today';
+  };
+  const spokenPeriod = (id) => (id === 'daily' ? 'today' : `this ${periodWord(id)}`);
 
   const describe = () => {
     const list = listFor(ctx.symptoms, period);
@@ -104,8 +114,11 @@ export const createCheckin = (ctx) => {
     }
     currentId = next.id;
     ctx.onCurrent?.(next, period);
-    return { next: ask(next, all), remaining: list.filter(pending).length };
+    const asked = ask(next, all);
+    opened = true;
+    return { next: asked, remaining: list.filter(pending).length };
   };
+
 
   // How to ask a symptom. `say` rides in every result because guidance given once fades over a
   // long live session.
@@ -117,7 +130,8 @@ export const createCheckin = (ctx) => {
       name: symptom.name,
       ...(symptom.description ? { description: symptom.description } : {}),
       ...(last !== null ? { last_time: last } : {}),
-      say: `${spokenName(symptom)}.${lastTime}`,
+      // The first question of a period names the period, so they know which slot they are filling
+      say: `${spokenName(symptom)}.${lastTime}${opened ? '' : ` How about ${spokenPeriod(period)}?`}`,
     };
   };
 
@@ -163,6 +177,7 @@ export const createCheckin = (ctx) => {
       if (!ctx.timePeriods.some((p) => p.id === period_id)) return { error: 'Unknown period_id.' };
       period = period_id;
       currentId = null;
+      opened = false;
       skipped.clear();
       return { period: periodLabel(period), ...describe() };
     },
@@ -177,8 +192,16 @@ export const createCheckin = (ctx) => {
   };
 
   return {
-    // Opening state for the model: which period, the first symptom, how many remain
-    start: () => ({ period: periodLabel(period), ...describe() }),
+    // Opening state for the model: which period, how to move to another one, the first symptom
+    start: () => {
+      const other = ctx.timePeriods.find((p) => p.id !== period);
+      return {
+        period: periodLabel(period),
+        periods: ctx.timePeriods.map((p) => ({ period_id: p.id, when: spokenPeriod(p.id) })),
+        ...(other ? { switch_hint: `We're doing ${spokenPeriod(period)}. If you'd rather fill in ${spokenPeriod(other.id)}, just say switch to ${periodWord(other.id)}.` } : {}),
+        ...describe(),
+      };
+    },
     handle: (name, args) => {
       const handler = handlers[name];
       if (!handler) return { error: `Unknown tool ${name}.` };

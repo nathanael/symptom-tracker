@@ -2,6 +2,7 @@ import { mintToken } from './voiceApi';
 import { handEntryMessage } from './scripts/dailyCheckin';
 import { connect } from './webrtcConnection';
 import { realtimeCost } from './pricing';
+import { totalWeight } from './speechPace';
 
 // The natural engine: one speech-to-speech model hears, decides and talks. Instructions and tools
 // are fixed server-side when the token is minted; here we run its tool calls and feed back results.
@@ -22,6 +23,8 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
   let modelBusy = true; // from connect until the greeting has finished playing
   let audioPlaying = false;
   let audioStartedAt = 0;
+  // Syllables per second, corrected after every utterance she finishes
+  let pace = 4.4;
   let releaseTimer = null;
   const applyMic = () => connection?.setMuted(userMuted || modelBusy);
   const holdMic = () => {
@@ -103,6 +106,12 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
         break;
       case 'output_audio_buffer.stopped':
       case 'output_audio_buffer.cleared':
+        if (event.type === 'output_audio_buffer.stopped' && audioStartedAt) {
+          const seconds = (Date.now() - audioStartedAt) / 1000;
+          const said = totalWeight(appCaption.split(/\s+/).filter(Boolean));
+          // Ignore the odd clipped or interrupted turn; ease towards the rest
+          if (seconds > 0.8 && said > 3) pace += ((said / seconds) - pace) * 0.5;
+        }
         audioPlaying = false;
         if (ending) return end(ending);
         releaseMic();
@@ -145,7 +154,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
     // No timing from a remote audio track: estimate from an ordinary speaking pace
     speechProgress: () => {
       if (!audioPlaying) return 1;
-      const seconds = appCaption.split(/\s+/).filter(Boolean).length / 2.9;
+      const seconds = totalWeight(appCaption.split(/\s+/).filter(Boolean)) / pace;
       return seconds > 0 ? Math.min(0.99, (Date.now() - audioStartedAt) / 1000 / seconds) : 0;
     },
     setMuted: (muted) => {
