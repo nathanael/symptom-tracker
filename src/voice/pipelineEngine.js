@@ -116,7 +116,7 @@ export const createPipelineEngine = ({ checkin, warmLines = [], onState, onCapti
       connection?.setMuted(true);
       await say(greeted ? SHORT_GREETING : GREETING);
       localStorage.setItem(GREETED_KEY, '1');
-      if (stopped) return;
+      if (stopped || ending) return;
       connection?.setMuted(userMuted);
       await say(lineFor(opening));
     },

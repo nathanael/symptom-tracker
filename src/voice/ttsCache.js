@@ -39,6 +39,7 @@ export const unlockAudio = () => {
 export const createSpeaker = () => {
   audio = audio || new Audio();
   let settle = null;
+  let latest = 0;
 
   const stop = () => {
     audio.pause();
@@ -75,6 +76,7 @@ export const createSpeaker = () => {
   return {
     // Resolves when the line has finished (or was interrupted by stop())
     say: async (text) => {
+      const mine = ++latest;
       stop();
       let blob = null;
       try {
@@ -82,6 +84,10 @@ export const createSpeaker = () => {
       } catch (err) {
         console.warn('[voice] TTS unavailable, using browser speech', err.message);
       }
+      // A newer line was requested while this clip was loading: playing it now would cut that
+      // line off without ever resolving it, and the conversation would hang
+      if (mine !== latest) return undefined;
+      stop();
       return blob ? playBlob(blob) : playSynth(text);
     },
     // Fetch clips ahead of time so the first run isn't a string of pauses
