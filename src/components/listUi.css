@@ -245,6 +245,12 @@
 .lr-ghead-in .lr-link { margin-left: auto; }
 .lr-input.lr-gname { width: 170px; font-weight: 600; font-size: 13px; letter-spacing: 0; color: #f3f4f6; }
 .lr.sym.desktop.edit .lr-cols { grid-template-columns: 22px minmax(0,1fr) 160px repeat(var(--lr-periods, 2), 56px) 140px; }
+/* Desktop: period columns read as one group, set off from the 14-day strip */
+.lr.sym.desktop:not(.edit) .lr-cols { column-gap: 4px; }
+.lr.sym.desktop:not(.edit) .lr-cols:not(.open) { grid-template-columns: minmax(0,1fr) 210px repeat(var(--lr-periods, 2), 41px); }
+.lr.sym.desktop:not(.edit) .lr-row.open { grid-template-columns: minmax(0,1fr) auto repeat(var(--lr-periods, 2), 41px); }
+.lr.sym.desktop:not(.edit) .lr-strip, .lr.sym.desktop:not(.edit) .lr-head .strip-h { margin-left: 12px; }
+.lr.sym.desktop:not(.edit) .lr-ikeys { margin-right: 35px; }
 .lr-gselect { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 4px 0 9px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; min-width: 0; max-width: 100%; }
 .lr-gselect:hover { border-color: rgba(255,255,255,.2); }
 .lr-gselect select { flex: 1; min-width: 0; appearance: none; -webkit-appearance: none; background: none; border: 0; outline: none; color: #d1d5db; font: inherit; font-size: 12px; cursor: pointer; padding-right: 14px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right center; background-size: 11px; }
