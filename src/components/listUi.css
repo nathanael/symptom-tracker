@@ -71,11 +71,15 @@
 /* Edit mode */
 .lr.edit .lr-cols { grid-template-columns: 22px minmax(0,1fr) repeat(var(--lr-periods, 2), 56px) 140px; }
 .lr.edit .lr-row { cursor: default; border: 1px solid transparent; }
-.lr.edit .lr-row.dragging { opacity: .35; }
 .lr.edit .lr-row.over { border-top-color: #818cf8; border-radius: 0; }
 .lr-row.expanded { background: rgba(255,255,255,.03); padding-top: 4px; }
 .lr-grip { color: #4b5563; cursor: grab; font-size: 16px; line-height: 1; user-select: none; touch-action: none; }
 .lr-grip:hover { color: #d1d5db; }
+/* While a row is being dragged: no text selection, no hover flicker under the moving row */
+body.lr-reordering { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+body.lr-reordering .lr-grip { cursor: grabbing; }
+body.lr-reordering .lr-row:hover { background: none; }
+.lr.mobile .lr-grip { padding: 12px 8px; margin: -12px -8px; }
 .lr-fields { display: flex; gap: 8px; min-width: 0; }
 .lr-input { background: transparent; border: 1px solid transparent; border-radius: 6px; color: #e5e7eb; font: inherit; padding: 5px 8px; min-width: 0; }
 .lr-input:hover { border-color: rgba(255,255,255,.1); }
@@ -240,7 +244,6 @@
 .lr.mobile .lr-suggest-row small { margin-left: auto; }
 .lr-ghead.edit { cursor: default; padding: 16px 14px 4px; border-top: 1px solid transparent; }
 .lr-ghead.edit.over, .lr-ghead.edit:has(.over) { border-top-color: #818cf8; }
-.lr-ghead.edit.dragging { opacity: .35; }
 .lr-ghead-in { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 !important; }
 .lr-ghead-in small { font-size: 12px; letter-spacing: 0; color: #6b7280; }
 .lr-ghead-in .lr-link { margin-left: auto; }

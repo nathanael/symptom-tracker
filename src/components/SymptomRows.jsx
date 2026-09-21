@@ -350,23 +350,29 @@ export default function SymptomRows({
     setLastAction(`Reverted ${symptom.name}`);
   };
 
-  const commitReorder = (fromId, toId, dragGroup) => {
+  // `order` is the list as it now looks on screen: symptom ids with `group:<name>` headers between
+  const commitReorder = (fromId, toId, dragGroup, order) => {
     if (dragGroup === 'groups') { commitGroupReorder(fromId, toId); return; }
-    // Dropped on a group header: join that group (at its end). Dropped on a symptom: join its group, next to it.
-    const header = toId.startsWith('group:') ? toId.slice(6) : null;
-    const target = header === null ? symptoms.find((s) => s.id === toId) : null;
+    const isHeader = (id) => id.startsWith('group:');
+    const at = order.indexOf(fromId);
     if (grouped) {
-      const name = header !== null ? (header || null) : (target?.group || null);
-      if ((symptoms.find((s) => s.id === fromId)?.group || null) !== name) setGroup([fromId], name);
+      // It belongs to whichever header it now sits under (dropped above them all: the first)
+      const above = order.slice(0, at).reverse().find(isHeader) ?? order.find(isHeader);
+      const name = above ? (above.slice(6) || null) : null;
+      if (above && (symptoms.find((s) => s.id === fromId)?.group || null) !== name) setGroup([fromId], name);
     }
-    if (target) {
-      const ids = reorder(orderedActive.map((s) => s.id), fromId, toId);
+    // Sit beside a neighbour in the same section: before the row below, else after the row above
+    const below = order[at + 1];
+    const aboveRow = order[at - 1];
+    const ids = orderedActive.map((s) => s.id).filter((id) => id !== fromId);
+    const anchor = below && !isHeader(below) ? ids.indexOf(below) : aboveRow && !isHeader(aboveRow) ? ids.indexOf(aboveRow) + 1 : -1;
+    if (anchor >= 0) {
+      ids.splice(anchor, 0, fromId);
       setSymptoms((prev) => prev.map((s) => {
         const i = ids.indexOf(s.id);
         return i === -1 || s.order === i ? s : { ...s, order: i };
       }));
     }
-    haptic('medium');
   };
 
   const { gripProps, rowClass: dragClass } = useReorderDrag(commitReorder);
