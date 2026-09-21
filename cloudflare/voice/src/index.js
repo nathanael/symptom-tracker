@@ -11,8 +11,9 @@ import { GREETING, INSTRUCTIONS, TOOLS } from './dailyCheckinSpec.js';
 
 const FIREBASE_PROJECT = 'symptoms-dae26';
 const ORIGINS = ['https://nathanael.github.io', 'http://localhost:5173'];
-// Per user, per UTC day. Generous for real use, tight enough that a leaked login can't run up a bill.
-const DAILY_CAPS = { sessions: 20 };
+// Per user, per UTC day. A backstop against a leaked login running up a bill, not a usage limit:
+// it has to sit well above a heavy day of testing (every session start counts, finished or not).
+const DAILY_CAPS = { sessions: 150 };
 
 // Model ids change often: override with vars in wrangler.toml rather than in code
 const DEFAULTS = {
