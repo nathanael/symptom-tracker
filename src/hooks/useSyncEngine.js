@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import SyncEngineV2 from '../sync/SyncEngineV2';
-import { mergeMapByTime, mergeIdArrayByTime } from '../sync/merge';
-import { applyTombstones } from '../sync/tombstones';
+import { mergeCloudMap, mergeIdArrayByTime } from '../sync/merge';
 import { readLocalDomains } from '../sync/migrationV2';
 import { saveSnapshot, listSnapshots, restoreSnapshot, bootSnapshotIfStale } from '../utils/snapshots';
 
@@ -66,7 +65,11 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
       for (const domain of MAP_DOMAINS) {
         if (!(domain in domains) || !setters[domain]) continue;
         const incoming = domains[domain];
-        setters[domain](prev => replace ? incoming : mergeMapByTime(prev, incoming));
+        // Union-merge by _t, then apply the cloud's tombstones: each removes the local record
+        // unless that record is newer (see mergeCloudMap). Same cloudRef flag window as every
+        // other setter here, so nothing echoes back as a local write.
+        const dead = tombstones && tombstones[domain];
+        setters[domain](prev => replace ? incoming : mergeCloudMap(prev, incoming, dead));
       }
 
       // --- Definition id-array domains: merge by id+_t (or replace). ---
@@ -120,15 +123,6 @@ export function useSyncEngine(uid, firebaseReady, stateSetters, isApplyingCloudR
           const next = prev.filter(it => !(it && idSet.has(it.id)));
           return next.length === prev.length ? prev : next;
         });
-      }
-    }
-
-    // --- TOMBSTONES: deletes made on another device (or another tab). Each one removes the local
-    // record unless that record is newer. Same cloudRef flag window, so nothing echoes back.
-    if (tombstones && !replace) {
-      for (const domain of MAP_DOMAINS) {
-        if (!tombstones[domain] || !setters[domain]) continue;
-        setters[domain](prev => applyTombstones(prev, tombstones[domain]));
       }
     }
 

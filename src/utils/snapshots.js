@@ -7,6 +7,8 @@
 // even if cloud or merge logic destroys data, the previous local state can
 // always be reconstructed from a snapshot taken seconds before the change.
 
+import { markRestorePending } from '../sync/restoreFlag';
+
 const SNAP_PREFIX = 'symptomTrackerSnap_';
 const TRACKED_KEYS = [
   'symptomTracker_symptoms',
@@ -109,6 +111,9 @@ export function restoreSnapshot(id) {
         localStorage.setItem(k, v);
       }
     }
+    // Tell the sync engine (after the reload) that this local data is a
+    // deliberate restore, so it beats tombstones written since the snapshot.
+    markRestorePending();
     return true;
   } catch (e) {
     console.error('[snapshots] restoreSnapshot failed:', e);

@@ -4,9 +4,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // THE GUARANTEE: a snapshot/read that is missing a key NEVER deletes it. The
 // listener path is UNION-ONLY — absence is not a delete — so a stale/cache
 // snapshot, or an authoritative server view lagging a REST-fallback write, can
-// never erase data the user just entered. (Cross-device delete propagation via
-// snapshot absence is intentionally gone; a tombstone mechanism is the future
-// fix.) Also: fromCache / hasPendingWrites snapshots are ignored entirely.
+// never erase data the user just entered. (Cross-device deletes propagate via
+// explicit tombstones instead — see SyncEngineV2.tombstones.test.js.) Also:
+// fromCache / hasPendingWrites snapshots are ignored entirely.
 
 vi.mock('../fieldWriter', () => ({
   writeFieldUpdates: vi.fn(() => Promise.resolve({ ok: true, via: 'sdk' })),

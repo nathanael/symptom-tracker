@@ -2,9 +2,11 @@
  * changeDiff — compute the exact records that changed or were deleted between a
  * previous synced view of a domain and the new local view.
  *
- * Pure module, no imports. The heart of "write only what changed": changed
- * records are stamped with `_t` (write time, ms); deletions are reported by key.
+ * Pure module. The heart of "write only what changed": changed records are
+ * stamped with `_t` (write time, ms); deletions are reported by key.
  */
+
+import { isTombstone, tOf } from './tombstones.js';
 
 /**
  * Recursive deep equal that is key-order INsensitive for objects and order
@@ -41,14 +43,55 @@ export function equalIgnoringT(a, b) {
 }
 
 /**
- * Diff a `{ key: value }` map domain.
+ * Diff a `{ key: value }` map domain. TOMBSTONE-AWARE: `prev` (the shadow) may
+ * hold tombstones; `next` (the local view) should not.
+ *
+ *   - shadow tombstone, key absent locally → nothing to do (already deleted).
+ *   - shadow tombstone, key present locally → pushed only when the local record
+ *     is genuinely newer: its `_t` beats the tombstone, or `isFresh` vouches for
+ *     it as a new local write (the app never stamps `_t` itself, so a re-rating
+ *     or an Undo arrives unstamped). Otherwise it is a STALE copy of a record
+ *     another device deleted and must not be resurrected. A fresh write is
+ *     stamped past the tombstone even if this device's clock is behind.
+ *   - a tombstone that leaked into the local view (merged into state by an app
+ *     version from before tombstones) is ignored: never uploaded, never a delete.
  *
  * @param {object|undefined} prev previous synced view (falsy/non-object → {})
  * @param {object} next new local view
  * @param {number} now write timestamp stamped onto changed records
+ * @param {(key: string, record: object, tombstone: object) => boolean} [isFresh]
  * @returns {{ changed: Object<string, object>, deleted: string[] }}
  */
-export function diffMapDomain(prev, next, now = Date.now()) {
+export function diffMapDomain(prev, next, now = Date.now(), isFresh) {
+  const base = (prev && typeof prev === 'object') ? prev : {};
+  const view = (next && typeof next === 'object') ? next : {};
+  const changed = {};
+  const deleted = [];
+
+  for (const k of Object.keys(view)) {
+    if (isTombstone(view[k])) continue;
+    if (isTombstone(base[k])) {
+      const newer = tOf(view[k]) > tOf(base[k]) || (isFresh ? isFresh(k, view[k], base[k]) : false);
+      if (newer) changed[k] = { ...view[k], _t: Math.max(now, tOf(base[k]) + 1) };
+      continue;
+    }
+    if (!(k in base) || !equalIgnoringT(base[k], view[k])) {
+      changed[k] = { ...view[k], _t: now };
+    }
+  }
+  for (const k of Object.keys(base)) {
+    if (!(k in view) && !isTombstone(base[k])) deleted.push(k);
+  }
+
+  return { changed, deleted };
+}
+
+/**
+ * Diff an id-keyed definition map `{ id: { id, ... } }`. Definitions are
+ * soft-deleted by the app (`deletedAt`), not tombstoned, so this is the plain
+ * diff: absence is a delete.
+ */
+export function diffIdMapDomain(prev, next, now = Date.now()) {
   const base = (prev && typeof prev === 'object') ? prev : {};
   const view = (next && typeof next === 'object') ? next : {};
   const changed = {};
@@ -65,9 +108,3 @@ export function diffMapDomain(prev, next, now = Date.now()) {
 
   return { changed, deleted };
 }
-
-/**
- * Diff an id-keyed definition map `{ id: { id, ... } }`. The shape is identical
- * to a map domain, so the logic is the same.
- */
-export const diffIdMapDomain = diffMapDomain;

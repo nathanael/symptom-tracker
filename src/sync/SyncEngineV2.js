@@ -9,7 +9,6 @@
 
 import { getFirebaseDb } from '../utils/firebase';
 import { assembleDomainsFromDocs } from './hydrate';
-import { isTombstone, makeTombstone, applyTombstones, TOMBSTONE_TTL_MS } from './tombstones.js';
 import { mergeMapByTime, mergeIdArrayByTime } from './merge';
 import { diffMapDomain, diffIdMapDomain, equalIgnoringT } from './changeDiff';
 import { arrayToIdMap } from './definitionShape';
@@ -19,6 +18,8 @@ import { MAP_DOMAINS } from './domains';
 import { enqueueOp, listOps, removeOp } from './outbox';
 import { saveSnapshot } from '../utils/snapshots';
 import { needsMigration, readLocalDomains, runMigration } from './migrationV2';
+import { isTombstone, makeTombstone, tOf, TOMBSTONE_TTL_MS } from './tombstones';
+import { isRestorePending, clearRestorePending } from './restoreFlag';
 
 // --- Resilience constants (silent-listener-death recovery) ---
 // On Safari PWA the Firestore streaming listener can die silently (no error
@@ -157,6 +158,26 @@ export default class SyncEngineV2 {
     // deletes when a snapshot/read lags our own write. Pruned on access.
     this._recentWrites = new Map();
 
+    // --- Tombstones (cross-device deletes; see tombstones.js) ---
+    // Per map domain, the last LOCAL view this engine was told about (seeded
+    // from localStorage at boot). The app never stamps `_t`, so when a key whose
+    // shadow is a tombstone shows up in a local view, this is how a genuinely
+    // new local write (re-rating, Undo — differs from the last view) is told
+    // apart from a stale copy of the deleted record (unchanged since).
+    this._localView = {};
+    // Latest value per domain notified BEFORE the engine was ready. Diffing
+    // those against the still-empty shadow would upload the whole local map
+    // with fresh stamps — straight over any tombstone — so they are held and
+    // diffed once the real shadow exists.
+    this._early = {};
+    // The pending map currently being written by _doFlush (so an in-flight
+    // local write still shields its key from an older incoming tombstone).
+    this._inflight = null;
+    // True for the boot that follows a snapshot restore: local records are the
+    // user's deliberate choice and beat tombstones written since the snapshot.
+    this._restoreMode = false;
+    this._seedLocalView();
+
     // --- Write path (Task 11) ---
     // Pending writes keyed by target doc PATH. Each entry:
     //   { ref, updates: {fieldPath: value}, deletes: Set<fieldPath>,
@@ -203,12 +224,18 @@ export default class SyncEngineV2 {
    * @param {*} data new full domain value (array for definition domains, flat
    *   map for map domains, string for trackingMode).
    */
-  notifyLocalChange(domain, data) {
+  notifyLocalChange(domain, data, { reconcile = false } = {}) {
     if (this._destroyed) return;
+    if (!this._ready) {
+      // Shadow not established yet — hold the view, diff it at the end of
+      // initialize() (see _early).
+      this._early[domain] = data;
+      return;
+    }
     const now = this._now();
 
     if (MAP_DOMAINS.includes(domain)) {
-      this._enqueueMapDomain(domain, data, now);
+      this._enqueueMapDomain(domain, data, now, reconcile);
     } else if (ID_MAP_DOMAINS.includes(domain)) {
       this._enqueueIdMapDomain(domain, data, now);
     } else if (domain === 'pinnedSymptoms') {
@@ -235,8 +262,8 @@ export default class SyncEngineV2 {
         // (the `_t` of the shadow record being deleted, 0 if absent). Used at
         // flush to skip a delete that a newer remote write has superseded.
         deleteBaseT: {},
-        // Same guard for staged tombstones (map-domain deletes), keyed by fieldPath.
-        tombstoneBaseT: {},
+        // `_t` for the tombstone each pending MAP-domain delete is written as.
+        deleteT: {},
         shadowChanges: {},
         shadowDeletes: {},
         shadowWhole: {},
@@ -264,11 +291,24 @@ export default class SyncEngineV2 {
       .doc('definitions');
   }
 
-  _enqueueMapDomain(domain, data, now) {
+  _enqueueMapDomain(domain, data, now, reconcile = false) {
     const shadowDomain = this._shadow[domain] || {};
-    const { changed, deleted } = diffMapDomain(shadowDomain, data, now);
-    const field = fieldForMapDomain(domain);
     const view = (data && typeof data === 'object') ? data : {};
+    // Is a local record sitting on a tombstoned key a NEW local write? (Only
+    // asked when its own `_t` does not already beat the tombstone.)
+    //   - reconcile views come from localStorage, which can still hold records
+    //     the hook has just removed — never fresh, unless the user restored a
+    //     snapshot (then every local record is a deliberate write);
+    //   - otherwise: fresh iff it differs from the last local view we saw.
+    const last = this._localView[domain];
+    const isFresh = (key, record) => {
+      if (reconcile) return this._restoreMode;
+      if (!last) return false;
+      return !(key in last) || !equalIgnoringT(last[key], record);
+    };
+    const { changed, deleted } = diffMapDomain(shadowDomain, view, now, isFresh);
+    const field = fieldForMapDomain(domain);
+    if (!reconcile) this._localView[domain] = view;
 
     const changedByMonth = groupKeysByMonth(Object.keys(changed));
     for (const monthId of Object.keys(changedByMonth)) {
@@ -278,7 +318,6 @@ export default class SyncEngineV2 {
         const stamped = changed[key];
         entry.updates[`${field}.${key}`] = stamped;
         // A later edit wins; a write supersedes a prior delete of the same key.
-        delete entry.tombstoneBaseT[`${field}.${key}`];
         this._undelete(entry, domain, `${field}.${key}`, key);
         sc[key] = stamped;
         if (entry.shadowDeletes[domain]) {
@@ -287,14 +326,11 @@ export default class SyncEngineV2 {
       }
     }
 
-    // A removed record is written as a TOMBSTONE, not a field delete, so other devices can tell
-    // "deleted on purpose" from "missing in a lagging view" (see tombstones.js). A key the shadow
-    // already holds as a tombstone is absent locally by design — not a new delete.
-    const deletedByMonth = groupKeysByMonth(deleted.filter((key) => !isTombstone(shadowDomain[key])));
+    const deletedByMonth = groupKeysByMonth(deleted);
     for (const monthId of Object.keys(deletedByMonth)) {
       const entry = this._pendingFor(this._monthDocRef(monthId));
       for (const key of deletedByMonth[monthId]) {
-        this._stageTombstone(entry, domain, `${field}.${key}`, key, shadowDomain[key], now);
+        this._enqueueDelete(entry, domain, `${field}.${key}`, key, shadowDomain[key], now);
       }
     }
 
@@ -313,43 +349,32 @@ export default class SyncEngineV2 {
         if (!fieldPath.startsWith(prefix)) continue;
         const key = fieldPath.slice(prefix.length);
         if (key in view) continue; // still present — leave it.
-        if (isTombstone(entry.updates[fieldPath])) continue; // already staged as deleted.
         // Removed in-window. Drop the pending update and its shadow staging.
         delete entry.updates[fieldPath];
         if (sc) delete sc[key];
-        // If the key also exists (live) in the shadow, the removal is a genuine
-        // delete (it would otherwise persist in the cloud). Stage it as one.
+        // If the key also exists in the shadow, the removal is a genuine delete
+        // (it would otherwise persist in the cloud). Stage it as one, guarded.
         if (key in shadowDomain && !isTombstone(shadowDomain[key])) {
-          this._stageTombstone(entry, domain, fieldPath, key, shadowDomain[key], now);
+          this._enqueueDelete(entry, domain, fieldPath, key, shadowDomain[key], now);
         }
       }
     }
   }
 
-  // Stage a tombstone for a map-domain `key`: an ordinary stamped write whose value says "deleted".
-  // Records the base `_t` of the shadow record so flush can drop it if a newer remote write of
-  // the same key arrives before it is sent (same guard as _enqueueDelete).
-  _stageTombstone(entry, domain, fieldPath, key, shadowRecord, now) {
-    const tombstone = makeTombstone(now);
-    entry.updates[fieldPath] = tombstone;
-    this._undelete(entry, domain, fieldPath, key);
-    entry.tombstoneBaseT[fieldPath] =
-      (shadowRecord && typeof shadowRecord === 'object' && typeof shadowRecord._t === 'number')
-        ? shadowRecord._t
-        : 0;
-    const sc = entry.shadowChanges[domain] || (entry.shadowChanges[domain] = {});
-    sc[key] = tombstone;
-  }
-
   // Stage a delete of `key` (fieldPath) on `entry`, recording the base `_t`
   // of the shadow record so flush can skip it if a newer remote write arrives.
-  _enqueueDelete(entry, domain, fieldPath, key, shadowRecord) {
+  //
+  // For MAP domains the delete is written as a TOMBSTONE (see _buildWrite), not
+  // a field delete; `deleteT` is its `_t` — when the user deleted, pushed past
+  // the record being deleted so the delete wins even if this clock is behind.
+  _enqueueDelete(entry, domain, fieldPath, key, shadowRecord, now = this._now()) {
     // A delete supersedes a prior write of the same key in this window.
     if (fieldPath in entry.updates) {
       delete entry.updates[fieldPath];
       if (entry.shadowChanges[domain]) delete entry.shadowChanges[domain][key];
     }
     entry.deletes.add(fieldPath);
+    entry.deleteT[fieldPath] = Math.max(now, tOf(shadowRecord) + 1);
     entry.deleteBaseT[fieldPath] =
       (shadowRecord && typeof shadowRecord === 'object' && typeof shadowRecord._t === 'number')
         ? shadowRecord._t
@@ -363,6 +388,7 @@ export default class SyncEngineV2 {
   _undelete(entry, domain, fieldPath, key) {
     entry.deletes.delete(fieldPath);
     delete entry.deleteBaseT[fieldPath];
+    delete entry.deleteT[fieldPath];
     if (entry.shadowDeletes[domain]) {
       entry.shadowDeletes[domain] = entry.shadowDeletes[domain].filter((k) => k !== key);
     }
@@ -497,6 +523,7 @@ export default class SyncEngineV2 {
     // Snapshot and clear pending so edits during the flush queue separately.
     const pending = this._pending;
     this._pending = {};
+    this._inflight = pending;
 
     try {
       for (const path of paths) {
@@ -516,32 +543,34 @@ export default class SyncEngineV2 {
             // Newer remote version arrived after the delete decision — skip.
             entry.deletes.delete(fieldPath);
             delete entry.deleteBaseT[fieldPath];
+            delete entry.deleteT[fieldPath];
             if (entry.shadowDeletes[domain]) {
               entry.shadowDeletes[domain] = entry.shadowDeletes[domain].filter((k) => k !== key);
             }
           }
         }
 
-        // Same guard for staged tombstones: a newer remote write beats the delete decision.
-        for (const fieldPath of Object.keys(entry.tombstoneBaseT || {})) {
+        // _t-guard on updates vs TOMBSTONES: if another device's tombstone for
+        // this key reached the shadow after the edit was staged and is the same
+        // age or newer, the delete wins (last-writer-wins) — writing the edit
+        // would resurrect the record. (A write made KNOWING about a tombstone is
+        // stamped past it by diffMapDomain, so it never trips this.)
+        for (const fieldPath of Object.keys(entry.updates)) {
           const { domain, key } = this._domainKeyForUpdate(fieldPath);
-          if (!domain || !isTombstone(entry.updates[fieldPath])) continue;
-          if (this._deleteIsStale(domain, key, entry.tombstoneBaseT[fieldPath])) {
+          if (!domain || !MAP_DOMAINS.includes(domain)) continue;
+          const current = (this._shadow[domain] || {})[key];
+          if (isTombstone(current) && tOf(current) >= tOf(entry.updates[fieldPath])) {
             delete entry.updates[fieldPath];
-            delete entry.tombstoneBaseT[fieldPath];
             if (entry.shadowChanges[domain]) delete entry.shadowChanges[domain][key];
           }
         }
 
-        // Nothing left to write for this doc after the guard? Skip it.
+        // Nothing left to write for this doc after the guards? Skip it.
         if (Object.keys(entry.updates).length === 0 && entry.deletes.size === 0) {
           continue;
         }
 
-        const result = await writeFieldUpdates(entry.ref, {
-          updates: entry.updates,
-          deletes: [...entry.deletes],
-        });
+        const result = await writeFieldUpdates(entry.ref, this._buildWrite(entry));
 
         if (this._destroyed) return;
 
@@ -559,6 +588,7 @@ export default class SyncEngineV2 {
         }
       }
     } finally {
+      this._inflight = null;
       this._flushing = false;
       this.syncing = false;
       this._notifyStatus();
@@ -568,6 +598,30 @@ export default class SyncEngineV2 {
     if (Object.keys(this._pending).length > 0) {
       this._scheduleFlush();
     }
+  }
+
+  // The wire payload for a pending/replayed entry. MAP-domain deletes become
+  // TOMBSTONE updates (`{ _deleted: true, _t }`) — absence is never a delete, so
+  // other devices need an explicit, timestamped record to act on. Definition
+  // (id-map) deletes stay real field deletes: those items are soft-deleted by
+  // the app long before they are purged.
+  _buildWrite(entry) {
+    const updates = { ...entry.updates };
+    const deletes = [];
+    for (const fieldPath of entry.deletes) {
+      const { domain } = this._domainKeyForDelete(entry, fieldPath);
+      if (domain && MAP_DOMAINS.includes(domain)) {
+        updates[fieldPath] = makeTombstone(this._tombstoneT(entry, fieldPath), domain);
+      } else {
+        deletes.push(fieldPath);
+      }
+    }
+    return { updates, deletes };
+  }
+
+  _tombstoneT(entry, fieldPath) {
+    const t = entry.deleteT && entry.deleteT[fieldPath];
+    return typeof t === 'number' ? t : this._now();
   }
 
   // Resolve the (domain, key) a pending delete fieldPath targets, for the
@@ -634,6 +688,7 @@ export default class SyncEngineV2 {
       updates: entry.updates,
       deletes: [...entry.deletes],
       deleteBaseT: entry.deleteBaseT,
+      deleteT: entry.deleteT,
       ts: this._now(),
     });
   }
@@ -679,8 +734,7 @@ export default class SyncEngineV2 {
         updates: {},
         deletes: new Set(),
         deleteBaseT: {},
-        // Same guard for staged tombstones (map-domain deletes), keyed by fieldPath.
-        tombstoneBaseT: {},
+        deleteT: {},
         shadowChanges: {},
         shadowDeletes: {},
         shadowWhole: {},
@@ -713,6 +767,12 @@ export default class SyncEngineV2 {
         const baseT = (op.deleteBaseT && op.deleteBaseT[fieldPath]) || 0;
         if (domain && this._deleteIsStale(domain, key, baseT)) continue;
         entry.deletes.add(fieldPath);
+        // The tombstone is stamped when the user deleted, not when we replay
+        // (ops queued by an older app version carry no deleteT → op.ts).
+        const queuedT = op.deleteT && op.deleteT[fieldPath];
+        entry.deleteT[fieldPath] = typeof queuedT === 'number'
+          ? queuedT
+          : (typeof op.ts === 'number' ? op.ts : this._now());
         if (domain) {
           const sd = entry.shadowDeletes[domain] || (entry.shadowDeletes[domain] = []);
           if (!sd.includes(key)) sd.push(key);
@@ -727,10 +787,7 @@ export default class SyncEngineV2 {
 
       let result;
       try {
-        result = await writeFieldUpdates(ref, {
-          updates: entry.updates,
-          deletes: [...entry.deletes],
-        });
+        result = await writeFieldUpdates(ref, this._buildWrite(entry));
       } catch {
         result = { ok: false };
       }
@@ -765,7 +822,13 @@ export default class SyncEngineV2 {
     for (const domain of Object.keys(entry.shadowDeletes)) {
       const fresh = { ...(this._shadow[domain] || {}) };
       for (const key of entry.shadowDeletes[domain]) {
-        delete fresh[key];
+        if (MAP_DOMAINS.includes(domain)) {
+          // Written as a tombstone — the shadow mirrors exactly that.
+          const fieldPath = `${fieldForMapDomain(domain)}.${key}`;
+          fresh[key] = makeTombstone(this._tombstoneT(entry, fieldPath), domain);
+        } else {
+          delete fresh[key];
+        }
         // A deliberate local delete: clear any recent-write protection so the
         // delete is honored (and a re-add later re-marks it).
         this._recentWrites.delete(`${domain} ${key}`);
@@ -954,6 +1017,7 @@ export default class SyncEngineV2 {
     const db = getFirebaseDb();
     if (!db) {
       this._ready = true;
+      this._drainEarly();
       return null;
     }
 
@@ -975,7 +1039,9 @@ export default class SyncEngineV2 {
       this._rawMonths = monthDocs;
       this._rawDefs = definitionsData;
 
-      let { domains, shadow, tombstones } = assembleDomainsFromDocs(definitionsData, monthDocs);
+      const assembled = assembleDomainsFromDocs(definitionsData, monthDocs);
+      let { domains } = assembled;
+      const { shadow } = assembled;
 
       // Legacy fallback: the cloud (months + definitions) is empty. Try the OLD
       // blob doc as a READ-ONLY source so an un-migrated device still sees data.
@@ -1000,15 +1066,25 @@ export default class SyncEngineV2 {
       }
 
       this._shadow = shadow;
+      this._restoreMode = isRestorePending();
 
       // Initial hydrate counts as cloud activity (seeds the heartbeat clock).
       this._touchActivity();
 
-      if ((hasAnyData(domains) || Object.keys(tombstones).length > 0) && !this._destroyed) {
-        this.onCloudUpdate(domains, true, { tombstones: this._tombstonesToEmit(tombstones, {}) });
-      }
-
+      // Ready BEFORE the emit so edits made while we were booting are staged
+      // first: a fresh local write must shield its key from an older tombstone
+      // in the initial emit (see _mergeCloudView).
       this._ready = true;
+      this._drainEarly();
+
+      // Every tombstone is news to a freshly-booted device: they remove the
+      // stale copies this device still holds in localStorage. (Emit for them
+      // even when the cloud holds no live data at all.)
+      const { tombstones } = this._mergeCloudView(assembled, {});
+      const hasTombstones = Object.keys(tombstones).length > 0;
+      if ((hasAnyData(domains) || hasTombstones) && !this._destroyed) {
+        this.onCloudUpdate(domains, true, { tombstones });
+      }
 
       // Begin watching for cloud changes (guarded inside).
       this._startListening();
@@ -1021,8 +1097,144 @@ export default class SyncEngineV2 {
     } catch (err) {
       this.syncError = err.message;
       this._ready = true;
+      this._drainEarly();
       return null;
     }
+  }
+
+  // Diff the views notified before the engine was ready, now that the shadow is
+  // real (see _early).
+  _drainEarly() {
+    const early = this._early;
+    this._early = {};
+    for (const domain of Object.keys(early)) {
+      this.notifyLocalChange(domain, early[domain]);
+    }
+  }
+
+  // Seed the last-known local view of each map domain from localStorage (which
+  // is what React state starts from). Guarded: never throws.
+  _seedLocalView() {
+    let local = {};
+    try {
+      local = readLocalDomains() || {};
+    } catch {
+      local = {};
+    }
+    for (const domain of MAP_DOMAINS) {
+      const map = local[domain];
+      this._localView[domain] = (map && typeof map === 'object' && !Array.isArray(map)) ? map : {};
+    }
+  }
+
+  // The newest `_t` of any local write of (domain, key) that has not been
+  // confirmed yet: staged, in flight, or parked in the durable outbox.
+  _unconfirmedWriteT(domain, key, outboxOps) {
+    const fieldPath = `${fieldForMapDomain(domain)}.${key}`;
+    let newest = 0;
+    for (const pending of [this._pending, this._inflight || {}]) {
+      for (const path of Object.keys(pending)) {
+        const value = pending[path].updates[fieldPath];
+        if (value !== undefined) newest = Math.max(newest, tOf(value));
+      }
+    }
+    for (const op of outboxOps) {
+      const value = op.updates && op.updates[fieldPath];
+      if (value !== undefined) newest = Math.max(newest, tOf(value));
+    }
+    return newest;
+  }
+
+  // The durable outbox, tolerating any storage failure.
+  _outboxOps() {
+    try {
+      return listOps() || [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Reconcile a freshly assembled cloud view with what this engine already
+   * knows, for keys where a TOMBSTONE is involved on either side, and work out
+   * which tombstones are NEWS for the hook. Everything else passes through
+   * untouched (live-vs-live stays the hook's union merge by `_t`).
+   *
+   * Per key, last-writer-wins by `_t` between the old shadow and the view (a
+   * tombstone wins a tie), because the view can LAG our own writes:
+   *   - we hold a tombstone and the view still shows the older live record (or
+   *     nothing) → keep the tombstone, and keep that record out of the emit so
+   *     it cannot reappear on the device that just cleared it;
+   *   - we hold a live record NEWER than the view's tombstone (we re-rated after
+   *     it) → keep our record; the tombstone is not emitted.
+   *
+   * A tombstone is emitted only when it is news (the shadow does not already
+   * hold one at least as new) — re-emitting a known tombstone would remove a
+   * re-rating the app has not stamped yet. It is also withheld while a NEWER
+   * local write of that key is still unconfirmed, and — on the boot after a
+   * snapshot restore — for every key the restored local data holds.
+   *
+   * @returns {{ domains, shadow, tombstones: Object<string, Object<string, number>> }}
+   */
+  _mergeCloudView(assembled, oldShadow = this._shadow) {
+    const old = oldShadow || {};
+    const domains = { ...assembled.domains };
+    const shadow = { ...assembled.shadow };
+    const tombstones = {};
+    let outboxOps = null; // read at most once, and only if a tombstone is news
+
+    for (const domain of MAP_DOMAINS) {
+      const oldMap = old[domain] || {};
+      const incoming = assembled.shadow[domain] || {};
+      let merged = incoming;
+      let live = assembled.domains[domain] || {};
+      const keep = (key, record) => {
+        if (merged === incoming) {
+          merged = { ...incoming };
+          live = { ...live };
+        }
+        merged[key] = record;
+        delete live[key];
+      };
+
+      for (const key of Object.keys(oldMap)) {
+        const was = oldMap[key];
+        const inc = incoming[key];
+        if (isTombstone(was)) {
+          const viewIsNewer = inc !== undefined &&
+            (isTombstone(inc) ? tOf(inc) >= tOf(was) : tOf(inc) > tOf(was));
+          if (!viewIsNewer) keep(key, was);
+        } else if (isTombstone(inc) && tOf(was) > tOf(inc)) {
+          keep(key, was);
+        }
+      }
+
+      const news = {};
+      const localView = this._localView[domain] || {};
+      for (const key of Object.keys(merged)) {
+        const rec = merged[key];
+        if (!isTombstone(rec)) continue;
+        const was = oldMap[key];
+        if (isTombstone(was) && tOf(was) >= tOf(rec)) continue; // not news
+        if (this._restoreMode && key in localView) continue;
+        if (!outboxOps) outboxOps = this._outboxOps();
+        if (this._unconfirmedWriteT(domain, key, outboxOps) > tOf(rec)) continue;
+        news[key] = tOf(rec);
+      }
+      if (Object.keys(news).length > 0) {
+        tombstones[domain] = news;
+        // The hook removes these locally; forget them so a later re-rating —
+        // even to the same value — reads as a fresh write.
+        const view = { ...localView };
+        for (const key of Object.keys(news)) delete view[key];
+        this._localView[domain] = view;
+      }
+
+      domains[domain] = live;
+      shadow[domain] = merged;
+    }
+
+    return { domains, shadow, tombstones };
   }
 
   /**
@@ -1076,8 +1288,16 @@ export default class SyncEngineV2 {
       // Refresh raw caches + shadow so the listener diffs against current cloud.
       this._rawMonths = monthDocs;
       this._rawDefs = definitionsData;
-      const { domains, shadow, tombstones } = assembleDomainsFromDocs(definitionsData, monthDocs);
+      const assembled = assembleDomainsFromDocs(definitionsData, monthDocs);
+      // Replace: the cloud as read IS the truth. Merge: keep what we know about
+      // tombstones (see _mergeCloudView).
+      const { domains, shadow, tombstones } = destructive
+        ? { ...assembled, tombstones: {} }
+        : this._mergeCloudView(assembled);
       this._shadow = shadow;
+      if (destructive) {
+        for (const domain of MAP_DOMAINS) this._localView[domain] = domains[domain] || {};
+      }
 
       // Per-domain counts for the Settings toast (array length / key count /
       // scalar present = 1).
@@ -1092,7 +1312,7 @@ export default class SyncEngineV2 {
       if (destructive) {
         this.onCloudUpdate(domains, false, { replace: true });
       } else {
-        this.onCloudUpdate(domains, false, { deletes: {}, tombstones: this._tombstonesToEmit(tombstones, {}) });
+        this.onCloudUpdate(domains, false, this._emitOpts(tombstones));
       }
       this.lastSynced = new Date();
 
@@ -1124,11 +1344,12 @@ export default class SyncEngineV2 {
    * cloud writes nothing and simply pulls the cloud's extra records down. This
    * is what makes the data-loss guard hold for behind devices.
    *
-   * A map-domain record deleted on another device is NOT resurrected: the cloud
-   * holds its tombstone, and a local copy the tombstone supersedes is left out
-   * of the push. (Definition domains have no tombstones; they use soft delete.)
-   * "Local has it, cloud lacks it entirely" still means a vanished ADD and is
-   * pushed back up. Guarded against no-db / destroyed; NEVER throws.
+   * DELETES made on another device are tombstones in the cloud, so they are not
+   * resurrected here: a local record on a tombstoned key is pushed only if its
+   * own `_t` beats the tombstone. (The one exception is a record whose tombstone
+   * has already been pruned — TOMBSTONE_TTL_MS — which reads as "cloud is
+   * missing it" and is re-added.) Afterwards, expired tombstones are pruned.
+   * Guarded against no-db / destroyed; NEVER throws.
    *
    * @param {Object} allData full app-shape values keyed by domain.
    */
@@ -1149,28 +1370,25 @@ export default class SyncEngineV2 {
       // shadow (whose belief that a dropped write succeeded is the root bug).
       this._rawMonths = monthDocs;
       this._rawDefs = definitionsData;
-      const { domains: cloudDomains, shadow, tombstones } = assembleDomainsFromDocs(
-        definitionsData,
-        monthDocs,
+      const { domains: cloudDomains, shadow, tombstones } = this._mergeCloudView(
+        assembleDomainsFromDocs(definitionsData, monthDocs),
       );
       this._shadow = shadow;
 
-      // PULL: union the cloud into local, and apply deletes made elsewhere. Only explicit
-      // tombstones delete — never absence (see _applyAssembledCloud).
-      const emitted = this._tombstonesToEmit(tombstones, {});
-      this.onCloudUpdate(cloudDomains, false, { deletes: {}, tombstones: emitted });
+      // PULL: union the cloud into local. Nothing is deleted by ABSENCE (see
+      // _applyAssembledCloud); explicit tombstones that are news are applied.
+      this.onCloudUpdate(cloudDomains, false, this._emitOpts(tombstones));
 
       // PUSH: enqueue only records the cloud is missing. Passing the UNION of
       // local+cloud guarantees the data is a superset of the shadow, so the
-      // diff yields additions only — never a delete. A local record that a
-      // newer tombstone supersedes is a stale copy of something deleted on
-      // another device: leave it out, or this push would resurrect it.
+      // diff yields additions only — never a delete.
+      // `reconcile: true`: allData comes from localStorage, which may still hold
+      // records the hook has just removed for a tombstone — a local record on a
+      // tombstoned key is pushed only if its own `_t` beats the tombstone.
       for (const domain of MAP_DOMAINS) {
-        const local = applyTombstones(allData[domain] || {}, emitted[domain]);
-        const union = mergeMapByTime(cloudDomains[domain] || {}, local);
-        this.notifyLocalChange(domain, union);
+        const union = mergeMapByTime(cloudDomains[domain] || {}, allData[domain] || {});
+        this.notifyLocalChange(domain, union, { reconcile: true });
       }
-      this._pruneTombstones(tombstones);
       for (const domain of ID_MAP_DOMAINS) {
         const localArr = Array.isArray(allData[domain]) ? allData[domain] : [];
         const cloudArr = Array.isArray(cloudDomains[domain]) ? cloudDomains[domain] : [];
@@ -1179,6 +1397,11 @@ export default class SyncEngineV2 {
       }
 
       await this.flushNow();
+      if (this._restoreMode) {
+        this._restoreMode = false;
+        clearRestorePending();
+      }
+      await this._pruneTombstones();
       this.lastSynced = new Date();
     } catch (err) {
       this.syncError = err && err.message ? err.message : String(err);
@@ -1281,8 +1504,8 @@ export default class SyncEngineV2 {
    * and refreshFromCloud() so both paths emit identically and stay
    * echo-suppressed.
    *
-   * ABSENCE NEVER DELETES — IMPORTANT: a key's ABSENCE from a cloud
-   * snapshot/read is NOT treated as a remote delete, because the cloud
+   * UNION-ONLY — IMPORTANT: this path NEVER emits deletes. A key's ABSENCE from
+   * a cloud snapshot/read is NOT treated as a remote delete, because the cloud
    * view can legitimately lag our own writes: REST-fallback writes (used when
    * the SDK channel stalls on Safari) bypass the SDK listener's cache, and a
    * stalled streaming channel can deliver a view well behind reality. Deriving
@@ -1290,85 +1513,81 @@ export default class SyncEngineV2 {
    * rapid-entry data-loss bug). The hook merges by `_t` and PRESERVES any key
    * the snapshot is missing, so a stale/lagging view can never destroy data.
    *
-   * Deletes of map-domain records DO propagate, but only explicitly: the
-   * deleting device writes a tombstone (`{ _deleted, _t }`, see tombstones.js),
-   * and this path emits the cloud's tombstones for the hook to apply by `_t`. A
-   * lagging view can at worst show an OLD tombstone, which _tombstonesToEmit
-   * screens out against the shadow, pending writes and recent writes.
+   * Deletes propagate EXPLICITLY instead: a local delete of a map-domain key is
+   * written as a tombstone (`{ _deleted: true, _t }`, see tombstones.js), and
+   * tombstones in the cloud view are handed to the hook WITH their `_t`, which
+   * removes the local record only if the tombstone is at least as new (so an
+   * Undo or a re-rating wins). See _mergeCloudView for how a tombstone is
+   * reconciled with a view that lags our own writes.
    */
   _applyAssembledCloud() {
     // Re-assemble the full cloud state.
-    const { domains, shadow: newShadow, tombstones } = assembleDomainsFromDocs(
-      this._rawDefs,
-      this._rawMonths,
+    const { domains, shadow: newShadow, tombstones } = this._mergeCloudView(
+      assembleDomainsFromDocs(this._rawDefs, this._rawMonths),
     );
 
     // Echo suppression: identical to our shadow → do nothing.
     if (this._shadowsEqual(this._shadow, newShadow)) return;
 
-    // Emit cloud data for a UNION merge in the hook. Absence never deletes (see above); an
-    // explicit tombstone does, by `_t`.
-    this.onCloudUpdate(domains, false, { deletes: {}, tombstones: this._tombstonesToEmit(tombstones, this._shadow) });
+    // Emit cloud data for a UNION merge in the hook. Nothing is deleted by
+    // absence (see above); only explicit tombstones that are news are applied.
+    this.onCloudUpdate(domains, false, this._emitOpts(tombstones));
 
     // Advance the shadow to the cloud view and stamp time. If this view lagged
-    // and dropped keys we still hold locally, the next local edit re-pushes
+    // and dropped LIVE keys we still hold locally, the next local edit re-pushes
     // them (diff vs shadow), and the next complete snapshot re-adds them — both
-    // self-healing and non-destructive.
+    // self-healing and non-destructive. Tombstones we know about are carried
+    // over by _mergeCloudView, so a lagging view never re-pushes a deleted key.
     this._shadow = newShadow;
     this.lastSynced = new Date();
   }
 
-  /**
-   * Which cloud tombstones the hook should apply. The hook removes a local record when the
-   * tombstone is not older than it, but local records often carry no `_t` (the app never stamps
-   * one; it only arrives with a cloud echo), so the engine screens out every case where this
-   * device knows better:
-   *   - already applied: `prevShadow` holds the same tombstone;
-   *   - `prevShadow` holds a NEWER live record (the view carrying the tombstone is lagging);
-   *   - a newer local write of the key is pending or was just flushed.
-   * @param {Object} tombstones { domain: { key: _t } } from assembleDomainsFromDocs
-   * @param {Object} prevShadow the shadow BEFORE this cloud view ({} to emit them all)
-   */
-  _tombstonesToEmit(tombstones, prevShadow) {
-    const out = {};
-    const now = this._now();
-    for (const domain of Object.keys(tombstones || {})) {
-      const field = fieldForMapDomain(domain);
-      const prev = (prevShadow && prevShadow[domain]) || {};
-      for (const key of Object.keys(tombstones[domain])) {
-        const t = tombstones[domain][key];
-        const known = prev[key];
-        if (known && typeof known === 'object' && typeof known._t === 'number') {
-          if (isTombstone(known) ? known._t >= t : known._t > t) continue;
-        }
-        const fieldPath = `${field}.${key}`;
-        const pendingLive = Object.keys(this._pending).some((path) => {
-          const update = this._pending[path].updates[fieldPath];
-          return update && !isTombstone(update);
-        });
-        if (pendingLive) continue;
-        const wroteAt = this._recentWrites.get(`${domain} ${key}`);
-        const current = (this._shadow[domain] || {})[key];
-        if (wroteAt != null && now - wroteAt < RECENT_WRITE_TTL_MS && current && !isTombstone(current) && current._t > t) continue;
-        (out[domain] || (out[domain] = {}))[key] = t;
-      }
-    }
-    return out;
+  // Emit opts for a union merge: never any absence-derived deletes; explicit
+  // tombstones as `{ domain: { key: _t } }` (only the ones that are news).
+  _emitOpts(tombstones) {
+    return { deletes: {}, tombstones: tombstones || {} };
   }
 
-  // Truly delete tombstones past their TTL so month docs don't grow forever. Staged through the
-  // ordinary guarded delete path; flushed with whatever else is pending.
-  _pruneTombstones(tombstones) {
+  /**
+   * Truly delete tombstones older than TOMBSTONE_TTL_MS so month docs do not
+   * grow forever. Runs after reconcile (the shadow was just read from the
+   * server). A failed write changes nothing and is retried next time. Trade-off:
+   * a device offline for longer than the TTL that still holds the record will
+   * re-add it. NEVER throws.
+   */
+  async _pruneTombstones() {
     const cutoff = this._now() - TOMBSTONE_TTL_MS;
-    for (const domain of Object.keys(tombstones || {})) {
-      const field = fieldForMapDomain(domain);
-      const expired = Object.keys(tombstones[domain]).filter((key) => tombstones[domain][key] < cutoff);
-      const byMonth = groupKeysByMonth(expired);
-      for (const monthId of Object.keys(byMonth)) {
-        const entry = this._pendingFor(this._monthDocRef(monthId));
-        for (const key of byMonth[monthId]) {
-          this._enqueueDelete(entry, domain, `${field}.${key}`, key, (this._shadow[domain] || {})[key]);
-        }
+    const byMonth = {}; // monthId → [{ domain, key }]
+    for (const domain of MAP_DOMAINS) {
+      const map = this._shadow[domain] || {};
+      const expired = Object.keys(map).filter((k) => isTombstone(map[k]) && tOf(map[k]) < cutoff);
+      const grouped = groupKeysByMonth(expired);
+      for (const monthId of Object.keys(grouped)) {
+        const list = byMonth[monthId] || (byMonth[monthId] = []);
+        for (const key of grouped[monthId]) list.push({ domain, key });
+      }
+    }
+
+    for (const monthId of Object.keys(byMonth)) {
+      if (this._destroyed) return;
+      const targets = byMonth[monthId];
+      let result;
+      try {
+        result = await writeFieldUpdates(this._monthDocRef(monthId), {
+          updates: {},
+          deletes: targets.map(({ domain, key }) => `${fieldForMapDomain(domain)}.${key}`),
+        });
+      } catch {
+        result = { ok: false };
+      }
+      if (this._destroyed || !result || !result.ok) continue;
+      for (const { domain, key } of targets) {
+        // Only if still the expired tombstone (a snapshot may have moved on).
+        const current = (this._shadow[domain] || {})[key];
+        if (!isTombstone(current) || tOf(current) >= cutoff) continue;
+        const fresh = { ...this._shadow[domain] };
+        delete fresh[key];
+        this._shadow[domain] = fresh;
       }
     }
   }

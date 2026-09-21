@@ -15,13 +15,13 @@
  * is deep-equal to it, to avoid unnecessary React re-renders.
  */
 
+import { isTombstone, tOf } from './tombstones.js';
+
 const jsonEqual = (a, b) => {
   if (a === b) return true;
   return JSON.stringify(a) === JSON.stringify(b);
 };
 
-const tOf = (v) =>
-  (v && typeof v === 'object' && typeof v._t === 'number') ? v._t : 0;
 
 /**
  * Merge two `{ key: value }` map domains by `_t`.
@@ -67,4 +67,34 @@ export const mergeIdArrayByTime = (prev, cloud) => {
   }
   const merged = [...byId.values()];
   return jsonEqual(prev, merged) ? prev : merged;
+};
+
+/**
+ * The hook-side merge for one map domain: union-merge the cloud's LIVE records
+ * by `_t`, then apply the cloud's tombstones (`{ key: _t }`).
+ *
+ * A tombstone removes the local record only when `tombstone._t >= local._t`; a
+ * newer local write (a re-rating, an Undo) survives and the engine replaces the
+ * tombstone in the cloud. A local record with no `_t` is older than any
+ * tombstone. Any tombstone OBJECT found in local state (merged in by an app
+ * version from before tombstones) is stripped — they must never reach the UI.
+ *
+ * @param {Object} prev - local map
+ * @param {Object} cloud - cloud map (live records only)
+ * @param {Object<string, number>} [tombstones] - key → tombstone `_t`
+ * @returns {Object} merged map (or `prev` reference if unchanged)
+ */
+export const mergeCloudMap = (prev, cloud, tombstones) => {
+  const merged = mergeMapByTime(prev, cloud);
+  if (!merged || typeof merged !== 'object') return merged;
+  const dead = (tombstones && typeof tombstones === 'object') ? tombstones : {};
+  let next = null;
+  for (const k of Object.keys(merged)) {
+    const v = merged[k];
+    if (isTombstone(v) || (k in dead && dead[k] >= tOf(v))) {
+      if (!next) next = { ...merged };
+      delete next[k];
+    }
+  }
+  return next || merged;
 };

@@ -17,11 +17,17 @@
 // longer than this while holding a stale copy could bring the record back.
 export const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-const tOf = (v) => ((v && typeof v === 'object' && typeof v._t === 'number') ? v._t : 0);
+export const tOf = (v) => ((v && typeof v === 'object' && typeof v._t === 'number') ? v._t : 0);
 
 export const isTombstone = (record) => !!(record && typeof record === 'object' && record._deleted === true);
 
-export const makeTombstone = (now) => ({ _deleted: true, _t: now });
+// Carries nothing of the deleted record (no note, no text). An `entries` tombstone also reads as
+// N/A (severity -1, NA_SEVERITY) purely for app versions from before tombstones: they merge it into
+// state as if it were a rating, and with no severity at all their export throws and their health
+// score goes NaN. As N/A they skip it.
+export const makeTombstone = (now, domain) => (
+  domain === 'entries' ? { _deleted: true, _t: now, severity: -1 } : { _deleted: true, _t: now }
+);
 
 /**
  * Split a flat cloud map into the records the app should see and the tombstones.

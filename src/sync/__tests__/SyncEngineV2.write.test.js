@@ -156,7 +156,7 @@ describe('SyncEngineV2 — granular write path', () => {
     const call = callForMonth('2026-03');
     expect(call).toBeTruthy();
     expect(call[1].deletes).toEqual([]);
-    expect(call[1].updates).toEqual({ 'entries.2026-03-16-b': { _deleted: true, _t: FIXED_NOW } });
+    expect(call[1].updates).toEqual({ 'entries.2026-03-16-b': { _deleted: true, _t: FIXED_NOW, severity: -1 } });
   });
 
   it('Test 4: edits spanning two months → one write per month doc', async () => {
@@ -340,9 +340,9 @@ describe('SyncEngineV2 — granular write path', () => {
     await engine.flushNow();
 
     const call = callForMonth('2026-03');
-    expect(call[1].updates['entries.2026-03-16-b']).toEqual({ _deleted: true, _t: FIXED_NOW });
+    expect(call[1].updates['entries.2026-03-16-b']).toEqual({ _deleted: true, _t: FIXED_NOW, severity: -1 });
     // The shadow remembers the delete, so the key's absence locally is not re-reported...
-    expect(engine._shadow.entries['2026-03-16-b']).toEqual({ _deleted: true, _t: FIXED_NOW });
+    expect(engine._shadow.entries['2026-03-16-b']).toEqual({ _deleted: true, _t: FIXED_NOW, severity: -1 });
     writeFieldUpdates.mockClear();
     engine.notifyLocalChange('entries', { '2026-03-15-a': { v: 1, _t: 1 } });
     await engine.flushNow();
