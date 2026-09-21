@@ -14,6 +14,7 @@ import {
   STORAGE_KEY_STACK_ENTRIES,
   STORAGE_KEY_PINNED,
   STORAGE_KEY_COPY_DAYS,
+  STORAGE_KEY_TALK_ENGINE,
   STORAGE_KEY_INPUT_ITEMS,
   STORAGE_KEY_INPUT_ENTRIES,
   severityColors,
@@ -46,6 +47,9 @@ import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import DesktopToolbar from './components/DesktopToolbar';
 import RapidEntry from './components/RapidEntry';
+import TalkMode from './components/TalkMode';
+import { unlockAudio } from './voice/ttsCache';
+import { primePlayback } from './voice/pcmAudio';
 import SymptomRows from './components/SymptomRows';
 import UndoToast from './components/UndoToast';
 import ProtocolRows from './components/ProtocolRows';
@@ -111,6 +115,7 @@ function App() {
     isApplyingCloudRef
   );
   const [copyDays, setCopyDays] = useLocalStorage(STORAGE_KEY_COPY_DAYS, 7);
+  const [talkEngine, setTalkEngine] = useLocalStorage(STORAGE_KEY_TALK_ENGINE, 'gemini');
 
   // Normalize legacy bare-string daily notes → { text } records, once, so the
   // sync diff never spreads a bare string (which would corrupt the record).
@@ -175,6 +180,7 @@ function App() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showRapidEntry, setShowRapidEntry] = useState(false);
+  const [showTalkMode, setShowTalkMode] = useState(false);
   const [showSymptomGraph, setShowSymptomGraph] = useState(null);
   const [showSupplementGraph, setShowSupplementGraph] = useState(null);
   // Mobile History button: jump to Insights with that symptom selected
@@ -591,17 +597,21 @@ function App() {
     setLastAction('');
   }, []);
 
-  const quickLog = useCallback((symptomId, severity, timeOverride = null) => {
+  // `note` undefined keeps whatever note the entry already has; a string replaces it ('' removes it)
+  const quickLog = useCallback((symptomId, severity, timeOverride = null, note) => {
     const dateKey = getDateKey(selectedDate);
     const timeId = timeOverride || timePeriods[0].id;
     const key = `${dateKey}-${symptomId}-${timeId}`;
 
     justLoggedRef.current = true;
 
-    setEntries(prev => ({
-      ...prev,
-      [key]: { time: timeId, severity, date: dateKey, symptomId }
-    }));
+    setEntries(prev => {
+      const text = (note === undefined ? prev[key]?.note : note)?.trim();
+      return {
+        ...prev,
+        [key]: { time: timeId, severity, date: dateKey, symptomId, ...(text ? { note: text } : {}) }
+      };
+    });
 
     const symptom = symptoms.find(s => s.id === symptomId);
     const period = timePeriods.find(p => p.id === timeId);
@@ -609,6 +619,15 @@ function App() {
     const severityLabel = severity === NA_SEVERITY ? 'N/A' : severity;
     setLastAction(`${symptom?.name}: ${severityLabel} (${period?.label || timeId})`);
   }, [selectedDate, timePeriods, symptoms]);
+
+  // Called from the launch tap itself: iOS only lets talk mode speak if audio starts inside a gesture
+  const openTalkMode = useCallback(() => {
+    unlockAudio();
+    primePlayback();
+    setAppMode('symptoms');
+    setShowInsights(false);
+    setShowTalkMode(true);
+  }, []);
 
   const quickCopyData = useCallback(() => {
     const insights = getInsights(copyDays, entries, liveSymptoms);
@@ -777,6 +796,7 @@ function App() {
                 setSymptomSearch={setSymptomSearch}
                 onOpenGraph={setShowSymptomGraph}
                 onEditNote={() => setShowNoteModal(true)}
+                onTalkMode={openTalkMode}
                 onClearDay={clearSymptomDay}
                 onDeleteSymptom={(symptom) => softDeleteItem('symptom', symptom)}
                 editing={symptomEditMode}
@@ -857,6 +877,7 @@ function App() {
                 setSymptomSearch={setSymptomSearch}
                 onOpenGraph={openSymptomInInsights}
                 onEditNote={() => setShowNoteModal(true)}
+                onTalkMode={openTalkMode}
                 onClearDay={clearSymptomDay}
                 onDeleteSymptom={(symptom) => softDeleteItem('symptom', symptom)}
                 editing={symptomEditMode}
@@ -907,6 +928,21 @@ function App() {
           quickLog={quickLog}
           setCopyToastMessage={setCopyToastMessage}
           onClose={() => setShowRapidEntry(false)}
+        />
+      )}
+
+      {/* Talk mode */}
+      {showTalkMode && (
+        <TalkMode
+          symptoms={activeSymptoms}
+          entries={entries}
+          selectedDate={selectedDate}
+          trackingMode={trackingMode}
+          timePeriods={timePeriods}
+          quickLog={quickLog}
+          engineKind={talkEngine}
+          setCopyToastMessage={setCopyToastMessage}
+          onClose={() => setShowTalkMode(false)}
         />
       )}
 
@@ -1229,6 +1265,8 @@ function App() {
           setInputEntries={setInputEntries}
           copyDays={copyDays}
           setCopyDays={setCopyDays}
+          talkEngine={talkEngine}
+          setTalkEngine={setTalkEngine}
           setLastAction={setLastAction}
           setCopyToastMessage={setCopyToastMessage}
           setShowExport={setShowExport}
@@ -1289,6 +1327,7 @@ function App() {
           onEditSymptoms={() => { setAppMode('symptoms'); setShowInsights(false); setSymptomEditMode(true); }}
           onClearSymptoms={clearSymptomDay}
           onRapidEntry={() => { setAppMode('symptoms'); setShowInsights(false); setShowRapidEntry(true); }}
+          onTalkMode={openTalkMode}
           // Stack page actions
           onCheckAll={protocolCheckAll}
           onClear={protocolClearDay}

@@ -16,6 +16,7 @@
 .lr-name small { color: #6b7280; font-size: 12px; margin-left: 8px; }
 .lr-row.done .lr-name { color: #9ca3af; }
 .lr-pin { color: #fbbf24; font-size: 10px; margin-right: 6px; }
+.lr-noted { margin-left: 8px; padding: 1px 6px; border-radius: 99px; border: 1px solid rgba(255,255,255,.1); color: #9ca3af; font-size: 10.5px; letter-spacing: .02em; }
 .lr-strip { display: flex; gap: 3px; align-items: flex-end; height: 18px; cursor: pointer; }
 .lr-strip i { width: 9px; border-radius: 2px; background: rgba(255,255,255,.06); height: 3px; }
 /* Symptom history: one square per day, severity shown by colour alone; an outline = nothing logged */

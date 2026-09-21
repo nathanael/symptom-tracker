@@ -11,10 +11,11 @@ const icons = {
   gear: solar.gear,
   trash: solar.trash,
   bolt: solar.bolt,
+  mic: solar.mic,
 };
 
 // The one mobile overflow. Ordered for the thumb: rare and destructive at the top,
-// the actions used most (day notes, rapid entry) at the bottom next to the ⋯ button.
+// the actions used most (day notes, talk mode, rapid entry) at the bottom next to the ⋯ button.
 export default function QuickActionsMenu({
   appMode,
   showInsights,
@@ -27,6 +28,7 @@ export default function QuickActionsMenu({
   onEditSymptoms,
   onClearSymptoms,
   onRapidEntry,
+  onTalkMode,
   // Stack page actions
   onClear,
   onMatchYesterday,
@@ -77,6 +79,7 @@ export default function QuickActionsMenu({
           <>
             <hr />
             <Item icon="note" label="Day notes" onClick={onEditNote} />
+            {tab === 'symptoms' && <Item icon="mic" label="Talk me through it" onClick={onTalkMode} />}
             {tab === 'symptoms' && <Item icon="bolt" label="Rapid entry" primary onClick={onRapidEntry} />}
           </>
         )}

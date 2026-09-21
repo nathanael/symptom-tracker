@@ -63,6 +63,8 @@ export default function Settings({
   setInputEntries,
   copyDays,
   setCopyDays,
+  talkEngine,
+  setTalkEngine,
   setLastAction,
   setCopyToastMessage,
   setShowExport,
@@ -415,6 +417,9 @@ export default function Settings({
         </Row>
         <Row stack title="Days of data to copy" desc={isDesktop ? 'How many days of data the Copy button in the top bar puts on your clipboard.' : 'How many days of data “Copy for AI” in the ⋯ menu puts on your clipboard.'}>
           <Seg options={[1, 7, 14, 30, 60].map((d) => [d, String(d)])} value={copyDays} onChange={setCopyDays} />
+        </Row>
+        <Row stack title="Talk mode voice" desc="Gemini and OpenAI are live back-and-forth conversations. Standard is turn-by-turn with fixed phrases, and the cheapest to run.">
+          <Seg options={[['gemini', 'Gemini'], ['realtime', 'OpenAI'], ['pipeline', 'Standard']]} value={talkEngine} onChange={setTalkEngine} />
         </Row>
       </div>
     </section>

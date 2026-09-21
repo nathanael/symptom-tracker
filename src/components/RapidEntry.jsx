@@ -4,7 +4,8 @@ import './desktopNav.css';
 import './rapidEntry.css';
 import { severityColors, NA_SEVERITY } from '../utils/constants';
 import { getDateKey, getCurrentTimePeriod, formatDate } from '../utils/helpers';
-import { isApplicable, getLastSeverity } from '../utils/listHelpers';
+import { getLastSeverity } from '../utils/listHelpers';
+import * as queue from '../voice/checkinQueue';
 
 // Full-screen, one-symptom-at-a-time logging. Rating jumps to the next unlogged symptom;
 // finishing a period offers the other one, then closes with confetti.
@@ -20,16 +21,11 @@ export default function RapidEntry({
   onClose,
 }) {
   const dateKey = getDateKey(selectedDate);
-  const entryKey = (symptom, periodId) => `${dateKey}-${symptom.id}-${periodId}`;
-  const listFor = (periodId) => symptoms.filter((s) => isApplicable(s, periodId));
-  const unloggedIn = (periodId) => listFor(periodId).filter((s) => !entries[entryKey(s, periodId)]);
+  const entryKey = (symptom, periodId) => queue.entryKey(dateKey, symptom.id, periodId);
+  const listFor = (periodId) => queue.listFor(symptoms, periodId);
 
   // Start in the current period, or the other one if this one is already complete
-  const [period, setPeriod] = useState(() => {
-    const now = timePeriods.find((p) => p.id === getCurrentTimePeriod(trackingMode))?.id || timePeriods[0].id;
-    if (unloggedIn(now).length > 0) return now;
-    return timePeriods.find((p) => unloggedIn(p.id).length > 0)?.id || now;
-  });
+  const [period, setPeriod] = useState(() => queue.initialPeriod(symptoms, entries, dateKey, timePeriods, getCurrentTimePeriod(trackingMode)));
   const list = useMemo(() => listFor(period), [symptoms, period]);
   const isLogged = (symptom) => !!entries[entryKey(symptom, period)];
 
@@ -37,7 +33,7 @@ export default function RapidEntry({
   const [done, setDone] = useState(() => list.every(isLogged));
   const current = list[Math.min(index, list.length - 1)];
   const periodLabel = timePeriods.length > 1 ? timePeriods.find((p) => p.id === period)?.label : '';
-  const otherIncomplete = timePeriods.filter((p) => p.id !== period).map((p) => ({ ...p, left: unloggedIn(p.id).length })).find((p) => p.left > 0);
+  const otherIncomplete = queue.otherIncomplete(symptoms, entries, dateKey, timePeriods, period);
 
   useEffect(() => {
     if (done) confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
@@ -51,13 +47,7 @@ export default function RapidEntry({
   };
 
   // Next unlogged symptom after `from`, wrapping; -1 when everything else is logged
-  const nextUnlogged = (from, skipId) => {
-    for (let offset = 1; offset <= list.length; offset++) {
-      const i = (from + offset) % list.length;
-      if (list[i].id !== skipId && !isLogged(list[i])) return i;
-    }
-    return -1;
-  };
+  const nextUnlogged = (from, skipId) => queue.nextUnlogged(list, isLogged, from, skipId);
 
   const finish = () => {
     if (otherIncomplete) {

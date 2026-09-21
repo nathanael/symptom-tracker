@@ -1,0 +1,148 @@
+import { mintToken } from './voiceApi';
+import { handEntryMessage } from './scripts/dailyCheckin';
+import { createMic, createPlayer } from './pcmAudio';
+
+// Gemini Live: one speech-to-speech model over a WebSocket. Model, voice, instructions and tools
+// are locked into the single-use token server-side; here we stream the mic up, play audio back,
+// and run its tool calls. Same interface as createPipelineEngine.
+export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onError, onEnd }) => {
+  let session = null;
+  let mic = null;
+  let player = null;
+  let stopped = false;
+  let closing = false; // we closed the socket ourselves; don't report it as a drop
+  let ending = null; // 'paused' | 'finished' once the model has been told to wrap up
+  let endTimer = null;
+  let turnDone = true;
+  let captions = { app: '', user: '' };
+  let lastUsage = null;
+  const startedAt = Date.now();
+
+  const end = (reason) => {
+    if (stopped) return;
+    stopped = true;
+    clearTimeout(endTimer);
+    player?.flush();
+    mic?.close();
+    try { session?.close(); } catch { /* already closed */ }
+    // For checking real cost against the estimate: the Live API reports running token totals
+    console.info('[voice] gemini session', { seconds: Math.round((Date.now() - startedAt) / 1000), usage: lastUsage });
+    onEnd(reason);
+  };
+
+  const fail = (message) => {
+    onState('error');
+    onError(message);
+  };
+
+  const tell = (text) => session?.sendClientContent({ turns: [{ role: 'user', parts: [{ text }] }], turnComplete: true });
+
+  // The model's turn is over and its audio has played out
+  const settle = () => {
+    if (stopped || !turnDone || player.playing) return;
+    if (ending) end(ending);
+    else onState('listening');
+  };
+
+  const runTools = (calls) => {
+    const functionResponses = calls.map((call) => {
+      const result = checkin.handle(call.name, call.args || {});
+      if (result.paused) ending = 'paused';
+      if (result.finished) ending = 'finished';
+      return { id: call.id, name: call.name, response: result };
+    });
+    session.sendToolResponse({ functionResponses });
+    // Let it say goodbye, but don't wait forever if no audio comes
+    if (ending) endTimer = setTimeout(() => end(ending), 8000);
+  };
+
+  const onMessage = (message) => {
+    if (stopped) return;
+    if (message.usageMetadata) lastUsage = message.usageMetadata;
+    if (message.toolCall?.functionCalls?.length) {
+      onState('thinking');
+      runTools(message.toolCall.functionCalls);
+    }
+    if (message.goAway) console.warn('[voice] gemini closing soon', message.goAway.timeLeft);
+
+    const content = message.serverContent;
+    if (!content) return;
+    if (content.interrupted) {
+      // Barge-in: the user spoke over the model
+      player.flush();
+      captions.app = '';
+      onState('listening');
+    }
+    if (content.inputTranscription?.text) {
+      captions.user += content.inputTranscription.text;
+      onCaption({ who: 'user', text: captions.user.trim() });
+    }
+    if (content.outputTranscription?.text) {
+      captions.app += content.outputTranscription.text;
+      onCaption({ who: 'app', text: captions.app.trim() });
+    }
+    for (const part of content.modelTurn?.parts || []) {
+      if (part.inlineData?.data) {
+        turnDone = false;
+        onState('speaking');
+        player.play(part.inlineData.data);
+      }
+    }
+    if (content.turnComplete) {
+      turnDone = true;
+      captions = { app: '', user: '' };
+      settle();
+    }
+  };
+
+  return {
+    start: async () => {
+      onState('connecting');
+      // Before connecting, so the screen shows where we are (and taps work) even if voice fails
+      const opening = checkin.start();
+      try {
+        player = createPlayer({ onIdle: settle });
+        const [{ secret, model }, { GoogleGenAI, Modality }] = await Promise.all([mintToken('gemini'), import('@google/genai')]);
+        if (stopped) return;
+        // Ephemeral tokens are only accepted on v1alpha
+        const ai = new GoogleGenAI({ apiKey: secret, httpOptions: { apiVersion: 'v1alpha' } });
+        session = await ai.live.connect({
+          model,
+          config: { responseModalities: [Modality.AUDIO] },
+          callbacks: {
+            onmessage: onMessage,
+            onerror: (e) => console.error('[voice] gemini error', e?.message || e),
+            onclose: (e) => {
+              if (stopped || closing) return;
+              console.warn('[voice] gemini closed', e?.code, e?.reason);
+              fail('The voice connection dropped.');
+            },
+          },
+        });
+        if (stopped) return session.close();
+      } catch (err) {
+        return fail(err.message || "Couldn't start talk mode.");
+      }
+      try {
+        mic = await createMic({
+          onLevel,
+          onChunk: (data) => !stopped && session.sendRealtimeInput({ audio: { data, mimeType: mic?.mimeType || 'audio/pcm;rate=16000' } }),
+        });
+        if (stopped) return mic.close();
+      } catch (err) {
+        fail(err.message);
+        // In development the session still runs on typed input, for testing without a microphone
+        if (!import.meta.env.DEV) {
+          closing = true;
+          return session.close();
+        }
+      }
+      tell(`Opening state: ${JSON.stringify(opening)}`);
+    },
+    stop: () => end('stopped'),
+    setMuted: (muted) => mic?.setMuted(muted),
+    sendText: (text) => tell(text),
+    // The user tapped a rating instead of speaking
+    advance: (result) => tell(handEntryMessage(result)),
+  };
+};

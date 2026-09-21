@@ -426,6 +426,20 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
     }
   }
 
+  // Notes attached to individual symptom ratings (e.g. spoken in talk mode)
+  const cutoffKey = getDateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - (days - 1)));
+  const symptomNames = new Map(symptoms.map((s) => [s.id, s.name]));
+  const noted = Object.values(entries)
+    .filter((e) => e?.note && e.date >= cutoffKey && symptomNames.has(e.symptomId))
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  if (noted.length > 0) {
+    output.push('\n### Symptom Notes');
+    for (const e of noted) {
+      const period = timePeriods.length > 1 ? timePeriods.find((p) => p.id === e.time)?.label : '';
+      output.push(`- ${formatTableDate(e.date)}${period ? ` ${period}` : ''} · ${symptomNames.get(e.symptomId)} (${e.severity === NA_SEVERITY ? 'N/A' : e.severity}): ${e.note}`);
+    }
+  }
+
   // Sleep data
   const sleepDays = readSleepCache();
   if (sleepDays.length > 0) {

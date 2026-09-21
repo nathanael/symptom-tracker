@@ -45,6 +45,7 @@ export default function SymptomRows({
   setSymptomSearch,
   onOpenGraph,
   onEditNote,
+  onTalkMode,
   onClearDay,
   onDeleteSymptom,
   editing,
@@ -124,6 +125,12 @@ export default function SymptomRows({
   }, [isDesktop, activeSymptoms, entries, stripKeys]);
 
   const entryFor = (symptom, periodId) => entries[`${dateKey}-${symptom.id}-${periodId}`];
+  // Notes on today's ratings (spoken in talk mode), labelled by period when there is more than one
+  const rowNotes = (symptom) => timePeriods
+    .map((p) => [p, entryFor(symptom, p.id)?.note])
+    .filter(([, note]) => note)
+    .map(([p, note]) => (timePeriods.length > 1 ? `${p.label}: ${note}` : note))
+    .join(' · ');
 
   const counts = timePeriods.map((p) => {
     const applicable = activeSymptoms.filter((s) => isApplicable(s, p.id));
@@ -516,6 +523,7 @@ export default function SymptomRows({
       <span className="lr-spacer" />
       {editing && <button className={`dn-btn ${proposal ? 'on' : ''}`} onClick={() => (proposal ? setProposal(null) : openProposal())}>Suggest grouping</button>}
       {isDesktop && !editing && hasEntriesToday && <button className="dn-btn ghost" onClick={onClearDay}>Clear day</button>}
+      {isDesktop && !editing && activeSymptoms.length > 0 && <button className="dn-btn" onClick={onTalkMode}>Talk me through it</button>}
       {isDesktop && !editing && <button className="dn-btn" onClick={onEditNote}>Day notes</button>}
       {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={toggleEdit}>{editing ? 'Done' : 'Edit symptoms'}</button>}
     </>,
@@ -648,6 +656,7 @@ export default function SymptomRows({
                 <div className="lr-name">
                   {pinnedSymptoms?.has(symptom.id) && <span className="lr-pin">⊙</span>}
                   {symptom.name}{symptom.description && <small>{symptom.description}</small>}
+                  {rowNotes(symptom) && <span className="lr-noted" title={rowNotes(symptom)}>{open && !isDesktop ? rowNotes(symptom) : 'note'}</span>}
                 </div>
                 {/* Desktop: while a row is open, the rating keys take the chart's place on the same row */}
                 {isDesktop && open && isApplicable(symptom, focus.period) && (
