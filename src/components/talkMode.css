@@ -29,3 +29,25 @@
 
 .tm-debug input { width: 100%; height: 40px; padding: 0 12px; border-radius: 12px; border: 1px dashed rgba(255,255,255,.14); background: none; color: #e5e7eb; font: inherit; font-size: 14px; outline: none; }
 .tm-debug input:focus { border-color: #6366f1; }
+
+/* Cost card: stays after a conversation until dismissed */
+.tm-cost { position: fixed; z-index: 1900; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: min(320px, calc(100vw - 32px)); padding: 14px 16px 12px; border-radius: 14px; background: #0e0f11; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 12px 32px rgba(0,0,0,.5); color: #e5e7eb; font-size: 13px; }
+.tm-cost h6 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: #a5b4fc; }
+.tm-cost h6 span { margin-left: 6px; font-weight: 500; text-transform: none; letter-spacing: 0; color: #6b7280; }
+.tm-cost-x { position: absolute; top: 6px; right: 8px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: #9ca3af; font-size: 18px; line-height: 1; cursor: pointer; }
+.tm-cost-x:hover { background: rgba(255,255,255,.08); color: #fff; }
+.tm-cost-main { display: flex; align-items: baseline; gap: 10px; }
+.tm-cost-main b { font-size: 24px; font-weight: 600; letter-spacing: -.02em; color: #f3f4f6; }
+.tm-cost-main span { color: #9ca3af; font-size: 12px; }
+.tm-cost-model { margin: 2px 0 10px; color: #9ca3af; font-size: 12px; }
+.tm-cost-model code { font: 11.5px ui-monospace, monospace; color: #d1d5db; }
+.tm-cost dl { margin: 0; border-top: 1px solid rgba(255,255,255,.07); }
+.tm-cost dl div { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+.tm-cost dt { color: #d1d5db; }
+.tm-cost dt small { margin-left: 8px; color: #6b7280; font: 11px ui-monospace, monospace; }
+.tm-cost dd { margin: 0; font-weight: 600; color: #f3f4f6; }
+.tm-cost dd small { margin-left: 2px; font-weight: 400; color: #6b7280; }
+.tm-cost-note { margin: 8px 0 0; color: #6b7280; font-size: 11px; line-height: 1.35; }
+/* Below the desktop breakpoint the bottom nav is showing: sit above it */
+@media (max-width: 1023px) { .tm-cost { bottom: calc(104px + env(safe-area-inset-bottom)); } }
+@media (max-width: 640px) { .tm-cost { left: 16px; right: 16px; width: auto; } }

@@ -152,7 +152,7 @@ const openaiToken = async (env, uid) => {
     },
   };
   const data = await (await openai(env, '/realtime/client_secrets', { session })).json();
-  return Response.json({ secret: data.value, expiresAt: data.expires_at, engine: 'realtime' });
+  return Response.json({ secret: data.value, expiresAt: data.expires_at, model: session.model, engine: 'realtime' });
 };
 
 const routes = { 'gemini-token': geminiToken, token: openaiToken };

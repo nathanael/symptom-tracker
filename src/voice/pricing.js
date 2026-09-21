@@ -43,10 +43,14 @@ export const realtimeCost = (usages) => {
   }, 0);
 };
 
-const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
+export const formatClock = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
 
-// "~$0.043 · 2:10 · 14 turns · Gemini"
-export const costSummary = ({ engine, usd, seconds, turns }) => {
-  const amount = usd < 0.01 ? `${(usd * 100).toFixed(1)}¢` : `$${usd.toFixed(usd < 1 ? 3 : 2)}`;
-  return `~${amount} · ${clock(seconds)} · ${turns} turn${turns === 1 ? '' : 's'} · ${engine}`;
-};
+// Tenths of a cent below one cent, three decimals below a dollar, cents above
+export const formatUsd = (usd) => (usd < 0.01 ? `${(usd * 100).toFixed(1)}¢` : `$${usd.toFixed(usd < 1 ? 3 : 2)}`);
+
+// What one conversation's cost adds up to over a 30-day month at a few check-in frequencies
+export const monthlyProjections = (usd) => [
+  { label: 'Twice a day', perMonth: 60 },
+  { label: 'Once a day', perMonth: 30 },
+  { label: 'Every other day', perMonth: 15 },
+].map(({ label, perMonth }) => ({ label, math: `${formatUsd(usd)} × ${perMonth}`, usd: usd * perMonth }));

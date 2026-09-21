@@ -49,6 +49,7 @@ import BottomNav from './components/BottomNav';
 import DesktopToolbar from './components/DesktopToolbar';
 import RapidEntry from './components/RapidEntry';
 import TalkMode from './components/TalkMode';
+import TalkCostCard from './components/TalkCostCard';
 import { primePlayback } from './voice/pcmAudio';
 import SymptomRows from './components/SymptomRows';
 import UndoToast from './components/UndoToast';
@@ -182,6 +183,7 @@ function App() {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showRapidEntry, setShowRapidEntry] = useState(false);
   const [showTalkMode, setShowTalkMode] = useState(false);
+  const [talkCost, setTalkCost] = useState(null); // stats of the last conversation, until dismissed
   const [showSymptomGraph, setShowSymptomGraph] = useState(null);
   const [showSupplementGraph, setShowSupplementGraph] = useState(null);
   // Mobile History button: jump to Insights with that symptom selected
@@ -624,6 +626,7 @@ function App() {
   // Called from the launch tap itself: iOS only lets talk mode play audio if it starts inside a gesture
   const openTalkMode = useCallback(() => {
     primePlayback();
+    setTalkCost(null);
     setAppMode('symptoms');
     setShowInsights(false);
     setShowTalkMode(true);
@@ -941,7 +944,7 @@ function App() {
           timePeriods={timePeriods}
           quickLog={quickLog}
           engineKind={talkEngine}
-          showCost={talkShowCost}
+          onCost={talkShowCost ? setTalkCost : undefined}
           setCopyToastMessage={setCopyToastMessage}
           onClose={() => setShowTalkMode(false)}
         />
@@ -1163,6 +1166,8 @@ function App() {
       )}
 
       <UndoToast toast={undoToast} onDismiss={dismissUndoToast} isDesktop={isDesktop} />
+
+      {talkCost && !showTalkMode && <TalkCostCard stats={talkCost} onDismiss={() => setTalkCost(null)} />}
 
       {/* Toast Notification */}
       {copyToastMessage && (

@@ -18,6 +18,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
   let turnDone = true;
   let captions = { app: '', user: '' };
   const usages = []; // one per model turn, for the cost estimate
+  let modelId = 'gemini';
   let quietUntil = 0;
   const startedAt = Date.now();
 
@@ -28,7 +29,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
     player?.flush();
     mic?.close();
     try { session?.close(); } catch { /* already closed */ }
-    const stats = { engine: 'Gemini', usd: geminiCost(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
+    const stats = { engine: 'Gemini', model: modelId, usd: geminiCost(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
     console.info('[voice] gemini session', stats, usages);
     onEnd(reason, stats);
   };
@@ -107,6 +108,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
         player = createPlayer({ onIdle: settle });
         const [{ secret, model }, { GoogleGenAI, Modality }] = await Promise.all([mintToken('gemini'), import('@google/genai')]);
         if (stopped) return;
+        modelId = model;
         // Ephemeral tokens are only accepted on v1alpha
         const ai = new GoogleGenAI({ apiKey: secret, httpOptions: { apiVersion: 'v1alpha' } });
         session = await ai.live.connect({

@@ -14,6 +14,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
   let endTimer = null;
   let appCaption = '';
   const usages = []; // one per model response, for the cost estimate
+  let modelId = 'openai realtime';
   const startedAt = Date.now();
 
   const end = (reason) => {
@@ -21,7 +22,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
     stopped = true;
     clearTimeout(endTimer);
     connection?.close();
-    const stats = { engine: 'OpenAI', usd: realtimeCost(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
+    const stats = { engine: 'OpenAI', model: modelId, usd: realtimeCost(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
     console.info('[voice] openai session', stats, usages);
     onEnd(reason, stats);
   };
@@ -94,8 +95,9 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
       // Before connecting, so the screen shows where we are (and taps work) even if voice fails
       const opening = checkin.start();
       try {
-        const { secret } = await mintToken('realtime');
+        const { secret, model } = await mintToken('realtime');
         if (stopped) return;
+        if (model) modelId = model;
         connection = await connect({ secret, onEvent, onLevel, playRemoteAudio: true, onClosed: () => !stopped && fail('The voice connection dropped.') });
         if (stopped) return connection.close();
       } catch (err) {

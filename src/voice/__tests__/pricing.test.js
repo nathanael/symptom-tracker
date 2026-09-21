@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { geminiCost, realtimeCost, costSummary } from '../pricing';
+import { geminiCost, realtimeCost, formatUsd, formatClock, monthlyProjections } from '../pricing';
 
 describe('geminiCost', () => {
   it('prices audio and text separately and sums every turn', () => {
@@ -34,10 +34,20 @@ describe('realtimeCost', () => {
   });
 });
 
-describe('costSummary', () => {
+describe('formatting and projections', () => {
   it('reads as cents below one cent and dollars above', () => {
-    expect(costSummary({ engine: 'Gemini', usd: 0.0432, seconds: 130, turns: 14 })).toBe('~$0.043 · 2:10 · 14 turns · Gemini');
-    expect(costSummary({ engine: 'OpenAI', usd: 0.004, seconds: 9, turns: 1 })).toBe('~0.4¢ · 0:09 · 1 turn · OpenAI');
-    expect(costSummary({ engine: 'Gemini', usd: 1.239, seconds: 600, turns: 60 })).toBe('~$1.24 · 10:00 · 60 turns · Gemini');
+    expect(formatUsd(0.0432)).toBe('$0.043');
+    expect(formatUsd(0.004)).toBe('0.4¢');
+    expect(formatUsd(1.239)).toBe('$1.24');
+    expect(formatClock(130)).toBe('2:10');
+    expect(formatClock(9)).toBe('0:09');
+  });
+
+  it('projects a 30-day month at twice daily, daily and every other day', () => {
+    expect(monthlyProjections(0.05)).toEqual([
+      { label: 'Twice a day', math: '$0.050 × 60', usd: 3 },
+      { label: 'Once a day', math: '$0.050 × 30', usd: 1.5 },
+      { label: 'Every other day', math: '$0.050 × 15', usd: 0.75 },
+    ]);
   });
 });
