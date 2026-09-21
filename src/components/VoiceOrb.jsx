@@ -7,17 +7,16 @@ const COLORS = {
   listening: [56, 189, 248],
   speaking: [167, 139, 250],
   error: [248, 113, 113],
-  muted: [107, 114, 128],
 };
 
 const BARS = 84;
 
 // The voice, drawn: a glowing core and a ring of bars that moves with whoever is talking. Reads
 // the mic level from a ref so audio-rate updates never re-render.
-export default function VoiceOrb({ status, muted, levelRef }) {
+export default function VoiceOrb({ status, levelRef }) {
   const canvasRef = useRef(null);
   const live = useRef({});
-  live.current = { status, muted };
+  live.current = { status };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -43,18 +42,18 @@ export default function VoiceOrb({ status, muted, levelRef }) {
     const draw = (now) => {
       frame = requestAnimationFrame(draw);
       const t = now / 1000;
-      const { status: state, muted: isMuted } = live.current;
+      const { status: state } = live.current;
       const waiting = state === 'connecting' || state === 'thinking';
 
       let target = 0;
-      if (state === 'listening') target = isMuted ? 0 : Math.min(1, (levelRef.current || 0) * 1.6);
+      if (state === 'listening') target = Math.min(1, (levelRef.current || 0) * 1.6);
       // No level for her audio on every engine, so her voice is a plausible syllable rhythm
       else if (state === 'speaking') target = 0.3 + 0.45 * Math.abs(Math.sin(t * 7.1) * Math.sin(t * 2.3 + 1)) + 0.12 * Math.sin(t * 13);
       // Waiting: a slow breath, so a long connect still reads as alive
       else if (waiting) target = 0.22 + 0.16 * Math.sin(t * 2.4);
       energy += (target - energy) * (target > energy ? 0.3 : 0.1);
 
-      const goal = COLORS[isMuted && state === 'listening' ? 'muted' : state] || COLORS.connecting;
+      const goal = COLORS[state] || COLORS.connecting;
       for (let i = 0; i < 3; i++) color[i] += (goal[i] - color[i]) * 0.08;
       const rgb = `${color[0] | 0},${color[1] | 0},${color[2] | 0}`;
 

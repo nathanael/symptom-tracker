@@ -14,13 +14,13 @@ import { createRealtimeEngine } from '../voice/realtimeEngine';
 import { createGeminiEngine } from '../voice/geminiEngine';
 import { createDemoEngine } from '../voice/demoEngine';
 import VoiceOrb from './VoiceOrb';
+import SpokenWords from './SpokenWords';
 
 const ENGINES = { realtime: createRealtimeEngine, gemini: createGeminiEngine };
 
 const STATUS = { connecting: 'Connecting', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking', error: 'Not listening' };
 // Silent walk-through of the screen for checking layout, dev server only
 const DEMO = import.meta.env.DEV && new URLSearchParams(window.location.search).has('talkdemo');
-const SHOW_TEXT_INPUT = import.meta.env.DEV || new URLSearchParams(window.location.search).has('talkdebug');
 
 // Full-screen spoken check-in: the app names each symptom, the user answers with a number and
 // anything else they want noted. Tapping a rating works too. The voice fills the lower part of the
@@ -43,13 +43,15 @@ export default function TalkMode({
   const [error, setError] = useState('');
   const [captions, setCaptions] = useState({ app: '', user: '' });
   const levelRef = useRef(0); // mic level, read by the orb each frame
-  const [muted, setMuted] = useState(false);
   const [current, setCurrent] = useState({ symptom: null, period: null });
-  const [draft, setDraft] = useState('');
+  // The demo never writes real ratings: its answers live here, for this screen only
+  const [demoEntries, setDemoEntries] = useState({});
 
   // The engine outlives renders; give it the latest values through refs
   const live = useRef({});
-  live.current = { entries, quickLog, onClose, setCopyToastMessage, onCost };
+  live.current = { ...live.current, entries, quickLog, onClose, setCopyToastMessage, onCost };
+  // Ratings that were already there when talk mode opened: only new ones pulse
+  const before = useRef(entries);
   const session = useRef(null);
 
   useEffect(() => {
@@ -66,7 +68,8 @@ export default function TalkMode({
       period: initialPeriod(symptoms, entries, dateKey, timePeriods, getCurrentTimePeriod(trackingMode)),
       getEntries: () => live.current.entries,
       log: (symptomId, severity, periodId, note) => {
-        live.current.quickLog(symptomId, severity, periodId, note);
+        if (DEMO) setDemoEntries((prev) => ({ ...prev, [entryKey(dateKey, symptomId, periodId)]: { severity, note } }));
+        else live.current.quickLog(symptomId, severity, periodId, note);
       },
       onCurrent: (symptom, period) => !disposed && setCurrent({ symptom, period }),
     });
@@ -81,7 +84,7 @@ export default function TalkMode({
         if (disposed) return;
         // A session that never reached the model reports no turns: nothing to price
         if (stats?.turns > 0) live.current.onCost?.(stats);
-        if (reason === 'finished') {
+        if (reason === 'finished' || live.current.complete) {
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
           toast('✓ Check-in complete');
         } else {
@@ -102,7 +105,6 @@ export default function TalkMode({
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === 'INPUT') return;
       if (e.key === 'Escape') session.current?.engine.stop();
       else if (/^[0-5]$/.test(e.key)) rate(parseInt(e.key, 10));
     };
@@ -117,23 +119,13 @@ export default function TalkMode({
     engine.advance(checkin.handle('record_symptom', { symptom_id: current.symptom.id, severity }));
   };
 
-  const toggleMute = () => {
-    session.current?.engine.setMuted(!muted);
-    setMuted(!muted);
-  };
-
-  // Keydown rather than a form submit: the app's list shortcuts swallow Enter before it submits
-  const sendDraft = (e) => {
-    if (e.key !== 'Enter' || !draft.trim()) return;
-    e.preventDefault();
-    session.current?.engine.sendText(draft.trim());
-    setDraft('');
-  };
-
   const period = current.period;
+  if (DEMO) entries = { ...entries, ...demoEntries };
   const list = useMemo(() => (period ? listFor(symptoms, period) : []), [symptoms, period]);
   const loggedCount = list.filter((s) => entries[entryKey(dateKey, s.id, period)]).length;
   const loading = status === 'connecting' && !error;
+  const complete = !loading && list.length > 0 && loggedCount === list.length;
+  live.current.complete = complete;
   const stop = () => session.current?.engine.stop();
 
   // The open row trails the conversation by a moment, so a rating is seen landing in its slot
@@ -141,7 +133,7 @@ export default function TalkMode({
   const [shown, setShown] = useState(null);
   const currentId = current.symptom?.id ?? null;
   useEffect(() => {
-    const timer = setTimeout(() => setShown(currentId), shown && currentId ? 650 : 0);
+    const timer = setTimeout(() => setShown(currentId), shown ? 750 : 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
@@ -196,14 +188,15 @@ export default function TalkMode({
                     const cur = open && p.id === period ? ' cur' : '';
                     if (!slot) return <span key={p.id} className={`lr-pill empty${cur}`}>·</span>;
                     if (slot.severity === NA_SEVERITY) return <span key={p.id} className={`lr-pill na${cur}`}>N/A</span>;
-                    return <span key={`${p.id}-${slot.severity}`} className={`lr-pill tm-land${cur}`} style={{ background: SEV_BG[slot.severity], color: SEV_FG[slot.severity] }}>{slot.severity}</span>;
+                    const landed = before.current[entryKey(dateKey, symptom.id, p.id)]?.severity !== slot.severity;
+                    return <span key={`${p.id}-${slot.severity}`} className={`lr-pill${landed ? ' tm-land' : ''}${cur}`} style={{ background: SEV_BG[slot.severity], color: SEV_FG[slot.severity] }}>{slot.severity}</span>;
                   })}
                   {open && (
                     <div className="lr-keys">
                       {SEVERITIES.map((n) => (
                         <button
                           key={n}
-                          className={`lr-key ${lastSeverity === n && !entry ? 'last' : ''}`}
+                          className={`lr-key ${entry?.severity === n ? 'tm-land' : lastSeverity === n && !entry ? 'last' : ''}`}
                           style={entry?.severity === n ? { background: SEV_BG[n], color: SEV_FG[n], borderColor: 'transparent' } : lastSeverity === n ? { '--c': STRIP_COLOR[n] } : undefined}
                           disabled={!settled}
                           onClick={() => rate(n)}
@@ -221,23 +214,19 @@ export default function TalkMode({
         </div>
 
         <div className="tm-stage">
+          {/* A fixed band: what she says never pushes the voice around */}
           <div className="tm-captions" aria-live="polite">
-            {error && <p className="tm-error">{error}</p>}
-            <p className="app">{captions.app}</p>
+            {error ? <p className="tm-error">{error}</p> : <SpokenWords text={captions.app} />}
             <p className="user">{captions.user && `“${captions.user}”`}</p>
           </div>
-          <VoiceOrb status={status} muted={muted} levelRef={levelRef} />
+          <VoiceOrb status={status} levelRef={levelRef} />
           <div className="tm-foot">
-            <p className={`tm-state ${status}`}>{muted && status === 'listening' ? 'Muted' : STATUS[status]}</p>
+            <p className={`tm-state ${status}`}>{STATUS[status]}</p>
             {loading && <p className="tm-hint">Waking her up. This takes a few seconds.</p>}
-            {SHOW_TEXT_INPUT && !loading && (
-              <div className="tm-debug">
-                <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={sendDraft} placeholder="Type what you would say" aria-label="Type instead of speaking" />
-              </div>
-            )}
             <div className="tm-actions">
-              {!loading && <button className={muted ? 'on' : ''} onClick={toggleMute} aria-pressed={muted}>{muted ? 'Unmute' : 'Mute'}</button>}
-              <button className="stop" onClick={stop}><i />{loading ? 'Cancel' : 'Stop'}</button>
+              {loading ? <button onClick={stop}>Cancel</button>
+                : complete ? <button className="done" onClick={stop}>Done</button>
+                  : <button onClick={stop}><i />Continue later</button>}
             </div>
           </div>
         </div>

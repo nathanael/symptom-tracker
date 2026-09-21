@@ -38,9 +38,15 @@ const fromBase64 = (data) => Uint8Array.from(atob(data), (c) => c.charCodeAt(0))
 // iOS only starts an AudioContext inside a tap, and talk mode speaks after async work, so the
 // launch tap creates and resumes the playback context up front.
 let playContext = null;
-export const primePlayback = () => {
+// `fresh` (the launch tap) replaces the context: on iOS one that has lived through an earlier
+// session's mic capture or a WebRTC call can report "running" and still play nothing.
+export const primePlayback = ({ fresh = false } = {}) => {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return;
+  if (fresh && playContext) {
+    playContext.close().catch(() => {});
+    playContext = null;
+  }
   playContext = playContext || new Ctx({ sampleRate: PLAY_RATE });
   playContext.resume().catch(() => {});
 };
@@ -97,6 +103,8 @@ export const createPlayer = ({ onIdle } = {}) => {
   return {
     play: (data) => {
       if (!context) return;
+      // Opening the mic can suspend or interrupt the context on iOS
+      if (context.state !== 'running') context.resume().catch(() => {});
       const bytes = fromBase64(data);
       const pcm = new Int16Array(bytes.buffer, 0, Math.floor(bytes.length / 2));
       const buffer = context.createBuffer(1, pcm.length, PLAY_RATE);

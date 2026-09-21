@@ -1,6 +1,7 @@
 // Dev-only stand-in for a voice engine (open the app with ?talkdemo): silent, no backend, no mic,
-// and it never records anything. It walks the screen through its states, moving down the list with
-// skip_symptom, so the talk mode layout and animation can be checked without a live session.
+// and nothing it "records" leaves the screen (TalkMode keeps demo answers to itself). It walks the
+// screen through its states, answering each symptom, so the talk mode layout and animation can be
+// checked without a live session.
 export const createDemoEngine = ({ checkin, onState, onCaption, onLevel, onEnd }) => {
   let timers = [];
   let stopped = false;
@@ -15,11 +16,11 @@ export const createDemoEngine = ({ checkin, onState, onCaption, onLevel, onEnd }
     onState('speaking');
     onCaption({ who: 'app', text: result.next.say });
     onCaption({ who: 'user', text: '' });
-    later(1600, () => {
+    later(3400, () => {
       onState('listening');
       later(1800, () => {
         onState('thinking');
-        later(500, () => ask(checkin.handle('skip_symptom', { symptom_id: result.next.symptom_id })));
+        later(500, () => ask(checkin.handle('record_symptom', { symptom_id: result.next.symptom_id, severity: result.next.last_time ?? 1 })));
       });
     });
   };

@@ -626,13 +626,14 @@ function App() {
 
   // Called from the launch tap itself: iOS only lets talk mode play audio if it starts inside a gesture
   const openTalkMode = useCallback(() => {
-    primePlayback();
-    primeRemoteAudio();
+    // Only the engine in use: each one's priming touches the phone's audio session
+    if (talkEngine === 'realtime') primeRemoteAudio();
+    else primePlayback({ fresh: true });
     setTalkCost(null);
     setAppMode('symptoms');
     setShowInsights(false);
     setShowTalkMode(true);
-  }, []);
+  }, [talkEngine]);
 
   const quickCopyData = useCallback(() => {
     const insights = getInsights(copyDays, entries, liveSymptoms);
