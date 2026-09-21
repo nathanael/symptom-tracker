@@ -31,6 +31,7 @@ export default function BottomNav({
   onClear,
   onMatchYesterday,
   onEditProtocol,
+  onLogMeal,
 }) {
   const activeTab = showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'stack';
 
@@ -79,6 +80,7 @@ export default function BottomNav({
           onClear={onClear}
           onMatchYesterday={onMatchYesterday}
           onEditProtocol={onEditProtocol}
+          onLogMeal={onLogMeal}
           onOpenSettings={() => {
             setShowSettings(true);
             setShowQuickActions(false);

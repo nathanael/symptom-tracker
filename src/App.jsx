@@ -18,6 +18,7 @@ import {
   STORAGE_KEY_TALK_SHOW_COST,
   STORAGE_KEY_INPUT_ITEMS,
   STORAGE_KEY_INPUT_ENTRIES,
+  STORAGE_KEY_MEALS,
   severityColors,
   NA_SEVERITY,
   trackingModes,
@@ -56,6 +57,9 @@ import { primeRemoteAudio } from './voice/webrtcConnection';
 import SymptomRows from './components/SymptomRows';
 import UndoToast from './components/UndoToast';
 import ProtocolRows from './components/ProtocolRows';
+import MealCapture from './components/MealCapture';
+import MealList from './components/MealList';
+import { mealKey, mealDateKey } from './food/mealKey';
 import Calendar from './components/Calendar';
 import Insights from './components/Insights';
 import Settings from './components/Settings';
@@ -117,6 +121,10 @@ function App() {
     (data) => syncNotifyRef.current?.('inputEntries', data),
     isApplyingCloudRef
   );
+  const [meals, setMeals] = useLocalStorage(STORAGE_KEY_MEALS, {},
+    (data) => syncNotifyRef.current?.('meals', data),
+    isApplyingCloudRef
+  );
   const [copyDays, setCopyDays] = useLocalStorage(STORAGE_KEY_COPY_DAYS, 7);
   const [talkEngine, setTalkEngine] = useLocalStorage(STORAGE_KEY_TALK_ENGINE, 'gemini');
   const [talkShowCost, setTalkShowCost] = useLocalStorage(STORAGE_KEY_TALK_SHOW_COST, true);
@@ -164,6 +172,7 @@ function App() {
       trackingMode: setTrackingMode,
       inputItems: setInputItems,
       inputEntries: setInputEntries,
+      meals: setMeals,
     },
     isApplyingCloudRef
   );
@@ -185,6 +194,8 @@ function App() {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showRapidEntry, setShowRapidEntry] = useState(false);
   const [showTalkMode, setShowTalkMode] = useState(false);
+  // null = closed; { key } opens an existing meal for editing; {} opens a fresh capture
+  const [mealSheet, setMealSheet] = useState(null);
   const [talkCost, setTalkCost] = useState(null); // stats of the last conversation, until dismissed
   const [showSymptomGraph, setShowSymptomGraph] = useState(null);
   const [showSupplementGraph, setShowSupplementGraph] = useState(null);
@@ -256,7 +267,7 @@ function App() {
         }
         await sync.forcePush({
           symptoms, entries, dailyNotes, stackItems, stackEntries,
-          pinnedSymptoms: [...pinnedSymptoms], trackingMode, inputItems, inputEntries,
+          pinnedSymptoms: [...pinnedSymptoms], trackingMode, inputItems, inputEntries, meals,
         });
         alert('Push complete. Cloud now has this device\'s data.');
         clearAction();
@@ -645,6 +656,47 @@ function App() {
     setShowTalkMode(true);
   }, [talkEngine]);
 
+  // The meal capture sheet reports a Date; the key is derived here rather than trusted from the
+  // sheet, and derived OUTSIDE the setMeals updater — an updater must be pure, and mealKey() pulls
+  // in a random suffix, so generating it inside would make the updater's result depend on how many
+  // times React happens to invoke it (StrictMode invokes render-phase updaters twice).
+  const saveMeal = useCallback(({ name, ingredients, at, source }) => {
+    const existingKey = mealSheet?.key;
+    const candidateKey = mealKey(at);
+    // Editing keeps the original key so the record updates in place — unless the new time falls on
+    // a different day, in which case the key must move with it: the day list filters by the key's
+    // date and sync shards by its month, so an unchanged key would leave the meal filed (and
+    // synced) under its old day.
+    const sameDay = existingKey && mealDateKey(existingKey) === mealDateKey(candidateKey);
+    const key = sameDay ? existingKey : candidateKey;
+    setMeals((prev) => {
+      const next = { ...prev };
+      if (existingKey && existingKey !== key) delete next[existingKey];
+      next[key] = { time: at.toISOString(), name, ingredients, source };
+      return next;
+    });
+    haptic('light');
+    setLastAction(name ? `Logged ${name}` : 'Meal logged');
+  }, [mealSheet, setMeals, setLastAction]);
+
+  const deleteMeal = useCallback((key) => {
+    // Captured from the current `meals` state (closure), not from inside the setMeals updater —
+    // an updater can run more than once (StrictMode double-invokes render-phase updaters), and
+    // reading the about-to-be-removed record back out of `prev` there would race the undo toast,
+    // which is built synchronously right after this call.
+    const removed = meals[key];
+    if (!removed) return;
+    setMeals((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setUndoToast({
+      message: 'Meal deleted',
+      onUndo: () => setMeals((prev) => ({ ...prev, [key]: removed })),
+    });
+  }, [meals, setMeals]);
+
   const quickCopyData = useCallback(() => {
     const insights = getInsights(copyDays, entries, liveSymptoms);
     const data = generateAIDataExport(copyDays, entries, liveSymptoms, liveStackItems, stackEntries, dailyNotes, trackingMode, insights, liveInputItems, inputEntries);
@@ -845,6 +897,14 @@ function App() {
                 keyboardEnabled={listKeyboardEnabled}
                 isDesktop={isDesktop}
                 barSlot={navSlot}
+                mealsSlot={(
+                  <MealList
+                    meals={meals}
+                    dateKey={getDateKey(selectedDate)}
+                    onOpen={(key) => setMealSheet({ key })}
+                    onAdd={() => setMealSheet({})}
+                  />
+                )}
               />
             )}
           </div>
@@ -926,6 +986,14 @@ function App() {
                 keyboardEnabled={listKeyboardEnabled}
                 isDesktop={isDesktop}
                 barSlot={navSlot}
+                mealsSlot={(
+                  <MealList
+                    meals={meals}
+                    dateKey={getDateKey(selectedDate)}
+                    onOpen={(key) => setMealSheet({ key })}
+                    onAdd={() => setMealSheet({})}
+                  />
+                )}
               />
             )}
           </div>
@@ -961,6 +1029,17 @@ function App() {
           onCost={talkShowCost ? setTalkCost : undefined}
           setCopyToastMessage={setCopyToastMessage}
           onClose={() => setShowTalkMode(false)}
+        />
+      )}
+
+      {/* Meal capture / review */}
+      {mealSheet && (
+        <MealCapture
+          existing={mealSheet.key ? { key: mealSheet.key, ...meals[mealSheet.key] } : null}
+          onSave={saveMeal}
+          onDelete={deleteMeal}
+          onClose={() => setMealSheet(null)}
+          isDesktop={isDesktop}
         />
       )}
 
@@ -1305,6 +1384,7 @@ function App() {
             trackingMode,
             inputItems,
             inputEntries,
+            meals,
           })}
           onForcePull={sync.forcePull}
         />
@@ -1355,6 +1435,7 @@ function App() {
           onClear={protocolClearDay}
           onMatchYesterday={protocolMatchYesterday}
           onEditProtocol={() => { setAppMode('stack'); setShowInsights(false); setProtocolEditMode(true); }}
+          onLogMeal={() => setMealSheet({})}
           symptoms={liveSymptoms}
           entries={deferredEntries}
           trackingMode={trackingMode}
