@@ -10,6 +10,8 @@
 .mn-top svg { width: 16px; height: 16px; }
 .mn-r1 { display: flex; align-items: center; gap: 8px; height: 40px; }
 .mn-r2 { height: 32px; margin-top: 4px; }
+/* Nothing in it but the spacer (symptoms list outside edit mode): no empty strip */
+.mn-r2:not(:has(> :not(.lr-spacer))) { display: none; }
 .mn-top .dn-step { height: 36px; border-radius: 11px; }
 .mn-top .dn-step button { min-width: 36px; }
 .mn-top .dn-step .dn-date { min-width: 0; padding: 0 10px; gap: 6px; font-size: 14px; }

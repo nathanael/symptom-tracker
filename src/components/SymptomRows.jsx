@@ -514,12 +514,7 @@ export default function SymptomRows({
   );
   const bar = barSlot ? createPortal(
     <>
-      {editing ? <span className="dn-progress"><b>{orderedActive.length}</b> active</span> : counts.map((c) => (
-        <span className="dn-progress" key={c.label}>
-          {timePeriods.length > 1 ? c.label : 'Logged'} <b>{c.done}/{c.total}</b>
-          <i style={{ '--p': `${c.total ? (c.done / c.total) * 100 : 0}%` }} />
-        </span>
-      ))}
+      {editing && <span className="dn-progress"><b>{orderedActive.length}</b> active</span>}
       {isDesktop && (hasGroups || editing) && groupByControl}
       <span className="lr-spacer" />
       {editing && <button className={`dn-btn ${proposal ? 'on' : ''}`} onClick={() => (proposal ? setProposal(null) : openProposal())}>Suggest grouping</button>}
