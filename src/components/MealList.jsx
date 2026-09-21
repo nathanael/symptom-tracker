@@ -10,10 +10,33 @@ const timeLabel = (iso) => {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 };
 
+// A meal's own key encodes the local wall-clock time it was created at, in the same fixed-width
+// format `compareMealKeys` sorts chronologically as a string, so it doubles as a fallback "time"
+// when `meal.time` is missing or unparseable (e.g. a record restored from an old backup).
+const KEY_STAMP_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/;
+const sortMs = (key, meal) => {
+  const t = meal?.time ? new Date(meal.time).getTime() : NaN;
+  if (!Number.isNaN(t)) return t;
+  const m = KEY_STAMP_RE.exec(String(key));
+  if (!m) return NaN;
+  const [, y, mo, d, h, mi, s] = m.map(Number);
+  return new Date(y, mo - 1, d, h, mi, s).getTime();
+};
+
+// Sort by the meal's displayed time, not by key — editing a meal's time keeps its key stable
+// (see mealKey.js), so the two can diverge. Fall back to the key's own embedded time when
+// `meal.time` is missing, and to `compareMealKeys` as a stable tiebreaker for equal times.
+const byDisplayedTime = (meals) => (a, b) => {
+  const ma = sortMs(a, meals[a]);
+  const mb = sortMs(b, meals[b]);
+  if (!Number.isNaN(ma) && !Number.isNaN(mb) && ma !== mb) return ma - mb;
+  return compareMealKeys(a, b);
+};
+
 export default function MealList({ meals, dateKey, onOpen, onAdd }) {
   const keys = Object.keys(meals || {})
     .filter((key) => mealDateKey(key) === dateKey)
-    .sort(compareMealKeys);
+    .sort(byDisplayedTime(meals || {}));
 
   return (
     <>

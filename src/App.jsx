@@ -1040,7 +1040,6 @@ function App() {
           onSave={saveMeal}
           onDelete={deleteMeal}
           onClose={() => setMealSheet(null)}
-          isDesktop={isDesktop}
         />
       )}
 

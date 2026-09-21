@@ -22,7 +22,7 @@ const withTime = (date, value) => {
   return next;
 };
 
-export default function MealCapture({ existing, onSave, onDelete, onClose, isDesktop }) {
+export default function MealCapture({ existing, onSave, onDelete, onClose }) {
   const [stage, setStage] = useState(existing ? 'review' : 'capture');
   const [preview, setPreview] = useState(null);      // object URL, revoked on unmount
   const [error, setError] = useState(null);
@@ -85,17 +85,20 @@ export default function MealCapture({ existing, onSave, onDelete, onClose, isDes
   const remove = (index) => setIngredients((prev) => prev.filter((_, i) => i !== index));
 
   // Nothing to persist yet: keeps the Save button visibly disabled instead of silently no-op'ing.
-  const canSave = name.trim().length > 0 || ingredients.some((i) => i.trim().length > 0);
+  // Includes the pending "add an ingredient" field so Save isn't disabled while text sits there.
+  const canSave = name.trim().length > 0 || ingredients.some((i) => i.trim().length > 0) || adding.trim().length > 0;
 
   const save = () => {
     const clean = ingredients.map((i) => i.trim().toLowerCase()).filter(Boolean);
+    const pending = adding.trim().toLowerCase();
+    if (pending && !clean.includes(pending)) clean.push(pending);
     if (clean.length === 0 && !name.trim()) return;
     onSave({ name: name.trim(), ingredients: clean, at, source });
     onClose();
   };
 
   return (
-    <div className={`mc-root${isDesktop ? ' desktop' : ''}`} role="dialog" aria-label="Log a meal">
+    <div className="mc-root" role="dialog" aria-label="Log a meal">
       <input
         ref={fileRef}
         type="file"
@@ -151,7 +154,7 @@ export default function MealCapture({ existing, onSave, onDelete, onClose, isDes
 
           <div className="mc-sec">INGREDIENTS · {ingredients.length}</div>
           {ingredients.map((item, index) => (
-            <div className="mc-ing" key={`${index}-${item}`}>
+            <div className="mc-ing" key={index}>
               <input value={item} onChange={(e) => rename(index, e.target.value)} />
               <button onClick={() => remove(index)} aria-label={`Remove ${item}`}>✕</button>
             </div>
