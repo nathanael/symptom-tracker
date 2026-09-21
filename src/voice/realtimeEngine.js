@@ -1,7 +1,7 @@
 import { mintToken } from './voiceApi';
 import { handEntryMessage } from './scripts/dailyCheckin';
 import { connect } from './webrtcConnection';
-import { realtimeCost } from './pricing';
+import { realtimeCost, realtimeParts } from './pricing';
 import { totalWeight } from './speechPace';
 
 // The natural engine: one speech-to-speech model hears, decides and talks. Instructions and tools
@@ -48,7 +48,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
     clearTimeout(endTimer);
     clearTimeout(releaseTimer);
     connection?.close();
-    const stats = { engine: 'OpenAI', model: modelId, usd: realtimeCost(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
+    const stats = { engine: 'OpenAI', model: modelId, usd: realtimeCost(usages), parts: realtimeParts(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
     console.info('[voice] openai session', stats, usages);
     onEnd(reason, stats);
   };

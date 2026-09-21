@@ -13,6 +13,7 @@ export default function TalkCostCard({ stats, onDismiss }) {
         <span>{formatClock(stats.seconds)} · {stats.turns} turn{stats.turns === 1 ? '' : 's'}</span>
       </div>
       <p className="tm-cost-model">{stats.engine} · <code>{stats.model}</code></p>
+      {stats.parts && <p className="tm-cost-model">Her voice {formatUsd(stats.parts.output)} · listening and context {formatUsd(stats.parts.input)}</p>}
       <dl>
         {monthlyProjections(stats.usd).map(({ label, math, usd }) => (
           <div key={label}>

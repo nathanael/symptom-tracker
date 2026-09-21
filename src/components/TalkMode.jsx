@@ -18,6 +18,11 @@ import SpokenWords from './SpokenWords';
 
 const ENGINES = { realtime: createRealtimeEngine, gemini: createGeminiEngine };
 
+// After this many conversations on this device the long introduction stops
+const INTRO_SESSIONS = 2;
+const SESSIONS_KEY = 'talkModeSessions';
+const sessionsSoFar = () => { try { return Number(localStorage.getItem(SESSIONS_KEY)) || 0; } catch { return 0; } };
+
 const STATUS = { connecting: 'Connecting', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking', error: 'Not listening' };
 // Silent walk-through of the screen for checking layout, dev server only
 const DEMO = import.meta.env.DEV && new URLSearchParams(window.location.search).has('talkdemo');
@@ -67,6 +72,7 @@ export default function TalkMode({
       dateKey,
       period: initialPeriod(symptoms, entries, dateKey, timePeriods, getCurrentTimePeriod(trackingMode)),
       getEntries: () => live.current.entries,
+      seasoned: sessionsSoFar() >= INTRO_SESSIONS,
       log: (symptomId, severity, periodId, note) => {
         if (DEMO) setDemoEntries((prev) => ({ ...prev, [entryKey(dateKey, symptomId, periodId)]: { severity, note } }));
         else live.current.quickLog(symptomId, severity, periodId, note);
@@ -83,7 +89,10 @@ export default function TalkMode({
       onEnd: (reason, stats) => {
         if (disposed) return;
         // A session that never reached the model reports no turns: nothing to price
-        if (stats?.turns > 0) live.current.onCost?.(stats);
+        if (stats?.turns > 0) {
+          live.current.onCost?.(stats);
+          try { localStorage.setItem(SESSIONS_KEY, String(sessionsSoFar() + 1)); } catch { /* private mode */ }
+        }
         if (reason === 'finished' || live.current.complete) {
           confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
           toast('✓ Check-in complete');

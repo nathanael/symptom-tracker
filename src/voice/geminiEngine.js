@@ -5,7 +5,7 @@ import { GoogleGenAI, Modality } from '@google/genai';
 import { mintToken } from './voiceApi';
 import { handEntryMessage } from './scripts/dailyCheckin';
 import { createMic, createPlayer } from './pcmAudio';
-import { geminiCost } from './pricing';
+import { geminiCost, geminiParts } from './pricing';
 
 // Gemini Live: one speech-to-speech model over a WebSocket. Model, voice, instructions and tools
 // are locked into the single-use token server-side; here we stream the mic up, play audio back,
@@ -34,7 +34,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
     player?.flush();
     mic?.close();
     try { session?.close(); } catch { /* already closed */ }
-    const stats = { engine: 'Gemini', model: modelId, usd: geminiCost(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
+    const stats = { engine: 'Gemini', model: modelId, usd: geminiCost(usages), parts: geminiParts(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
     console.info('[voice] gemini session', stats, usages);
     onEnd(reason, stats);
   };

@@ -7,7 +7,7 @@
 // Deploy: `npx wrangler deploy` in this folder. Secrets: `npx wrangler secret put GEMINI_API_KEY`.
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { GoogleGenAI, Modality } from '@google/genai';
-import { GREETING, INSTRUCTIONS, TOOLS } from './dailyCheckinSpec.js';
+import { INSTRUCTIONS, TOOLS } from './dailyCheckinSpec.js';
 
 const FIREBASE_PROJECT = 'symptoms-dae26';
 const ORIGINS = ['https://nathanael.github.io', 'http://localhost:5173'];
@@ -21,7 +21,10 @@ const DEFAULTS = {
   TALK_GEMINI_VOICE: 'Despina',
   // The Live API re-bills the whole context every turn. The app owns the checklist, so the model
   // needs almost no history: compress early. Set to 0 to turn compression off.
-  TALK_GEMINI_TRIGGER_TOKENS: '4000',
+  // Gemini bills the whole context again on every turn, so the window is kept small: the app
+  // owns the checklist, and she needs little more than the last exchange
+  TALK_GEMINI_TRIGGER_TOKENS: '3000',
+  TALK_GEMINI_TARGET_TOKENS: '1800',
   TALK_REALTIME_MODEL: 'gpt-realtime-2.1-mini',
   TALK_TRANSCRIBE_MODEL: 'gpt-live-transcribe',
   TALK_VOICE: 'marin',
@@ -80,7 +83,7 @@ const openai = async (env, path, body) => {
   return res;
 };
 
-const opening = `The first message gives you the opening state. Start by saying this greeting, then ask the first symptom: "${GREETING}"`;
+const opening = 'The first message gives you the opening state, including the greeting to start with.';
 
 // The token is single-use, short-lived, and carries the whole session config, so the browser
 // can't repurpose it for a different model or prompt.
@@ -122,7 +125,7 @@ const geminiToken = async (env, uid) => {
                 silenceDurationMs: 1100,
               },
             },
-            ...(trigger > 0 ? { contextWindowCompression: { triggerTokens: String(trigger), slidingWindow: { targetTokens: String(Math.round(trigger / 2)) } } } : {}),
+            ...(trigger > 0 ? { contextWindowCompression: { triggerTokens: String(trigger), slidingWindow: { targetTokens: String(Math.min(Number(setting(env, 'TALK_GEMINI_TARGET_TOKENS')) || Math.round(trigger / 2), trigger - 200)) } } } : {}),
           },
         },
       },

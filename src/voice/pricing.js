@@ -11,7 +11,7 @@ const perMillion = (tokens, price) => ((tokens || 0) * price) / 1e6;
 
 // Gemini Live sends one usageMetadata per model turn; each turn's prompt is the whole context so
 // far, which is why a long conversation costs more per turn than a short one.
-export const geminiCost = (usages) => {
+export const geminiParts = (usages) => {
   const p = PRICES.gemini;
   const count = (details, modality) => (details || []).filter((d) => d.modality === modality).reduce((sum, d) => sum + (d.tokenCount || 0), 0);
   return usages.reduce((total, u) => {
@@ -20,12 +20,16 @@ export const geminiCost = (usages) => {
     // Anything not itemized as audio (including tool results and thinking) is billed as text
     const promptText = Math.max(0, (u.promptTokenCount || 0) - promptAudio) + (u.toolUsePromptTokenCount || 0);
     const responseText = Math.max(0, (u.responseTokenCount || 0) - responseAudio) + (u.thoughtsTokenCount || 0);
-    return total + perMillion(promptText, p.textIn) + perMillion(promptAudio, p.audioIn) + perMillion(responseText, p.textOut) + perMillion(responseAudio, p.audioOut);
-  }, 0);
+    return {
+      input: total.input + perMillion(promptText, p.textIn) + perMillion(promptAudio, p.audioIn),
+      output: total.output + perMillion(responseText, p.textOut) + perMillion(responseAudio, p.audioOut),
+    };
+  }, { input: 0, output: 0 });
 };
+export const geminiCost = (usages) => { const { input, output } = geminiParts(usages); return input + output; };
 
 // OpenAI realtime reports usage on every response.done
-export const realtimeCost = (usages) => {
+export const realtimeParts = (usages) => {
   const p = PRICES.realtime;
   return usages.reduce((total, u) => {
     const input = u.input_token_details || {};
@@ -33,15 +37,17 @@ export const realtimeCost = (usages) => {
     const output = u.output_token_details || {};
     const cachedText = cached.text_tokens || 0;
     const cachedAudio = cached.audio_tokens || 0;
-    return total
-      + perMillion(Math.max(0, (input.text_tokens || 0) - cachedText), p.textIn)
-      + perMillion(Math.max(0, (input.audio_tokens || 0) - cachedAudio), p.audioIn)
-      + perMillion(cachedText, p.cachedTextIn)
-      + perMillion(cachedAudio, p.cachedAudioIn)
-      + perMillion(output.text_tokens, p.textOut)
-      + perMillion(output.audio_tokens, p.audioOut);
-  }, 0);
+    return {
+      input: total.input
+        + perMillion(Math.max(0, (input.text_tokens || 0) - cachedText), p.textIn)
+        + perMillion(Math.max(0, (input.audio_tokens || 0) - cachedAudio), p.audioIn)
+        + perMillion(cachedText, p.cachedTextIn)
+        + perMillion(cachedAudio, p.cachedAudioIn),
+      output: total.output + perMillion(output.text_tokens, p.textOut) + perMillion(output.audio_tokens, p.audioOut),
+    };
+  }, { input: 0, output: 0 });
 };
+export const realtimeCost = (usages) => { const { input, output } = realtimeParts(usages); return input + output; };
 
 export const formatClock = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
 

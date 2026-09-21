@@ -2,7 +2,9 @@ import { NA_SEVERITY } from '../../utils/constants';
 import { getLastSeverity } from '../../utils/listHelpers';
 import { entryKey, listFor, otherIncomplete } from '../checkinQueue';
 
-export { GREETING, INSTRUCTIONS, TOOLS } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
+import { GREETING, SHORT_GREETING } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
+
+export { GREETING, SHORT_GREETING, INSTRUCTIONS, TOOLS } from '../../../cloudflare/voice/src/dailyCheckinSpec.js';
 
 const normalize = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -70,6 +72,7 @@ export const handEntryMessage = (result) => {
 //   getEntries()                       live entries map
 //   log(symptomId, severity, periodId, note)   writes a rating (App's quickLog)
 //   onCurrent(symptom, periodId), onPause(), onFinish()   UI hooks, all optional
+//   seasoned                           they have heard the introduction before: keep the opening short
 export const createCheckin = (ctx) => {
   let period = ctx.period;
   let currentId = null;
@@ -198,10 +201,14 @@ export const createCheckin = (ctx) => {
     // Opening state for the model: which period, how to move to another one, the first symptom
     start: () => {
       const other = ctx.timePeriods.find((p) => p.id !== period);
+      const hint = ctx.seasoned
+        ? `Recording for ${spokenPeriod(period)}. Say switch to ${periodWord(other?.id)} to change.`
+        : `We're recording symptoms for ${spokenPeriod(period)}. To record for ${spokenPeriod(other?.id)} instead, just say switch to ${periodWord(other?.id)}.`;
       return {
+        greeting: ctx.seasoned ? SHORT_GREETING : GREETING,
         period: periodLabel(period),
         periods: ctx.timePeriods.map((p) => ({ period_id: p.id, when: spokenPeriod(p.id) })),
-        ...(other ? { switch_hint: `We're recording symptoms for ${spokenPeriod(period)}. To record for ${spokenPeriod(other.id)} instead, just say switch to ${periodWord(other.id)}.` } : {}),
+        ...(other ? { switch_hint: hint } : {}),
         ...describe(),
       };
     },
