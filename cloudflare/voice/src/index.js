@@ -13,7 +13,9 @@ const FIREBASE_PROJECT = 'symptoms-dae26';
 const ORIGINS = ['https://nathanael.github.io', 'http://localhost:5173'];
 // Per user, per UTC day. A backstop against a leaked login running up a bill, not a usage limit:
 // it has to sit well above a heavy day of testing (every session start counts, finished or not).
-const DAILY_CAPS = { sessions: 150 };
+// `sessions` is talk mode; `meals` is photo/text meal analysis. Separate counters so a heavy day
+// of one never locks out the other.
+const DAILY_CAPS = { sessions: 150, meals: 50 };
 
 // Model ids change often: override with vars in wrangler.toml rather than in code
 const DEFAULTS = {
@@ -28,6 +30,8 @@ const DEFAULTS = {
   TALK_REALTIME_MODEL: 'gpt-realtime-2.1-mini',
   TALK_TRANSCRIBE_MODEL: 'gpt-live-transcribe',
   TALK_VOICE: 'marin',
+  // Meal photo analysis (not a Live model — plain generateContent with vision)
+  MEAL_MODEL: 'gemini-3-flash',
 };
 const setting = (env, name) => env[name] || DEFAULTS[name];
 
@@ -171,7 +175,64 @@ const saveLog = async (env, uid, body) => {
   return Response.json({ ok: true });
 };
 
-const routes = { 'gemini-token': geminiToken, token: openaiToken, log: saveLog };
+// --- Meal analysis -------------------------------------------------------
+// A photo (base64 JPEG) or a typed description in; a name and an ingredient list out. The image is
+// never stored — it lives only for the length of this request.
+
+const MEAL_SCHEMA = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    ingredients: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['name', 'ingredients'],
+};
+
+const MEAL_PROMPT = [
+  'Identify this meal and list the ingredients in it.',
+  '',
+  '- `name`: a short dish name, five words at most (e.g. "Chicken caesar wrap").',
+  '- `ingredients`: the individual food ingredients. Include ones that are not visible but are',
+  '  almost certainly present — cooking oil, butter, flour in a bread, dairy in a creamy sauce.',
+  '- Use lowercase, singular, generic names: "tomato", not "3 cherry tomatoes"; "olive oil", not',
+  '  "extra virgin olive oil from Tuscany".',
+  '- No quantities, no preparation notes, no brand names.',
+  '- If this is not food, return an empty name and an empty list.',
+].join('\n');
+
+const IMAGE_LIMIT = 1500000; // base64 chars, ~1.1MB of JPEG
+const TEXT_LIMIT = 2000;
+
+const meal = async (env, uid, body) => {
+  const image = typeof body?.image === 'string' ? body.image : '';
+  const text = typeof body?.text === 'string' ? body.text.trim() : '';
+  if (!image && !text) throw new HttpError(400, 'Send a photo or a description.');
+  if (image.length > IMAGE_LIMIT) throw new HttpError(400, 'That photo is too large.');
+  if (text.length > TEXT_LIMIT) throw new HttpError(400, 'That description is too long.');
+
+  const apiKey = requireKey(env, 'GEMINI_API_KEY');
+  await spend(env, uid, 'meals', 1);
+
+  const parts = image
+    ? [{ inlineData: { mimeType: 'image/jpeg', data: image } }, { text: MEAL_PROMPT }]
+    : [{ text: `${MEAL_PROMPT}\n\nThe meal: ${text}` }];
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const res = await ai.models.generateContent({
+      model: setting(env, 'MEAL_MODEL'),
+      contents: [{ role: 'user', parts }],
+      config: { responseMimeType: 'application/json', responseJsonSchema: MEAL_SCHEMA },
+    });
+    // The app normalises this again (src/food/mealParse.js); here we only guarantee it is JSON.
+    return Response.json(JSON.parse(res.text));
+  } catch (err) {
+    console.error('Meal analysis error', err);
+    throw new HttpError(502, "Couldn't read that meal. Try again or type it in.");
+  }
+};
+
+const routes = { 'gemini-token': geminiToken, token: openaiToken, log: saveLog, meal };
 
 const cors = (req) => {
   const origin = req.headers.get('Origin') || '';
