@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import './desktopNav.css';
 import './insights.css';
 
@@ -25,7 +26,8 @@ export default function SeriesPicker({ title, noun, items, selectedIds, colors, 
     onClose();
   };
 
-  return (
+  // Rendered on <body>: inside the tab's scroll container, iOS paints this fixed layer under the top bar and the dock, hiding Done
+  return createPortal(
     <div className={`is-pick-back${isDesktop ? '' : ' mobile'}`} onClick={onClose}>
       <div className="is-pick" onClick={(e) => e.stopPropagation()}>
         <div className="is-pick-head">
@@ -72,6 +74,7 @@ export default function SeriesPicker({ title, noun, items, selectedIds, colors, 
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -58,7 +58,7 @@
 .is-pills .is-add { align-self: auto; height: 38px; padding: 0 14px; border-radius: 19px; border-style: dashed; border-color: rgba(255,255,255,.16); font-size: 13.5px; font-weight: 400; }
 
 /* Series picker modal: single-column rows, neutral chrome */
-.is-pick-back { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: center; align-items: flex-start; padding: calc(72px + env(safe-area-inset-top)) 20px 20px; background: rgba(0,0,0,.7); }
+.is-pick-back { position: fixed; inset: 0; z-index: 1000; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: flex-start; padding: calc(72px + env(safe-area-inset-top)) 20px 20px; background: rgba(0,0,0,.7); }
 .is-pick { width: 100%; max-width: 440px; max-height: calc(100vh - 140px); display: flex; flex-direction: column; overflow: hidden; border-radius: 12px; background: #17191c; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 16px 40px rgba(0,0,0,.6); color: #e5e7eb; }
 .is-pick svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .is-pick-head { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 18px; border-bottom: 1px solid rgba(255,255,255,.07); }
@@ -75,6 +75,7 @@
 .is-pick-row .name small { margin-left: 8px; font-size: 12px; color: #6b7280; }
 .is-pick-row .check { color: #9ca3af; }
 .is-pick-empty { padding: 32px 16px; text-align: center; color: #6b7280; font-size: 13px; line-height: 1.6; }
+.is-pick button, .is-pick input { font-family: inherit; }
 .is-pick-back.mobile { padding: env(safe-area-inset-top) 0 0; }
 .is-pick-back.mobile .is-pick { max-width: none; max-height: calc(100dvh - env(safe-area-inset-top)); border-radius: 0 0 16px 16px; border-width: 0 0 1px; }
 .is-pick-back.mobile .is-pick-search { height: 38px; flex-basis: auto; }
