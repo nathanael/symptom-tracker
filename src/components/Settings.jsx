@@ -726,9 +726,17 @@ export default function Settings({
                   </button>
                 </div>
               </section>
+              <section className="st-section">
+                <h3>App</h3>
+                <div className="st-group">
+                  <Row title="Update app" desc={`v${APP_VERSION} · ${isStandalone() ? 'Home Screen App' : 'Browser'}`}>
+                    <button className="dn-btn" onClick={checkForUpdates} disabled={checkingForUpdates}>{checkingForUpdates ? 'Updating…' : 'Update'}</button>
+                  </Row>
+                </div>
+              </section>
             </>
           ) : page === 'data' ? (
-            <>{data}{about}</>
+            <>{data}</>
           ) : (
             <section className="st-section" style={{ paddingTop: 12 }}><div className="st-group">{recoveryRows}</div></section>
           )}

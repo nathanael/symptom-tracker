@@ -212,7 +212,7 @@ export default function ComparisonStudio({
   );
 
   // SVG dimensions
-  const H_MOBILE = 380;
+  const H_MOBILE = 418;
   const chartContainerRef = useRef(null);
   const [desktopChartDims, setDesktopChartDims] = useState({ w: 500, h: 420 });
   useEffect(() => {
@@ -1062,7 +1062,7 @@ export default function ComparisonStudio({
     );
   };
   const seriesRow = ({ id, color, name, val, unit, delta, onRemove }) => (
-    <div key={id} className={`is-row${id === primarySeriesId ? ' on' : ''}`} onClick={() => makePrimary(id)}>
+    <div key={id} className={`${isDesktop ? 'is-row' : 'is-pill'}${id === primarySeriesId ? ' on' : ''}`} onClick={() => makePrimary(id)}>
       <span className="dot" style={{ background: color }} />
       <span className="name">{name}</span>
       <span className="val">{val}{unit && val !== '--' && <small> {unit}</small>}</span>
@@ -1071,8 +1071,18 @@ export default function ComparisonStudio({
     </div>
   );
   const legendVal = (id) => legendItems.items.find(it => it.id === id)?.val ?? null;
+  const addSupplement = selectedSupplements.length < 3 && (
+    <button className="dn-btn is-add" onClick={() => { setShowSupplementPicker(true); haptic('light'); }}>+ Supplement</button>
+  );
+  const addSymptom = selectedSymptoms.length < 3 && (
+    <button className="dn-btn is-add" onClick={() => { setShowSymptomPicker(true); haptic('light'); }}>+ Symptom</button>
+  );
+  const addSleep = SLEEP_ENABLED && selectedSleepMetrics.length < 3 && (
+    <button className="dn-btn is-add" onClick={() => { setShowSleepPicker(true); haptic('light'); }}>+ Sleep</button>
+  );
+  // Desktop: full-width rows with each add button under its own group. Mobile: one wrapping row of pills under the chart, add pills last.
   const seriesChips = (
-    <div className="is-rows">
+    <div className={isDesktop ? 'is-rows' : 'is-pills'}>
       {selectedSupplements.map((suppId, idx) => seriesRow({
         id: suppId,
         color: SUPPLEMENT_STYLES[idx].color,
@@ -1081,9 +1091,7 @@ export default function ComparisonStudio({
         unit: suppItems[idx]?.unit || 'mg',
         onRemove: () => removeSupplement(suppId),
       }))}
-      {selectedSupplements.length < 3 && (
-        <button className="dn-btn is-add" onClick={() => { setShowSupplementPicker(true); haptic('light'); }}>+ Supplement</button>
-      )}
+      {isDesktop && addSupplement}
 
       {selectedSymptoms.map((symId, idx) => {
         const sym = activeSymptoms.find(s => s.id === symId);
@@ -1096,9 +1104,7 @@ export default function ComparisonStudio({
           onRemove: () => removeSymptom(symId),
         });
       })}
-      {selectedSymptoms.length < 3 && (
-        <button className="dn-btn is-add" onClick={() => { setShowSymptomPicker(true); haptic('light'); }}>+ Symptom</button>
-      )}
+      {isDesktop && addSymptom}
 
       {SLEEP_ENABLED && (
         <>
@@ -1113,11 +1119,10 @@ export default function ComparisonStudio({
               onRemove: () => removeSleep(metricKey),
             });
           })}
-          {selectedSleepMetrics.length < 3 && (
-            <button className="dn-btn is-add" onClick={() => { setShowSleepPicker(true); haptic('light'); }}>+ Sleep</button>
-          )}
+          {isDesktop && addSleep}
         </>
       )}
+      {!isDesktop && <>{addSupplement}{addSymptom}{addSleep}</>}
     </div>
   );
 
@@ -1164,18 +1169,28 @@ export default function ComparisonStudio({
     setPickedMarkerDate(protocolMarkers[(i + 1) % protocolMarkers.length].date);
     haptic('light');
   };
+  const markerIndex = activeMarker ? protocolMarkers.findIndex(m => m.date === activeMarker.date) : -1;
+  const markerDay = activeMarker && new Date(activeMarker.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const markerChip = activeMarker && markerEffect && (
     <button className="is-effect" disabled={protocolMarkers.length < 2} onClick={nextMarker}
+      aria-label={protocolMarkers.length > 1 ? 'Insights, show the next protocol change' : undefined}
       title="Up to 30 days before the change against up to 30 days since, stopping at any other protocol change. Only clear changes are listed.">
-      <span className="mark" />
-      <span>Since {sinceText}</span>
-      {markerEffect.status === 'early' ? <span>· too early to tell</span>
-        : markerEffect.status === 'crowded' ? <span>· too close to another change to tell</span>
-        : markerEffect.movers.length === 0 ? <span>· no clear change in any symptom</span>
-        : markerEffect.movers.slice(0, isDesktop ? 3 : 2).map(e => (
-          <b key={e.sym.id}>{e.sym.name} {deltaTag(e.delta)}</b>
-        ))}
-      {protocolMarkers.length > 1 && <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg>}
+      <span className="body">
+        <span className="mark" />
+        <span className="txt">
+          <span className="head">Insights{protocolMarkers.length > 1 && <small>{markerIndex + 1} of {protocolMarkers.length}</small>}</span>
+          <span className="movers">
+            {markerEffect.status === 'early' ? <span>Too early to tell</span>
+              : markerEffect.status === 'crowded' ? <span>Too close to another change to tell</span>
+              : markerEffect.movers.length === 0 ? <span>No clear change in any symptom</span>
+              : markerEffect.movers.slice(0, isDesktop ? 3 : 2).map(e => (
+                <b key={e.sym.id}>{e.sym.name} {deltaTag(e.delta)}</b>
+              ))}
+          </span>
+          <span className="since">since {sinceText} · {markerDay}</span>
+        </span>
+      </span>
+      {protocolMarkers.length > 1 && <span className="next"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg></span>}
     </button>
   );
 
@@ -1236,8 +1251,7 @@ export default function ComparisonStudio({
           <div className="is-mhead">{rangeControls}</div>
           {valuesCaption}
           {healthScoreTile}
-          <div className="is-gap" />
-          {seriesChips}
+          {markerChip}
           {scrubReadout}
           <div style={{ touchAction: 'none' }}>
             <svg ref={svgRef} width="100%" viewBox={`0 0 ${W} ${H}`}
@@ -1254,7 +1268,7 @@ export default function ComparisonStudio({
               {chartSVGContent}
             </svg>
           </div>
-          {markerChip}
+          {seriesChips}
         </div>
       )}
     </div>

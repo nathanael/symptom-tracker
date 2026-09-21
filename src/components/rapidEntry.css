@@ -29,15 +29,15 @@
 
 .re-pad { flex: none; padding: 0 12px calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
 .re-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.re-key { position: relative; height: 74px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: #0e0f11; color: var(--c, #d1d5db); font-size: 26px; font-weight: 600; display: grid; place-items: center; transition: transform .06s, background .12s, border-color .12s; }
+.re-key { position: relative; aspect-ratio: 1; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: #0e0f11; color: var(--c, #d1d5db); font-size: 26px; font-weight: 600; display: grid; place-items: center; transition: transform .06s, background .12s, border-color .12s; }
 .re-key:active { transform: scale(.97); background: color-mix(in srgb, var(--c) 14%, #0e0f11); }
 .re-key.last { border-color: var(--c); background: color-mix(in srgb, var(--c) 12%, #0e0f11); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent); }
 .re-key.last::after { content: "last"; position: absolute; bottom: 7px; font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: #6b7280; }
 .re-key.on { background: color-mix(in srgb, var(--c) 20%, #0e0f11); border-color: var(--c); }
 .re-key.on::after { content: "✓"; position: absolute; top: 7px; right: 10px; bottom: auto; font-size: 12px; color: var(--c); }
-.re-key.na { height: 46px; font-size: 14px; font-weight: 500; color: #9ca3af; --c: #64748b; }
+.re-key.na { aspect-ratio: auto; height: 60px; font-size: 14px; font-weight: 500; color: #9ca3af; --c: #64748b; }
 .re-nav { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; }
-.re-nav button { height: 46px; border-radius: 14px; border: 1px solid rgba(255,255,255,.07); background: none; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 500; }
+.re-nav button { height: 69px; border-radius: 14px; border: 1px solid rgba(255,255,255,.07); background: none; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 500; }
 .re-nav button:active { background: rgba(255,255,255,.06); color: #f3f4f6; }
 
 /* Done screen */

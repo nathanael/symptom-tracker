@@ -7,10 +7,12 @@ export default function SeriesPicker({ title, noun, items, selectedIds, colors, 
   const [search, setSearch] = useState('');
   const inputRef = useRef(null);
 
+  // Desktop only: on a phone the focus raises the keyboard, and iOS then scrolls the panel's header (and Done) out of view
   useEffect(() => {
+    if (!isDesktop) return undefined;
     const t = setTimeout(() => inputRef.current?.focus(), 50);
     return () => clearTimeout(t);
-  }, []);
+  }, [isDesktop]);
 
   const q = search.toLowerCase();
   const filtered = items.filter(it => !q || it.name.toLowerCase().includes(q) || (it.description || '').toLowerCase().includes(q));
@@ -43,6 +45,7 @@ export default function SeriesPicker({ title, noun, items, selectedIds, colors, 
                   if (e.key === 'Escape') { e.stopPropagation(); if (search) setSearch(''); else onClose(); }
                   if (e.key === 'Enter') finish();
                 }}
+                enterKeyHint="done"
                 placeholder={`Search ${noun}…`}
               />
             </label>
