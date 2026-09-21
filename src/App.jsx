@@ -60,6 +60,7 @@ import ProtocolRows from './components/ProtocolRows';
 import MealCapture from './components/MealCapture';
 import MealList from './components/MealList';
 import { mealKey, mealDateKey } from './food/mealKey';
+import { mergeBackupMeals } from './food/mealBackup';
 import Calendar from './components/Calendar';
 import Insights from './components/Insights';
 import Settings from './components/Settings';
@@ -1153,6 +1154,14 @@ function App() {
                       Object.entries(backup.inputEntries).forEach(([k, v]) => { if (!m[k]) { m[k] = v; counts.added++; } else counts.kept++; });
                       return m;
                     });
+                    if (backup.meals) setMeals(prev => {
+                      const { merged, added } = mergeBackupMeals(prev, backup.meals);
+                      const total = (backup.meals && typeof backup.meals === 'object' && !Array.isArray(backup.meals))
+                        ? Object.keys(backup.meals).length : 0;
+                      counts.added += added;
+                      counts.kept += total - added;
+                      return merged;
+                    });
                     if (backup.trackingMode) setTrackingMode(backup.trackingMode);
                     if (backup.pinnedSymptoms) setPinnedSymptoms(new Set(backup.pinnedSymptoms));
                     alert(`Restore complete.\n\nAdded: ${counts.added}\nAlready present: ${counts.kept}\n\nBackup exported: ${backup.exportedAt || '(unknown)'}\nApp version: ${backup.version || '(unknown)'}`);
@@ -1362,6 +1371,8 @@ function App() {
           setInputItems={setInputItems}
           inputEntries={inputEntries}
           setInputEntries={setInputEntries}
+          meals={meals}
+          setMeals={setMeals}
           copyDays={copyDays}
           setCopyDays={setCopyDays}
           talkEngine={talkEngine}
