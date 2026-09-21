@@ -15,12 +15,34 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
   let appCaption = '';
   const usages = []; // one per model response, for the cost estimate
   let modelId = 'openai realtime';
+  // Half-duplex: the mic only reaches the model while it is the user's turn. On speakers the
+  // model otherwise hears its own voice, takes it for the user, cuts itself off and starts a new
+  // (billed) response, over and over.
+  let userMuted = false;
+  let modelBusy = true; // from connect until the greeting has finished playing
+  let audioPlaying = false;
+  let releaseTimer = null;
+  const applyMic = () => connection?.setMuted(userMuted || modelBusy);
+  const holdMic = () => {
+    clearTimeout(releaseTimer);
+    modelBusy = true;
+    applyMic();
+  };
+  // A short tail after she stops covers room echo; the long fallback covers a missed event
+  const releaseMic = (delay = 350) => {
+    clearTimeout(releaseTimer);
+    releaseTimer = setTimeout(() => {
+      modelBusy = false;
+      applyMic();
+    }, delay);
+  };
   const startedAt = Date.now();
 
   const end = (reason) => {
     if (stopped) return;
     stopped = true;
     clearTimeout(endTimer);
+    clearTimeout(releaseTimer);
     connection?.close();
     const stats = { engine: 'OpenAI', model: modelId, usd: realtimeCost(usages), seconds: Math.round((Date.now() - startedAt) / 1000), turns: usages.length };
     console.info('[voice] openai session', stats, usages);
@@ -65,7 +87,12 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
         break;
       case 'response.created':
         appCaption = '';
+        holdMic();
         onState('thinking');
+        break;
+      case 'output_audio_buffer.started':
+        audioPlaying = true;
+        holdMic();
         break;
       case 'response.output_audio_transcript.delta':
         appCaption += event.delta || '';
@@ -73,13 +100,19 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
         onState('speaking');
         break;
       case 'output_audio_buffer.stopped':
-        if (ending) end(ending);
-        else onState('listening');
+      case 'output_audio_buffer.cleared':
+        audioPlaying = false;
+        if (ending) return end(ending);
+        releaseMic();
+        onState('listening');
         break;
       case 'response.done': {
         if (event.response?.usage) usages.push(event.response.usage);
         const calls = (event.response?.output || []).filter((item) => item.type === 'function_call');
         if (calls.length > 0) runTools(calls);
+        // A response with no speech (a tool call) never fires the audio events; one with speech
+        // releases the mic when playback stops, with a fallback in case that event is missed
+        else releaseMic(audioPlaying ? 20000 : 0);
         break;
       }
       case 'error':
@@ -100,13 +133,17 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
         if (model) modelId = model;
         connection = await connect({ secret, onEvent, onLevel, playRemoteAudio: true, onClosed: () => !stopped && fail('The voice connection dropped.') });
         if (stopped) return connection.close();
+        applyMic();
       } catch (err) {
         return fail(err.message);
       }
       tell(`${LIVE_GUIDANCE}\n\nOpening state: ${JSON.stringify(opening)}`);
     },
     stop: () => end('stopped'),
-    setMuted: (muted) => connection?.setMuted(muted),
+    setMuted: (muted) => {
+      userMuted = muted;
+      applyMic();
+    },
     sendText: (text) => connection && tell(text),
     // The user tapped a rating instead of speaking
     advance: (result) => connection && tell(handEntryMessage(result)),

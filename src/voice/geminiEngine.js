@@ -20,6 +20,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
   const usages = []; // one per model turn, for the cost estimate
   let modelId = 'gemini';
   let quietUntil = 0;
+  let greeted = false; // the mic is held back until the greeting has finished playing
   const startedAt = Date.now();
 
   const end = (reason) => {
@@ -44,8 +45,9 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
   // The model's turn is over and its audio has played out
   const settle = () => {
     if (stopped || !turnDone || player.playing) return;
-    if (ending) end(ending);
-    else onState('listening');
+    if (ending) return end(ending);
+    greeted = true;
+    onState('listening');
   };
 
   const runTools = (calls) => {
@@ -135,8 +137,8 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
           // or on speakers she hears herself, takes it for the user, and interrupts her own sentence
           onChunk: (data) => {
             if (stopped) return;
-            if (player.playing) quietUntil = Date.now() + 350;
-            if (Date.now() < quietUntil) return;
+            if (player.playing || !turnDone) quietUntil = Date.now() + 350;
+            if (!greeted || Date.now() < quietUntil) return;
             session.sendRealtimeInput({ audio: { data, mimeType: mic?.mimeType || 'audio/pcm;rate=16000' } });
           },
         });

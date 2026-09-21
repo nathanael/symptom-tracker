@@ -145,8 +145,9 @@ const openaiToken = async (env, uid) => {
       input: {
         transcription: { model: setting(env, 'TALK_TRANSCRIBE_MODEL') },
         noise_reduction: { type: 'near_field' },
-        // Low eagerness: wait through mid-sentence pauses rather than jumping in
-        turn_detection: { type: 'semantic_vad', eagerness: 'low' },
+        // Low eagerness: wait through mid-sentence pauses rather than jumping in. No barge-in:
+        // on speakers the model hears itself, and every false interruption is a new billed response.
+        turn_detection: { type: 'semantic_vad', eagerness: 'low', interrupt_response: false },
       },
       output: { voice: setting(env, 'TALK_VOICE') },
     },
