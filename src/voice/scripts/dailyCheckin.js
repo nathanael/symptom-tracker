@@ -198,7 +198,7 @@ export const createCheckin = (ctx) => {
       return {
         period: periodLabel(period),
         periods: ctx.timePeriods.map((p) => ({ period_id: p.id, when: spokenPeriod(p.id) })),
-        ...(other ? { switch_hint: `We're doing ${spokenPeriod(period)}. If you'd rather fill in ${spokenPeriod(other.id)}, just say switch to ${periodWord(other.id)}.` } : {}),
+        ...(other ? { switch_hint: `We're recording symptoms for ${spokenPeriod(period)}. To record ${spokenPeriod(other.id)} instead, just say switch to ${periodWord(other.id)}.` } : {}),
         ...describe(),
       };
     },
