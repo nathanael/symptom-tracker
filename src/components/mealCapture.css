@@ -1,0 +1,54 @@
+/* Meal capture: full-screen sheet, three stages (capture / analyzing / review). Shares the app's
+   one dark visual language — colours and geometry lifted from talkMode.css / rapidEntry.css / settings.css
+   rather than invented fresh. */
+.mc-root { position: fixed; inset: 0; z-index: 260; display: flex; flex-direction: column; background: #08090a; color: #f3f4f6; font-size: 13px; padding-top: env(safe-area-inset-top); }
+/* Desktop has no bottom nav to clear; sit under the persistent top bar instead, same as Settings */
+.mc-root.desktop { top: 54px; left: 0; right: 0; bottom: 0; inset: auto; z-index: 195; padding-top: 0; }
+.mc-root button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+
+.mc-head { flex: none; height: 48px; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
+.mc-head h4 { margin: 0; font-size: 15px; font-weight: 600; }
+.mc-x { width: 40px; height: 40px; border: 0; border-radius: 11px; background: none; color: #9ca3af; font-size: 16px; display: grid; place-items: center; }
+.mc-x:hover, .mc-x:active { background: rgba(255,255,255,.06); color: #f3f4f6; }
+.mc-save { margin-left: auto; height: 32px; padding: 0 14px; border-radius: 9px; border: 0; background: #8b5cf6; color: #fff; font-size: 13px; font-weight: 600; }
+.mc-save:hover { background: #7c4df0; }
+.mc-save:active { background: #6d3fe0; }
+
+.mc-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; max-width: 500px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.mc-body.mc-centered { flex: 1; align-items: center; justify-content: center; text-align: center; gap: 16px; }
+.mc-body.mc-centered p { margin: 0; color: #9ca3af; font-size: 14.5px; }
+
+.mc-bigicon { width: 64px; height: 64px; color: #6b7280; }
+
+.mc-preview { width: 100%; max-width: 280px; max-height: 45vh; border-radius: 14px; object-fit: cover; border: 1px solid rgba(255,255,255,.1); }
+.mc-preview.small { max-width: 140px; max-height: 140px; align-self: flex-start; }
+
+.mc-spinner { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255,255,255,.12); border-top-color: #8b5cf6; animation: mc-spin .8s linear infinite; }
+@keyframes mc-spin { to { transform: rotate(360deg); } }
+
+.mc-error { padding: 10px 12px; border-radius: 10px; background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.25); color: #fca5a5; font-size: 13px; line-height: 1.4; }
+
+.mc-field { display: flex; flex-direction: column; gap: 6px; }
+.mc-field span { color: #6b7280; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.mc-field input { height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #0e0f11; color: #f3f4f6; font-size: 16px; font-family: inherit; }
+.mc-field input:focus { outline: none; border-color: rgba(139,92,246,.5); }
+
+.mc-sec { margin-top: 6px; color: #6b7280; font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; }
+
+.mc-ing { display: flex; align-items: center; gap: 8px; }
+.mc-ing input { flex: 1; height: 42px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: #0e0f11; color: #f3f4f6; font-size: 16px; font-family: inherit; }
+.mc-ing input:focus { outline: none; border-color: rgba(139,92,246,.5); }
+.mc-ing button { flex: none; width: 34px; height: 34px; border: 0; border-radius: 9px; background: none; color: #6b7280; font-size: 14px; display: grid; place-items: center; }
+.mc-ing button:hover { background: rgba(255,255,255,.06); color: #f87171; }
+.mc-ing.add input { border-style: dashed; color: #f3f4f6; }
+.mc-ing.add input::placeholder { color: #6b7280; }
+
+.mc-primary { height: 52px; padding: 0 26px; border-radius: 99px; border: 0; background: #8b5cf6; color: #fff; font-size: 15px; font-weight: 600; }
+.mc-primary:hover { background: #7c4df0; }
+.mc-primary:active { background: #6d3fe0; }
+
+.mc-link { border: 0; background: none; color: #9ca3af; font-size: 13.5px; text-decoration: underline; text-underline-offset: 2px; }
+.mc-link:hover { color: #f3f4f6; }
+
+.mc-danger { margin-top: 8px; height: 44px; border-radius: 10px; border: 1px solid rgba(248,113,113,.25); background: none; color: #f87171; font-size: 14px; font-weight: 500; }
+.mc-danger:hover { background: rgba(248,113,113,.08); border-color: rgba(248,113,113,.45); }
