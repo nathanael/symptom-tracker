@@ -99,6 +99,10 @@ export const createCheckin = (ctx) => {
       const other = otherIncomplete(ctx.symptoms, all, ctx.dateKey, ctx.timePeriods, period);
       return {
         done: true,
+        // The check-in ends on her voice, not on the screen closing under them
+        say: other
+          ? `That's everything for ${spokenPeriod(period)}. Nice work. Would you like to carry on with ${spokenPeriod(other.id)}, or stop there?`
+          : "Congratulations, that's all of them. You're done for now.",
         period: periodLabel(period),
         skipped: list.filter((s) => skipped.has(s.id) && !all[key(s.id)]).length,
         other_period: other ? { period_id: other.id, label: other.label || other.id, left: other.left } : null,
@@ -188,7 +192,7 @@ export const createCheckin = (ctx) => {
     },
     finish: () => {
       ctx.onFinish?.();
-      return { finished: true };
+      return { finished: true, note: "If you have not said a closing line yet, say: \"You're done for now. Well done.\" Otherwise say nothing more." };
     },
   };
 

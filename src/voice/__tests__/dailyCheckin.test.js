@@ -153,6 +153,8 @@ describe('createCheckin', () => {
     const done = checkin.handle('record_symptom', { symptom_id: 'anxiety-physical', severity: 0 });
     expect(ctx.log).toHaveBeenCalledTimes(2);
     expect(done).toMatchObject({ done: true, period: 'AM', skipped: 1, other_period: { period_id: 'evening', label: 'PM', left: 4 } });
+    // She closes the period out loud rather than the screen just ending
+    expect(done.say).toMatch(/carry on with this (afternoon|evening), or stop there\?$/);
   });
 
   it('revises an earlier answer by spoken name and stays on the current symptom', () => {
@@ -179,7 +181,7 @@ describe('createCheckin', () => {
     expect(checkin.handle('switch_period', { period_id: 'noon' }).error).toBeDefined();
     checkin.handle('pause_session');
     expect(ctx.onPause).toHaveBeenCalled();
-    expect(checkin.handle('finish')).toEqual({ finished: true });
+    expect(checkin.handle('finish')).toMatchObject({ finished: true });
     expect(ctx.onFinish).toHaveBeenCalled();
     expect(checkin.handle('dance').error).toMatch(/Unknown tool/);
   });
