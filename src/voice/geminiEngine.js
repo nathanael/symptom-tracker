@@ -1,5 +1,5 @@
 import { mintToken } from './voiceApi';
-import { handEntryMessage } from './scripts/dailyCheckin';
+import { handEntryMessage, LIVE_GUIDANCE } from './scripts/dailyCheckin';
 import { createMic, createPlayer } from './pcmAudio';
 
 // Gemini Live: one speech-to-speech model over a WebSocket. Model, voice, instructions and tools
@@ -16,6 +16,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
   let turnDone = true;
   let captions = { app: '', user: '' };
   let lastUsage = null;
+  let quietUntil = 0;
   const startedAt = Date.now();
 
   const end = (reason) => {
@@ -126,7 +127,14 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
       try {
         mic = await createMic({
           onLevel,
-          onChunk: (data) => !stopped && session.sendRealtimeInput({ audio: { data, mimeType: mic?.mimeType || 'audio/pcm;rate=16000' } }),
+          // Half-duplex: while she is talking (plus a short tail for room echo) the mic is not sent,
+          // or on speakers she hears herself, takes it for the user, and interrupts her own sentence
+          onChunk: (data) => {
+            if (stopped) return;
+            if (player.playing) quietUntil = Date.now() + 350;
+            if (Date.now() < quietUntil) return;
+            session.sendRealtimeInput({ audio: { data, mimeType: mic?.mimeType || 'audio/pcm;rate=16000' } });
+          },
         });
         if (stopped) return mic.close();
       } catch (err) {
@@ -137,7 +145,7 @@ export const createGeminiEngine = ({ checkin, onState, onCaption, onLevel, onErr
           return session.close();
         }
       }
-      tell(`Opening state: ${JSON.stringify(opening)}`);
+      tell(`${LIVE_GUIDANCE}\n\nOpening state: ${JSON.stringify(opening)}`);
     },
     stop: () => end('stopped'),
     setMuted: (muted) => mic?.setMuted(muted),

@@ -1,5 +1,5 @@
 import { mintToken } from './voiceApi';
-import { handEntryMessage } from './scripts/dailyCheckin';
+import { handEntryMessage, LIVE_GUIDANCE } from './scripts/dailyCheckin';
 import { connect } from './webrtcConnection';
 
 // The natural engine: one speech-to-speech model hears, decides and talks. Instructions and tools
@@ -94,7 +94,7 @@ export const createRealtimeEngine = ({ checkin, onState, onCaption, onLevel, onE
       } catch (err) {
         return fail(err.message);
       }
-      tell(`Opening state: ${JSON.stringify(opening)}`);
+      tell(`${LIVE_GUIDANCE}\n\nOpening state: ${JSON.stringify(opening)}`);
     },
     stop: () => end('stopped'),
     setMuted: (muted) => connection?.setMuted(muted),

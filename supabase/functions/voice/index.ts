@@ -122,6 +122,15 @@ const geminiToken = async (uid: string) => {
             }],
             inputAudioTranscription: {},
             outputAudioTranscription: {},
+            // Live defaults to HIGH on both: it then hears its own voice from the speakers as the
+            // user starting to talk, and cuts in the moment the user pauses mid-thought.
+            realtimeInputConfig: {
+              automaticActivityDetection: {
+                startOfSpeechSensitivity: 'START_SENSITIVITY_LOW',
+                endOfSpeechSensitivity: 'END_SENSITIVITY_LOW',
+                silenceDurationMs: 1100,
+              },
+            },
             ...(trigger > 0 ? { contextWindowCompression: { triggerTokens: String(trigger), slidingWindow: { targetTokens: String(Math.round(trigger / 2)) } } } : {}),
           },
         },

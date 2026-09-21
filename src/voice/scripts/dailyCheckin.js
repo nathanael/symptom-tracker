@@ -2,7 +2,7 @@ import { NA_SEVERITY } from '../../utils/constants';
 import { getLastSeverity } from '../../utils/listHelpers';
 import { entryKey, listFor, otherIncomplete } from '../checkinQueue';
 
-export { GREETING, INSTRUCTIONS, TOOLS } from '../../../supabase/functions/voice/dailyCheckinSpec.js';
+export { GREETING, INSTRUCTIONS, LIVE_GUIDANCE, TOOLS } from '../../../supabase/functions/voice/dailyCheckinSpec.js';
 
 const normalize = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -105,7 +105,7 @@ export const createCheckin = (ctx) => {
       const value = parseSeverity(severity);
       if (value === null) return { error: 'severity must be an integer 0 to 5, or -1 for not applicable. Ask the user again.' };
       write(symptom, value, note);
-      return { saved: { name: symptom.name, severity: value }, ...describe() };
+      return { saved: { name: symptom.name, severity: value, ...(note?.trim() ? { note: note.trim() } : {}) }, ...describe() };
     },
     skip_symptom: ({ symptom_id }) => {
       if (symptom_id) skipped.add(symptom_id);

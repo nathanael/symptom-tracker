@@ -80,7 +80,8 @@ describe('createCheckin', () => {
     checkin.start();
     const result = checkin.handle('record_symptom', { symptom_id: 'headache', severity: 2, note: ' worse after coffee ' });
     expect(ctx.log).toHaveBeenCalledWith('headache', 2, 'morning', 'worse after coffee');
-    expect(result.saved).toEqual({ name: 'Headache', severity: 2 });
+    // The note rides along so the voice can acknowledge it
+    expect(result.saved).toEqual({ name: 'Headache', severity: 2, note: 'worse after coffee' });
     expect(result.next.symptom_id).toBe('brain-fog');
     expect(result.next.description).toBe('Trouble focusing');
     expect(result.remaining).toBe(2);

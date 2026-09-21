@@ -27,10 +27,11 @@ export const lineFor = (result) => {
     return LINES.notFound;
   }
   if (result.done) {
-    if (result.other_period) return `That's everything for now. Want to do the ${spokenPeriod(result.other_period)} ones too?`;
+    if (result.other_period) return `${result.saved?.note ? "Got it, I've noted that. " : ''}That's everything for now. Want to do the ${spokenPeriod(result.other_period)} ones too?`;
     return LINES.finished;
   }
-  return `${result.next.name}.`;
+  // A note gets an acknowledgement so the user knows it was captured
+  return result.saved?.note ? `Got it, I've noted that. ${result.next.name}.` : `${result.next.name}.`;
 };
 
 // What the model (or local parser) needs to know to interpret the next utterance
