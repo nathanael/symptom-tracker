@@ -22,14 +22,14 @@ const withTime = (date, value) => {
   return next;
 };
 
-export default function MealCapture({ existing, onSave, onDelete, onClose }) {
-  const [stage, setStage] = useState(existing ? 'review' : 'capture');
+export default function MealCapture({ existing, startManual, onSave, onDelete, onClose }) {
+  const [stage, setStage] = useState(existing || startManual ? 'review' : 'capture');
   const [preview, setPreview] = useState(null);      // object URL, revoked on unmount
   const [error, setError] = useState(null);
   const [name, setName] = useState(existing?.name || '');
   const [ingredients, setIngredients] = useState(existing?.ingredients || []);
   const [adding, setAdding] = useState('');
-  const [source, setSource] = useState(existing?.source || 'photo');
+  const [source, setSource] = useState(existing?.source || (startManual ? 'manual' : 'photo'));
   const [at, setAt] = useState(existing?.time ? new Date(existing.time) : new Date());
 
   const fileRef = useRef(null);

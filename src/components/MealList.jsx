@@ -1,6 +1,7 @@
 // The meals logged on the day being viewed. Read-only summary; tapping one reopens the review
 // sheet so it can be corrected or deleted.
 
+import { useEffect, useRef } from 'react';
 import { mealDateKey, compareMealKeys } from '../food/mealKey';
 import { solar } from './solarIcons';
 
@@ -33,14 +34,22 @@ const byDisplayedTime = (meals) => (a, b) => {
   return compareMealKeys(a, b);
 };
 
-export default function MealList({ meals, dateKey, onOpen, onAdd }) {
+export default function MealList({ meals, dateKey, onOpen, onAdd, scrollIntoViewOnMount }) {
+  const headingRef = useRef(null);
+
+  // "Today's meals" on the Home screen lands on the Protocol tab, where this section sits below
+  // the whole supplement list and would otherwise be off-screen on arrival.
+  useEffect(() => {
+    if (scrollIntoViewOnMount) headingRef.current?.scrollIntoView({ block: 'start' });
+  }, [scrollIntoViewOnMount]);
+
   const keys = Object.keys(meals || {})
     .filter((key) => mealDateKey(key) === dateKey)
     .sort(byDisplayedTime(meals || {}));
 
   return (
     <>
-      <div className="lr-sec">
+      <div className="lr-sec" ref={headingRef}>
         <b>MEALS</b> {keys.length === 0 ? 'none logged' : `${keys.length} logged`}
       </div>
       {keys.map((key) => {
