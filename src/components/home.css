@@ -22,25 +22,26 @@
 .hm-hit:focus-visible { outline: 2px solid #a78bfa; outline-offset: -4px; border-radius: 20px; }
 
 .hm-face { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 16px; text-align: center; color: #f3f4f6; pointer-events: none; }
-.hm-face .hm-glyph { width: 30px; height: 30px; margin-bottom: 4px; fill: currentColor; color: #e5e7eb; opacity: .92; }
-.hm-face h2 { margin: 0; font-size: 27px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
-.hm-face small { color: #cbd5e1; font-size: 13.5px; }
+.hm-face .hm-glyph { width: 23px; height: 23px; margin-bottom: 3px; fill: currentColor; color: #e5e7eb; opacity: .8; }
+.hm-face h2 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; line-height: 1.2; }
+.hm-face small { color: #aab6c6; font-size: 12.5px; }
 
 /* Collapsed strip: the same block laid on its side and shrunk. */
 .hm-card.off .hm-face { flex-direction: row; gap: 10px; }
-.hm-card.off .hm-face .hm-glyph { width: 19px; height: 19px; margin-bottom: 0; }
-.hm-card.off .hm-face h2 { font-size: 17px; font-weight: 600; }
+.hm-card.off .hm-face .hm-glyph { width: 18px; height: 18px; margin-bottom: 0; }
+.hm-card.off .hm-face h2 { font-size: 16px; font-weight: 600; }
 .hm-card.off .hm-face small { display: none; }
 
-/* Options: centred and shrink-wrapped. The two ways of logging are soft translucent pills;
-   the third is plain text below them. `margin: auto 0` floats the group in the space left
-   under the headline. They stagger in, 70ms apart, so the card unfolds rather than snapping. */
-.hm-opts { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 16px; margin: auto 0; padding: 0 16px; }
+/* Options: the two ways of logging are full-width frosted bars; the third is plain text
+   below them. `margin: auto 0` floats the group in the space left under the headline.
+   They stagger in, 70ms apart, so the card unfolds rather than snapping. */
+.hm-opts { position: relative; z-index: 3; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 14px; margin: auto 0; padding: 0 16px; }
 .hm-opts button {
-  display: inline-flex; align-items: center; gap: 12px;
-  border: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  width: 100%; border: 0; cursor: pointer;
   color: #fff; font-family: inherit; font-size: 21px; font-weight: 700; letter-spacing: -.015em;
-  padding: 17px 30px; border-radius: 15px; background: rgba(255,255,255,.14);
+  padding: 19px 20px; border-radius: 16px; background: rgba(255,255,255,.13);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   opacity: 0; transform: translateY(12px);
   /* Deaf to taps until it has finished arriving. The options mount at their final position the
      instant the card opens, while the card itself is still growing under them — without this a
@@ -50,10 +51,10 @@
   animation-delay: calc(var(--i) * 70ms + 40ms);
 }
 .hm-opts button svg { width: 1.3em; height: 1.3em; flex: none; fill: currentColor; color: #fff; }
-.hm-opts button:active { background: rgba(255,255,255,.24); }
+.hm-opts button:active { background: rgba(255,255,255,.22); }
 
 /* The door into the detailed view, not a way of logging: plain text under the two buttons. */
-.hm-opts button.deep { margin-top: 8px; padding: 6px 10px; border-radius: 10px; background: none; font-size: 16px; font-weight: 500; letter-spacing: 0; color: #cbd5e1; }
+.hm-opts button.deep { width: auto; margin-top: 6px; padding: 6px 10px; border-radius: 10px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; font-size: 16px; font-weight: 500; letter-spacing: 0; color: #cbd5e1; }
 .hm-opts button.deep svg { width: 1.2em; height: 1.2em; color: #94a3b8; }
 .hm-opts button.deep:active { background: rgba(255,255,255,.1); }
 
