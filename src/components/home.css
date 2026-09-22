@@ -32,17 +32,15 @@
 .hm-card.off .hm-face h2 { font-size: 17px; font-weight: 600; }
 .hm-card.off .hm-face small { display: none; }
 
-/* Options: centred, shrink-wrapped, underlined — text that happens to be tappable, not chrome.
-   `margin: auto 0` floats them in the space left under the headline, well clear of it.
-   They stagger in, 70ms apart, so the card unfolds rather than snapping. */
-.hm-opts { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 22px; margin: auto 0; padding: 0 16px; }
+/* Options: centred and shrink-wrapped. The two ways of logging are soft translucent pills;
+   the third is plain text below them. `margin: auto 0` floats the group in the space left
+   under the headline. They stagger in, 70ms apart, so the card unfolds rather than snapping. */
+.hm-opts { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 16px; margin: auto 0; padding: 0 16px; }
 .hm-opts button {
   display: inline-flex; align-items: center; gap: 12px;
-  border: 0; padding: 2px; background: none; cursor: pointer;
-  color: #fff; font-family: inherit; font-size: 22px; font-weight: 700; letter-spacing: -.015em;
-  text-decoration: underline; text-decoration-color: rgba(255,255,255,.9);
-  text-decoration-thickness: 2px; text-underline-offset: 8px;
-  text-shadow: 0 2px 14px rgba(0,0,0,.55);
+  border: 0; cursor: pointer;
+  color: #fff; font-family: inherit; font-size: 21px; font-weight: 700; letter-spacing: -.015em;
+  padding: 17px 30px; border-radius: 15px; background: rgba(255,255,255,.14);
   opacity: 0; transform: translateY(12px);
   /* Deaf to taps until it has finished arriving. The options mount at their final position the
      instant the card opens, while the card itself is still growing under them — without this a
@@ -51,13 +49,13 @@
   animation: hmOptIn .34s cubic-bezier(.22,1,.36,1) forwards;
   animation-delay: calc(var(--i) * 70ms + 40ms);
 }
-/* Sized and nudged so the glyph spans the cap line down to the underline. */
-.hm-opts button svg { width: 1.3em; height: 1.3em; flex: none; fill: currentColor; color: #fff; transform: translateY(2px); }
-.hm-opts button:active { opacity: .6; }
+.hm-opts button svg { width: 1.3em; height: 1.3em; flex: none; fill: currentColor; color: #fff; }
+.hm-opts button:active { background: rgba(255,255,255,.24); }
 
-/* The door into the detailed view, not a way of logging: quieter, and no underline. */
-.hm-opts button.deep { font-size: 16px; font-weight: 500; letter-spacing: 0; color: #cbd5e1; text-decoration: none; }
-.hm-opts button.deep svg { width: 1.2em; height: 1.2em; color: #94a3b8; transform: none; }
+/* The door into the detailed view, not a way of logging: plain text under the two buttons. */
+.hm-opts button.deep { margin-top: 8px; padding: 6px 10px; border-radius: 10px; background: none; font-size: 16px; font-weight: 500; letter-spacing: 0; color: #cbd5e1; }
+.hm-opts button.deep svg { width: 1.2em; height: 1.2em; color: #94a3b8; }
+.hm-opts button.deep:active { background: rgba(255,255,255,.1); }
 
 @keyframes hmOptIn { to { opacity: 1; transform: none; pointer-events: auto; } }
 
@@ -65,3 +63,4 @@
   .hm-card { transition: none; }
   .hm-opts button { animation: none; opacity: 1; transform: none; pointer-events: auto; }
 }
+
