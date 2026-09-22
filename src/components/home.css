@@ -50,7 +50,7 @@
   animation: hmOptIn .34s cubic-bezier(.22,1,.36,1) forwards;
   animation-delay: calc(var(--i) * 70ms + 40ms);
 }
-.hm-opts button svg { width: 1.3em; height: 1.3em; flex: none; fill: currentColor; color: #fff; }
+.hm-opts button svg { width: 1em; height: 1em; flex: none; fill: currentColor; color: #fff; }
 .hm-opts button:active { background: rgba(255,255,255,.22); }
 
 /* The door into the detailed view, not a way of logging: plain text under the two buttons. */
