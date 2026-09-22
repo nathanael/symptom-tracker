@@ -1,0 +1,30 @@
+/* Home — three photographs, one expanding in place. Same tokens as the nav and Rapid entry.
+   The expansion animates flex-grow, a plain number, rather than grid-template-rows between
+   fr units, which iOS Safari has not interpolated reliably. */
+.hm { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.hm * { -webkit-tap-highlight-color: transparent; }
+
+.hm-card { position: relative; flex: 1 1 0; min-height: 64px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 20px; overflow: hidden; background-size: cover; background-position: center; background-color: #17191c; transition: flex-grow .28s cubic-bezier(.22,1,.36,1); }
+.hm-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(8,9,10,.93) 0%, rgba(8,9,10,.6) 45%, rgba(8,9,10,.18) 100%); }
+.hm-card.on { flex-grow: 6; }
+.hm-card.off { flex-grow: 1; }
+
+.hm-face { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border: 0; background: none; color: #f3f4f6; font-family: inherit; text-align: left; cursor: pointer; }
+.hm-face h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.hm-face small { color: #94a3b8; font-size: 13px; }
+.hm-card.off .hm-face { padding: 0 16px; height: 64px; justify-content: center; }
+.hm-card.off .hm-face h2 { font-size: 17px; font-weight: 600; }
+.hm-card.off .hm-face small { display: none; }
+
+.hm-opts { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; animation: hmOptsIn .2s ease-out; }
+@keyframes hmOptsIn { from { opacity: 0; transform: translateY(6px); } }
+.hm-opts button { display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 14px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(0,0,0,.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: #f3f4f6; font-family: inherit; font-size: 15.5px; text-align: left; cursor: pointer; }
+.hm-opts button svg { width: 20px; height: 20px; flex: none; fill: currentColor; color: #9ca3af; }
+.hm-opts button:active { background: rgba(0,0,0,.62); }
+.hm-opts button.primary { background: rgba(139,92,246,.32); border-color: rgba(139,92,246,.5); font-weight: 500; }
+.hm-opts button.primary svg { color: #ddd6fe; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-card { transition: none; }
+  .hm-opts { animation: none; }
+}
