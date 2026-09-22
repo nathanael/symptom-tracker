@@ -974,7 +974,7 @@ function App() {
         </div>
       ) : (
         /* Mobile: tab-switching layout */
-        <div ref={scrollContainerRef} style={{
+        <div ref={scrollContainerRef} className="mn-main" style={{
           flex: 1,
           overflowY: 'auto',
           overflowX: 'hidden',

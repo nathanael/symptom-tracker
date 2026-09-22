@@ -1,6 +1,7 @@
 import './mobileNav.css';
 import QuickActionsMenu from './QuickActionsMenu';
 import { solar } from './solarIcons';
+import { shatterSwitch } from './shatter';
 
 const TABS = [
   { id: 'home', label: 'Home', icon: solar.bolt },
@@ -53,6 +54,13 @@ export default function BottomNav({
   // Both layers stay mounted, stacked in one grid cell, so the swap can animate both ways.
   const easy = appMode === 'home' && !showInsights;
 
+  // Leaving Home for Advanced mode, and coming back to it, the photographs shatter into the
+  // other screen's blocks and back (shatter.js). Every other tab change is instant.
+  const onTab = (tab, e) => {
+    if (tab === 'home' && !easy) shatterSwitch({ toAdv: false, originEl: e.currentTarget, commit: () => goTo('home') });
+    else goTo(tab);
+  };
+
   return (
     <>
       <div className="mn-dock">
@@ -60,12 +68,12 @@ export default function BottomNav({
           <div className={`mn-tabs${easy ? ' easy' : ''}`}>
             <div className="mn-layer mn-tablist" role="tablist" aria-hidden={easy || undefined}>
               {TABS.map((tab, i) => (
-                <button key={tab.id} role="tab" style={{ '--i': i }} tabIndex={easy ? -1 : 0} aria-selected={activeTab === tab.id} className={activeTab === tab.id ? 'on' : ''} onClick={() => goTo(tab.id)}>
+                <button key={tab.id} role="tab" style={{ '--i': i }} tabIndex={easy ? -1 : 0} aria-selected={activeTab === tab.id} className={activeTab === tab.id ? 'on' : ''} onClick={(e) => onTab(tab.id, e)}>
                   <svg viewBox="0 0 24 24">{tab.icon}</svg><span>{tab.label}</span>
                 </button>
               ))}
             </div>
-            <button className="mn-layer mn-adv" tabIndex={easy ? 0 : -1} aria-hidden={!easy || undefined} onClick={() => goTo('symptoms')}>
+            <button className="mn-layer mn-adv" tabIndex={easy ? 0 : -1} aria-hidden={!easy || undefined} onClick={(e) => shatterSwitch({ toAdv: true, originEl: e.currentTarget, commit: () => goTo('symptoms') })}>
               Advanced mode
             </button>
           </div>

@@ -1,66 +1,68 @@
-/* Home — three photographs, one expanding in place. Same tokens as the nav and Rapid entry.
-   The expansion animates flex-grow, a plain number, rather than grid-template-rows between
-   fr units, which iOS Safari has not interpolated reliably. */
-.hm { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px 12px 12px; }
+/* Home — three photographs; tapping one morphs it into a panel over the Home area. Same tokens
+   as the nav and Rapid entry. The morph itself is Web Animations in Home.jsx. */
+.hm { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px 12px 12px; }
 .hm * { -webkit-tap-highlight-color: transparent; }
 
-.hm-card { position: relative; flex: 1 1 0; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 20px; overflow: hidden; background-size: cover; background-position: center; background-color: #17191c; transition: flex-grow .3s cubic-bezier(.22,1,.36,1); }
-/* Darkest through the middle band, where the centred title and the options sit, and lighter at
-   the top and bottom edges so the photograph still reads. Two of the three photos are near-white
-   across the whole frame, so this band is what keeps the text legible over them. */
+.hm-card { position: relative; flex: 1 1 0; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 20px; overflow: hidden; background-size: cover; background-position: center; background-color: #17191c; transition: transform .55s cubic-bezier(.22,1,.36,1), filter .55s; }
+/* Darkest through the middle band, where the centred title sits, and lighter at the top and
+   bottom edges so the photograph still reads. Two of the three photos are near-white across the
+   whole frame, so this band is what keeps the text legible over them. shatter.js copies it. */
 .hm-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(8,9,10,.34) 0%, rgba(8,9,10,.78) 34%, rgba(8,9,10,.78) 78%, rgba(8,9,10,.5) 100%); }
-/* Open: the headline sits near the top, on its own, and the options take the space below it. */
-.hm-card.on { flex-grow: 6; justify-content: flex-start; padding: 32px 0 36px; }
-.hm-card.off { flex-grow: 1; }
-/* Collapsed strip is short enough (~1/8 of the column) that the expanded gradient's stops land
-   inside it, leaving the title over too little alpha. Flatten and darken the whole strip. */
-.hm-card.off::before { background: linear-gradient(to top, rgba(8,9,10,.93) 0%, rgba(8,9,10,.8) 100%); }
+.hm-card:active { transform: scale(.97); transition-duration: .2s; }
+/* The open card's tile stays in the layout, invisible, as the place the panel folds back into.
+   The others sink back behind the panel while it grows. */
+.hm-card.hide { visibility: hidden; }
+.hm.recede .hm-card:not(.hide) { transform: scale(.93); filter: brightness(.45); }
 
-/* The whole tile is the tap target: above the photo, below the options. One real focusable
-   button per card, with no buttons nested inside buttons. */
+/* The whole tile is the tap target: above the photo. */
 .hm-hit { position: absolute; inset: 0; z-index: 2; border: 0; padding: 0; background: none; cursor: pointer; }
 .hm-hit:focus-visible { outline: 2px solid #a78bfa; outline-offset: -4px; border-radius: 20px; }
 
-.hm-face { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 16px; text-align: center; color: #f3f4f6; pointer-events: none; }
-.hm-face h2 { margin: 0; font-size: 25px; font-weight: 600; letter-spacing: -.015em; line-height: 1.2; transition: font-size .3s cubic-bezier(.22,1,.36,1), color .3s; }
-/* Once a card is open the options are the point, so its title shrinks and steps back. */
-.hm-card.on .hm-face h2 { font-size: 20px; letter-spacing: -.01em; color: rgba(243,244,246,.78); }
+.hm-face { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0 16px; text-align: center; color: #f3f4f6; pointer-events: none; transition: opacity .3s; }
+.hm-face h2 { margin: 0; font-size: 25px; font-weight: 600; letter-spacing: -.015em; line-height: 1.2; }
 .hm-face small { color: #aab6c6; font-size: 12.5px; }
 
-/* Collapsed strip: just the title, shrunk. */
-.hm-card.off .hm-face h2 { font-size: 16px; font-weight: 600; }
-.hm-card.off .hm-face small { display: none; }
+/* The open panel: fills the Home area (the same box as .hm's padding), under the dock. */
+.hm-xp { position: absolute; z-index: 5; top: 16px; left: 12px; right: 12px; bottom: 12px; transform-origin: 50% 25%; touch-action: none; color: #f3f4f6; }
+.hm-xp-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 20px; overflow: hidden; background: #17191c center / cover no-repeat; }
+.hm-xp-bg i { position: absolute; inset: 0; }
+.hm-xp-bg .g1 { background: linear-gradient(to bottom, rgba(8,9,10,.34) 0%, rgba(8,9,10,.78) 34%, rgba(8,9,10,.78) 78%, rgba(8,9,10,.5) 100%); }
+/* Open: dark behind the header at the top and the options at the bottom. */
+.hm-xp-bg .g2 { background: linear-gradient(to bottom, rgba(8,9,10,.72) 0%, rgba(8,9,10,.4) 30%, rgba(8,9,10,.45) 48%, rgba(8,9,10,.9) 74%, rgba(8,9,10,.97) 100%); }
+.hm-xp-head { position: absolute; left: 22px; right: 60px; top: 44px; pointer-events: none; }
+.hm-xp-head h2 { display: inline-block; margin: 0; font-size: 36px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; transform-origin: 0 0; text-shadow: 0 2px 24px rgba(0,0,0,.45); }
+.hm-xp-head small { display: block; margin-top: 10px; color: #cbd5e1; font-size: 15px; }
+.hm-xp-x { position: absolute; z-index: 2; top: 14px; right: 14px; width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 0; background: rgba(255,255,255,.16); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.hm-xp-x svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
 
-/* Options: the two ways of logging are full-width frosted bars; the third is plain text
-   below them. `margin: auto 0` floats the group in the space left under the headline.
-   They stagger in, 70ms apart, so the card unfolds rather than snapping. */
-.hm-opts { position: relative; z-index: 3; align-self: stretch; display: flex; flex-direction: column; align-items: center; gap: 14px; margin: auto 0; padding: 0 16px; }
+/* Options: the two ways of logging are full-width frosted bars; the third is plain text below. */
+.hm-opts { position: absolute; left: 14px; right: 14px; bottom: 22px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .hm-opts button {
   display: flex; align-items: center; justify-content: center; gap: 12px;
   width: 100%; border: 0; cursor: pointer;
   color: #fff; font-family: inherit; font-size: 21px; font-weight: 700; letter-spacing: -.015em;
-  padding: 19px 20px; border-radius: 16px; background: rgba(255,255,255,.13);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  opacity: 0; transform: translateY(12px);
-  /* Deaf to taps until it has finished arriving. The options mount at their final position the
-     instant the card opens, while the card itself is still growing under them — without this a
-     finger lifting from the tap that opened the card lands on whichever option slid under it. */
-  pointer-events: none;
-  animation: hmOptIn .34s cubic-bezier(.22,1,.36,1) forwards;
-  animation-delay: calc(var(--i) * 70ms + 40ms);
+  padding: 21px 20px; border-radius: 18px; background: rgba(255,255,255,.14);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  transition: transform .15s, background .15s;
 }
 .hm-opts button svg { width: 1em; height: 1em; flex: none; fill: currentColor; color: #fff; }
-.hm-opts button:active { background: rgba(255,255,255,.22); }
+.hm-opts button:active { transform: scale(.97); background: rgba(255,255,255,.24); }
 
 /* The door into the detailed view, not a way of logging: plain text under the two buttons. */
-.hm-opts button.deep { width: auto; margin-top: 6px; padding: 6px 10px; border-radius: 10px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; font-size: 16px; font-weight: 500; letter-spacing: 0; color: #cbd5e1; }
+.hm-opts button.deep { width: auto; margin-top: 4px; padding: 8px 12px; border-radius: 10px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; font-size: 16px; font-weight: 500; letter-spacing: 0; color: #cbd5e1; }
 .hm-opts button.deep svg { width: 1.2em; height: 1.2em; color: #94a3b8; }
 .hm-opts button.deep:active { background: rgba(255,255,255,.1); }
 
-@keyframes hmOptIn { to { opacity: 1; transform: none; pointer-events: auto; } }
+/* Advanced-mode shatter (shatter.js): the tiles fly on a layer over everything but the sheets,
+   swallowing taps; the screen underneath is held invisible until they land, then fades in. */
+.fx-layer { position: fixed; inset: 0; z-index: 250; perspective: 900px; }
+.fx-tile { position: absolute; left: 0; top: 0; transform-origin: 0 0; background-repeat: no-repeat; will-change: transform; }
+.fx-tile i { position: absolute; inset: 0; opacity: 0; }
+.fx-ring { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 2px solid rgba(255,255,255,.7); }
+html.fx-noface .hm-face { opacity: 0; transition-duration: .12s; }
+html.fx-hold .hm, html.fx-hold .mn-main, html.fx-hold .mn-top { opacity: 0; }
+html.fx-reveal .hm, html.fx-reveal .mn-main, html.fx-reveal .mn-top { transition: opacity .28s ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
   .hm-card { transition: none; }
-  .hm-opts button { animation: none; opacity: 1; transform: none; pointer-events: auto; }
 }
-
