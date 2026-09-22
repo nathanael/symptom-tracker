@@ -3,6 +3,7 @@ import QuickActionsMenu from './QuickActionsMenu';
 import { solar } from './solarIcons';
 
 const TABS = [
+  { id: 'home', label: 'Home', icon: solar.bolt },
   { id: 'symptoms', label: 'Symptoms', icon: solar.symptoms },
   { id: 'stack', label: 'Protocol', icon: solar.protocol },
   { id: 'insights', label: 'Progress', icon: solar.progress },
@@ -33,7 +34,7 @@ export default function BottomNav({
   onEditProtocol,
   onLogMeal,
 }) {
-  const activeTab = showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'stack';
+  const activeTab = showInsights ? 'insights' : appMode === 'home' ? 'home' : appMode === 'symptoms' ? 'symptoms' : 'stack';
 
   const goTo = (tab) => {
     if (tab === 'insights') {
@@ -54,7 +55,7 @@ export default function BottomNav({
           <div className="mn-tabs" role="tablist">
             {TABS.map((tab) => (
               <button key={tab.id} role="tab" aria-selected={activeTab === tab.id} className={activeTab === tab.id ? 'on' : ''} onClick={() => goTo(tab.id)}>
-                <svg viewBox="0 0 24 24">{tab.icon}</svg>{tab.label}
+                <svg viewBox="0 0 24 24">{tab.icon}</svg><span>{tab.label}</span>
               </button>
             ))}
           </div>

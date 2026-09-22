@@ -44,9 +44,11 @@ import {
 } from './utils/helpers';
 import { clearDay, restoreDay } from './utils/listHelpers';
 import { liveItems, markDeleted, restoreDeleted, isExpired, removeEntriesFor } from './utils/softDelete';
+import { summaryLines } from './utils/homeSummary';
 
 // Components
 import Header from './components/Header';
+import Home from './components/Home';
 import BottomNav from './components/BottomNav';
 import DesktopToolbar from './components/DesktopToolbar';
 import RapidEntry from './components/RapidEntry';
@@ -70,8 +72,8 @@ import SymptomGraph from './components/SymptomGraph';
 import SupplementGraph from './components/SupplementGraph';
 
 function App() {
-  // App mode: 'symptoms' or 'stack'
-  const [appMode, setAppMode] = useState('symptoms');
+  // App mode: 'home' (the easy-mode landing screen), 'symptoms' or 'stack'
+  const [appMode, setAppMode] = useState('home');
   // Protocol sub-view: 'stack' or 'inputs'
   const scrollContainerRef = useRef(null);
 
@@ -197,6 +199,8 @@ function App() {
   const [showTalkMode, setShowTalkMode] = useState(false);
   // null = closed; { key } opens an existing meal for editing; {} opens a fresh capture
   const [mealSheet, setMealSheet] = useState(null);
+  // One-shot: Home's "Today's meals" sets this so MealList scrolls itself into view on mount.
+  const [scrollToMeals, setScrollToMeals] = useState(false);
   const [talkCost, setTalkCost] = useState(null); // stats of the last conversation, until dismissed
   const [showSymptomGraph, setShowSymptomGraph] = useState(null);
   const [showSupplementGraph, setShowSupplementGraph] = useState(null);
@@ -230,6 +234,20 @@ function App() {
 
   // Desktop mode
   const isDesktop = useDesktopMode();
+
+  // Home is mobile-only. Rotating a tablet or widening a browser must not strand the user on a
+  // screen desktop does not render.
+  useEffect(() => {
+    if (isDesktop && appMode === 'home') setAppMode('symptoms');
+  }, [isDesktop, appMode]);
+
+  // One-shot: "Today's meals" sets it, MealList consumes it on its next mount.
+  useEffect(() => {
+    if (scrollToMeals && appMode === 'stack') {
+      const id = setTimeout(() => setScrollToMeals(false), 400);
+      return () => clearTimeout(id);
+    }
+  }, [scrollToMeals, appMode]);
 
   const garminSync = useGarminSync(firebase.user);
 
@@ -910,6 +928,33 @@ function App() {
             )}
           </div>
         </div>
+      ) : appMode === 'home' ? (
+        <div style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          paddingBottom: '104px',
+        }}>
+          <Home
+            summary={summaryLines({
+              entries: deferredEntries,
+              meals,
+              stackItems: liveStackItems,
+              stackEntries: deferredStackEntries,
+              date: selectedDate,
+            })}
+            onRapidEntry={() => { setAppMode('symptoms'); setShowRapidEntry(true); }}
+            onTalkMode={() => { setAppMode('symptoms'); openTalkMode(); }}
+            onSymptomList={() => setAppMode('symptoms')}
+            onPhotoMeal={() => setMealSheet({})}
+            onTypeMeal={() => setMealSheet({ startManual: true })}
+            onTodaysMeals={() => { setScrollToMeals(true); setAppMode('stack'); }}
+            onMatchYesterday={() => { setAppMode('stack'); protocolMatchYesterday(); }}
+            onSimpleChecklist={() => setAppMode('stack')}
+            onProtocolDetail={() => setAppMode('stack')}
+          />
+        </div>
       ) : (
         /* Mobile: tab-switching layout */
         <div ref={scrollContainerRef} style={{
@@ -991,6 +1036,7 @@ function App() {
                   <MealList
                     meals={meals}
                     dateKey={getDateKey(selectedDate)}
+                    scrollIntoViewOnMount={scrollToMeals}
                     onOpen={(key) => setMealSheet({ key })}
                     onAdd={() => setMealSheet({})}
                   />
@@ -1037,6 +1083,7 @@ function App() {
       {mealSheet && (
         <MealCapture
           existing={mealSheet.key ? { key: mealSheet.key, ...meals[mealSheet.key] } : null}
+          startManual={!!mealSheet.startManual}
           onSave={saveMeal}
           onDelete={deleteMeal}
           onClose={() => setMealSheet(null)}
