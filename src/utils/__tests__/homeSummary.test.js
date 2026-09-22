@@ -75,6 +75,22 @@ describe('supplementsTaken', () => {
   it('is safe on missing stores', () => {
     expect(supplementsTaken(undefined, undefined, DAY)).toEqual({ taken: 0, due: 0 });
   });
+
+  it('counts a due item whose entry has taken: false', () => {
+    // A merged/restored backup can carry `taken: false` on a key that still exists — presence
+    // of the key is what SimpleProtocol and ProtocolRows check, so this must count as taken too.
+    const entries = {
+      '2026-09-22-d3': { date: '2026-09-22', itemId: 'd3', dose: 5000, taken: false },
+    };
+    expect(supplementsTaken(stackItems, entries, DAY)).toEqual({ taken: 1, due: 2 });
+  });
+
+  it('counts a due item whose entry has no taken field at all', () => {
+    const entries = {
+      '2026-09-22-d3': { date: '2026-09-22', itemId: 'd3', dose: 5000 },
+    };
+    expect(supplementsTaken(stackItems, entries, DAY)).toEqual({ taken: 1, due: 2 });
+  });
 });
 
 describe('summaryLines', () => {

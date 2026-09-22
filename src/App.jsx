@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback, useDeferredValue } from 'react';
 import { useLocalStorage, useLocalStorageSet } from './hooks/useLocalStorage';
 import { useFirebase } from './hooks/useFirebase';
 import { useSyncEngine } from './hooks/useSyncEngine';
@@ -238,8 +238,9 @@ function App() {
   const isDesktop = useDesktopMode();
 
   // Home is mobile-only. Rotating a tablet or widening a browser must not strand the user on a
-  // screen desktop does not render.
-  useEffect(() => {
+  // screen desktop does not render. useLayoutEffect so a desktop cold load never paints a frame
+  // with SymptomRows showing while DesktopToolbar still highlights Protocol.
+  useLayoutEffect(() => {
     if (isDesktop && appMode === 'home') setAppMode('symptoms');
   }, [isDesktop, appMode]);
 
@@ -951,13 +952,13 @@ function App() {
               stackEntries: deferredStackEntries,
               date: selectedDate,
             })}
-            onRapidEntry={() => { setAppMode('symptoms'); setShowRapidEntry(true); }}
-            onTalkMode={() => { setAppMode('symptoms'); openTalkMode(); }}
+            onRapidEntry={() => setShowRapidEntry(true)}
+            onTalkMode={() => openTalkMode()}
             onSymptomList={() => setAppMode('symptoms')}
             onPhotoMeal={() => setMealSheet({})}
             onTypeMeal={() => setMealSheet({ startManual: true })}
             onTodaysMeals={() => { setScrollToMeals(true); setAppMode('stack'); }}
-            onMatchYesterday={() => { setAppMode('stack'); protocolMatchYesterday(); }}
+            onMatchYesterday={() => protocolMatchYesterday()}
             onSimpleChecklist={() => setShowSimpleProtocol(true)}
             onProtocolDetail={() => setAppMode('stack')}
           />

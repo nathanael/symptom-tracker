@@ -51,7 +51,7 @@ export default function QuickActionsMenu({
 
   const currentVersion = `v${APP_VERSION}`;
 
-  const tab = showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'protocol';
+  const tab = showInsights ? 'insights' : appMode === 'home' ? 'home' : appMode === 'symptoms' ? 'symptoms' : 'protocol';
   const Item = ({ icon, label, hint, danger, primary, onClick }) => (
     <button className={danger ? 'danger' : primary ? 'primary' : ''} onClick={() => { onClick(); onClose(); }}>
       <svg viewBox="0 0 24 24">{icons[icon]}</svg>{label}{hint && <small>{hint}</small>}
@@ -63,10 +63,10 @@ export default function QuickActionsMenu({
       <div className="mn-dim" onClick={onClose} />
       <div className="mn-sheet" role="menu">
         <h6>
-          {tab === 'insights' ? 'Progress' : `${tab === 'symptoms' ? 'Symptoms' : 'Protocol'} · ${formatDate(selectedDate)}`}
+          {tab === 'insights' ? 'Progress' : tab === 'home' ? `Home · ${formatDate(selectedDate)}` : `${tab === 'symptoms' ? 'Symptoms' : 'Protocol'} · ${formatDate(selectedDate)}`}
           <span>{currentVersion}</span>
         </h6>
-        {tab !== 'insights' && <Item icon="trash" label="Clear day" danger onClick={tab === 'symptoms' ? onClearSymptoms : onClear} />}
+        {tab !== 'insights' && tab !== 'home' && <Item icon="trash" label="Clear day" danger onClick={tab === 'symptoms' ? onClearSymptoms : onClear} />}
         <Item icon="gear" label="Settings" onClick={onOpenSettings} />
         <hr />
         <Item icon="copy" label="Copy for AI" hint={`${copyDays} days`} onClick={onCopyData} />

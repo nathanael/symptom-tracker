@@ -30,12 +30,15 @@ export function mealsLogged(meals, date) {
 
 // `taken` is counted over the due list only, so an entry left behind by an item that has since
 // been descheduled or deactivated cannot push taken past due.
+//
+// Presence of the stackEntries key is what counts, matching SimpleProtocol and ProtocolRows —
+// not the `taken` field, which a merged/restored entry can carry as false or omit entirely.
 export function supplementsTaken(stackItems, stackEntries, date) {
   const dateKey = getDateKey(date);
   const due = (stackItems || []).filter((i) => i.active && isScheduledForDate(i.schedule, date));
   let taken = 0;
   for (const item of due) {
-    if (stackEntries?.[`${dateKey}-${item.id}`]?.taken) taken += 1;
+    if (stackEntries?.[`${dateKey}-${item.id}`]) taken += 1;
   }
   return { taken, due: due.length };
 }
