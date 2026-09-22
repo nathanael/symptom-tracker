@@ -34,14 +34,15 @@ export default function Home({
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // The first option on each card is the intended path and reads louder than the others.
+  // Two ways to log, then one way deeper. The `deep` option is the door into the detailed view
+  // rather than a way of logging, so it renders quieter — smaller, lighter, no underline.
   const cards = [
     {
       id: 'symptoms', title: 'Log symptoms', icon: 'symptoms', art: symptomsArt, line: summary.symptoms,
       options: [
         { icon: 'bolt', label: 'Rapid entry', onClick: onRapidEntry },
         { icon: 'mic', label: 'Talk me through it', onClick: onTalkMode },
-        { icon: 'symptoms', label: 'Full list', onClick: onSymptomList },
+        { icon: 'symptoms', label: 'Full list', onClick: onSymptomList, deep: true },
       ],
     },
     {
@@ -49,7 +50,7 @@ export default function Home({
       options: [
         { icon: 'camera', label: 'Photo', onClick: onPhotoMeal },
         { icon: 'edit', label: 'Type it', onClick: onTypeMeal },
-        { icon: 'note', label: "Today's meals", onClick: onTodaysMeals },
+        { icon: 'note', label: "Today's meals", onClick: onTodaysMeals, deep: true },
       ],
     },
     {
@@ -57,7 +58,7 @@ export default function Home({
       options: [
         { icon: 'yesterday', label: 'Match yesterday', onClick: onMatchYesterday },
         { icon: 'protocol', label: 'Simple checklist', onClick: onSimpleChecklist },
-        { icon: 'more', label: 'Full detail', onClick: onProtocolDetail },
+        { icon: 'more', label: 'Full detail', onClick: onProtocolDetail, deep: true },
       ],
     },
   ];
@@ -91,7 +92,7 @@ export default function Home({
                     type="button"
                     key={opt.label}
                     style={{ '--i': i }}
-                    className={i === 0 ? 'primary' : ''}
+                    className={opt.deep ? 'deep' : ''}
                     onClick={opt.onClick}
                   >
                     <svg viewBox="0 0 24 24">{solar[opt.icon]}</svg>

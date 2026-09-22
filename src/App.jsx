@@ -678,7 +678,9 @@ function App() {
     if (talkEngine === 'realtime') primeRemoteAudio();
     else primePlayback({ fresh: true });
     setTalkCost(null);
-    setAppMode('symptoms');
+    // Deliberately does not touch appMode: every other caller is already on the Symptoms tab
+    // (SymptomRows only renders there, and the overflow item only shows there), and forcing it
+    // would throw a Home-screen user onto the dense list when the conversation ends.
     setShowInsights(false);
     setShowTalkMode(true);
   }, [talkEngine]);
@@ -1066,6 +1068,7 @@ function App() {
           timePeriods={timePeriods}
           quickLog={quickLog}
           setCopyToastMessage={setCopyToastMessage}
+          fromHome={appMode === 'home'}
           onClose={() => setShowRapidEntry(false)}
         />
       )}
@@ -1095,6 +1098,7 @@ function App() {
           engineKind={talkEngine}
           onCost={talkShowCost ? setTalkCost : undefined}
           setCopyToastMessage={setCopyToastMessage}
+          fromHome={appMode === 'home'}
           onClose={() => setShowTalkMode(false)}
         />
       )}

@@ -43,6 +43,7 @@ export default function TalkMode({
   engineKind, // 'gemini' | 'realtime'
   onCost, // called with the conversation's cost stats when it ends (omit to not report)
   setCopyToastMessage,
+  fromHome,   // launched from the Home screen, so stopping lands back there — say so on the button
   onClose,
 }) {
   const dateKey = getDateKey(selectedDate);
@@ -182,7 +183,9 @@ export default function TalkMode({
     <div className={`re tm${loading ? ' loading' : ''}`}>
       <div className="re-in">
         <div className="re-bar">
-          <button className="re-close" aria-label="Stop talk mode" onClick={stop}><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+          {fromHome
+            ? <button className="re-home" onClick={stop}><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg>Home</button>
+            : <button className="re-close" aria-label="Stop talk mode" onClick={stop}><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></button>}
           <h2>Talk me through it</h2>
           {!loading && <span className="tm-count">{formatDate(selectedDate)} · <b>{loggedCount}</b> of {list.length}</span>}
         </div>

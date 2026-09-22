@@ -18,6 +18,7 @@ export default function RapidEntry({
   timePeriods,
   quickLog,
   setCopyToastMessage,
+  fromHome,   // launched from the Home screen, so closing lands back there — say so on the button
   onClose,
 }) {
   const dateKey = getDateKey(selectedDate);
@@ -118,7 +119,9 @@ export default function RapidEntry({
 
   const header = (
     <div className="re-bar">
-      <button className="re-close" aria-label="Close rapid entry" onClick={onClose}><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+      {fromHome
+        ? <button className="re-home" onClick={onClose}><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg>Home</button>
+        : <button className="re-close" aria-label="Close rapid entry" onClick={onClose}><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></button>}
       <h2>Rapid entry</h2>
       {timePeriods.length > 1 && (
         <div className="dn-seg sm">

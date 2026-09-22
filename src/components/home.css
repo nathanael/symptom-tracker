@@ -9,7 +9,8 @@
    the top and bottom edges so the photograph still reads. Two of the three photos are near-white
    across the whole frame, so this band is what keeps the text legible over them. */
 .hm-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(8,9,10,.34) 0%, rgba(8,9,10,.78) 34%, rgba(8,9,10,.78) 78%, rgba(8,9,10,.5) 100%); }
-.hm-card.on { flex-grow: 6; }
+/* Open: the headline sits near the top, on its own, and the options take the space below it. */
+.hm-card.on { flex-grow: 6; justify-content: flex-start; padding: 32px 0 36px; }
 .hm-card.off { flex-grow: 1; }
 /* Collapsed strip is short enough (~1/8 of the column) that the expanded gradient's stops land
    inside it, leaving the title over too little alpha. Flatten and darken the whole strip. */
@@ -32,25 +33,35 @@
 .hm-card.off .hm-face small { display: none; }
 
 /* Options: centred, shrink-wrapped, underlined — text that happens to be tappable, not chrome.
-   They stagger in, 65ms apart, so the card unfolds rather than snapping. */
-.hm-opts { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 20px; margin-top: 26px; padding: 0 16px; }
+   `margin: auto 0` floats them in the space left under the headline, well clear of it.
+   They stagger in, 70ms apart, so the card unfolds rather than snapping. */
+.hm-opts { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 22px; margin: auto 0; padding: 0 16px; }
 .hm-opts button {
-  display: inline-flex; align-items: center; gap: 11px;
-  border: 0; padding: 4px 2px; background: none; cursor: pointer;
-  color: #fff; font-family: inherit; font-size: 21px; font-weight: 700; letter-spacing: -.015em;
-  text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 7px;
+  display: inline-flex; align-items: center; gap: 12px;
+  border: 0; padding: 2px; background: none; cursor: pointer;
+  color: #fff; font-family: inherit; font-size: 22px; font-weight: 700; letter-spacing: -.015em;
+  text-decoration: underline; text-decoration-color: rgba(255,255,255,.9);
+  text-decoration-thickness: 2px; text-underline-offset: 8px;
   text-shadow: 0 2px 14px rgba(0,0,0,.55);
   opacity: 0; transform: translateY(12px);
+  /* Deaf to taps until it has finished arriving. The options mount at their final position the
+     instant the card opens, while the card itself is still growing under them — without this a
+     finger lifting from the tap that opened the card lands on whichever option slid under it. */
+  pointer-events: none;
   animation: hmOptIn .34s cubic-bezier(.22,1,.36,1) forwards;
-  animation-delay: calc(var(--i) * 65ms + 40ms);
+  animation-delay: calc(var(--i) * 70ms + 40ms);
 }
-.hm-opts button svg { width: 23px; height: 23px; flex: none; fill: currentColor; color: #cbd5e1; }
+/* Sized and nudged so the glyph spans the cap line down to the underline. */
+.hm-opts button svg { width: 1.3em; height: 1.3em; flex: none; fill: currentColor; color: #fff; transform: translateY(2px); }
 .hm-opts button:active { opacity: .6; }
-.hm-opts button.primary { font-size: 25px; text-decoration-color: #a78bfa; text-decoration-thickness: 3px; }
-.hm-opts button.primary svg { color: #c4b5fd; }
-@keyframes hmOptIn { to { opacity: 1; transform: none; } }
+
+/* The door into the detailed view, not a way of logging: quieter, and no underline. */
+.hm-opts button.deep { font-size: 16px; font-weight: 500; letter-spacing: 0; color: #cbd5e1; text-decoration: none; }
+.hm-opts button.deep svg { width: 1.2em; height: 1.2em; color: #94a3b8; transform: none; }
+
+@keyframes hmOptIn { to { opacity: 1; transform: none; pointer-events: auto; } }
 
 @media (prefers-reduced-motion: reduce) {
   .hm-card { transition: none; }
-  .hm-opts button { animation: none; opacity: 1; transform: none; }
+  .hm-opts button { animation: none; opacity: 1; transform: none; pointer-events: auto; }
 }
