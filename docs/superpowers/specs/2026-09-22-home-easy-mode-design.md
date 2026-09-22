@@ -102,16 +102,24 @@ already exist:
 | Talk me through it | `openTalkMode()` |
 | Full list | `setAppMode('symptoms')` |
 | Photo | `setMealSheet({})` — the capture sheet opens the camera on mount |
-| Type it | `setMealSheet({ manual: true })` — same sheet, skipping the picker |
-| Today's meals | `setAppMode('stack')`, scrolled to the meals section |
+| Type it | `setMealSheet({ startManual: true })` — same sheet, skipping the picker |
+| Today's meals | `setAppMode('stack')` plus a one-shot `scrollToMeals` flag |
 | Match yesterday | `protocolMatchYesterday()` |
 | Simple checklist | `setShowSimpleProtocol(true)` |
 | Full detail | `setAppMode('stack')` |
 
-"Type it" is the one existing component that needs a small change:
+Two existing components need small changes.
+
 `MealCapture` currently always starts at `stage: 'capture'` for a new meal and
-clicks the file input on mount. It gains an optional prop so it can start at
-`'review'` with an empty ingredient list instead.
+clicks the file input on mount. It gains an optional `startManual` prop that
+makes it start at `'review'` with an empty ingredient list and `source:
+'manual'` instead, so "Type it" never opens the camera.
+
+`MealList` gains an optional `scrollIntoViewOnMount` prop. "Today's meals"
+sets `appMode` to `'stack'` and passes that flag once; `MealList` calls
+`scrollIntoView({ block: 'start' })` on its own container in an effect and the
+flag is cleared. Without it the meals section sits below the full supplement
+list and would be off-screen on arrival.
 
 ## SimpleProtocol
 
@@ -152,7 +160,8 @@ Edited:
   overlay.
 - `src/components/BottomNav.jsx` — fourth tab.
 - `src/components/mobileNav.css` — fit four tabs.
-- `src/components/MealCapture.jsx` — optional prop to start in review.
+- `src/components/MealCapture.jsx` — optional `startManual` prop.
+- `src/components/MealList.jsx` — optional `scrollIntoViewOnMount` prop.
 
 `App.jsx` is already 1460 lines. This design does not refactor it; that is out
 of scope. `Home` is kept purely presentational so the new surface area there is
