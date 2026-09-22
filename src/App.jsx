@@ -241,12 +241,17 @@ function App() {
     if (isDesktop && appMode === 'home') setAppMode('symptoms');
   }, [isDesktop, appMode]);
 
-  // One-shot: "Today's meals" sets it, MealList consumes it on its next mount.
+  // One-shot: "Today's meals" sets it, MealList consumes it on its next mount. If the user
+  // leaves Protocol before the timeout fires, clear it immediately instead of leaving it
+  // armed for the next visit.
   useEffect(() => {
-    if (scrollToMeals && appMode === 'stack') {
-      const id = setTimeout(() => setScrollToMeals(false), 400);
-      return () => clearTimeout(id);
+    if (!scrollToMeals) return;
+    if (appMode !== 'stack') {
+      setScrollToMeals(false);
+      return;
     }
+    const id = setTimeout(() => setScrollToMeals(false), 400);
+    return () => clearTimeout(id);
   }, [scrollToMeals, appMode]);
 
   const garminSync = useGarminSync(firebase.user);
@@ -867,32 +872,7 @@ function App() {
                 trackingMode={trackingMode}
                 setStackItems={setStackItems}
               />
-            ) : appMode === 'symptoms' ? (
-              <SymptomRows
-                symptoms={liveSymptoms}
-                setSymptoms={setSymptoms}
-                activeSymptoms={activeSymptoms}
-                entries={deferredEntries}
-                setEntries={setEntries}
-                selectedDate={selectedDate}
-                timePeriods={timePeriods}
-                pinnedSymptoms={pinnedSymptoms}
-                quickLog={quickLog}
-                setLastAction={setLastAction}
-                symptomSearch={symptomSearch}
-                setSymptomSearch={setSymptomSearch}
-                onOpenGraph={setShowSymptomGraph}
-                onEditNote={() => setShowNoteModal(true)}
-                onTalkMode={openTalkMode}
-                onClearDay={clearSymptomDay}
-                onDeleteSymptom={(symptom) => softDeleteItem('symptom', symptom)}
-                editing={symptomEditMode}
-                setEditing={setSymptomEditMode}
-                keyboardEnabled={listKeyboardEnabled}
-                isDesktop={isDesktop}
-                barSlot={navSlot}
-              />
-            ) : (
+            ) : appMode === 'stack' ? (
               <ProtocolRows
                 stackItems={liveStackItems}
                 setStackItems={setStackItems}
@@ -925,10 +905,35 @@ function App() {
                   />
                 )}
               />
+            ) : (
+              <SymptomRows
+                symptoms={liveSymptoms}
+                setSymptoms={setSymptoms}
+                activeSymptoms={activeSymptoms}
+                entries={deferredEntries}
+                setEntries={setEntries}
+                selectedDate={selectedDate}
+                timePeriods={timePeriods}
+                pinnedSymptoms={pinnedSymptoms}
+                quickLog={quickLog}
+                setLastAction={setLastAction}
+                symptomSearch={symptomSearch}
+                setSymptomSearch={setSymptomSearch}
+                onOpenGraph={setShowSymptomGraph}
+                onEditNote={() => setShowNoteModal(true)}
+                onTalkMode={openTalkMode}
+                onClearDay={clearSymptomDay}
+                onDeleteSymptom={(symptom) => softDeleteItem('symptom', symptom)}
+                editing={symptomEditMode}
+                setEditing={setSymptomEditMode}
+                keyboardEnabled={listKeyboardEnabled}
+                isDesktop={isDesktop}
+                barSlot={navSlot}
+              />
             )}
           </div>
         </div>
-      ) : appMode === 'home' ? (
+      ) : appMode === 'home' && !showInsights ? (
         <div style={{
           flex: 1,
           minHeight: 0,
