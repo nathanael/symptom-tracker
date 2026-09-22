@@ -35,10 +35,10 @@ export default function Home({
   }, []);
 
   // Two ways to log, then one way deeper. The `deep` option is the door into the detailed view
-  // rather than a way of logging, so it renders quieter — smaller, lighter, no underline.
+  // rather than a way of logging, so it renders as plain text under the two bars.
   const cards = [
     {
-      id: 'symptoms', title: 'Log symptoms', icon: 'symptoms', art: symptomsArt, line: summary.symptoms,
+      id: 'symptoms', title: 'Log symptoms', art: symptomsArt, line: summary.symptoms,
       options: [
         { icon: 'bolt', label: 'Rapid entry', onClick: onRapidEntry },
         { icon: 'mic', label: 'Talk me through it', onClick: onTalkMode },
@@ -46,7 +46,7 @@ export default function Home({
       ],
     },
     {
-      id: 'meals', title: 'Log a meal', icon: 'camera', art: mealsArt, line: summary.meals,
+      id: 'meals', title: 'Log a meal', art: mealsArt, line: summary.meals,
       options: [
         { icon: 'camera', label: 'Photo', onClick: onPhotoMeal },
         { icon: 'edit', label: 'Type it', onClick: onTypeMeal },
@@ -54,7 +54,7 @@ export default function Home({
       ],
     },
     {
-      id: 'supplements', title: 'Log supplements', icon: 'protocol', art: supplementsArt, line: summary.supplements,
+      id: 'supplements', title: 'Log supplements', art: supplementsArt, line: summary.supplements,
       options: [
         { icon: 'yesterday', label: 'Match yesterday', onClick: onMatchYesterday },
         { icon: 'protocol', label: 'Simple checklist', onClick: onSimpleChecklist },
@@ -81,7 +81,6 @@ export default function Home({
               onClick={() => setOpen(isOpen ? null : card.id)}
             />
             <div className="hm-face">
-              <svg className="hm-glyph" viewBox="0 0 24 24">{solar[card.icon]}</svg>
               <h2>{card.title}</h2>
               {card.line && <small>{card.line}</small>}
             </div>
