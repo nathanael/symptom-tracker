@@ -52,6 +52,7 @@ import Home from './components/Home';
 import BottomNav from './components/BottomNav';
 import DesktopToolbar from './components/DesktopToolbar';
 import RapidEntry from './components/RapidEntry';
+import SimpleProtocol from './components/SimpleProtocol';
 import TalkMode from './components/TalkMode';
 import TalkCostCard from './components/TalkCostCard';
 import { primePlayback } from './voice/pcmAudio';
@@ -196,6 +197,7 @@ function App() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showRapidEntry, setShowRapidEntry] = useState(false);
+  const [showSimpleProtocol, setShowSimpleProtocol] = useState(false);
   const [showTalkMode, setShowTalkMode] = useState(false);
   // null = closed; { key } opens an existing meal for editing; {} opens a fresh capture
   const [mealSheet, setMealSheet] = useState(null);
@@ -956,7 +958,7 @@ function App() {
             onTypeMeal={() => setMealSheet({ startManual: true })}
             onTodaysMeals={() => { setScrollToMeals(true); setAppMode('stack'); }}
             onMatchYesterday={() => { setAppMode('stack'); protocolMatchYesterday(); }}
-            onSimpleChecklist={() => setAppMode('stack')}
+            onSimpleChecklist={() => setShowSimpleProtocol(true)}
             onProtocolDetail={() => setAppMode('stack')}
           />
         </div>
@@ -1064,6 +1066,18 @@ function App() {
           quickLog={quickLog}
           setCopyToastMessage={setCopyToastMessage}
           onClose={() => setShowRapidEntry(false)}
+        />
+      )}
+
+      {/* Simplified supplement checklist */}
+      {showSimpleProtocol && (
+        <SimpleProtocol
+          stackItems={liveStackItems}
+          stackEntries={stackEntries}
+          setStackEntries={setStackEntries}
+          selectedDate={selectedDate}
+          onFullDetail={() => { setShowSimpleProtocol(false); setAppMode('stack'); }}
+          onClose={() => setShowSimpleProtocol(false)}
         />
       )}
 
