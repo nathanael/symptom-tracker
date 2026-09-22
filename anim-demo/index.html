@@ -96,15 +96,15 @@ button { font-family: inherit; cursor: pointer; }
 /* ---------- Toast + tuning ---------- */
 #toast { position: absolute; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 400; transform: translate(-50%, 10px); padding: 10px 16px; border-radius: 12px; background: rgba(40,42,48,.96); font-size: 14px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .2s, transform .3s cubic-bezier(.22,1,.36,1); }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
-#tuneBtn { position: fixed; z-index: 500; top: calc(22px + env(safe-area-inset-top)); left: 20px; padding: 6px 12px; border-radius: 99px; border: 1px solid rgba(255,255,255,.18); background: rgba(20,21,24,.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: #e5e7eb; font-size: 12px; font-weight: 600; }
-#tune { position: fixed; z-index: 500; top: calc(58px + env(safe-area-inset-top)); left: 16px; width: 260px; padding: 14px 16px; border-radius: 16px; background: rgba(20,21,24,.97); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 50px rgba(0,0,0,.6); font-size: 13px; }
+#tuneBtn { position: fixed; z-index: 500; bottom: calc(92px + env(safe-area-inset-bottom)); right: 20px; padding: 6px 12px; border-radius: 99px; border: 1px solid rgba(255,255,255,.18); background: rgba(20,21,24,.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: #e5e7eb; font-size: 12px; font-weight: 600; }
+#tune { position: fixed; z-index: 500; bottom: calc(130px + env(safe-area-inset-bottom)); right: 16px; width: 260px; padding: 14px 16px; border-radius: 16px; background: rgba(20,21,24,.97); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 20px 50px rgba(0,0,0,.6); font-size: 13px; }
 #tune[hidden] { display: none; }
 #tune label { display: block; margin-bottom: 12px; color: #9ca3af; }
 #tune label b { float: right; color: #f3f4f6; font-weight: 600; }
 #tune input { width: 100%; margin-top: 6px; accent-color: #a78bfa; }
 #tune p { margin: 0 0 12px; color: #6b7280; line-height: 1.4; }
 #tune button { width: 100%; padding: 8px; border-radius: 10px; border: 0; background: rgba(255,255,255,.08); color: #e5e7eb; }
-@media (min-width: 520px) { #tuneBtn { left: auto; right: 24px; top: 24px; } #tune { left: auto; right: 20px; top: 62px; } }
+@media (min-width: 520px) { #tuneBtn { bottom: auto; right: 24px; top: 24px; } #tune { bottom: auto; right: 20px; top: 62px; } }
 </style>
 </head>
 <body>
