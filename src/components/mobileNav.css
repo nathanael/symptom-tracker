@@ -26,11 +26,26 @@
 /* Dock: floating tab pill + one separate overflow button */
 .mn-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 200; pointer-events: none; padding: 28px 14px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, #08090a 62%, transparent); }
 .mn-dock-in { max-width: 472px; margin: 0 auto; display: flex; align-items: center; gap: 10px; pointer-events: auto; }
-.mn-tabs { flex: 1; display: flex; padding: 4px; border-radius: 22px; background: rgba(23,25,28,.94); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
-.mn-tabs button { flex: 1; min-width: 0; height: 46px; padding: 0 2px; border: 0; border-radius: 18px; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #6b7280; font-size: 10px; font-weight: 500; }
-.mn-tabs button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mn-tabs button svg { width: 20px; height: 20px; }
-.mn-tabs button.on { background: rgba(255,255,255,.08); color: #f3f4f6; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
+.mn-tabs { flex: 1; display: grid; padding: 4px; border-radius: 22px; background: rgba(23,25,28,.94); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.mn-tablist button { flex: 1; min-width: 0; height: 46px; padding: 0 2px; border: 0; border-radius: 18px; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #6b7280; font-size: 10px; font-weight: 500; }
+.mn-tablist button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mn-tablist button svg { width: 20px; height: 20px; }
+.mn-tablist button.on { background: rgba(255,255,255,.08); color: #f3f4f6; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
+
+/* Home folds the tabs into one "Advanced mode" button. Both layers share one grid cell. Folding,
+   the tabs gather toward the centre and fade, then the label appears; unfolding, the label goes
+   at once and the tabs fan back out one after another. */
+.mn-layer { grid-area: 1 / 1; min-width: 0; }
+.mn-tablist { display: flex; }
+.mn-tablist button { transition: opacity .24s ease, transform .36s cubic-bezier(.22,1,.36,1), background .2s, color .2s; transition-delay: calc(var(--i) * 35ms + 60ms); }
+.mn-tabs.easy .mn-tablist { pointer-events: none; }
+.mn-tabs.easy .mn-tablist button { opacity: 0; transform: translateX(calc((1.5 - var(--i)) * 22px)) scale(.8); transition-delay: 0s; }
+.mn-adv { height: 46px; border: 0; border-radius: 18px; background: none; color: #e5e7eb; font-size: 15px; font-weight: 600; letter-spacing: -.01em; opacity: 0; transform: scale(.94); pointer-events: none; transition: opacity .18s ease, transform .32s cubic-bezier(.22,1,.36,1); }
+.mn-tabs.easy .mn-adv { opacity: 1; transform: none; pointer-events: auto; transition-delay: .16s; }
+.mn-adv:active { background: rgba(255,255,255,.08); }
+@media (prefers-reduced-motion: reduce) {
+  .mn-tablist button, .mn-adv { transition: none; }
+}
 .mn-more { width: 54px; height: 54px; flex: none; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: rgba(23,25,28,.94); color: #9ca3af; display: grid; place-items: center; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 .mn-more svg { width: 24px; height: 24px; }
 .mn-more.on { color: #f3f4f6; background: rgba(139,92,246,.25); border-color: rgba(139,92,246,.5); }
