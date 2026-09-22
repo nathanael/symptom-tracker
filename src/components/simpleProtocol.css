@@ -1,26 +1,26 @@
 /* The simplified supplement view — what's due today, a name and a big check, nothing else.
    Same overlay shell as Rapid entry. */
-.sp { position: fixed; inset: 0; z-index: 260; display: flex; flex-direction: column; background: #08090a; color: #f3f4f6; padding-top: env(safe-area-inset-top); }
-.sp-in { flex: 1; min-height: 0; width: 100%; max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; }
-.sp button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.sck { position: fixed; inset: 0; z-index: 260; display: flex; flex-direction: column; background: #08090a; color: #f3f4f6; padding-top: env(safe-area-inset-top); }
+.sck-in { flex: 1; min-height: 0; width: 100%; max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; }
+.sck button { font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
-.sp-bar { flex: none; display: flex; align-items: center; gap: 6px; height: 48px; padding: 0 16px 0 8px; background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
-.sp-bar h2 { margin: 0; font-size: 16px; font-weight: 600; }
-.sp-bar span { margin-left: auto; color: #9ca3af; font-size: 13px; }
-.sp-close { width: 40px; height: 40px; border: 0; border-radius: 11px; background: none; color: #9ca3af; display: grid; place-items: center; }
-.sp-close:active { background: rgba(255,255,255,.06); }
-.sp-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.sck-bar { flex: none; display: flex; align-items: center; gap: 6px; height: 48px; padding: 0 16px 0 8px; background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
+.sck-bar h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.sck-bar span { margin-left: auto; color: #9ca3af; font-size: 13px; }
+.sck-close { width: 40px; height: 40px; border: 0; border-radius: 11px; background: none; color: #9ca3af; display: grid; place-items: center; }
+.sck-close:active { background: rgba(255,255,255,.06); }
+.sck-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 
-.sp-list { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
-.sp-empty { margin: 32px 0; text-align: center; color: #6b7280; font-size: 14.5px; }
+.sck-list { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.sck-empty { margin: 32px 0; text-align: center; color: #6b7280; font-size: 14.5px; }
 
-.sp-row { display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 16px; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; background: #101214; color: #f3f4f6; font-size: 17px; text-align: left; }
-.sp-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sp-row i { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,.22); }
-.sp-row:active { background: #16191c; }
-.sp-row.on { border-color: rgba(74,222,128,.35); background: rgba(74,222,128,.08); }
-.sp-row.on i { border-color: #4ade80; background: #4ade80 no-repeat center/16px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23052e16' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
+.sck-row { display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 16px; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; background: #101214; color: #f3f4f6; font-size: 17px; text-align: left; }
+.sck-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sck-row i { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,.22); }
+.sck-row:active { background: #16191c; }
+.sck-row.on { border-color: rgba(74,222,128,.35); background: rgba(74,222,128,.08); }
+.sck-row.on i { border-color: #4ade80; background: #4ade80 no-repeat center/16px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23052e16' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"); }
 
-.sp-foot { flex: none; padding: 8px 12px calc(14px + env(safe-area-inset-bottom)); }
-.sp-foot button { width: 100%; height: 48px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: none; color: #9ca3af; font-size: 15px; }
-.sp-foot button:active { background: rgba(255,255,255,.06); }
+.sck-foot { flex: none; padding: 8px 12px calc(14px + env(safe-area-inset-bottom)); }
+.sck-foot button { width: 100%; height: 48px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: none; color: #9ca3af; font-size: 15px; }
+.sck-foot button:active { background: rgba(255,255,255,.06); }

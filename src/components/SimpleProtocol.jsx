@@ -26,7 +26,7 @@ export default function SimpleProtocol({
   const dateKey = getDateKey(selectedDate);
   const due = (stackItems || []).filter((i) => i.active && isScheduledForDate(i.schedule, selectedDate));
   const keyFor = (item) => `${dateKey}-${item.id}`;
-  const isTaken = (item) => !!stackEntries[keyFor(item)]?.taken;
+  const isTaken = (item) => !!stackEntries[keyFor(item)];
   const taken = due.filter(isTaken).length;
 
   const toggle = (item) => {
@@ -43,24 +43,24 @@ export default function SimpleProtocol({
   };
 
   return (
-    <div className="sp">
-      <div className="sp-in">
-        <div className="sp-bar">
-          <button className="sp-close" onClick={onClose} aria-label="Close">
+    <div className="sck">
+      <div className="sck-in">
+        <div className="sck-bar">
+          <button className="sck-close" onClick={onClose} aria-label="Close">
             <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
           <h2>Today</h2>
           {due.length > 0 && <span>{taken} of {due.length}</span>}
         </div>
 
-        <div className="sp-list">
+        <div className="sck-list">
           {due.length === 0 ? (
-            <p className="sp-empty">Nothing scheduled today.</p>
+            <p className="sck-empty">Nothing scheduled today.</p>
           ) : due.map((item) => (
             <button
               key={item.id}
               type="button"
-              className={`sp-row${isTaken(item) ? ' on' : ''}`}
+              className={`sck-row${isTaken(item) ? ' on' : ''}`}
               aria-pressed={isTaken(item)}
               onClick={() => toggle(item)}
             >
@@ -70,7 +70,7 @@ export default function SimpleProtocol({
           ))}
         </div>
 
-        <div className="sp-foot">
+        <div className="sck-foot">
           <button onClick={onFullDetail}>Full detail →</button>
         </div>
       </div>
