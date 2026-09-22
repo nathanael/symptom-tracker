@@ -244,6 +244,13 @@ function App() {
     if (isDesktop && appMode === 'home') setAppMode('symptoms');
   }, [isDesktop, appMode]);
 
+  // Home shows no date stepper, so it always means today: arriving on it from a day the user had
+  // stepped back to on another tab snaps the date forward rather than logging to a hidden day.
+  const onHome = !isDesktop && appMode === 'home' && !showInsights;
+  useEffect(() => {
+    if (onHome && getDateKey(selectedDate) !== getDateKey(new Date())) setSelectedDate(new Date());
+  }, [onHome, selectedDate]);
+
   // One-shot: "Today's meals" sets it, MealList consumes it on its next mount. If the user
   // leaves Protocol before the timeout fires, clear it immediately instead of leaving it
   // armed for the next visit.
@@ -831,8 +838,8 @@ function App() {
         />
       )}
 
-      {/* Mobile Header - hide on desktop and when in edit modes */}
-      {!isDesktop && (
+      {/* Mobile Header - hidden on desktop, and on Home, which is always today */}
+      {!isDesktop && !onHome && (
         <Header
           selectedDate={selectedDate}
           changeDate={changeDate}
@@ -944,7 +951,7 @@ function App() {
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          paddingBottom: '104px',
+          paddingBottom: '68px', // the dock pill's height plus its bottom margin; .hm's own 12px is the gap
         }}>
           <Home
             summary={summaryLines({

@@ -1,7 +1,7 @@
 /* Home — three photographs, one expanding in place. Same tokens as the nav and Rapid entry.
    The expansion animates flex-grow, a plain number, rather than grid-template-rows between
    fr units, which iOS Safari has not interpolated reliably. */
-.hm { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.hm { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px 12px 12px; }
 .hm * { -webkit-tap-highlight-color: transparent; }
 
 .hm-card { position: relative; flex: 1 1 0; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 20px; overflow: hidden; background-size: cover; background-position: center; background-color: #17191c; transition: flex-grow .3s cubic-bezier(.22,1,.36,1); }
