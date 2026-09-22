@@ -8,6 +8,10 @@
 .hm-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(8,9,10,.93) 0%, rgba(8,9,10,.6) 45%, rgba(8,9,10,.18) 100%); }
 .hm-card.on { flex-grow: 6; }
 .hm-card.off { flex-grow: 1; }
+/* Collapsed strip is short enough (~1/8 of the column) that the expanded gradient's 45%/100%
+   stops land inside it, leaving the title over as little as .57 alpha — not enough contrast
+   over the two near-white photos. Flatten and darken the whole strip instead. */
+.hm-card.off::before { background: linear-gradient(to top, rgba(8,9,10,.93) 0%, rgba(8,9,10,.8) 100%); }
 
 .hm-face { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border: 0; background: none; color: #f3f4f6; font-family: inherit; text-align: left; cursor: pointer; }
 .hm-face h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
