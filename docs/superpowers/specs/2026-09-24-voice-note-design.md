@@ -28,19 +28,23 @@ Mobile Home only. Desktop and Advanced mode are unchanged.
 
 `BottomNav`'s Home dock becomes:
 
-`[ Advanced mode (flex 1) ] [ Note (108 × 54) ] [ ⋯ (54 × 54) ]`
+`[ Advanced mode (flex 1) ] [ Note (108 × 56) ] [ ⋯ (54 × 54) ]`
 
-- **Note pill**: 108px wide (two circles), 54px tall, 22px radius — the same
-  corners as the Advanced mode pill. Fill `linear-gradient(135deg, #7c3aed,
+- **Note pill**: 108px wide (two circles), 56px tall and 22px radius — the
+  same height and corners as the Advanced mode pill (46px button + 4px padding
+  + 1px border each side). Fill `linear-gradient(135deg, #7c3aed,
   #a855f7)`, white mic icon (the existing `solar.mic` in `solarIcons.jsx`) and
   the label "Note", 15px/600.
 - At 320px wide the row leaves the Advanced mode pill about 110px, so below a
   360px viewport its label drops to 14px and the gaps to 8px. Checked in the
   preview at 320×568.
-- It is a new `mn-note` button rendered only while the dock is in its Home
-  (`easy`) state. When the dock unfolds into the tab list for Advanced mode, the
-  pill fades and collapses to zero width with the same timing as `.mn-adv`, so
-  the tabs get the full width back. `prefers-reduced-motion` swaps instantly.
+- It is a new `mn-note` button that is always rendered, like `.mn-adv`: an
+  `easy` class shows it, and outside Home it has `tabIndex={-1}`,
+  `aria-hidden` and no pointer events. When the dock unfolds into the tab list
+  for Advanced mode, the pill fades and collapses to zero width (animating
+  `width`, `margin` and `opacity`) with the same timing as `.mn-adv`, so the
+  tabs get the full width back; coming back to Home it grows back.
+  `prefers-reduced-motion` swaps instantly.
 - Tapping it calls a new `onVoiceNote` prop, which App wires to
   `setShowVoiceNote(true)`.
 - `VoiceNote` takes `onSave(text)`, `onClose()` and `onTypeInstead()`. App's
@@ -173,15 +177,16 @@ createDictation({ onTranscript, onLevel, onDropped })
   ordered item list (below).
 - `finish()`: the Stop path.
   1. `connection.setMuted(true)` — stop sending the mic (`replaceTrack(null)`,
-     which `connect` already provides; the capture itself stays open so the
-     level meter settles naturally).
-  2. `connection.send({ type: 'input_audio_buffer.commit' })`. If the buffer
-     is empty the service answers with an error event; during `finish()` that
-     error is ignored.
-  3. Wait until every known item has `completed`, or 3 seconds, whichever is
-     first.
-  4. `connection.close()`; resolve. Idempotent; resolves at once if the
-     connection is already closed.
+     which `connect` already provides). The capture stays open, so `onLevel`
+     keeps reporting; `VoiceNote` ignores levels once it is `finishing`.
+  2. `connection.send({ type: 'input_audio_buffer.commit' })`.
+  3. Wait for the commit's reply: an `input_audio_buffer.committed` event
+     (which adds the final item through the reducer) or, when nothing was left
+     in the buffer, the service's empty-buffer `error` event (ignored during
+     `finish()`).
+  4. Then wait until every item is `done`.
+  5. Steps 3–4 share one 3-second limit. `connection.close()`; resolve.
+     Idempotent; resolves at once if the connection is already closed.
 - `cancel()`: closes immediately without waiting (×/Discard while recording).
 - `error` events from the service while listening are logged (`console.warn`)
   and otherwise ignored; only a closed connection ends the note early.
@@ -222,11 +227,11 @@ Mapped to one plain sentence on the `error` state, all offering **Type instead**
 
 | Cause | Message |
 |---|---|
-| Not signed in (401 from `post`) | "Sign in to use voice notes." |
-| Mic blocked / missing | from `micErrorMessage(err, 'voice notes')`: "Microphone access is blocked. Allow it for this site to use voice notes." |
+| Not signed in (`VoiceApiError` status 401; `VoiceNote` uses its own wording, not `post`'s talk-mode message) | "Sign in to use voice notes." |
+| Mic blocked / missing / failed (`Error` with `name === 'MicError'`) | its message, from `micErrorMessage(err, 'voice notes')`: "Microphone access is blocked. Allow it for this site to use voice notes.", "No microphone found." or "Couldn't start the microphone." |
 | Offline / worker unreachable | "Can't reach the voice service. Check your connection." |
 | Daily cap (429) | the worker's message |
-| Connection refused or failed to open (`connect`'s own errors) | "Couldn't start voice notes. Try again in a moment." |
+| Any other `Error` from `connect` (refused or failed connection) | "Couldn't start voice notes. Try again in a moment." |
 | Anything else | "Something went wrong starting voice notes." |
 | Connection drops mid-note | not an error screen: `onDropped` → `review` with what was heard, plus a one-line notice "Connection lost — this is what was heard." |
 
@@ -236,7 +241,7 @@ Mapped to one plain sentence on the `error` state, all offering **Type instead**
 |---|---|
 | `cloudflare/voice/src/index.js` | `transcribeToken` route, `DAILY_CAPS.notes` |
 | `src/voice/dictation.js` | new: token + connection + `finish()` + transcript reducer |
-| `src/voice/webrtcConnection.js` | `micErrorMessage(err, feature = 'talk mode')`; `connect` accepts an optional `feature` and passes it through. Talk mode's wording is unchanged |
+| `src/voice/webrtcConnection.js` | `micErrorMessage(err, feature = 'talk mode')`; `connect` accepts an optional `feature` and passes it through, and its mic failure is thrown as an `Error` with `name = 'MicError'` so callers can tell it from connection failures. Talk mode's wording and handling are unchanged |
 | `src/utils/voiceNote.js` | new: `appendToNote` |
 | `src/components/VoiceNote.jsx`, `voiceNote.css` | new: recorder and review |
 | `src/components/BottomNav.jsx`, `mobileNav.css` | Note pill in the Home dock |
@@ -254,16 +259,20 @@ Mapped to one plain sentence on the `error` state, all offering **Type instead**
     the list unchanged.
   - `transcriptText`: joins completed and partial texts in order, skipping
     empty items.
-  - `finish()` with a stubbed connection: mutes, sends one commit, resolves
-    when the pending item completes, resolves after 3s when it never does,
-    ignores the empty-buffer error, and never calls `onDropped`.
+  - `finish()` with a stubbed connection: mutes and sends one commit; with
+    every earlier item already done, it does not resolve until the
+    `committed` event arrives and that new item completes; it resolves on the
+    empty-buffer error when nothing was left; it resolves after 3s when the
+    reply or completion never comes; it never calls `onDropped`.
 - `src/voice/__tests__/webrtcConnection` (or alongside existing voice tests):
   `micErrorMessage` defaults to talk mode wording and uses the given feature.
 - Preview: the dock pill on Home at 375 and 320 wide, and its collapse into Advanced mode; the
   recorder's layout and ribbon at 375×812 and 320×568 with a stubbed dictation;
   review, Save and the appended note in Day notes.
-- On the phone, after `npx wrangler deploy`: real speech in the PWA, locking
-  the screen mid-note, and airplane mode for the error path.
+- On the phone, after `npx wrangler deploy`: real speech in the PWA, tapping
+  Stop straight after the last word (the last sentence must survive), locking
+  the screen mid-note (iOS may pause the 3s wait in the background, so review
+  can appear only on return), and airplane mode for the error path.
 
 ## Out of scope
 
