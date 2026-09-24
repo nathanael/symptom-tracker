@@ -145,18 +145,27 @@ export default function Home({
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // A tap anywhere on the open panel except its buttons closes it, like the X.
+  const onPanelClick = (e) => {
+    if (dragged.current || e.target.closest('button')) return;
+    close();
+  };
+
   // Drag down to dismiss: the panel follows the finger, shrinking; let go past 90px to close,
   // short of that it springs back.
   const drag = useRef(null);
+  const dragged = useRef(false);   // the last press moved, so its click is not a tap to close
   const onPointerDown = (e) => {
     if (busy.current || e.target.closest('button')) return;
     drag.current = { y0: e.clientY, dy: 0 };
+    dragged.current = false;
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e) => {
     if (!drag.current) return;
     const xp = xpRef.current, dy = Math.max(0, e.clientY - drag.current.y0), p = Math.min(dy / 400, 1);
     drag.current.dy = dy;
+    if (dy > 8) dragged.current = true;
     xp.style.transform = `translateY(${dy * 0.4}px) scale(${1 - p * 0.2})`;
     xp.querySelector('.hm-xp-bg').style.borderRadius = `${20 + p * 30}px`;
   };
@@ -204,6 +213,7 @@ export default function Home({
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
+          onClick={onPanelClick}
         >
           <div className="hm-xp-bg" style={{ backgroundImage: `url(${openCard.art})` }}>
             <i className="g1" /><i className="g2" />

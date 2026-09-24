@@ -41,15 +41,16 @@
   display: flex; align-items: center; justify-content: center; gap: 12px;
   width: 100%; border: 0; cursor: pointer;
   color: #fff; font-family: inherit; font-size: 21px; font-weight: 700; letter-spacing: -.015em;
-  padding: 21px 20px; border-radius: 18px; background: rgba(255,255,255,.14);
+  padding: 21px 20px; line-height: 26px; border-radius: 18px; background: rgba(255,255,255,.14);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   transition: transform .15s, background .15s;
 }
 .hm-opts button svg { width: 1em; height: 1em; flex: none; fill: currentColor; color: #fff; }
 .hm-opts button:active { transform: scale(.97); background: rgba(255,255,255,.24); }
 
-/* The door into the detailed view, not a way of logging: plain text under the two buttons. */
-.hm-opts button.deep { width: auto; margin-top: 4px; padding: 8px 12px; border-radius: 10px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; font-size: 16px; font-weight: 500; letter-spacing: 0; color: #cbd5e1; }
+/* The door into the detailed view, not a way of logging: plain text under the two buttons, but
+   with the same full-size tap area so it is as hard to miss as they are. */
+.hm-opts button.deep { margin-top: 0; border-radius: 18px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; font-size: 16px; font-weight: 500; letter-spacing: 0; color: #cbd5e1; }
 .hm-opts button.deep svg { width: 1.2em; height: 1.2em; color: #94a3b8; }
 .hm-opts button.deep:active { background: rgba(255,255,255,.1); }
 
