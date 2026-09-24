@@ -1539,7 +1539,6 @@ function App() {
           onEditSymptoms={() => { setAppMode('symptoms'); setShowInsights(false); setSymptomEditMode(true); }}
           onClearSymptoms={clearSymptomDay}
           onRapidEntry={() => { setAppMode('symptoms'); setShowInsights(false); setShowRapidEntry(true); }}
-          onTalkMode={openTalkMode}
           // Stack page actions
           onCheckAll={protocolCheckAll}
           onClear={protocolClearDay}
