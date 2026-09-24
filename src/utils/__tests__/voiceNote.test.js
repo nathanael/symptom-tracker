@@ -45,9 +45,13 @@ describe('stripBars', () => {
   });
 
   it('takes the loudest level in each slice', () => {
-    const levels = Array.from({ length: 140 }, (_, i) => (i % 2 ? 0.8 : 0.1));
+    const levels = Array.from({ length: 140 }, (_, i) => (i % 2 ? 0.1 : 0.8));
     const bars = stripBars(levels, 70);
     expect(bars).toHaveLength(70);
     expect(bars.every((v) => v === 0.8)).toBe(true);
+  });
+
+  it('takes the max, not the last, sample in each slice', () => {
+    expect(stripBars([0.2, 0.9, 0.1, 0.3, 0.7], 2)).toEqual([0.9, 0.7]);
   });
 });
