@@ -177,12 +177,50 @@ describe('createDictation', () => {
   });
 
   it('finish() resolves at once if the connection drops while waiting, without onDropped', async () => {
-    const { dictation, drop, onDropped } = setup();
+    const { dictation, conn, drop, onDropped } = setup();
     await dictation.start();
     const finished = dictation.finish();
     drop();
     await finished;
     expect(onDropped).not.toHaveBeenCalled();
+    expect(conn.close).toHaveBeenCalled();
+  });
+
+  it('finish() before start()\'s connection arrives still closes it once it does', async () => {
+    let release;
+    const conn = { setMuted: vi.fn(), send: vi.fn(), close: vi.fn() };
+    const { dictation, onTranscript, onDropped } = setup({
+      connectImpl: () => new Promise((resolve) => { release = () => resolve(conn); }),
+    });
+    const started = dictation.start();
+    await tick();
+    const finished = dictation.finish();
+    await finished;
+    release();
+    await started;
+    expect(conn.close).toHaveBeenCalled();
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(onDropped).not.toHaveBeenCalled();
+  });
+
+  it('finish() closes the connection even if send throws', async () => {
+    const { dictation, conn } = setup();
+    await dictation.start();
+    conn.send = vi.fn(() => { throw new Error('boom'); });
+    await dictation.finish().catch(() => {});
+    expect(conn.close).toHaveBeenCalled();
+  });
+
+  it('cancel() during finish() resolves it right away instead of waiting out the timeout', async () => {
+    vi.useFakeTimers();
+    const { dictation, conn } = setup();
+    await dictation.start();
+    let resolved = false;
+    dictation.finish().then(() => { resolved = true; });
+    dictation.cancel();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(resolved).toBe(true);
+    expect(conn.close).toHaveBeenCalled();
   });
 
   it('finish() is idempotent', async () => {

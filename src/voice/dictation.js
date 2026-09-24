@@ -81,6 +81,8 @@ export const createDictation = ({ onTranscript, onLevel, onDropped, getToken = f
       wake();
       return;
     }
+    // A VAD-triggered commit can race ours and count as the reply; either way we still wait below
+    // for every item to finish, which is what keeps the last sentence in the transcript
     if (finishing && event.type === 'input_audio_buffer.committed') finishing.replied = true;
     const next = reduceTranscript(items, event);
     if (next !== items) {
@@ -100,8 +102,9 @@ export const createDictation = ({ onTranscript, onLevel, onDropped, getToken = f
     const { secret } = await getToken();
     if (cancelled) return;
     const conn = await connect({ secret, onEvent, onLevel, onClosed, feature: 'voice notes' });
-    // Closed while connecting: never leave the mic running (and billed) behind a closed screen
-    if (cancelled) {
+    // Closed while connecting, or finish() already ran and found no connection to close: never
+    // leave the mic running (and billed) behind a closed screen
+    if (cancelled || finished) {
       conn.close();
       return;
     }
@@ -119,23 +122,27 @@ export const createDictation = ({ onTranscript, onLevel, onDropped, getToken = f
         return;
       }
       finishing = { replied: false };
-      connection.setMuted(true);
-      connection.send({ type: 'input_audio_buffer.commit' });
-      await new Promise((resolve) => {
-        let timer = null;
-        const done = () => {
-          clearTimeout(timer);
-          waiters.delete(check);
-          resolve();
-        };
-        function check() {
-          if (dropped || (finishing.replied && items.every((it) => it.done))) done();
-        }
-        timer = setTimeout(done, timeoutMs);
-        waiters.add(check);
-        check();
-      });
-      connection.close();
+      try {
+        connection.setMuted(true);
+        connection.send({ type: 'input_audio_buffer.commit' });
+        await new Promise((resolve) => {
+          let timer = null;
+          const done = () => {
+            clearTimeout(timer);
+            waiters.delete(check);
+            resolve();
+          };
+          function check() {
+            if (cancelled || dropped || (finishing.replied && items.every((it) => it.done))) done();
+          }
+          timer = setTimeout(done, timeoutMs);
+          waiters.add(check);
+          check();
+        });
+      } finally {
+        // Idempotent, so this is safe even if the connection was already closed elsewhere
+        connection.close();
+      }
     })();
     return finished;
   };
@@ -143,6 +150,7 @@ export const createDictation = ({ onTranscript, onLevel, onDropped, getToken = f
   const cancel = () => {
     cancelled = true;
     connection?.close();
+    wake();
   };
 
   return { start, finish, cancel };
