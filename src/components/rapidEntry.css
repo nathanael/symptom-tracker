@@ -41,8 +41,10 @@
 .re-key.on { background: color-mix(in srgb, var(--c) 20%, #0e0f11); border-color: var(--c); }
 .re-key.on::after { content: "✓"; position: absolute; top: 7px; right: 10px; bottom: auto; font-size: 12px; color: var(--c); }
 .re-key.na { aspect-ratio: auto; height: 60px; font-size: 14px; font-weight: 500; color: #9ca3af; --c: #64748b; }
-.re-nav { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; }
-.re-nav button { height: 69px; border-radius: 14px; border: 1px solid rgba(255,255,255,.07); background: none; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 500; }
+/* One box split by hairline dividers: back · next unlogged · forward */
+.re-nav { display: grid; grid-template-columns: 1fr 1.4fr 1fr; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; overflow: hidden; }
+.re-nav button + button { border-left: 1px solid rgba(255,255,255,.07); }
+.re-nav button { height: 90px; border: 0; background: none; color: #9ca3af; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 500; }
 .re-nav button:active { background: rgba(255,255,255,.06); color: #f3f4f6; }
 
 /* Done screen */
