@@ -1,0 +1,53 @@
+/* Voice note: a full-screen recorder over everything. Portalled to <body> so the dock can't paint
+   over it (iOS draws fixed layers inside the app's scroll container under the dock). */
+.vn { position: fixed; inset: 0; z-index: 300; display: flex; flex-direction: column; background: radial-gradient(120% 70% at 50% 100%, #1a1030 0%, #08090a 60%); color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+.vn button, .vn textarea { font-family: inherit; }
+.vn button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+.vn-top { flex: none; display: grid; grid-template-columns: 64px 1fr 64px; align-items: center; padding: calc(12px + env(safe-area-inset-top)) 16px 0; }
+.vn-x { width: 40px; height: 40px; border: 0; border-radius: 50%; background: rgba(255,255,255,.06); color: #9ca3af; display: grid; place-items: center; }
+.vn-x svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.vn-when { text-align: center; }
+.vn-when b { display: block; font-size: 15px; font-weight: 600; }
+.vn-when small { font-size: 12px; color: #6b7280; }
+.vn-timer { justify-self: end; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; color: #6b7280; }
+.vn-timer.on { color: #f87171; }
+.vn-timer i { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: vn-blink 1.2s infinite; }
+@keyframes vn-blink { 50% { opacity: .25; } }
+
+/* Words fill the screen, newest line just above the ribbon; older lines fade out at the top */
+.vn-words { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; padding: 28px 24px 0; font-size: 24px; line-height: 1.35; font-weight: 500; letter-spacing: -.01em; -webkit-mask-image: linear-gradient(transparent, #000 30%); mask-image: linear-gradient(transparent, #000 30%); }
+.vn-words .old { color: #6b7280; }
+.vn-words .now { color: #f3f4f6; }
+.vn-words .live { color: #c4b5fd; }
+.vn-caret { display: inline-block; width: 2px; height: 1em; margin-left: 1px; vertical-align: -3px; background: #a78bfa; animation: vn-blink 1s infinite; }
+.vn-finishing { margin: 10px 0 0; font-size: 14px; font-weight: 400; color: #9ca3af; }
+.vn-ribbon { display: block; flex: none; width: 100%; height: 170px; }
+
+.vn-controls { flex: none; display: flex; justify-content: center; padding: 8px 0 calc(28px + env(safe-area-inset-bottom)); }
+.vn-stop { width: 78px; height: 78px; border-radius: 50%; border: 3px solid rgba(255,255,255,.85); background: none; display: grid; place-items: center; transition: opacity .2s, transform .1s; }
+.vn-stop i { width: 30px; height: 30px; border-radius: 8px; background: #ef4444; }
+.vn-stop:disabled { opacity: .35; cursor: default; }
+.vn-stop:not(:disabled):active { transform: scale(.96); }
+
+/* Review */
+.vn.review { background: #08090a; }
+.vn-notice { flex: none; margin: 16px 18px 0; font-size: 13px; color: #fbbf24; }
+.vn-edit { flex: 1; min-height: 0; margin: 18px 16px 0; padding: 16px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); color: #f3f4f6; font-size: 18px; line-height: 1.5; resize: none; outline: none; }
+.vn-edit:focus { border-color: rgba(167,139,250,.5); }
+.vn-strip { flex: none; margin: 12px 16px 0; height: 44px; padding: 0 12px; border-radius: 12px; background: rgba(255,255,255,.04); display: flex; align-items: center; gap: 2px; }
+.vn-strip span { flex: 1; border-radius: 2px; background: #6b7280; }
+.vn-dest { flex: none; margin: 12px 18px 0; font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vn-dest b { color: #9ca3af; font-weight: 500; }
+.vn-acts { flex: none; display: flex; gap: 10px; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); }
+.vn-btn { flex: 1; height: 54px; border: 0; border-radius: 18px; background: rgba(255,255,255,.06); color: #d1d5db; font-size: 16px; font-weight: 600; }
+.vn-btn.primary { background: #8b5cf6; color: #fff; }
+.vn-btn.primary:disabled { opacity: .4; cursor: default; }
+.vn-btn.danger { background: rgba(239,68,68,.16); color: #fca5a5; }
+.vn-confirm { flex: none; }
+.vn-confirm p { margin: 16px 0 0; text-align: center; font-size: 15px; color: #e5e7eb; }
+
+/* Error */
+.vn-error { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 24px 24px calc(24px + env(safe-area-inset-bottom)); }
+.vn-error p { margin: 0 0 14px; text-align: center; font-size: 17px; line-height: 1.45; color: #e5e7eb; }
+.vn-error .vn-btn { flex: none; }
