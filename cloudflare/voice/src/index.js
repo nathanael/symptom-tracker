@@ -167,8 +167,9 @@ const openaiToken = async (env, uid) => {
   return Response.json({ secret: data.value, expiresAt: data.expires_at, model: session.model, engine: 'realtime' });
 };
 
-// Voice notes: a transcription-only session. Speech in, text out; no model ever answers. Server
-// VAD commits a stretch at each pause so the app gets it back sentence by sentence.
+// Voice notes: a transcription-only session. Speech in, text out; no model ever answers. The live
+// transcription model streams words as they are spoken and rejects turn detection ("not supported
+// for this transcription model"), so the app commits the audio itself when the user taps Stop.
 const transcribeToken = async (env, uid) => {
   requireKey(env, 'OPENAI_API_KEY');
   await spend(env, uid, 'notes', 1, "You've hit today's voice-note limit. It resets at midnight UTC.");
@@ -179,7 +180,7 @@ const transcribeToken = async (env, uid) => {
       input: {
         transcription: { model },
         noise_reduction: { type: 'near_field' },
-        turn_detection: { type: 'server_vad', silence_duration_ms: 700 },
+        turn_detection: null,
       },
     },
   };

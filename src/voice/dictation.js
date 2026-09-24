@@ -81,9 +81,10 @@ export const createDictation = ({ onTranscript, onLevel, onDropped, getToken = f
       wake();
       return;
     }
-    // A VAD-triggered commit can race ours and count as the reply; either way we still wait below
-    // for every item to finish, which is what keeps the last sentence in the transcript
-    if (finishing && event.type === 'input_audio_buffer.committed') finishing.replied = true;
+    // The reply to our commit: a `committed`, or the final transcript itself (gpt-live-transcribe
+    // streams with no turn detection and need not confirm the commit). Either way we still wait
+    // below for every item to finish, which is what keeps the last sentence in the transcript.
+    if (finishing && (event.type === 'input_audio_buffer.committed' || event.type === 'conversation.item.input_audio_transcription.completed')) finishing.replied = true;
     const next = reduceTranscript(items, event);
     if (next !== items) {
       items = next;

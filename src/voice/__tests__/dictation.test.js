@@ -154,6 +154,26 @@ describe('createDictation', () => {
     expect(onDropped).not.toHaveBeenCalled();
   });
 
+  // gpt-live-transcribe streams deltas with no commits of its own and may never send a
+  // `committed` for ours: the final transcript arriving is the reply
+  it('finish() resolves when the streamed item completes, without a committed event', async () => {
+    vi.useFakeTimers();
+    const { dictation, conn, emit, onTranscript } = setup();
+    await dictation.start();
+    emit(delta('live', 'Woke up'));
+    emit(delta('live', ' with a headache'));
+    let resolved = false;
+    dictation.finish().then(() => { resolved = true; });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(resolved).toBe(false);
+    emit(completed('live', 'Woke up with a headache.'));
+    // Well inside the 3s limit: the completion itself is the answer
+    await vi.advanceTimersByTimeAsync(0);
+    expect(resolved).toBe(true);
+    expect(lastText(onTranscript)).toBe('Woke up with a headache.');
+    expect(conn.close).toHaveBeenCalled();
+  });
+
   it('finish() resolves on the empty-buffer error when nothing was left', async () => {
     const { dictation, conn, emit } = setup();
     await dictation.start();
