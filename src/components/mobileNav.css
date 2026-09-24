@@ -53,7 +53,7 @@
 /* 320pt phones: Advanced mode is left about 110px, so its label and the gaps tighten */
 @media (max-width: 359px) {
   .mn-dock-in { gap: 8px; }
-  .mn-adv { font-size: 14px; }
+  .mn-adv { font-size: 14px; padding: 0 4px; white-space: nowrap; }
   .mn-note { margin-left: -8px; }
   .mn-note.easy { margin-left: 0; }
 }
