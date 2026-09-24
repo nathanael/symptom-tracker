@@ -1,6 +1,7 @@
 /* Voice note: a full-screen recorder over everything. Portalled to <body> so the dock can't paint
-   over it (iOS draws fixed layers inside the app's scroll container under the dock). */
-.vn { position: fixed; inset: 0; z-index: 300; display: flex; flex-direction: column; background: radial-gradient(120% 70% at 50% 100%, #1a1030 0%, #08090a 60%); color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+   over it (iOS draws fixed layers inside the app's scroll container under the dock). z-index sits
+   above the sync banner (3000), below the recovery modal (4000). */
+.vn { position: fixed; inset: 0; z-index: 3100; display: flex; flex-direction: column; background: radial-gradient(120% 70% at 50% 100%, #1a1030 0%, #08090a 60%); color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
 .vn button, .vn textarea { font-family: inherit; }
 .vn button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 

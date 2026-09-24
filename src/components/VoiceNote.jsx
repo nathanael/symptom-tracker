@@ -33,6 +33,7 @@ export default function VoiceNote({ onSave, onClose, onTypeInstead }) {
   // Read from callbacks that outlive a render
   const live = useRef({ phase: 'connecting', items: [], history: [], startedAt: 0 });
   const dictation = useRef(null);
+  const saved = useRef(false);
 
   const enter = (next) => {
     live.current.phase = next;
@@ -146,7 +147,7 @@ export default function VoiceNote({ onSave, onClose, onTypeInstead }) {
   const now = new Date();
 
   return createPortal(
-    <div className={`vn ${phase}`} role="dialog" aria-label="Voice note">
+    <div className={`vn ${phase}`} role="dialog" aria-modal="true" aria-label="Voice note">
       <div className="vn-top">
         <button type="button" className="vn-x" aria-label="Close" onClick={close}>
           <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>
@@ -182,7 +183,11 @@ export default function VoiceNote({ onSave, onClose, onTypeInstead }) {
           {confirming ? confirmRow('Keep editing') : (
             <div className="vn-acts">
               <button type="button" className="vn-btn" onClick={discard}>Discard</button>
-              <button type="button" className="vn-btn primary" disabled={!text.trim()} onClick={() => onSave(text.trim())}>Save</button>
+              <button type="button" className="vn-btn primary" disabled={!text.trim()} onClick={() => {
+                if (saved.current) return;
+                saved.current = true;
+                onSave(text.trim());
+              }}>Save</button>
             </div>
           )}
         </>
