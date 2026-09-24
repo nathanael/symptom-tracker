@@ -3,7 +3,7 @@
 //
 //   POST /gemini-token   -> { secret, model }   Gemini Live   (secret GEMINI_API_KEY)
 //   POST /token          -> { secret }          OpenAI realtime (secret OPENAI_API_KEY)
-//   POST /transcribe-token -> { secret }        OpenAI transcription-only session, for voice notes
+//   POST /transcribe-token -> { secret, expiresAt, model }  OpenAI transcription-only session, for voice notes
 //
 // Deploy: `npx wrangler deploy` in this folder. Secrets: `npx wrangler secret put GEMINI_API_KEY`.
 import { createRemoteJWKSet, jwtVerify } from 'jose';
