@@ -17,6 +17,13 @@ const BURST_MS = 400;
 const EMPTY = '#131417';  // tint for a target with no background of its own
 
 let running = false;
+
+// Beside the dock, in its stacking context, so the tiles fly under the bottom menu rather than
+// over it (a layer on <body> would paint above everything inside the app's fixed shell).
+const mount = (layer) => {
+  const dock = document.querySelector('.mn-dock');
+  if (dock) dock.before(layer); else document.body.appendChild(layer);
+};
 const root = document.documentElement;
 const sizes = new Map();
 
@@ -161,7 +168,7 @@ export async function shatterSwitch({ toAdv, originEl, commit }) {
     if (toAdv) {
       root.classList.add('fx-noface');
       const [photos] = await Promise.all([photoTiles(), wait(110)]);
-      document.body.appendChild(layer);
+      mount(layer);
       placeholders(layer, photos);
       root.classList.add('fx-hold');
       commit();
@@ -169,7 +176,7 @@ export async function shatterSwitch({ toAdv, originEl, commit }) {
       await fly(layer, photos, slots(photos.length), true, origin);
     } else {
       const cells = slots(COLS * 12);
-      document.body.appendChild(layer);
+      mount(layer);
       placeholders(layer, cells);
       root.classList.add('fx-hold');
       commit();

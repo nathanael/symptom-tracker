@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { formatDate } from '../utils/helpers';
+import { formatDate, updateApp } from '../utils/helpers';
 import { solar } from './solarIcons';
 import { APP_VERSION } from '../version';
 
@@ -13,6 +13,7 @@ const icons = {
   bolt: solar.bolt,
   mic: solar.mic,
   camera: solar.camera,
+  refresh: solar.refresh,
 };
 
 // The one mobile overflow. Ordered for the thumb: rare and destructive at the top,
@@ -66,6 +67,7 @@ export default function QuickActionsMenu({
           {tab === 'insights' ? 'Progress' : tab === 'home' ? `Home · ${formatDate(selectedDate)}` : `${tab === 'symptoms' ? 'Symptoms' : 'Protocol'} · ${formatDate(selectedDate)}`}
           <span>{currentVersion}</span>
         </h6>
+        {tab === 'home' && <Item icon="refresh" label="Update app" onClick={updateApp} />}
         {tab !== 'insights' && tab !== 'home' && <Item icon="trash" label="Clear day" danger onClick={tab === 'symptoms' ? onClearSymptoms : onClear} />}
         <Item icon="gear" label="Settings" onClick={onOpenSettings} />
         <hr />
@@ -78,7 +80,7 @@ export default function QuickActionsMenu({
             <Item icon="camera" label="Log a meal" onClick={onLogMeal} />
           </>
         )}
-        {tab !== 'insights' && (
+        {tab !== 'insights' && tab !== 'home' && (
           <>
             <hr />
             <Item icon="note" label="Day notes" onClick={onEditNote} />

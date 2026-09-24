@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Progress tab — mobile layouts</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #050506; color: #e5e7eb; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  .page { display: flex; flex-wrap: wrap; justify-content: center; gap: 32px 24px; padding: 20px 12px 60px; }
+  .opt { width: 375px; }
+  .opt > h2 { margin: 0 0 2px; font-size: 14px; font-weight: 600; color: #f3f4f6; }
+  .opt > p { margin: 0 0 12px; font-size: 12px; color: #6b7280; min-height: 52px; }
+  .phone { position: relative; width: 375px; height: 812px; overflow: hidden; border: 1px solid rgba(255,255,255,.1); border-radius: 28px; background: #08090a; padding: 56px 12px 0; }
+  .fold { position: absolute; left: 0; right: 0; bottom: 0; height: 92px; background: linear-gradient(transparent, #08090a 40%); pointer-events: none; }
+  .dock { position: absolute; left: 14px; right: 14px; bottom: 14px; height: 54px; border-radius: 27px; background: #17191c; border: 1px solid rgba(255,255,255,.1); display: grid; place-items: center; color: #6b7280; font-size: 11px; }
+  svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  .step, .seg { display: flex; height: 36px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); margin-bottom: 8px; align-items: center; }
+  .step { justify-content: space-between; padding: 0 12px; font-weight: 600; color: #f3f4f6; }
+  .step svg { width: 15px; height: 15px; color: #9ca3af; }
+  .seg span { flex: 1; text-align: center; color: #9ca3af; line-height: 34px; }
+  .seg span.on { background: rgba(255,255,255,.08); color: #f3f4f6; font-weight: 500; }
+  .seg { margin-bottom: 12px; overflow: hidden; }
+  .cap { padding: 0 2px 8px; font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: #6b7280; }
+  .score { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.08); }
+  .score .num { font-size: 22px; font-weight: 600; color: #f59e0b; }
+  .score .body { flex: 1; display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: #6b7280; letter-spacing: .4px; text-transform: uppercase; }
+  .score .bar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.08); }
+  .score .bar i { display: block; width: 62%; height: 100%; border-radius: 4px; background: #f59e0b; }
+  .gap { height: 6px; }
+
+  .rows { display: flex; flex-direction: column; gap: 6px; }
+  .row { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px 0 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.08); color: #f3f4f6; font-size: 14px; font-weight: 500; }
+  .row .dot, .chip .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .row .name { flex: 1; }
+  .row .val { color: #d1d5db; font-variant-numeric: tabular-nums; }
+  .row .val small { color: #6b7280; font-size: 11px; font-weight: 400; }
+  .row .delta { font-size: 11px; color: #34d399; }
+  .row .x { width: 28px; text-align: center; color: #6b7280; font-size: 15px; font-weight: 400; }
+  .add { display: flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); color: #d1d5db; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .pair .add { justify-content: center; height: 44px; font-size: 14px; }
+
+  .scrub { min-height: 32px; margin-top: 12px; display: flex; align-items: center; padding: 0 2px; font-size: 12px; color: #6b7280; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: 100%; }
+  .chart .lbl { position: absolute; top: -2px; left: 52%; font-size: 11px; color: #a78bfa; }
+  .axis { display: flex; justify-content: space-between; font-size: 10.5px; color: #6b7280; padding: 4px 0 0; }
+
+  .ins { display: flex; align-items: stretch; margin-top: 10px; overflow: hidden; border-radius: 12px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.025); color: #9ca3af; }
+  .ins .body { flex: 1; display: flex; gap: 10px; padding: 10px 12px 11px; }
+  .ins .mark { width: 2px; border-radius: 1px; background: #a78bfa; }
+  .ins .txt { display: flex; flex-direction: column; gap: 3px; }
+  .ins .head { font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: #6b7280; }
+  .ins .mv { font-size: 15px; font-weight: 500; color: #f3f4f6; }
+  .ins .mv i { font-style: normal; font-size: 12px; color: #34d399; }
+  .ins .since { font-size: 12.5px; }
+  .ins .next { width: 56px; display: grid; place-items: center; border-left: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.03); color: #d1d5db; }
+  .ins .next svg { width: 24px; height: 24px; stroke-width: 2.2; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 6px 0 11px; border-radius: 18px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.08); color: #f3f4f6; font-weight: 500; }
+  .chip small { color: #d1d5db; font-weight: 500; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .chip .x { width: 22px; text-align: center; color: #6b7280; font-size: 15px; font-weight: 400; }
+  .chip.new { padding: 0 13px; border-style: dashed; border-color: rgba(255,255,255,.16); background: none; color: #9ca3af; font-weight: 400; }
+  .mt { margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="page" id="page"></div>
+<script>
+  const chev = (d) => `<svg viewBox="0 0 24 24"><path d="${d}"/></svg>`;
+  const head = `<div class="step">${chev('M15 18l-6-6 6-6')}<span>Aug 23 — Sep 21</span>${chev('M9 18l6-6-6-6')}</div>
+    <div class="seg"><span>W</span><span class="on">M</span><span>3M</span><span>6M</span></div>
+    <div class="cap">30-day average · change vs previous 30</div>
+    <div class="score"><span class="num">62%</span><span class="body">Health score<span class="bar"><i></i></span></span></div>`;
+  const rows = `<div class="row"><span class="dot" style="background:#60a5fa"></span><span class="name">Magnesium</span><span class="val">400<small> mg</small></span><span class="x">×</span></div>
+    <div class="row"><span class="dot" style="background:#4ade80"></span><span class="name">Headache</span><span class="val">1.6<small>/5</small></span><span class="delta">▼0.8</span><span class="x">×</span></div>`;
+  const addStacked = `<div class="add">+ Supplement</div><div class="add">+ Symptom</div>`;
+  const addPair = `<div class="pair"><div class="add">+ Supplement</div><div class="add">+ Symptom</div></div>`;
+  const scrub = `<div class="scrub">Drag across the chart to read a day</div>`;
+  const chart = (h) => `<div class="chart" style="height:${h}px"><span class="lbl">Started Magnesium</span>
+    <svg viewBox="0 0 351 ${h}" preserveAspectRatio="none">
+      <g stroke="rgba(255,255,255,.06)" stroke-width="1"><path d="M0 ${h*.25}H351M0 ${h*.5}H351M0 ${h*.75}H351M0 ${h-1}H351"/></g>
+      <path d="M182 16V${h}" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <path d="M0 ${h*.30} C40 ${h*.22} 70 ${h*.42} 110 ${h*.34} S160 ${h*.30} 182 ${h*.36} S240 ${h*.66} 280 ${h*.62} S330 ${h*.74} 351 ${h*.70}" stroke="#4ade80" stroke-width="2"/>
+      <path d="M182 ${h*.55}H351" stroke="#60a5fa" stroke-width="2"/>
+    </svg></div><div class="axis"><span>Aug 23</span><span>Aug 30</span><span>Sep 6</span><span>Sep 13</span><span>Sep 20</span></div>`;
+  const ins = `<div class="ins"><span class="body"><span class="mark"></span><span class="txt"><span class="head">Insights &nbsp;1 of 2</span><span class="mv">Headache <i>▼0.8</i></span><span class="since">since starting Magnesium · Aug 22</span></span></span><span class="next">${chev('M9 18l6-6-6-6')}</span></div>`;
+  const chips = `<div class="chips"><span class="chip"><span class="dot" style="background:#60a5fa"></span>Magnesium <small>400 mg</small><span class="x">×</span></span><span class="chip"><span class="dot" style="background:#4ade80"></span>Headache <small>1.6</small><span class="x">×</span></span><span class="chip new">+ Supplement</span><span class="chip new">+ Symptom</span></div>`;
+
+  const H0 = 267, H1 = 294; // 380 → 418 viewBox units at a 351px-wide chart
+  const opts = [
+    ['Current', 'For reference. Series rows and both add buttons sit above the chart, so the chart starts two-thirds of the way down and Insights falls under the dock.',
+      head + '<div class="gap"></div><div class="rows">' + rows + addStacked + '</div>' + scrub + chart(H0) + ins],
+    ['A · Add buttons under the chart', 'Series rows stay above as the legend. The two add buttons become one side-by-side row below the chart, then Insights. Chart +10%.',
+      head + '<div class="gap"></div><div class="rows">' + rows + '</div>' + scrub + chart(H1) + '<div class="mt">' + addPair + '</div>' + ins],
+    ['B · Everything under the chart', 'Series rows and add buttons all move below; the chart comes straight after the health score and sits fully on screen. Insights directly under the chart, series last. Chart +10%.',
+      head + scrub + chart(H1) + ins + '<div class="rows mt">' + rows + addPair + '</div>'],
+    ['C · Chips under the chart', 'Series become compact chips in one wrapping row under the chart, with the add buttons as dashed chips in the same row. Shortest page. Chart +10%.',
+      head + scrub + chart(H1) + chips + ins],
+  ];
+  document.getElementById('page').innerHTML = opts.map(([t, p, html]) =>
+    `<section class="opt"><h2>${t}</h2><p>${p}</p><div class="phone">${html}<div class="fold"></div><div class="dock">Symptoms · Protocol · Progress</div></div></section>`).join('');
+</script>
+</body>
+</html>

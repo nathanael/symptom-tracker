@@ -41,15 +41,15 @@ export default function Home({
   const xpRef = useRef(null);
   const busy = useRef(false);
 
-  // Two ways to log, then one way deeper. The `deep` option is the door into the detailed view
+  // Supplements on top, symptoms at the bottom. Two ways to log, then one way deeper. The `deep` option is the door into the detailed view
   // rather than a way of logging, so it renders as plain text under the two bars.
   const cards = [
     {
-      id: 'symptoms', title: 'Log symptoms', art: symptomsArt, line: summary.symptoms,
+      id: 'supplements', title: 'Log supplements', art: supplementsArt, line: summary.supplements,
       options: [
-        { icon: 'bolt', label: 'Rapid entry', onClick: onRapidEntry },
-        { icon: 'mic', label: 'Talk me through it', onClick: onTalkMode },
-        { icon: 'symptoms', label: 'Full list', onClick: onSymptomList, deep: true },
+        { icon: 'yesterday', label: 'Match yesterday', onClick: onMatchYesterday },
+        { icon: 'protocol', label: 'Simple checklist', onClick: onSimpleChecklist },
+        { icon: 'more', label: 'Full detail', onClick: onProtocolDetail, deep: true },
       ],
     },
     {
@@ -61,11 +61,11 @@ export default function Home({
       ],
     },
     {
-      id: 'supplements', title: 'Log supplements', art: supplementsArt, line: summary.supplements,
+      id: 'symptoms', title: 'Log symptoms', art: symptomsArt, line: summary.symptoms,
       options: [
-        { icon: 'yesterday', label: 'Match yesterday', onClick: onMatchYesterday },
-        { icon: 'protocol', label: 'Simple checklist', onClick: onSimpleChecklist },
-        { icon: 'more', label: 'Full detail', onClick: onProtocolDetail, deep: true },
+        { icon: 'bolt', label: 'Rapid entry', onClick: onRapidEntry },
+        { icon: 'mic', label: 'Talk me through it', onClick: onTalkMode },
+        { icon: 'symptoms', label: 'Full list', onClick: onSymptomList, deep: true },
       ],
     },
   ];

@@ -55,7 +55,7 @@
 
 /* Advanced-mode shatter (shatter.js): the tiles fly on a layer over everything but the sheets,
    swallowing taps; the screen underneath is held invisible until they land, then fades in. */
-.fx-layer { position: fixed; inset: 0; z-index: 250; perspective: 900px; }
+.fx-layer { position: fixed; inset: 0; z-index: 150; perspective: 900px; }
 .fx-tile { position: absolute; left: 0; top: 0; transform-origin: 0 0; background-repeat: no-repeat; will-change: transform; }
 .fx-tile i { position: absolute; inset: 0; opacity: 0; }
 .fx-ring { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 2px solid rgba(255,255,255,.7); }

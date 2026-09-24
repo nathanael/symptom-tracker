@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Insights line — mobile options</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #08090a; color: #e5e7eb; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 1240px; margin: 0 auto; padding: 20px 12px 60px; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 28px 20px; }
+  .opt > h2 { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: #f3f4f6; }
+  .opt > p { margin: 0 0 12px; font-size: 12px; color: #6b7280; min-height: 34px; }
+  .phone { border: 1px solid rgba(255,255,255,.07); border-radius: 18px; padding: 12px; background: #0b0c0e; }
+  svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+  /* stub of the chart above, so the block is seen in context */
+  .chart { height: 150px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); position: relative; overflow: hidden; margin-bottom: 10px; }
+  .chart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .chart .flag { position: absolute; top: 0; bottom: 0; width: 2px; background: #a78bfa; opacity: .35; }
+  .chart .flag.on { opacity: 1; }
+
+  .delta { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .good { color: #34d399; } .bad { color: #d4a017; }
+  .mark { flex: none; width: 2px; border-radius: 1px; background: #a78bfa; }
+
+  /* ── Current ── */
+  .cur { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; width: 100%; min-height: 44px; padding: 9px 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); background: none; color: #9ca3af; text-align: left; }
+  .cur b { font-weight: 500; color: #f3f4f6; }
+  .cur .mark { height: 14px; }
+  .cur svg { width: 14px; height: 14px; margin-left: auto; stroke: #6b7280; }
+
+  /* ── shared pieces for the options ── */
+  .title { font-size: 11px; letter-spacing: .4px; text-transform: uppercase; color: #6b7280; }
+  .count { font-size: 11px; color: #6b7280; font-variant-numeric: tabular-nums; }
+  .since { font-size: 12.5px; color: #9ca3af; }
+  .movers { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 15px; font-weight: 500; color: #f3f4f6; }
+
+  /* ── A: titled card, full-height next button ── */
+  .a { display: flex; align-items: stretch; width: 100%; padding: 0; border-radius: 12px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.025); text-align: left; overflow: hidden; }
+  .a .body { flex: 1; min-width: 0; display: flex; gap: 10px; padding: 11px 12px 12px; }
+  .a .txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .a .head { display: flex; gap: 8px; align-items: baseline; }
+  .a .next { flex: none; width: 56px; display: grid; place-items: center; border-left: 1px solid rgba(255,255,255,.07); color: #d1d5db; background: rgba(255,255,255,.03); }
+  .a:active .next { background: rgba(255,255,255,.08); }
+  .a .next svg { width: 24px; height: 24px; stroke-width: 2.2; }
+
+  /* ── B: title row with a prev / next stepper (same control as the date stepper) ── */
+  .b { border-radius: 12px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.025); }
+  .b .head { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .b .head .count { margin-left: auto; }
+  .step { display: flex; height: 36px; border-radius: 9px; border: 1px solid rgba(255,255,255,.1); overflow: hidden; }
+  .step button { width: 44px; border: 0; background: none; display: grid; place-items: center; color: #d1d5db; }
+  .step button + button { border-left: 1px solid rgba(255,255,255,.1); }
+  .step button:active { background: rgba(255,255,255,.08); }
+  .step svg { width: 18px; height: 18px; }
+  .b .body { display: flex; gap: 10px; padding: 11px 12px 12px; }
+  .b .txt { display: flex; flex-direction: column; gap: 3px; }
+
+  /* ── C: section heading outside, result first, round next button, dots ── */
+  .c-head { display: flex; align-items: baseline; justify-content: space-between; padding: 6px 2px 8px; }
+  .c-head h3 { margin: 0; font-size: 15px; font-weight: 600; color: #f3f4f6; letter-spacing: -.01em; }
+  .c { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 12px 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.025); text-align: left; }
+  .c .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .c .movers { font-size: 16px; }
+  .c .since { display: flex; align-items: center; gap: 7px; }
+  .c .since .mark { height: 12px; }
+  .c .next { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: rgba(139,92,246,.16); border: 1px solid rgba(139,92,246,.4); color: #c4b5fd; }
+  .c:active .next { background: rgba(139,92,246,.3); }
+  .c .next svg { width: 22px; height: 22px; stroke-width: 2.4; }
+  .dots { display: flex; justify-content: center; gap: 5px; padding-top: 9px; }
+  .dots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.14); }
+  .dots i.on { width: 14px; border-radius: 3px; background: #a78bfa; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <section class="opt">
+    <h2>Current</h2>
+    <p>For reference. 14px grey chevron; when the text wraps it drops to the last line.</p>
+    <div class="phone">
+      <div class="chart"><i class="flag" style="left:22%"></i><i class="flag on" style="left:48%"></i><i class="flag" style="left:80%"></i>
+        <svg viewBox="0 0 300 150" preserveAspectRatio="none"><path d="M0 60 C40 40 70 90 110 70 S170 100 200 95 S260 120 300 110" stroke="#60a5fa"/><path d="M0 95 C50 105 80 70 120 80 S190 60 230 72 S280 50 300 55" stroke="#f59e0b"/></svg></div>
+      <button class="cur"><span class="mark"></span><span>Since Magnesium 400 mg started</span><b>Headache <span class="delta good">▼0.8</span></b><b>Brain fog <span class="delta bad">▲0.4</span></b><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+  </section>
+
+  <section class="opt">
+    <h2>A · Titled card, full-height Next</h2>
+    <p>Small "Insights" label + position. The whole right edge is a 56px next button, always vertically centred.</p>
+    <div class="phone">
+      <div class="chart"><i class="flag" style="left:22%"></i><i class="flag on" style="left:48%"></i><i class="flag" style="left:80%"></i>
+        <svg viewBox="0 0 300 150" preserveAspectRatio="none"><path d="M0 60 C40 40 70 90 110 70 S170 100 200 95 S260 120 300 110" stroke="#60a5fa"/><path d="M0 95 C50 105 80 70 120 80 S190 60 230 72 S280 50 300 55" stroke="#f59e0b"/></svg></div>
+      <button class="a">
+        <span class="body"><span class="mark"></span>
+          <span class="txt">
+            <span class="head"><span class="title">Insights</span><span class="count">2 of 3</span></span>
+            <span class="movers"><span>Headache <span class="delta good">▼0.8</span></span><span>Brain fog <span class="delta bad">▲0.4</span></span></span>
+            <span class="since">since Magnesium 400 mg started · Sep 3</span>
+          </span>
+        </span>
+        <span class="next"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </button>
+    </div>
+  </section>
+
+  <section class="opt">
+    <h2>B · Title bar with back / next stepper</h2>
+    <p>Reuses the date-stepper control from the top of the tab. Adds going back, which today's single chevron can't do.</p>
+    <div class="phone">
+      <div class="chart"><i class="flag" style="left:22%"></i><i class="flag on" style="left:48%"></i><i class="flag" style="left:80%"></i>
+        <svg viewBox="0 0 300 150" preserveAspectRatio="none"><path d="M0 60 C40 40 70 90 110 70 S170 100 200 95 S260 120 300 110" stroke="#60a5fa"/><path d="M0 95 C50 105 80 70 120 80 S190 60 230 72 S280 50 300 55" stroke="#f59e0b"/></svg></div>
+      <div class="b">
+        <div class="head"><span class="title">Insights</span><span class="count">2 of 3</span>
+          <div class="step"><button aria-label="Previous insight"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button><button aria-label="Next insight"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button></div>
+        </div>
+        <div class="body"><span class="mark"></span>
+          <span class="txt">
+            <span class="movers"><span>Headache <span class="delta good">▼0.8</span></span><span>Brain fog <span class="delta bad">▲0.4</span></span></span>
+            <span class="since">since Magnesium 400 mg started · Sep 3</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="opt">
+    <h2>C · Section heading, result first, round Next</h2>
+    <p>"Insights" as a real heading. Result leads, cause underneath. Purple 44px button ties to the purple flag on the chart; dots show position.</p>
+    <div class="phone">
+      <div class="chart"><i class="flag" style="left:22%"></i><i class="flag on" style="left:48%"></i><i class="flag" style="left:80%"></i>
+        <svg viewBox="0 0 300 150" preserveAspectRatio="none"><path d="M0 60 C40 40 70 90 110 70 S170 100 200 95 S260 120 300 110" stroke="#60a5fa"/><path d="M0 95 C50 105 80 70 120 80 S190 60 230 72 S280 50 300 55" stroke="#f59e0b"/></svg></div>
+      <div class="c-head"><h3>Insights</h3><span class="count">2 of 3 protocol changes</span></div>
+      <button class="c">
+        <span class="txt">
+          <span class="movers"><span>Headache <span class="delta good">▼0.8</span></span><span>Brain fog <span class="delta bad">▲0.4</span></span></span>
+          <span class="since"><span class="mark"></span>since Magnesium 400 mg started · Sep 3</span>
+        </span>
+        <span class="next"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
+      </button>
+      <div class="dots"><i></i><i class="on"></i><i></i></div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

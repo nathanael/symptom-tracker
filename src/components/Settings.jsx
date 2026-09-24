@@ -3,7 +3,7 @@ import './desktopNav.css';
 import './settings.css';
 import { isDeleted, liveItems, countEntriesFor, daysUntilPurge, RETENTION_DAYS } from '../utils/softDelete';
 import { trackingModes, SLEEP_ENABLED } from '../utils/constants';
-import { isStandalone, getDateKey, haptic, generateAIDataExport } from '../utils/helpers';
+import { isStandalone, getDateKey, haptic, generateAIDataExport, updateApp } from '../utils/helpers';
 import { mergeSupplements, previewMerge } from '../utils/supplementTools';
 import { listSnapshots, restoreSnapshot, saveSnapshot } from '../utils/snapshots';
 import { APP_VERSION } from '../version';
@@ -384,18 +384,7 @@ export default function Settings({
     if (checkingForUpdates) return;
     setCheckingForUpdates(true);
     haptic('light');
-
-    sessionStorage.setItem('justCheckedForUpdates', 'true');
-
-    if ('caches' in window) {
-      const names = await caches.keys();
-      await Promise.all(names.map(name => caches.delete(name)));
-    }
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map(reg => reg.unregister()));
-    }
-    window.location.reload(true);
+    await updateApp();
   };
 
   const copyForAI = (days) => {

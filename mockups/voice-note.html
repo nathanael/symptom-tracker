@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice note — mockups</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #050506; color: #e5e7eb; font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  .page { display: flex; flex-wrap: wrap; justify-content: center; gap: 36px 24px; padding: 20px 12px 60px; }
+  .opt { width: 375px; }
+  .opt > h2 { margin: 0 0 2px; font-size: 14px; font-weight: 600; color: #f3f4f6; }
+  .opt > p { margin: 0 0 12px; font-size: 12px; color: #6b7280; min-height: 52px; }
+  .phone { position: relative; width: 375px; height: 812px; overflow: hidden; border: 1px solid rgba(255,255,255,.1); border-radius: 36px; background: #08090a; }
+  svg.i { width: 22px; height: 22px; fill: currentColor; flex: none; }
+
+  /* Home cards (stand-ins for the photos) */
+  .home { position: absolute; inset: 0; padding: 32px 12px 0; display: flex; flex-direction: column; gap: 12px; }
+  .card { flex: 1; border-radius: 22px; display: grid; place-items: center; font-size: 25px; font-weight: 700; color: #fff; letter-spacing: -.01em; }
+  .c1 { background: linear-gradient(160deg, #3b2f2a, #15110f); }
+  .c2 { background: linear-gradient(160deg, #1f2a25, #0d1210); }
+  .c3 { background: linear-gradient(160deg, #3a3a26, #15150d); }
+  .home .spacer { height: 70px; flex: none; }
+
+  /* Dock */
+  .dock { position: absolute; left: 0; right: 0; bottom: 0; padding: 28px 14px 14px; background: linear-gradient(to top, #08090a 62%, transparent); }
+  .dock-in { display: flex; align-items: center; gap: 10px; }
+  .glass { border: 1px solid rgba(255,255,255,.12); background: rgba(23,25,28,.94); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  .adv { flex: 1; height: 54px; border-radius: 22px; display: grid; place-items: center; font-size: 15px; font-weight: 600; color: #e5e7eb; }
+  .more { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: #9ca3af; flex: none; }
+  .note { width: 108px; height: 54px; border-radius: 22px; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 15px; font-weight: 600; flex: none; }
+  .note.plain { color: #e5e7eb; }
+  .note.accent { color: #fff; background: linear-gradient(135deg, #7c3aed, #a855f7); border-color: rgba(255,255,255,.18); box-shadow: 0 10px 30px rgba(124,58,237,.35); }
+  .note.red { color: #fecaca; }
+  .note.red .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,.18); }
+  .tag { position: absolute; top: 12px; left: 0; right: 0; text-align: center; font-size: 11px; color: #6b7280; }
+
+  /* Recorder */
+  .rec { position: absolute; inset: 0; display: flex; flex-direction: column; background: radial-gradient(120% 70% at 50% 100%, #1a1030 0%, #08090a 60%); }
+  .rec.b { background: radial-gradient(120% 60% at 50% 55%, #0b1b2a 0%, #08090a 65%); }
+  .top { display: flex; align-items: center; justify-content: space-between; padding: 54px 18px 0; }
+  .x { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; color: #9ca3af; background: rgba(255,255,255,.06); }
+  .x svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+  .when { text-align: center; }
+  .when b { display: block; font-size: 15px; color: #f3f4f6; font-weight: 600; }
+  .when small { font-size: 12px; color: #6b7280; }
+  .timer { font-size: 15px; font-variant-numeric: tabular-nums; color: #f87171; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .timer i { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+  .words { flex: 1; min-height: 0; padding: 28px 24px 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; font-size: 24px; line-height: 1.35; font-weight: 500; letter-spacing: -.01em; color: #f3f4f6; mask-image: linear-gradient(transparent, #000 30%); -webkit-mask-image: linear-gradient(transparent, #000 30%); }
+  .words .old { color: #6b7280; }
+  .words .live { color: #c4b5fd; }
+  .words .caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -3px; background: #a78bfa; animation: blink 1s infinite; }
+  canvas.wave { display: block; width: 100%; flex: none; }
+  .controls { flex: none; display: flex; align-items: center; justify-content: center; gap: 40px; padding: 8px 0 44px; }
+  .ghost { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.06); color: #9ca3af; font-size: 11px; }
+  .stop { width: 78px; height: 78px; border-radius: 50%; display: grid; place-items: center; border: 3px solid rgba(255,255,255,.85); }
+  .stop i { width: 30px; height: 30px; border-radius: 8px; background: #ef4444; }
+
+  /* Review */
+  .rev { position: absolute; inset: 0; display: flex; flex-direction: column; background: #08090a; }
+  .rev h3 { margin: 0; font-size: 15px; color: #f3f4f6; }
+  .edit { margin: 22px 16px 0; flex: 1; min-height: 0; padding: 16px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); font-size: 18px; line-height: 1.5; color: #f3f4f6; }
+  .edit .hl { background: rgba(167,139,250,.25); border-radius: 4px; padding: 0 2px; }
+  .strip { margin: 12px 16px 0; height: 44px; border-radius: 12px; background: rgba(255,255,255,.04); display: flex; align-items: center; gap: 2px; padding: 0 12px; }
+  .strip span { flex: 1; border-radius: 2px; background: #6b7280; }
+  .dest { margin: 12px 18px 0; font-size: 12px; color: #6b7280; }
+  .dest b { color: #9ca3af; font-weight: 500; }
+  .acts { display: flex; gap: 10px; padding: 16px 16px 40px; }
+  .acts div { flex: 1; height: 54px; border-radius: 18px; display: grid; place-items: center; font-size: 16px; font-weight: 600; }
+  .discard { background: rgba(255,255,255,.06); color: #d1d5db; }
+  .save { background: #8b5cf6; color: #fff; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <section class="opt">
+    <h2>Dock 1 · "Note" pill, quiet</h2>
+    <p>Same glass as Advanced mode and ⋯. 108px wide (two circles), 22px corners like the Advanced mode pill. Mic icon + "Note".</p>
+    <div class="phone"><div class="home"><div class="card c1">Log symptoms</div><div class="card c2">Log a meal</div><div class="card c3">Log supplements</div><div class="spacer"></div></div>
+      <div class="dock"><div class="dock-in">
+        <div class="adv glass">Advanced mode</div>
+        <div class="note glass plain"><svg class="i" viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.08A7 7 0 0 0 19 11Z"/></svg>Note</div>
+        <div class="more glass"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></div>
+      </div></div></div>
+  </section>
+
+  <section class="opt">
+    <h2>Dock 2 · "Note" pill, accent</h2>
+    <p>Same size and shape, in the app's purple so it reads as the main thing to press on Home.</p>
+    <div class="phone"><div class="home"><div class="card c1">Log symptoms</div><div class="card c2">Log a meal</div><div class="card c3">Log supplements</div><div class="spacer"></div></div>
+      <div class="dock"><div class="dock-in">
+        <div class="adv glass">Advanced mode</div>
+        <div class="note glass accent"><svg class="i" viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4Zm7-4a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.08A7 7 0 0 0 19 11Z"/></svg>Note</div>
+        <div class="more glass"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></div>
+      </div></div></div>
+  </section>
+
+  <section class="opt">
+    <h2>Recorder A · Scrolling bars</h2>
+    <p>Voice Memos style: your voice scrolls in from the right as bars. Live words fill the screen above, newest in purple; earlier sentences fade upward.</p>
+    <div class="phone"><div class="rec">
+      <div class="top"><div class="x"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></div><div class="when"><b>Today's note</b><small>Wed, Sep 24</small></div><div class="timer"><i></i>0:37</div></div>
+      <div class="words"><div><span class="old">Woke up with a mild headache behind the eyes. </span>Took the magnesium last night and slept better than usual, <span class="live">but my stomach felt a bit off after</span><span class="caret"></span></div></div>
+      <canvas class="wave" id="wa" height="170"></canvas>
+      <div class="controls"><div class="stop"><i></i></div></div>
+    </div></div>
+  </section>
+
+  <section class="opt">
+    <h2>Recorder B · Flowing ribbon</h2>
+    <p>Three soft layered waves across the middle that swell with your voice, like Siri. Calmer; words sit under it.</p>
+    <div class="phone"><div class="rec b">
+      <div class="top"><div class="x"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></div><div class="when"><b>Today's note</b><small>Wed, Sep 24</small></div><div class="timer"><i></i>0:37</div></div>
+      <canvas class="wave" id="wb" height="260" style="margin-top:40px"></canvas>
+      <div class="words" style="justify-content:flex-start;padding-top:8px;font-size:21px"><div><span class="old">Woke up with a mild headache behind the eyes. </span>Took the magnesium last night and slept better than usual, <span class="live">but my stomach felt a bit off after</span><span class="caret"></span></div></div>
+      <div class="controls"><div class="stop"><i></i></div></div>
+    </div></div>
+  </section>
+
+  <section class="opt">
+    <h2>Recorder C · A's layout, B's ribbon</h2>
+    <p>Words fill the screen from the top, newest at the bottom; the Siri-style ribbon sits just above the stop button where the bars were.</p>
+    <div class="phone"><div class="rec">
+      <div class="top"><div class="x"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></div><div class="when"><b>Today's note</b><small>Wed, Sep 24</small></div><div class="timer"><i></i>0:37</div></div>
+      <div class="words"><div><span class="old">Woke up with a mild headache behind the eyes. </span>Took the magnesium last night and slept better than usual, <span class="live">but my stomach felt a bit off after</span><span class="caret"></span></div></div>
+      <canvas class="wave" id="wc" height="170"></canvas>
+      <div class="controls"><div class="stop"><i></i></div></div>
+    </div></div>
+  </section>
+
+  <section class="opt">
+    <h2>After Stop · Review</h2>
+    <p>The transcript becomes editable text; tap a word to fix it. A still of the recording's waveform. Save appends it to today's note with the time.</p>
+    <div class="phone"><div class="rev">
+      <div class="top"><div class="x"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></div><h3>Review note</h3><div style="width:40px;font-size:12px;color:#6b7280;text-align:right">0:52</div></div>
+      <div class="edit">Woke up with a mild headache behind the eyes. Took the magnesium last night and slept better than usual, but my stomach felt a bit off after <span class="hl">breakfast</span>. Going to skip coffee today and see if that helps.</div>
+      <div class="strip" id="strip"></div>
+      <div class="dest">Adds to <b>today's note</b> as "08:42 — Woke up with…"</div>
+      <div class="acts"><div class="discard">Discard</div><div class="save">Save</div></div>
+    </div></div>
+  </section>
+
+</div>
+<script>
+  // fake voice: bursts of syllables with pauses
+  let t0 = performance.now();
+  const level = (t) => {
+    const s = t / 1000;
+    const phrase = (Math.sin(s * 0.9) + Math.sin(s * 0.37 + 1)) > -0.4 ? 1 : 0.08;
+    const syl = Math.abs(Math.sin(s * 11)) * 0.6 + Math.abs(Math.sin(s * 5.3 + 2)) * 0.4;
+    return Math.min(1, phrase * syl * (0.6 + 0.4 * Math.random()));
+  };
+  const fit = (c) => { const d = Math.min(devicePixelRatio || 1, 2); c.width = c.clientWidth * d; c.height = c.clientHeight * d; const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); return x; };
+  const ca = document.getElementById('wa'), xa = fit(ca);
+  const cb = document.getElementById('wb'), xb = fit(cb);
+  const cc = document.getElementById('wc'), xc = fit(cc);
+  const bars = []; let last = 0, sm = 0;
+  // Siri-style ribbon: three layered waves that swell with the voice
+  const ribbon = (c, x, t, sm) => {
+    const W2 = c.clientWidth, H2 = c.clientHeight, s = t / 1000;
+    x.clearRect(0, 0, W2, H2);
+    x.globalCompositeOperation = 'lighter';
+    [['56,189,248', 1, 0], ['167,139,250', 0.8, 1.7], ['244,114,182', 0.6, 3.1]].forEach(([rgb, k, ph]) => {
+      const amp = (6 + sm * (H2 * 0.36)) * k;
+      x.beginPath();
+      for (let px = 0; px <= W2; px += 3) {
+        const u = px / W2, env = Math.sin(Math.PI * u) ** 2;
+        const y = H2 / 2 + Math.sin(u * 9 + s * 3.2 * k + ph) * amp * env;
+        px ? x.lineTo(px, y) : x.moveTo(px, y);
+      }
+      for (let px = W2; px >= 0; px -= 3) {
+        const u = px / W2, env = Math.sin(Math.PI * u) ** 2;
+        x.lineTo(px, H2 / 2 - Math.sin(u * 9 + s * 3.2 * k + ph) * amp * env * 0.6);
+      }
+      x.closePath();
+      x.fillStyle = `rgba(${rgb},.28)`; x.fill();
+      x.strokeStyle = `rgba(${rgb},.8)`; x.lineWidth = 1.5; x.stroke();
+    });
+    x.globalCompositeOperation = 'source-over';
+  };
+  const frame = (now) => {
+    const t = now - t0, lv = level(t); sm += (lv - sm) * 0.25;
+    // A: scrolling bars, new at right edge, older fade left
+    const W = ca.clientWidth, H = ca.clientHeight, step = 5;
+    if (now - last > 55) { bars.push(lv); last = now; if (bars.length > W / step) bars.shift(); }
+    xa.clearRect(0, 0, W, H);
+    xa.fillStyle = 'rgba(255,255,255,.06)'; xa.fillRect(0, H / 2, W, 1);
+    bars.forEach((v, i) => {
+      const x = W - (bars.length - i) * step, h = Math.max(3, v * (H - 30));
+      const a = 0.25 + 0.75 * (i / bars.length);
+      const g = xa.createLinearGradient(0, H / 2 - h / 2, 0, H / 2 + h / 2);
+      g.addColorStop(0, `rgba(196,181,253,${a})`); g.addColorStop(1, `rgba(139,92,246,${a})`);
+      xa.fillStyle = g; xa.beginPath(); xa.roundRect(x, H / 2 - h / 2, 3, h, 1.5); xa.fill();
+    });
+    ribbon(cb, xb, t, sm);
+    ribbon(cc, xc, t, sm);
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  // review strip: a frozen waveform
+  const strip = document.getElementById('strip');
+  for (let i = 0; i < 70; i++) { const v = level(i * 180 + 400); const e = document.createElement('span'); e.style.height = Math.max(3, v * 30) + 'px'; strip.appendChild(e); }
+</script>
+</body>
+</html>
