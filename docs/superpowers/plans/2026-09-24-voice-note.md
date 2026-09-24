@@ -1150,7 +1150,8 @@ export default function VoiceNote({ onSave, onClose, onTypeInstead }) {
       },
       // Only while listening: once Stop is pressed the ribbon settles even though the mic is open
       onLevel: (value) => { levelRef.current = live.current.phase === 'listening' ? value : 0; },
-      // A drop can be reported mid-handshake too; start() rejecting covers that case
+      // Only a drop while listening means "keep what was heard". A handshake that dies stays on
+      // "Getting ready…" until ×, as talk mode does today.
       onDropped: () => {
         if (disposed || live.current.phase !== 'listening') return;
         setDropped(true);
