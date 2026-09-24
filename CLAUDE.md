@@ -11,5 +11,6 @@ When committing changes:
    - Everything else reads it from `src/version.js` (`APP_VERSION`, imported from `package.json`): the Settings "About" line, the backup file's `version` field (`backupToFile` in `src/components/Settings.jsx`), and the menu in `src/components/QuickActionsMenu.jsx`. Do not hardcode a version string anywhere else.
 2. Commit and push to main
 3. After every push, always run `npm run build && npm run deploy` to deploy to GitHub Pages
+   - `deploy` uses `gh-pages --add`, so old hashed bundles stay on the site. Keep it: GitHub Pages caches `index.html` for 10 minutes, and a home-screen app still holding the old page asks for the old bundle; if a deploy deleted it, the app loads blank.
 
 Version must be bumped on every deploy, no exceptions. Do not deploy without bumping.
