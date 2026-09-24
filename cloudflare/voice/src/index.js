@@ -3,6 +3,7 @@
 //
 //   POST /gemini-token   -> { secret, model }   Gemini Live   (secret GEMINI_API_KEY)
 //   POST /token          -> { secret }          OpenAI realtime (secret OPENAI_API_KEY)
+//   POST /transcribe-token -> { secret }        OpenAI transcription-only session, for voice notes
 //
 // Deploy: `npx wrangler deploy` in this folder. Secrets: `npx wrangler secret put GEMINI_API_KEY`.
 import { createRemoteJWKSet, jwtVerify } from 'jose';
@@ -13,9 +14,9 @@ const FIREBASE_PROJECT = 'symptoms-dae26';
 const ORIGINS = ['https://nathanael.github.io', 'http://localhost:5173'];
 // Per user, per UTC day. A backstop against a leaked login running up a bill, not a usage limit:
 // it has to sit well above a heavy day of testing (every session start counts, finished or not).
-// `sessions` is talk mode; `meals` is photo/text meal analysis. Separate counters so a heavy day
-// of one never locks out the other.
-const DAILY_CAPS = { sessions: 150, meals: 50 };
+// `sessions` is talk mode; `meals` is photo/text meal analysis; `notes` is voice notes. Separate
+// counters so a heavy day of one never locks out the other.
+const DAILY_CAPS = { sessions: 150, meals: 50, notes: 100 };
 
 // Model ids change often: override with vars in wrangler.toml rather than in code
 const DEFAULTS = {
@@ -166,6 +167,26 @@ const openaiToken = async (env, uid) => {
   return Response.json({ secret: data.value, expiresAt: data.expires_at, model: session.model, engine: 'realtime' });
 };
 
+// Voice notes: a transcription-only session. Speech in, text out; no model ever answers. Server
+// VAD commits a stretch at each pause so the app gets it back sentence by sentence.
+const transcribeToken = async (env, uid) => {
+  requireKey(env, 'OPENAI_API_KEY');
+  await spend(env, uid, 'notes', 1, "You've hit today's voice-note limit. It resets at midnight UTC.");
+  const model = setting(env, 'TALK_TRANSCRIBE_MODEL');
+  const session = {
+    type: 'transcription',
+    audio: {
+      input: {
+        transcription: { model },
+        noise_reduction: { type: 'near_field' },
+        turn_detection: { type: 'server_vad', silence_duration_ms: 700 },
+      },
+    },
+  };
+  const data = await (await openai(env, '/realtime/client_secrets', { session })).json();
+  return Response.json({ secret: data.value, expiresAt: data.expires_at, model });
+};
+
 // A conversation's timeline from the app, kept two weeks for debugging. The same id is written
 // repeatedly as the session goes on; read them back with
 //   npx wrangler kv key list --binding VOICE_USAGE --remote --prefix log:
@@ -234,7 +255,7 @@ const meal = async (env, uid, body) => {
   }
 };
 
-const routes = { 'gemini-token': geminiToken, token: openaiToken, log: saveLog, meal };
+const routes = { 'gemini-token': geminiToken, token: openaiToken, 'transcribe-token': transcribeToken, log: saveLog, meal };
 
 const cors = (req) => {
   const origin = req.headers.get('Origin') || '';
