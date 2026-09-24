@@ -32,14 +32,19 @@ Mobile Home only. Desktop and Advanced mode are unchanged.
 
 - **Note pill**: 108px wide (two circles), 54px tall, 22px radius — the same
   corners as the Advanced mode pill. Fill `linear-gradient(135deg, #7c3aed,
-  #a855f7)`, white mic icon (a new `solar.mic` entry in `solarIcons.jsx`) and
+  #a855f7)`, white mic icon (the existing `solar.mic` in `solarIcons.jsx`) and
   the label "Note", 15px/600.
+- At 320px wide the row leaves the Advanced mode pill about 110px, so below a
+  360px viewport its label drops to 14px and the gaps to 8px. Checked in the
+  preview at 320×568.
 - It is a new `mn-note` button rendered only while the dock is in its Home
   (`easy`) state. When the dock unfolds into the tab list for Advanced mode, the
   pill fades and collapses to zero width with the same timing as `.mn-adv`, so
   the tabs get the full width back. `prefers-reduced-motion` swaps instantly.
 - Tapping it calls a new `onVoiceNote` prop, which App wires to
   `setShowVoiceNote(true)`.
+- `VoiceNote` takes `onSave(text)`, `onClose()` and `onTypeInstead()`. App's
+  `onTypeInstead` closes the recorder and calls `setShowNoteModal(true)`.
 
 ## Recorder screen (`VoiceNote.jsx`, `voiceNote.css`)
 
@@ -72,19 +77,27 @@ Top to bottom:
 | State | Shown | Leaves by |
 |---|---|---|
 | `connecting` | Header, "Getting ready…", flat ribbon | token + connection ready → `listening`; failure → `error` |
-| `listening` | As above, live words, moving ribbon, running timer | Stop / auto-stop / app hidden → `review`; × → close (confirm if any text) |
+| `listening` | As above, live words, moving ribbon, running timer | Stop / auto-stop / app hidden → `finishing`; × → close (confirm if any text) |
+| `finishing` | Words stay; ribbon eases flat; timer stops; stop button dimmed and disabled; "Finishing…" under the words | last words transcribed, or 3s timeout → `review` |
 | `review` | Header "Review note" + duration; editable textarea with the full transcript; still bar strip of the recording; "Adds to today's note as "08:42 — …""; **Discard** / **Save** | Save → append + toast + close; Discard → close |
 | `error` | The reason, **Type instead** (opens the existing Day notes modal), **Close** | — |
 
-- **Stop** ends the session and goes to `review`. Any partial still in flight
-  is kept: the review text is all completed segments plus the last partial.
-- **×** while `listening`: if any text has arrived, a confirm ("Discard this
-  note?"); otherwise it closes straight away. × in `review` behaves as Discard
-  after the same confirm when the text is non-empty.
-- **Auto-stop** at 10:00 goes to `review`, bounding cost per note.
+- **Stop** does not just close the connection: with server-side turn detection
+  the audio since the last pause has not been committed yet, and closing would
+  drop the final sentence. Stop calls `dictation.finish()` (see Client), which
+  stops sending the mic, commits the remaining audio and waits for it to be
+  transcribed before closing. The review text is every item in order, using
+  the final text where an item completed and its partial where it did not.
+- **×** while `listening`: if any text has arrived, the controls are replaced
+  in place by "Discard this note?" with **Discard** and **Keep recording**
+  (recording carries on underneath); otherwise it closes straight away. × in
+  `review` shows the same prompt with **Discard** / **Keep editing** when the
+  text is non-empty. No native `confirm()`.
+- **Auto-stop** at 10:00 goes through `finishing` like Stop, bounding cost per
+  note.
 - **App hidden** (`visibilitychange` → hidden): iOS takes the mic away from a
-  backgrounded PWA, so the session is stopped and the screen goes to `review`
-  with whatever was heard.
+  backgrounded PWA, so it is treated as Stop (`finishing` → `review`). If the
+  connection has already gone, `finish()` resolves at once with what was heard.
 - **Empty review** (nothing heard): the textarea is empty and Save is disabled.
 - The **review strip** is a still of the recording: the mic levels sampled
   every ~150ms during recording, downsampled to ~70 bars, grey.
@@ -146,25 +159,62 @@ same either way.
 ### Client: `src/voice/dictation.js`
 
 ```js
-createDictation({ onPartial, onSegment, onLevel, onError, onEnd })
-  -> { start(), stop() }
+createDictation({ onTranscript, onLevel, onDropped })
+  -> { start(): Promise<void>, finish(): Promise<void>, cancel(): void }
 ```
 
 - `start()`: `post(`${BASE}/transcribe-token`)` via `voiceApi.js`, then
-  `connect({ secret, onEvent, onLevel, onClosed })` from `webrtcConnection.js`
-  (mic up, no remote audio).
-- Events, keyed by `item_id` so out-of-order arrivals land in the right place:
-  - `conversation.item.input_audio_transcription.delta` → appends to that
-    item's partial → `onPartial(text)` with the current partial.
-  - `conversation.item.input_audio_transcription.completed` → the item's final
-    transcript replaces its partial → `onSegment(text)`.
-  - `error` events → `onError(message)`.
-- `stop()`: closes the connection and resolves once closed. Idempotent.
-- The event reducer is a pure function (`reduceTranscript(state, event)`) so it
-  can be unit tested without WebRTC.
+  `connect({ secret, onEvent, onLevel, onClosed, feature: 'voice notes' })`
+  from `webrtcConnection.js` (mic up, no remote audio). It **rejects** on
+  failure, with the `VoiceApiError` from `post` (carrying `status`: 0 offline,
+  401 signed out, 429 over the daily cap) or the `Error` from `connect` (mic or
+  connection). `VoiceNote` maps these to the Errors table.
+- `onTranscript(items)`: called whenever the transcript changes, with the
+  ordered item list (below).
+- `finish()`: the Stop path.
+  1. `connection.setMuted(true)` — stop sending the mic (`replaceTrack(null)`,
+     which `connect` already provides; the capture itself stays open so the
+     level meter settles naturally).
+  2. `connection.send({ type: 'input_audio_buffer.commit' })`. If the buffer
+     is empty the service answers with an error event; during `finish()` that
+     error is ignored.
+  3. Wait until every known item has `completed`, or 3 seconds, whichever is
+     first.
+  4. `connection.close()`; resolve. Idempotent; resolves at once if the
+     connection is already closed.
+- `cancel()`: closes immediately without waiting (×/Discard while recording).
+- `error` events from the service while listening are logged (`console.warn`)
+  and otherwise ignored; only a closed connection ends the note early.
+- `onDropped()`: fires only when the connection closes on its own (the
+  `onClosed` callback from `connect`) — not after `finish()` or `cancel()`.
+  `VoiceNote` then goes straight to `review` with what was heard and shows the
+  "Connection lost" notice.
 
-`VoiceNote.jsx` owns the state machine and display only; it holds the level in
-a ref for the ribbon and the sampled level history for the review strip.
+#### Transcript items
+
+The transcript is a list of items, one per committed stretch of speech, each
+`{ id, text, done }`. A pure reducer does the work so it can be tested without
+WebRTC:
+
+```js
+reduceTranscript(items, event) -> items
+transcriptText(items) -> string   // non-empty texts joined with a space
+```
+
+- **Order** is the order in which an `item_id` is first seen in any event.
+  `input_audio_buffer.committed` arrives before that item's transcription
+  events, so in practice this is commit order; items first seen through a
+  delta or a completion (after a missed commit event) are appended at the end.
+- `input_audio_buffer.committed` → adds `{ id, text: '', done: false }` if new.
+- `conversation.item.input_audio_transcription.delta` → appends `delta` to
+  that item's text (adding the item if new) unless it is already `done`.
+- `conversation.item.input_audio_transcription.completed` → sets the item's
+  text to `transcript` and `done: true`.
+- Anything else → unchanged.
+
+Display: `done` items before the most recent `done` item are grey, the most
+recent `done` item is white, and every item not yet `done` is purple with the
+caret after the last one.
 
 ### Errors
 
@@ -173,31 +223,43 @@ Mapped to one plain sentence on the `error` state, all offering **Type instead**
 | Cause | Message |
 |---|---|
 | Not signed in (401 from `post`) | "Sign in to use voice notes." |
-| Mic blocked / missing | from `micErrorMessage` (reworded: "…to use voice notes.") |
+| Mic blocked / missing | from `micErrorMessage(err, 'voice notes')`: "Microphone access is blocked. Allow it for this site to use voice notes." |
 | Offline / worker unreachable | "Can't reach the voice service. Check your connection." |
 | Daily cap (429) | the worker's message |
-| Connection drops mid-note | not an error screen: go to `review` with what was heard, plus a one-line notice "Connection lost — this is what was heard." |
+| Connection refused or failed to open (`connect`'s own errors) | "Couldn't start voice notes. Try again in a moment." |
+| Anything else | "Something went wrong starting voice notes." |
+| Connection drops mid-note | not an error screen: `onDropped` → `review` with what was heard, plus a one-line notice "Connection lost — this is what was heard." |
 
 ## Files
 
 | File | Change |
 |---|---|
 | `cloudflare/voice/src/index.js` | `transcribeToken` route, `DAILY_CAPS.notes` |
-| `src/voice/dictation.js` | new: token + connection + transcript reducer |
+| `src/voice/dictation.js` | new: token + connection + `finish()` + transcript reducer |
+| `src/voice/webrtcConnection.js` | `micErrorMessage(err, feature = 'talk mode')`; `connect` accepts an optional `feature` and passes it through. Talk mode's wording is unchanged |
 | `src/utils/voiceNote.js` | new: `appendToNote` |
 | `src/components/VoiceNote.jsx`, `voiceNote.css` | new: recorder and review |
 | `src/components/BottomNav.jsx`, `mobileNav.css` | Note pill in the Home dock |
-| `src/components/solarIcons.jsx` | `mic` icon |
 | `src/App.jsx` | `showVoiceNote` state, render `VoiceNote`, save handler, toast |
 
 ## Testing
 
 - `src/utils/__tests__/voiceNote.test.js`: time format (single-digit hours,
   midnight), joining onto empty / existing text, whitespace-only text ignored.
-- `src/voice/__tests__/dictation.test.js`: `reduceTranscript` — deltas
-  accumulate per item, `completed` replaces the partial, interleaved items stay
-  separate and ordered, the review text is completed segments + last partial.
-- Preview: the dock pill on Home and its collapse into Advanced mode; the
+- `src/voice/__tests__/dictation.test.js`:
+  - `reduceTranscript`: deltas accumulate per item; `completed` replaces the
+    partial and sets `done`; a delta after `completed` is ignored; two items
+    streaming at once stay separate; order follows first sighting (commit
+    first, then an item first seen by delta goes last); unknown events leave
+    the list unchanged.
+  - `transcriptText`: joins completed and partial texts in order, skipping
+    empty items.
+  - `finish()` with a stubbed connection: mutes, sends one commit, resolves
+    when the pending item completes, resolves after 3s when it never does,
+    ignores the empty-buffer error, and never calls `onDropped`.
+- `src/voice/__tests__/webrtcConnection` (or alongside existing voice tests):
+  `micErrorMessage` defaults to talk mode wording and uses the given feature.
+- Preview: the dock pill on Home at 375 and 320 wide, and its collapse into Advanced mode; the
   recorder's layout and ribbon at 375×812 and 320×568 with a stubbed dictation;
   review, Save and the appended note in Day notes.
 - On the phone, after `npx wrangler deploy`: real speech in the PWA, locking
