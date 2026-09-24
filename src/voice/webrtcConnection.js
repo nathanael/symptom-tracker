@@ -2,8 +2,9 @@
 // sessions, the model's audio) down. Authenticated with a short-lived client secret.
 const CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
 
-export const micErrorMessage = (err) => {
-  if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') return 'Microphone access is blocked. Allow it for this site to use talk mode.';
+// `feature` names what needs the mic, so talk mode and voice notes each read right
+export const micErrorMessage = (err, feature = 'talk mode') => {
+  if (err?.name === 'NotAllowedError' || err?.name === 'SecurityError') return `Microphone access is blocked. Allow it for this site to use ${feature}.`;
   if (err?.name === 'NotFoundError') return 'No microphone found.';
   return "Couldn't start the microphone.";
 };
@@ -24,12 +25,15 @@ export const primeRemoteAudio = () => {
   remoteAudio.play().catch(() => {});
 };
 
-export const connect = async ({ secret, onEvent, onLevel, onClosed, playRemoteAudio = false }) => {
+export const connect = async ({ secret, onEvent, onLevel, onClosed, playRemoteAudio = false, feature }) => {
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
   } catch (err) {
-    throw new Error(micErrorMessage(err));
+    // Named, so a caller can tell "the mic" apart from "the connection" without matching strings
+    const micError = new Error(micErrorMessage(err, feature));
+    micError.name = 'MicError';
+    throw micError;
   }
 
   const pc = new RTCPeerConnection();
