@@ -69,6 +69,8 @@ import Insights from './components/Insights';
 import Settings from './components/Settings';
 import Export from './components/Export';
 import NoteModal from './components/NoteModal';
+import VoiceNote from './components/VoiceNote';
+import { appendToNote } from './utils/voiceNote';
 import SymptomGraph from './components/SymptomGraph';
 import SupplementGraph from './components/SupplementGraph';
 
@@ -199,6 +201,7 @@ function App() {
   const [showRapidEntry, setShowRapidEntry] = useState(false);
   const [showSimpleProtocol, setShowSimpleProtocol] = useState(false);
   const [showTalkMode, setShowTalkMode] = useState(false);
+  const [showVoiceNote, setShowVoiceNote] = useState(false);
   // null = closed; { key } opens an existing meal for editing; {} opens a fresh capture
   const [mealSheet, setMealSheet] = useState(null);
   // One-shot: Home's "Today's meals" sets this so MealList scrolls itself into view on mount.
@@ -679,6 +682,16 @@ function App() {
     });
   }, [selectedDate, setDailyNotes]);
 
+  // A voice note always lands on today, keyed when it is saved (not when it was started)
+  const saveVoiceNote = useCallback((text) => {
+    const now = new Date();
+    const dateKey = getDateKey(now);
+    setDailyNotes((prev) => ({ ...prev, [dateKey]: { text: appendToNote(noteText(prev[dateKey]), text, now) } }));
+    setShowVoiceNote(false);
+    setCopyToastMessage("Saved to today's note");
+    setTimeout(() => setCopyToastMessage(''), 2250);
+  }, [setDailyNotes]);
+
   // Called from the launch tap itself: iOS only lets talk mode play audio if it starts inside a gesture
   const openTalkMode = useCallback(() => {
     // Only the engine in use: each one's priming touches the phone's audio session
@@ -1121,6 +1134,15 @@ function App() {
         />
       )}
 
+      {/* Voice note (Home dock) */}
+      {showVoiceNote && (
+        <VoiceNote
+          onSave={saveVoiceNote}
+          onClose={() => setShowVoiceNote(false)}
+          onTypeInstead={() => { setShowVoiceNote(false); setShowNoteModal(true); }}
+        />
+      )}
+
       {/* Note Modal */}
       {showNoteModal && (
         <NoteModal
@@ -1524,6 +1546,7 @@ function App() {
           onMatchYesterday={protocolMatchYesterday}
           onEditProtocol={() => { setAppMode('stack'); setShowInsights(false); setProtocolEditMode(true); }}
           onLogMeal={() => setMealSheet({})}
+          onVoiceNote={() => setShowVoiceNote(true)}
           symptoms={liveSymptoms}
           entries={deferredEntries}
           trackingMode={trackingMode}

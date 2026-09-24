@@ -34,6 +34,7 @@ export default function BottomNav({
   onMatchYesterday,
   onEditProtocol,
   onLogMeal,
+  onVoiceNote,
 }) {
   const activeTab = showInsights ? 'insights' : appMode === 'home' ? 'home' : appMode === 'symptoms' ? 'symptoms' : 'stack';
 
@@ -77,6 +78,16 @@ export default function BottomNav({
               Advanced mode
             </button>
           </div>
+          {/* Home only. Always mounted so it can fold away with the tabs, like "Advanced mode" */}
+          <button
+            className={`mn-note${easy ? ' easy' : ''}`}
+            tabIndex={easy ? 0 : -1}
+            aria-hidden={!easy || undefined}
+            aria-label="Record a note"
+            onClick={onVoiceNote}
+          >
+            <svg viewBox="0 0 24 24">{solar.mic}</svg><span>Note</span>
+          </button>
           <button className={`mn-more ${showQuickActions ? 'on' : ''}`} aria-label="More actions" aria-haspopup="menu" onClick={() => setShowQuickActions(!showQuickActions)}>
             <svg viewBox="0 0 24 24">{solar.more}</svg>
           </button>

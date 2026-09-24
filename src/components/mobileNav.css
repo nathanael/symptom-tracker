@@ -43,8 +43,22 @@
 .mn-adv { height: 46px; border: 0; border-radius: 18px; background: none; color: #e5e7eb; font-size: 15px; font-weight: 600; letter-spacing: -.01em; opacity: 0; transform: scale(.94); pointer-events: none; transition: opacity .18s ease, transform .32s cubic-bezier(.22,1,.36,1); }
 .mn-tabs.easy .mn-adv { opacity: 1; transform: none; pointer-events: auto; transition-delay: .16s; }
 .mn-adv:active { background: rgba(255,255,255,.08); }
+/* Home: a purple Note pill between Advanced mode and ⋯, the same height and corners as the
+   Advanced mode pill. Collapses to nothing (width, the dock's 10px gap via the margin, opacity)
+   when the tabs unfold, so they get the full width back. */
+.mn-note { flex: none; width: 0; height: 56px; margin-left: -10px; padding: 0; overflow: hidden; border: 0; border-radius: 22px; background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 15px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; opacity: 0; pointer-events: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 10px 30px rgba(124,58,237,.35); transition: width .32s cubic-bezier(.22,1,.36,1), margin .32s cubic-bezier(.22,1,.36,1), opacity .18s ease; }
+.mn-note.easy { width: 108px; margin-left: 0; opacity: 1; pointer-events: auto; transition-delay: .16s; }
+.mn-note svg { width: 20px; height: 20px; }
+.mn-note:active { filter: brightness(1.12); }
+/* 320pt phones: Advanced mode is left about 110px, so its label and the gaps tighten */
+@media (max-width: 359px) {
+  .mn-dock-in { gap: 8px; }
+  .mn-adv { font-size: 14px; }
+  .mn-note { margin-left: -8px; }
+  .mn-note.easy { margin-left: 0; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .mn-tablist button, .mn-adv { transition: none; }
+  .mn-tablist button, .mn-adv, .mn-note { transition: none; }
 }
 .mn-more { width: 54px; height: 54px; flex: none; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); background: rgba(23,25,28,.94); color: #9ca3af; display: grid; place-items: center; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 .mn-more svg { width: 24px; height: 24px; }
