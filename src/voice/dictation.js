@@ -1,4 +1,5 @@
-import { VoiceApiError } from './voiceApi';
+import { BASE, VoiceApiError, post } from './voiceApi';
+import { connect as rtcConnect } from './webrtcConnection';
 
 // Voice notes: speech in, text out. One OpenAI transcription-only realtime session per note — no
 // model ever answers. The service commits a stretch of speech at each pause and transcribes it as
@@ -49,4 +50,100 @@ export const dictationErrorMessage = (err) => {
   if (err?.name === 'MicError') return err.message;
   if (err instanceof Error) return "Couldn't start voice notes. Try again in a moment.";
   return 'Something went wrong starting voice notes.';
+};
+
+// ── Session ──
+
+export const FINISH_TIMEOUT_MS = 3000;
+
+const fetchToken = async () => (await post(`${BASE}/transcribe-token`, {})).json();
+
+// createDictation({ onTranscript(items), onLevel(0..1), onDropped() })
+//   -> { start(): Promise, finish(): Promise, cancel() }
+// start() rejects with the token or connection error. onDropped fires only when the connection
+// closes on its own while listening — never after finish() or cancel().
+// getToken/connect are injectable for tests.
+export const createDictation = ({ onTranscript, onLevel, onDropped, getToken = fetchToken, connect = rtcConnect, timeoutMs = FINISH_TIMEOUT_MS }) => {
+  let items = [];
+  let connection = null;
+  let cancelled = false;
+  let dropped = false;
+  let finishing = null; // { replied } once finish() has sent its commit
+  let finished = null;
+  const waiters = new Set();
+  const wake = () => waiters.forEach((check) => check());
+
+  const onEvent = (event) => {
+    if (event.type === 'error') {
+      // While finishing, an error is the answer to our commit (nothing was left in the buffer)
+      if (finishing) finishing.replied = true;
+      else console.warn('[dictation]', event.error?.message || event.error?.code || event);
+      wake();
+      return;
+    }
+    if (finishing && event.type === 'input_audio_buffer.committed') finishing.replied = true;
+    const next = reduceTranscript(items, event);
+    if (next !== items) {
+      items = next;
+      onTranscript?.(items);
+    }
+    wake();
+  };
+
+  const onClosed = () => {
+    dropped = true;
+    wake();
+    if (!finishing && !cancelled) onDropped?.();
+  };
+
+  const start = async () => {
+    const { secret } = await getToken();
+    if (cancelled) return;
+    const conn = await connect({ secret, onEvent, onLevel, onClosed, feature: 'voice notes' });
+    // Closed while connecting: never leave the mic running (and billed) behind a closed screen
+    if (cancelled) {
+      conn.close();
+      return;
+    }
+    connection = conn;
+  };
+
+  // The stretch since the last pause has not been committed yet; closing now would lose it. So:
+  // stop sending, commit, wait for the reply, wait for every item to finish — then close.
+  const finish = () => {
+    if (finished) return finished;
+    finished = (async () => {
+      if (!connection) return;
+      if (dropped) {
+        connection.close();
+        return;
+      }
+      finishing = { replied: false };
+      connection.setMuted(true);
+      connection.send({ type: 'input_audio_buffer.commit' });
+      await new Promise((resolve) => {
+        let timer = null;
+        const done = () => {
+          clearTimeout(timer);
+          waiters.delete(check);
+          resolve();
+        };
+        function check() {
+          if (dropped || (finishing.replied && items.every((it) => it.done))) done();
+        }
+        timer = setTimeout(done, timeoutMs);
+        waiters.add(check);
+        check();
+      });
+      connection.close();
+    })();
+    return finished;
+  };
+
+  const cancel = () => {
+    cancelled = true;
+    connection?.close();
+  };
+
+  return { start, finish, cancel };
 };
