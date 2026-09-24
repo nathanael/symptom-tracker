@@ -40,7 +40,7 @@
 .re-key.last::after { content: "last"; position: absolute; bottom: 7px; font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: #6b7280; }
 .re-key.on { background: color-mix(in srgb, var(--c) 20%, #0e0f11); border-color: var(--c); }
 .re-key.on::after { content: "✓"; position: absolute; top: 7px; right: 10px; bottom: auto; font-size: 12px; color: var(--c); }
-.re-key.na { aspect-ratio: auto; height: 60px; font-size: 14px; font-weight: 500; color: #9ca3af; --c: #64748b; }
+.re-key.na { aspect-ratio: auto; height: 78px; font-size: 14px; font-weight: 500; color: #9ca3af; --c: #64748b; }
 /* One box split by hairline dividers: back · next unlogged · forward */
 .re-nav { display: grid; grid-template-columns: 1fr 1.4fr 1fr; border: 1px solid rgba(255,255,255,.07); border-radius: 14px; overflow: hidden; }
 .re-nav button + button { border-left: 1px solid rgba(255,255,255,.07); }

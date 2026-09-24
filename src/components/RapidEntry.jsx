@@ -180,6 +180,11 @@ export default function RapidEntry({
         </div>
 
         <div className="re-pad">
+          <div className="re-nav">
+            <button aria-label="Previous symptom" onClick={() => step(-1)}><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg></button>
+            <button aria-label="Next unlogged symptom" onClick={skipToUnlogged}>Next unlogged<svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" /></svg></button>
+            <button aria-label="Next symptom" onClick={() => step(1)}><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg></button>
+          </div>
           <div className="re-keys">
             {[0, 1, 2, 3, 4, 5].map((severity) => (
               <button
@@ -192,12 +197,7 @@ export default function RapidEntry({
               </button>
             ))}
           </div>
-          <button className={`re-key na ${currentSeverity === NA_SEVERITY ? 'on' : ''}`} onClick={() => rate(NA_SEVERITY)}>N/A</button>
-          <div className="re-nav">
-            <button aria-label="Previous symptom" onClick={() => step(-1)}><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg></button>
-            <button aria-label="Next unlogged symptom" onClick={skipToUnlogged}>Next unlogged<svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" /></svg></button>
-            <button aria-label="Next symptom" onClick={() => step(1)}><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg></button>
-          </div>
+          <button className={`re-key na ${currentSeverity === NA_SEVERITY ? 'on' : ''}`} onClick={() => rate(NA_SEVERITY)}>Not applicable right now</button>
         </div>
       </div>
     </div>
