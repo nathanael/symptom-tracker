@@ -188,6 +188,13 @@ createDictation({ onTranscript, onLevel, onDropped })
   5. Steps 3–4 share one 3-second limit. `connection.close()`; resolve.
      Idempotent; resolves at once if the connection is already closed.
 - `cancel()`: closes immediately without waiting (×/Discard while recording).
+  Called while `start()` is still waiting for the token or the connection, it
+  marks the dictation cancelled; `start()` then closes whatever connection it
+  gets and resolves without reporting anything, so the mic is never left
+  running (and billed) after the recorder has closed. × or the app being
+  hidden during `connecting` uses this path.
+- If the connection drops while `finish()` is waiting, `finish()` resolves at
+  once with what was heard rather than sitting out the 3 seconds.
 - `error` events from the service while listening are logged (`console.warn`)
   and otherwise ignored; only a closed connection ends the note early.
 - `onDropped()`: fires only when the connection closes on its own (the
@@ -215,6 +222,8 @@ transcriptText(items) -> string   // non-empty texts joined with a space
   that item's text (adding the item if new) unless it is already `done`.
 - `conversation.item.input_audio_transcription.completed` → sets the item's
   text to `transcript` and `done: true`.
+- `conversation.item.input_audio_transcription.failed` → `done: true`, keeping
+  whatever partial text it had, so `finish()` does not wait on it.
 - Anything else → unchanged.
 
 Display: `done` items before the most recent `done` item are grey, the most
@@ -241,7 +250,7 @@ Mapped to one plain sentence on the `error` state, all offering **Type instead**
 |---|---|
 | `cloudflare/voice/src/index.js` | `transcribeToken` route, `DAILY_CAPS.notes` |
 | `src/voice/dictation.js` | new: token + connection + `finish()` + transcript reducer |
-| `src/voice/webrtcConnection.js` | `micErrorMessage(err, feature = 'talk mode')`; `connect` accepts an optional `feature` and passes it through, and its mic failure is thrown as an `Error` with `name = 'MicError'` so callers can tell it from connection failures. Talk mode's wording and handling are unchanged |
+| `src/voice/webrtcConnection.js` | `micErrorMessage(err, feature = 'talk mode')`; `connect` accepts an optional `feature` and passes it through, and its mic failure is thrown as an `Error` with `name = 'MicError'` so callers can tell it from connection failures. Talk mode's wording and handling are unchanged. (If the WebSocket fallback is needed, `pcmAudio.js`'s mic error gets the same treatment.) |
 | `src/utils/voiceNote.js` | new: `appendToNote` |
 | `src/components/VoiceNote.jsx`, `voiceNote.css` | new: recorder and review |
 | `src/components/BottomNav.jsx`, `mobileNav.css` | Note pill in the Home dock |
