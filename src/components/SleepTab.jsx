@@ -12,12 +12,21 @@ import {
   symptomLinks, supplementLinks, pearson, mean, shiftDate,
 } from '../utils/sleepInsights';
 
-const RANGE_PRESETS = [['7d', 'Last 7 days'], ['14d', 'Last 14 days'], ['30d', 'Last 30 days'], ['3mo', 'Last 3 months'], ['6mo', 'Last 6 months'], ['1y', 'Last year'], ['all', 'All time']];
+const RANGE_PRESETS = [['7d', 'Last 7 nights'], ['14d', 'Last 14 nights'], ['30d', 'Last 30 nights'], ['3mo', 'Last 3 months'], ['6mo', 'Last 6 months'], ['1y', 'Last year'], ['all', 'All nights']];
 const MODES = [['days', 'Days'], ['weeks', 'Weeks'], ['months', 'Months']];
 const TIP = { background: '#1f2937', border: '1px solid #374151', borderRadius: 6, fontSize: 12 };
 const AXIS = { fill: '#6b7280', fontSize: 11 };
 const hm = (min) => (min == null ? '—' : `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`);
 const shortDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+
+// In daily view, add an empty row for each night Garmin didn't record so the gap shows
+function withGaps(rows, mode, range) {
+  if (mode !== 'days' || !range) return rows;
+  const have = new Map(rows.map((r) => [r.date, r]));
+  const out = [];
+  for (let d = range.start; d <= range.end; d = shiftDate(d, 1)) out.push(have.get(d) || { date: d, missing: true });
+  return out;
+}
 
 const plain = (v) => (v == null ? '—' : Number.isInteger(v) ? String(v) : v.toFixed(1));
 const mins = (sec) => (sec != null ? sec / 60 : null);
@@ -71,6 +80,8 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
   const row = days[nightIdx] || {};
 
   // Window + the equal-length period before it
+  // Every calendar night in the window; Garmin sometimes records nothing for one
+  const windowNights = (r) => (r ? Math.round((new Date(r.end) - new Date(r.start)) / 86400000) + 1 : 0);
   const { visible, prior, range } = useMemo(() => {
     if (!days.length) return { visible: [], prior: [], range: null };
     const r = customRange || rangeForPreset(preset || '14d', minDate, maxDate);
@@ -93,7 +104,8 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
 
   // Chart rows (aggregated for weeks/months), with a 7-point rolling average
   const chartRows = useMemo(() => {
-    const rows = aggregate(visible, mode).map((d) => ({
+    const rows = withGaps(aggregate(visible, mode), mode, range).map((d) => ({
+      missing: !!d.missing,
       date: d.date,
       value: chartValue(metric, d),
       health: mode === 'days' ? healthByDate.get(d.date) ?? null : (() => {
@@ -105,15 +117,16 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
       const win = rows.slice(Math.max(0, i - 6), i + 1).map((x) => x.value).filter((v) => v != null);
       return { ...r, rolling: win.length ? +mean(win).toFixed(1) : null };
     });
-  }, [visible, mode, metric, healthByDate]);
+  }, [visible, mode, metric, healthByDate, range]);
 
-  const stageRows = useMemo(() => aggregate(visible, mode).map((d) => ({
+  const stageRows = useMemo(() => withGaps(aggregate(visible, mode), mode, range).map((d) => ({
     date: d.date,
+    missing: !!d.missing,
     Deep: d.deepSleepSeconds != null ? Math.round(d.deepSleepSeconds / 60) : null,
     REM: d.remSleepSeconds != null ? Math.round(d.remSleepSeconds / 60) : null,
     Light: d.lightSleepSeconds != null ? Math.round(d.lightSleepSeconds / 60) : null,
     Awake: d.awakeSleepSeconds != null ? Math.round(d.awakeSleepSeconds / 60) : null,
-  })), [visible, mode]);
+  })), [visible, mode, range]);
 
   const compare = useMemo(() => {
     if (!range) return null;
@@ -262,7 +275,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
             <button className="sl-range-step" title="Previous period" disabled={!canBack} onClick={() => stepPeriod(-1)}>‹</button>
             <div className="sl-range-wrap">
               <button className="sl-range-btn" onClick={() => setRangeMenu((o) => !o)}>
-                <b>{visible.length} nights</b>
+                <b>{visible.length < windowNights(range) ? `${visible.length} of ${windowNights(range)} nights` : `${visible.length} nights`}</b>
                 <span>{range && `${shortDate(range.start)} – ${shortDate(range.end)}`}</span>
                 <i>▾</i>
               </button>
@@ -339,7 +352,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
       <div className="sl-panel">
         <div className="sl-head">
           <h2 className="sl-trend-title">{metric.chart} Trend</h2>
-          <span className="sl-sub">{range && `${shortDate(range.start)} – ${shortDate(range.end)} · ${visible.length} nights · ${mode === 'days' ? 'daily' : mode === 'weeks' ? 'weekly' : 'monthly'}`}</span>
+          <span className="sl-sub">{range && `${shortDate(range.start)} – ${shortDate(range.end)} · ${visible.length} of ${windowNights(range)} nights recorded · ${mode === 'days' ? 'daily' : mode === 'weeks' ? 'weekly' : 'monthly'}`}</span>
           <button className={`dn-btn sl-push ${overlay ? 'sl-on' : ''}`} onClick={() => setOverlay((o) => !o)}>Overlay Health score</button>
         </div>
         <div className="sl-chart" style={{ height: 280 }}>
@@ -353,11 +366,15 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
               <YAxis yAxisId="m" tick={AXIS} stroke="rgba(255,255,255,.1)" />
               {overlay && <YAxis yAxisId="h" orientation="right" domain={[0, 100]} tick={{ ...AXIS, fill: '#22d3ee' }} stroke="rgba(255,255,255,.1)" />}
               <Tooltip contentStyle={TIP} labelStyle={{ color: '#9ca3af' }} cursor={{ fill: 'rgba(255,255,255,.04)' }}
+                labelFormatter={(d) => (chartRows.find((r) => r.date === d)?.missing ? `${d} · no data recorded` : d)}
                 formatter={(v, name) => [v, name === 'value' ? `${metric.chart}${unitOf(metric) ? ` (${unitOf(metric)})` : ''}` : name === 'rolling' ? '7-point avg' : 'Health score']} />
               {metric.ref != null && <ReferenceLine yAxisId="m" y={metric.ref} stroke="#6b7280" strokeDasharray="5 5" />}
               <Bar yAxisId="m" dataKey="value" fill={metric.color} fillOpacity={0.55} radius={[3, 3, 0, 0]} isAnimationActive={false} />
               <Line yAxisId="m" dataKey="rolling" stroke="rgba(255,255,255,.75)" strokeWidth={2} strokeDasharray="6 4" dot={false} isAnimationActive={false} connectNulls />
               {overlay && <Line yAxisId="h" dataKey="health" stroke="#22d3ee" strokeWidth={2} dot={{ r: 2.5, fill: '#22d3ee' }} isAnimationActive={false} connectNulls />}
+              {chartRows.filter((r) => r.missing).map((r) => (
+                <ReferenceArea key={r.date} yAxisId="m" x1={r.date} x2={r.date} fill="rgba(255,255,255,.05)" label={{ value: 'no data', fill: '#6b7280', fontSize: 10, position: 'insideTop' }} />
+              ))}
               {drag && drag.a !== drag.b && <ReferenceArea yAxisId="m" x1={drag.a} x2={drag.b} fill="rgba(139,92,246,.15)" />}
               {selection && !drag && <ReferenceArea yAxisId="m" x1={selection.s} x2={selection.e} fill="rgba(139,92,246,.12)" stroke="rgba(139,92,246,.5)" />}
             </ComposedChart>
@@ -384,7 +401,11 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
                 <CartesianGrid stroke="rgba(255,255,255,.06)" vertical={false} />
                 <XAxis dataKey="date" tick={AXIS} tickFormatter={(d) => (mode === 'months' ? d : d.slice(5))} stroke="rgba(255,255,255,.1)" minTickGap={12} />
                 <YAxis tick={AXIS} stroke="rgba(255,255,255,.1)" />
-                <Tooltip contentStyle={TIP} labelStyle={{ color: '#9ca3af' }} cursor={{ fill: 'rgba(255,255,255,.04)' }} />
+                <Tooltip contentStyle={TIP} labelStyle={{ color: '#9ca3af' }} cursor={{ fill: 'rgba(255,255,255,.04)' }}
+                  labelFormatter={(d) => (stageRows.find((r) => r.date === d)?.missing ? `${d} · no data recorded` : d)} />
+                {stageRows.filter((r) => r.missing).map((r) => (
+                  <ReferenceArea key={r.date} x1={r.date} x2={r.date} fill="rgba(255,255,255,.05)" label={{ value: 'no data', fill: '#6b7280', fontSize: 10, position: 'insideTop' }} />
+                ))}
                 <Bar dataKey="Deep" stackId="s" fill="#6d28d9" isAnimationActive={false} />
                 <Bar dataKey="REM" stackId="s" fill="#a78bfa" isAnimationActive={false} />
                 <Bar dataKey="Light" stackId="s" fill="#3f3f55" isAnimationActive={false} />
