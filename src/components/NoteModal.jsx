@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { getDateKey, noteText } from '../utils/helpers';
+import './noteModal.css';
 
 // Write a note as a { text } record, or delete the key when the text is empty.
 // The sync engine stamps `_t`; the app never sets it. Deleting an empty note
@@ -16,6 +17,7 @@ function writeNote(setDailyNotes, dateKey, value) {
   });
 }
 
+// Notes: a side panel on desktop, a bottom sheet on mobile
 export default function NoteModal({
   selectedDate,
   dailyNotes,
@@ -25,18 +27,17 @@ export default function NoteModal({
 }) {
   const textareaRef = useRef(null);
   const dateKey = getDateKey(selectedDate);
+  const saved = noteText(dailyNotes[dateKey]);
 
   // Local state for immediate input response
-  const [localNote, setLocalNote] = useState(noteText(dailyNotes[dateKey]));
+  const [localNote, setLocalNote] = useState(saved);
 
   useEffect(() => {
-    // Focus textarea on mount
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-      // Move cursor to end
-      const len = textareaRef.current.value.length;
-      textareaRef.current.setSelectionRange(len, len);
-    }
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
   }, []);
 
   // Track the latest note value for saving on unmount
@@ -60,103 +61,42 @@ export default function NoteModal({
     };
   }, [dateKey, setDailyNotes]);
 
-  const handleNoteChange = (value) => {
-    setLocalNote(value);
-  };
+  const isToday = dateKey === getDateKey(new Date());
+  const longDate = selectedDate.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const pending = localNote.trim() !== saved.trim();
+  const words = localNote.trim() ? localNote.trim().split(/\s+/).length : 0;
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.92)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        padding: '20px',
-        paddingTop: 'calc(60px + env(safe-area-inset-top))',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%',
-          maxWidth: '500px',
-          background: 'rgba(15, 17, 21, 0.95)',
-          borderRadius: '12px',
-          border: '1px solid rgba(99, 102, 241, 0.3)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '16px 20px',
-          borderBottom: '1px solid rgba(100, 116, 139, 0.2)',
-        }}>
-          <h3 style={{
-            color: '#f8fafc',
-            fontSize: '18px',
-            fontWeight: '600',
-            margin: 0,
-          }}>
-            Notes for {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </h3>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#8b5cf6',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              padding: '4px 8px',
-            }}
-          >
-            Done
+    <div className={`nm-scrim ${isDesktop ? 'desk' : 'mob'}`} onClick={onClose}>
+      <section className="nm-panel" role="dialog" aria-modal="true" aria-label={`Notes for ${longDate}`} onClick={(e) => e.stopPropagation()}>
+        {!isDesktop && <div className="nm-grabber" aria-hidden="true" />}
+        <header className="nm-head">
+          <div>
+            <div className="nm-eyebrow">Notes</div>
+            <h2 className="nm-title">{isToday ? 'Today' : longDate}</h2>
+            {isToday && <div className="nm-sub">{longDate}</div>}
+          </div>
+          <button className="nm-close" onClick={onClose} aria-label="Close notes">
+            {isDesktop
+              ? <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              : 'Done'}
           </button>
-        </div>
-
-        {/* Textarea */}
-        <div style={{ padding: '16px 20px 20px' }}>
-          <textarea
-            ref={textareaRef}
-            value={localNote}
-            onChange={(e) => handleNoteChange(e.target.value)}
-            onBlur={onClose}
-            placeholder="Add notes about today... (diet, sleep, stress, activities, etc.)"
-            enterKeyHint="done"
-            style={{
-              width: '100%',
-              minHeight: '300px',
-              background: 'rgba(15, 10, 46, 0.5)',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
-              borderRadius: '8px',
-              padding: '14px',
-              color: '#e2e8f0',
-              fontSize: '15px',
-              lineHeight: '1.6',
-              resize: 'vertical',
-              fontFamily: 'inherit',
-              outline: 'none',
-            }}
-          />
-          <p style={{
-            color: '#64748b',
-            fontSize: '12px',
-            margin: '12px 0 0 0',
-            textAlign: 'center',
-          }}>
-            Notes are saved automatically
-          </p>
-        </div>
-      </div>
+        </header>
+        <textarea
+          ref={textareaRef}
+          className="nm-text"
+          value={localNote}
+          onChange={(e) => setLocalNote(e.target.value)}
+          placeholder="How was the day? Food, sleep, stress, activity, anything that might matter…"
+          enterKeyHint="enter"
+        />
+        <footer className="nm-foot">
+          <span className={`nm-status ${pending ? 'pending' : ''}`}>
+            <i />{pending ? 'Saving…' : localNote.trim() ? 'Saved' : 'Nothing written yet'}
+          </span>
+          <span>{words ? `${words} word${words === 1 ? '' : 's'}` : ''}{isDesktop && <kbd>Esc</kbd>}</span>
+        </footer>
+      </section>
     </div>
   );
 }
