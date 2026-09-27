@@ -3,7 +3,8 @@
 .dn-top { height: 54px; z-index: 200; background: rgba(8,9,10,.98); border-bottom: 1px solid rgba(255,255,255,.07); }
 .dn-context { height: 52px; z-index: 190; background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
 .dn-wrap { max-width: 1080px; height: 100%; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; gap: 10px; }
-.dn-top .dn-wrap { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 16px; }
+.dn-top .dn-wrap { gap: 14px; }
+.dn-top .dn-right { margin-left: auto; }
 .dn-top button, .dn-context button { font-family: inherit; cursor: pointer; }
 
 .dn-brand { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; }

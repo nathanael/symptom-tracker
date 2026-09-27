@@ -107,9 +107,8 @@ export default function DesktopToolbar({
       {/* Layer 1: where am I — identical on every tab */}
       <div className="dn-top">
         <div className="dn-wrap">
-          <div className="dn-brand">
+          <div className="dn-brand" title="Glimpse" aria-label="Glimpse">
             <span className="dn-logo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><circle className="pupil" cx="15.5" cy="11" r="3" /></svg></span>
-            Glimpse
           </div>
 
           <div className="dn-seg" role="tablist">
