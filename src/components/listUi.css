@@ -269,3 +269,12 @@ body.lr-reordering .lr-row:hover { background: none; }
 .lr.mobile .lr-input.lr-gname { width: 124px; font-size: 15px; }
 .lr.mobile .lr-gselect { height: 38px; flex: 1; }
 .lr.mobile .lr-gselect select { font-size: 15px; }
+
+/* Search hits that are hidden or deleted: dimmed, labelled, one click to restore */
+.lr-hidden-match { display: flex; align-items: center; gap: 10px; cursor: default; }
+.lr-hm-name { color: #9ca3af; text-decoration: none; }
+.lr-hm-kind { font-size: 11px; color: #6b7280; }
+.lr-hm-tag { font-size: 11px; font-weight: 500; color: #d1d5db; background: #374151; padding: 1px 7px; border-radius: 4px; white-space: nowrap; }
+.lr-hm-tag.deleted { color: #fca5a5; background: rgba(239,68,68,.12); }
+.lr-hm-restore { margin-left: auto; color: #93c5fd; }
+.lr-hm-restore:hover { color: #fff; background: #2563eb; }

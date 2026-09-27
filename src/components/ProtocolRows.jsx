@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import HiddenSearchResults, { findHiddenMatches } from './HiddenSearchResults';
 import { createPortal } from 'react-dom';
 import './listUi.css';
 import { INPUT_CATEGORIES, VERDICT_COLORS } from '../utils/constants';
@@ -57,6 +58,9 @@ export default function ProtocolRows({
   onClearDay,
   onMatchYesterday,
   onDeleteItem,
+  allStackItems,
+  allInputItems,
+  onRestoreDeleted,
   editing,
   setEditing,
   keyboardEnabled,
@@ -100,6 +104,12 @@ export default function ProtocolRows({
     const logged = inputItems.filter((i) => !activeIds.has(i.id) && inputEntries[`${dateKey}-${i.id}`]);
     return [...active, ...logged].sort(byOrder).filter((i) => matches(i, search));
   }, [inputItems, inputEntries, dateKey, search]);
+
+  // Search also finds hidden and deleted items (not already shown above) so they can be restored in place
+  const hiddenMatches = useMemo(() => {
+    const shown = new Set([...dueItems, ...otherItems, ...factors].map((i) => i.id));
+    return findHiddenMatches(search, [['supplement', allStackItems || stackItems], ['factor', allInputItems || inputItems]], shown);
+  }, [search, allStackItems, allInputItems, stackItems, inputItems, dueItems, otherItems, factors]);
 
   const stripKeys = useMemo(() => getStripDateKeys(selectedDate, 14), [dateKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -552,14 +562,18 @@ export default function ProtocolRows({
         <b>SUPPLEMENTS</b> {takenCount} of {dueItems.length} taken
         {isDesktop && <span>LAST 14 DAYS</span>}
       </div>
-      {dueItems.length === 0 && otherItems.length === 0 && (
+      {dueItems.length === 0 && otherItems.length === 0 && !(search && hiddenMatches.length) && (
         <div className="lr-empty">{search ? `Nothing matches "${search}"` : 'No supplements yet. Use Edit protocol to add one.'}</div>
       )}
       {dueItems.map((item) => renderSupplementRow(item, true))}
       {otherItems.map((item) => renderSupplementRow(item, false))}
       <div className="lr-sec"><b>OTHER FACTORS</b> {loggedCount} of {factors.length} {isToday ? 'today' : 'logged'}</div>
-      {factors.length === 0 && <div className="lr-empty">{search ? `Nothing matches "${search}"` : 'No factors yet.'}</div>}
+      {factors.length === 0 && !(search && hiddenMatches.length) && <div className="lr-empty">{search ? `Nothing matches "${search}"` : 'No factors yet.'}</div>}
       {factors.map(renderFactorRow)}
+      <HiddenSearchResults matches={hiddenMatches} onRestore={(m) => {
+        if (m.deleted) onRestoreDeleted?.(m.kind, m.item);
+        else { patch(m.kind, m.item.id, { active: true }); setLastAction(`Restored ${m.item.name}`); }
+      }} />
       {mealsSlot}
       {isDesktop && (
         <div className="lr-hintbar">

@@ -926,6 +926,9 @@ function App() {
             ) : appMode === 'stack' ? (
               <ProtocolRows
                 stackItems={liveStackItems}
+                allStackItems={stackItems}
+                allInputItems={inputItems}
+                onRestoreDeleted={restoreDeletedItem}
                 setStackItems={setStackItems}
                 stackEntries={deferredStackEntries}
                 setStackEntries={setStackEntries}
@@ -959,6 +962,8 @@ function App() {
             ) : (
               <SymptomRows
                 symptoms={liveSymptoms}
+                allSymptoms={symptoms}
+                onRestoreDeleted={restoreDeletedItem}
                 setSymptoms={setSymptoms}
                 activeSymptoms={activeSymptoms}
                 entries={deferredEntries}
@@ -1041,6 +1046,8 @@ function App() {
             ) : appMode === 'symptoms' ? (
               <SymptomRows
                 symptoms={liveSymptoms}
+                allSymptoms={symptoms}
+                onRestoreDeleted={restoreDeletedItem}
                 setSymptoms={setSymptoms}
                 activeSymptoms={activeSymptoms}
                 entries={deferredEntries}
@@ -1065,6 +1072,9 @@ function App() {
             ) : (
               <ProtocolRows
                 stackItems={liveStackItems}
+                allStackItems={stackItems}
+                allInputItems={inputItems}
+                onRestoreDeleted={restoreDeletedItem}
                 setStackItems={setStackItems}
                 stackEntries={deferredStackEntries}
                 setStackEntries={setStackEntries}

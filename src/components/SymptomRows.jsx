@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
+import HiddenSearchResults, { findHiddenMatches } from './HiddenSearchResults';
 import { createPortal } from 'react-dom';
 import './listUi.css';
 import { NA_SEVERITY } from '../utils/constants';
@@ -42,6 +43,8 @@ export default function SymptomRows({
   onEditNote,
   onClearDay,
   onDeleteSymptom,
+  allSymptoms,
+  onRestoreDeleted,
   editing,
   setEditing,
   keyboardEnabled,
@@ -217,6 +220,16 @@ export default function SymptomRows({
     [symptoms]
   );
   const hiddenSymptoms = useMemo(() => symptoms.filter((s) => !s.active), [symptoms]);
+
+  // Search also finds hidden and deleted symptoms so they can be restored in place
+  const hiddenMatches = useMemo(
+    () => findHiddenMatches(symptomSearch, [['symptom', allSymptoms || symptoms]]),
+    [symptomSearch, allSymptoms, symptoms]
+  );
+  const restoreMatch = (m) => {
+    if (m.deleted) onRestoreDeleted?.('symptom', m.item);
+    else { patchSymptom(m.item.id, { active: true }); setLastAction(`Restored ${m.item.name}`); }
+  };
 
   const patchSymptom = (id, patch) =>
     setSymptoms((prev) => prev.map((s) => (s.id === id ? applySymptomPatch(s, patch) : s)));
@@ -602,7 +615,7 @@ export default function SymptomRows({
     <div ref={rootRef} className={rootClass} style={rootStyle}>
       {bar}
       {activeSymptoms.length === 0 ? (
-        <div className="lr-empty">{symptomSearch ? `No symptoms match "${symptomSearch}"` : 'No symptoms yet. Use Edit symptoms to add one.'}</div>
+        hiddenMatches.length ? null : <div className="lr-empty">{symptomSearch ? `No symptoms match "${symptomSearch}"` : 'No symptoms yet. Use Edit symptoms to add one.'}</div>
       ) : (
         <>
           {!isDesktop && hasGroups && groupByControl}
@@ -732,6 +745,7 @@ export default function SymptomRows({
           )}
         </>
       )}
+      <HiddenSearchResults matches={hiddenMatches} onRestore={restoreMatch} />
     </div>
   );
 }
