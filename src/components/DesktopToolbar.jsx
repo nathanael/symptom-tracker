@@ -107,9 +107,6 @@ export default function DesktopToolbar({
       {/* Layer 1: where am I — identical on every tab */}
       <div className="dn-top">
         <div className="dn-wrap">
-          <div className="dn-brand" title="Glimpse" aria-label="Glimpse">
-            <span className="dn-logo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><circle className="pupil" cx="15.5" cy="11" r="3" /></svg></span>
-          </div>
 
           <div className="dn-seg" role="tablist">
             {(sleepAvailable ? [...TABS, { id: 'sleep', label: 'Sleep' }] : TABS).map((tab) => (
@@ -144,10 +141,11 @@ export default function DesktopToolbar({
                 )}
               </div>
             )}
-            {garminSync && (() => {
+            {/* Garmin sync status only matters on the Sleep tab */}
+            {garminSync && activeTab === 'sleep' && (() => {
               const g = garminStatus(garminSync, garminSleepDays || []);
               return (
-                <button className={`dn-garmin ${g.tone}${garminSync.syncing ? ' syncing' : ''}`} data-tip={garminSync.syncing ? 'Garmin: syncing…' : g.tip} aria-label={g.tip} onClick={() => (sleepAvailable ? handleTabClick('sleep') : onOpenSettings())}>
+                <button className={`dn-garmin ${g.tone}${garminSync.syncing ? ' syncing' : ''}`} data-tip={garminSync.syncing ? 'Garmin: syncing…' : g.tip} aria-label={g.tip} onClick={onOpenSettings}>
                   <span className="dn-dot" />Garmin<small>{garminSync.syncing ? 'Syncing…' : g.label}</small>
                 </button>
               );

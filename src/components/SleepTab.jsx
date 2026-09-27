@@ -68,7 +68,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
   const [compareMode, setCompareMode] = useState(false);
   const [mode, setMode] = useState('days');
   const [active, setActive] = useState('score');
-  const [overlay, setOverlay] = useState(true);
+  const [overlay, setOverlay] = useState(false);
   const [compareTo, setCompareTo] = useState('previous');
   const [drag, setDrag] = useState(null); // { a, b } dates while selecting
   const [selection, setSelection] = useState(null);
@@ -227,7 +227,6 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
           </div>
           <div className="sl-contrib-head">
             <span className="sl-label">Contributors</span>
-            <span className="sl-sub">Green meets the guideline · amber is close · red is well short</span>
           </div>
           <div className="sl-rings">
             {CONTRIBUTORS.map((c) => {
