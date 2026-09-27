@@ -863,6 +863,7 @@ function App() {
           garminSync={GARMIN_SYNC_ENABLED ? garminSync : null}
           garminSleepDays={garminSleepDays}
           showSleep={showSleep && sleepAvailable}
+          editing={!showInsights && ((appMode === 'symptoms' && symptomEditMode) || (appMode === 'stack' && protocolEditMode))}
           setShowSleep={setShowSleep}
           sleepAvailable={sleepAvailable}
         />

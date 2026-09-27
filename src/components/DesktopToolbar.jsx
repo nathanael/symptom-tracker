@@ -64,6 +64,7 @@ export default function DesktopToolbar({
   showSleep,
   setShowSleep,
   sleepAvailable,
+  editing,
 }) {
   const searchRef = useRef(null);
   const isToday = selectedDate.toDateString() === new Date().toDateString();
@@ -164,7 +165,8 @@ export default function DesktopToolbar({
           Sleep carries its own controls inside its cards, like the Garmin dashboard. */}
       {activeTab !== 'sleep' && <div className="dn-context">
         <div className="dn-wrap">
-          {activeTab !== 'insights' && activeTab !== 'sleep' && (
+          {/* Editing a list isn't about a day, so the date stepper steps aside */}
+          {activeTab !== 'insights' && activeTab !== 'sleep' && !editing && (
             <>
               <div className="dn-step">
                 <button aria-label="Previous day" onClick={() => changeDate(-1)}><Chevron points="15 18 9 12 15 6" /></button>

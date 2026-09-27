@@ -520,16 +520,17 @@ export default function SymptomRows({
   );
   const groupByControl = (
     <div className={`dn-seg ${isDesktop ? 'sm' : ''} lr-groupby`} role="group" aria-label="Group symptoms by">
-      <button className={grouped ? '' : 'on'} onClick={() => setGroupBy('order')}>Order</button>
-      <button className={grouped ? 'on' : ''} onClick={() => setGroupBy('groups')}>Groups</button>
+      <button className={grouped ? '' : 'on'} onClick={() => setGroupBy('order')}>Ordered</button>
+      <button className={grouped ? 'on' : ''} onClick={() => setGroupBy('groups')}>Grouped</button>
     </div>
   );
   const bar = barSlot ? createPortal(
     <>
       {editing && <span className="dn-progress"><b>{orderedActive.length}</b> active</span>}
       {isDesktop && (hasGroups || editing) && groupByControl}
-      <span className="lr-spacer" />
+      {/* Grouping help sits with the grouping control it affects */}
       {editing && <button className={`dn-btn ${proposal ? 'on' : ''}`} onClick={() => (proposal ? setProposal(null) : openProposal())}>Suggest grouping</button>}
+      <span className="lr-spacer" />
       {isDesktop && !editing && hasEntriesToday && <button className="dn-btn ghost" onClick={onClearDay}>Clear day</button>}
       {isDesktop && !editing && <button className="dn-btn" onClick={onEditNote}>Notes</button>}
       {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={toggleEdit}>{editing ? 'Done' : 'Edit symptoms'}</button>}
