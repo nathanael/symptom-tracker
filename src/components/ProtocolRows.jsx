@@ -439,9 +439,15 @@ export default function ProtocolRows({
         </span>
       )}
       <span className="lr-spacer" />
-      {isDesktop && !editing && hasAnyToday && <button className="dn-btn ghost" onClick={onClearDay}>Clear day</button>}
-      {isDesktop && !editing && <button className="dn-btn" onClick={onMatchYesterday}>Match yesterday</button>}
-      {!editing && <button className={`dn-btn ${isDesktop ? '' : 'primary'}`} onClick={onCheckAll}>Check all</button>}
+      {/* Clear day, Match yesterday and Check all all set the day's checkmarks, so desktop shows them as one control */}
+      {isDesktop && !editing && (
+        <span className="dn-seg lr-dayacts" role="group" aria-label="Day's checkmarks">
+          {hasAnyToday && <button onClick={onClearDay}>Clear day</button>}
+          <button onClick={onMatchYesterday}>Match yesterday</button>
+          <button onClick={onCheckAll}>Check all</button>
+        </span>
+      )}
+      {!isDesktop && !editing && <button className="dn-btn primary" onClick={onCheckAll}>Check all</button>}
       {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={() => { setEditing(!editing); setExpandedId(null); }}>{editing ? 'Done' : 'Edit protocol'}</button>}
     </>,
     barSlot
@@ -518,7 +524,6 @@ export default function ProtocolRows({
     const entry = inputEntries[`${dateKey}-${item.id}`];
     const count = entry ? entry.count || 1 : 0;
     const focused = isDesktop && focusId === item.id;
-    const category = categoryOf(item.category);
     return (
       <div
         key={item.id}
@@ -527,7 +532,6 @@ export default function ProtocolRows({
         onClick={() => { setFocusId(item.id); if (!isDesktop) setFactorCount(item, count ? 0 : 1); }}
       >
         <div className="lr-name">
-          <i className="lr-dot" style={{ background: category.color }} />
           {item.name}
           {item.verdict && <span className="lr-verdict" style={{ color: VERDICT_COLORS[item.verdict], borderColor: `${VERDICT_COLORS[item.verdict]}55` }}>{item.verdict}</span>}
           {item.description && <small>{item.description}</small>}
