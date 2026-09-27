@@ -2,12 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getFirebaseDb } from '../utils/firebase';
 import { GARMIN_SYNC_ENABLED } from '../utils/constants';
 
-const GARMY_BASE = 'http://localhost:8484';
+export const GARMY_BASE = 'http://localhost:8484';
 const SYNC_INTERVAL = 10 * 60 * 1000; // 10 minutes
 const SHORT_TIMEOUT = 2000; // 2s for server detection
 const SYNC_TIMEOUT = 120000; // 120s for Garmin sync
 
-function transformRecord(record) {
+export function transformRecord(record) {
   return {
     date: record.calendarDate,
     sleepScore: record.sleepScores?.overallScore ?? null,

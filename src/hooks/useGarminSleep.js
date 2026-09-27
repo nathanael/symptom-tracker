@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getFirebaseDb } from '../utils/firebase';
 import { applyFirestoreSnapshot } from '../utils/garminSleepCache';
+import { GARMY_BASE, transformRecord } from './useGarminSync';
 
 const CACHE_KEY = 'garminSleepCache';
 
@@ -70,6 +71,26 @@ export function useGarminSleep(user) {
   }, [user && user.uid]);
 
   useEffect(() => { refetch(); }, [refetch]);
+
+  // Local dev without sign-in: read every night straight from the garmy server
+  useEffect(() => {
+    if (!import.meta.env.DEV || (user && user.uid)) return;
+    let cancelled = false;
+    fetch(`${GARMY_BASE}/api/sleep`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((records) => {
+        if (cancelled || !records.length) return;
+        const local = records
+          .map(transformRecord)
+          .filter((r) => r.date)
+          .map((r) => ({ ...r, syncedAt: r.syncedAt.toISOString() }))
+          .sort((a, b) => a.date.localeCompare(b.date));
+        setDays(local);
+        writeCache(local, null);
+      })
+      .catch(() => { /* garmy server not running — keep whatever is cached */ });
+    return () => { cancelled = true; };
+  }, [user && user.uid]);
 
   useEffect(() => {
     const handler = () => {
