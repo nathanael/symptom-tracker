@@ -1,8 +1,8 @@
 /* Desktop navigation: global top bar (layer 1) + context bar (layer 2) */
 .dn-top, .dn-context { flex-shrink: 0; position: relative; color: #f3f4f6; font-size: 13px; }
-.dn-top { height: 54px; z-index: 200; background: rgba(8,9,10,.98); border-bottom: 1px solid rgba(255,255,255,.07); }
-.dn-context { height: 52px; z-index: 190; background: #0e0f11; border-bottom: 1px solid rgba(255,255,255,.07); }
-.dn-wrap { max-width: 1080px; height: 100%; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; gap: 10px; }
+.dn-top { height: 54px; z-index: 200; background: #111827; border-bottom: 1px solid #1f2937; }
+.dn-context { height: 52px; z-index: 190; background: #111827; border-bottom: 1px solid #1f2937; }
+.dn-wrap { max-width: 1152px; height: 100%; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; gap: 10px; }
 .dn-top .dn-wrap { gap: 14px; }
 .dn-top .dn-right { margin-left: auto; }
 .dn-top button, .dn-context button { font-family: inherit; cursor: pointer; }
@@ -14,62 +14,60 @@
 .dn-logo svg { width: 15px; height: 15px; stroke: #fff; stroke-width: 2.8; }
 .dn-logo svg .pupil { fill: #fff; stroke: none; }
 
-/* Segmented control */
-/* One box, hairline dividers; the active segment is a highlighted section of it, not a button inside it */
-.dn-seg { display: inline-flex; height: 32px; border: 1px solid rgba(255,255,255,.07); border-radius: 9px; overflow: hidden; flex: none; }
-.dn-seg button { height: 100%; padding: 0 16px; border: 0; border-radius: 0; background: none; color: #9ca3af; font-size: 13px; font-weight: 500; transition: color .15s, background .15s; }
-.dn-seg button + button { border-left: 1px solid rgba(255,255,255,.07); }
-.dn-seg button:hover { color: #f3f4f6; background: rgba(255,255,255,.04); }
-.dn-seg button.on { background: rgba(255,255,255,.1); color: #f3f4f6; }
-.dn-seg.sm { height: 28px; border-radius: 8px; }
-.dn-seg.sm button { padding: 0 12px; font-size: 12px; }
+/* Segmented control — Garmi style: one filled gray block, the active part blue */
+.dn-seg { display: inline-flex; height: 32px; border-radius: 4px; overflow: hidden; flex: none; background: #374151; }
+.dn-seg button { height: 100%; padding: 0 12px; border: 0; border-radius: 0; background: none; color: #d1d5db; font-size: 12px; font-weight: 500; transition: color .15s, background .15s; }
+.dn-seg button:hover { background: #4b5563; color: #f3f4f6; }
+.dn-seg button.on { background: #2563eb; color: #fff; }
+.dn-seg.sm { height: 28px; }
+.dn-seg.sm button { padding: 0 10px; font-size: 12px; }
 
 /* Search */
-.dn-search { display: flex; align-items: center; gap: 8px; height: 32px; flex: 0 1 200px; min-width: 120px; padding: 0 8px 0 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.03); color: #6b7280; }
-.dn-search:hover { border-color: rgba(255,255,255,.12); }
-.dn-search:focus-within { border-color: rgba(139,92,246,.6); color: #9ca3af; }
+.dn-search { display: flex; align-items: center; gap: 8px; height: 32px; flex: 0 1 200px; min-width: 120px; padding: 0 8px 0 10px; border-radius: 4px; border: 1px solid transparent; background: #1f2937; color: #6b7280; }
+.dn-search:hover { border-color: #374151; }
+.dn-search:focus-within { border-color: #2563eb; color: #9ca3af; }
 .dn-search input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: #f3f4f6; font: inherit; }
 .dn-search input::placeholder { color: #6b7280; }
-.dn-search kbd { font-family: inherit; font-size: 11px; font-weight: 500; color: #9ca3af; padding: 1px 5px; border-radius: 5px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.07); }
+.dn-search kbd { font-family: inherit; font-size: 11px; font-weight: 500; color: #9ca3af; padding: 1px 5px; border-radius: 3px; background: #374151; border: 0; }
 
 /* Health score chip */
-.dn-score { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 8px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.dn-score { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px 0 8px; border-radius: 4px; background: #1f2937; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .dn-ring { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; }
-.dn-ring::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #08090a; }
+.dn-ring::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #1f2937; }
 .dn-score small { font-size: 11px; font-weight: 500; }
 
 /* Garmin sync pill */
-.dn-garmin { position: relative; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); background: none; color: #f3f4f6; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
-.dn-garmin:hover { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.12); }
+.dn-garmin { position: relative; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px; border-radius: 4px; border: 0; background: #1f2937; color: #f3f4f6; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.dn-garmin:hover { background: #374151; }
 .dn-garmin small { font-size: 11px; font-weight: 500; color: #9ca3af; }
 .dn-dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
 .dn-garmin.ok .dn-dot { background: #22c55e; }
 .dn-garmin.warn .dn-dot { background: #f59e0b; }
-.dn-garmin.syncing .dn-dot { background: #8b5cf6; animation: dn-pulse 1s ease-in-out infinite; }
+.dn-garmin.syncing .dn-dot { background: #3b82f6; animation: dn-pulse 1s ease-in-out infinite; }
 @keyframes dn-pulse { 50% { opacity: .3; } }
-.dn-garmin[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: 38px; right: 0; z-index: 5; white-space: nowrap; font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 6px; background: #1c1e22; border: 1px solid rgba(255,255,255,.12); color: #f3f4f6; }
+.dn-garmin[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: 38px; right: 0; z-index: 5; white-space: nowrap; font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 6px; background: #1f2937; border: 1px solid #374151; color: #f3f4f6; }
 
-/* Buttons */
-.dn-icon { position: relative; width: 32px; height: 32px; flex: none; border: 0; border-radius: 9px; background: none; color: #9ca3af; display: grid; place-items: center; }
-.dn-icon:hover, .dn-icon.on { background: rgba(255,255,255,.06); color: #f3f4f6; }
-.dn-icon.on { box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
-.dn-icon[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: 38px; right: 0; z-index: 5; white-space: nowrap; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: #1c1e22; border: 1px solid rgba(255,255,255,.12); color: #f3f4f6; }
-.dn-btn { height: 32px; padding: 0 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); background: none; color: #9ca3af; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.dn-btn:hover { border-color: rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: #f3f4f6; }
-.dn-btn.ghost { border-color: transparent; }
-.dn-btn.primary { background: #8b5cf6; border-color: transparent; color: #fff; }
-.dn-btn.primary:hover { background: #7c4df0; }
+/* Buttons — Garmi style: filled gray-700, 4px corners, 12px medium text */
+.dn-icon { position: relative; width: 32px; height: 32px; flex: none; border: 0; border-radius: 4px; background: none; color: #9ca3af; display: grid; place-items: center; }
+.dn-icon:hover, .dn-icon.on { background: #374151; color: #f3f4f6; }
+.dn-icon[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: 38px; right: 0; z-index: 5; white-space: nowrap; font-size: 11px; padding: 4px 8px; border-radius: 4px; background: #1f2937; border: 1px solid #374151; color: #f3f4f6; }
+.dn-btn { height: 32px; padding: 0 12px; border-radius: 4px; border: 0; background: #374151; color: #d1d5db; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; transition: background .15s, color .15s; }
+.dn-btn:hover { background: #4b5563; color: #f3f4f6; }
+.dn-btn.ghost { background: none; }
+.dn-btn.ghost:hover { background: #374151; }
+.dn-btn.primary { background: #2563eb; color: #fff; }
+.dn-btn.primary:hover { background: #3b82f6; }
 .dn-split { display: inline-flex; }
-.dn-split > .dn-btn { border-radius: 9px 0 0 9px; }
-.dn-split .dn-btn.caret { border-radius: 0 9px 9px 0; padding: 0 8px; border-left: 1px solid rgba(255,255,255,.25); }
+.dn-split > .dn-btn { border-radius: 4px 0 0 4px; }
+.dn-split .dn-btn.caret { border-radius: 0 4px 4px 0; padding: 0 8px; border-left: 1px solid rgba(255,255,255,.25); }
 
 /* Date stepper */
-.dn-step { display: inline-flex; align-items: center; height: 32px; border: 1px solid rgba(255,255,255,.07); border-radius: 9px; overflow: hidden; flex: none; }
-.dn-step button { height: 100%; padding: 0 8px; border: 0; background: none; color: #9ca3af; display: grid; place-items: center; }
-.dn-step button:hover:not(:disabled) { background: rgba(255,255,255,.06); color: #f3f4f6; }
+.dn-step { display: inline-flex; align-items: center; height: 32px; border-radius: 4px; overflow: hidden; flex: none; background: #374151; }
+.dn-step button { height: 100%; padding: 0 8px; border: 0; background: none; color: #d1d5db; display: grid; place-items: center; }
+.dn-step button:hover:not(:disabled) { background: #4b5563; color: #f3f4f6; }
 .dn-step button:disabled { opacity: .3; cursor: default; }
-.dn-step .dn-date { min-width: 176px; padding: 0 12px; border-left: 1px solid rgba(255,255,255,.07); border-right: 1px solid rgba(255,255,255,.07); display: flex; gap: 8px; align-items: center; justify-content: center; line-height: 1; color: #f3f4f6; font-size: 13px; font-weight: 600; white-space: nowrap; }
-.dn-date small { color: #6b7280; font-weight: 400; font-size: 12px; }
+.dn-step .dn-date { min-width: 176px; padding: 0 12px; border-left: 1px solid #1f2937; border-right: 1px solid #1f2937; display: flex; gap: 8px; align-items: center; justify-content: center; line-height: 1; color: #f3f4f6; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.dn-date small { color: #9ca3af; font-weight: 400; font-size: 12px; }
 
 /* Slot the active view fills: scope on the left, actions on the right */
 .dn-slot { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
@@ -81,8 +79,8 @@
 
 /* Dropdown menu */
 .dn-menu-wrap { position: relative; display: inline-flex; }
-.dn-menu { position: absolute; right: 0; top: 38px; z-index: 10; min-width: 190px; padding: 5px; border-radius: 11px; background: #17191c; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 16px 40px rgba(0,0,0,.6); }
-.dn-menu button { display: block; width: 100%; text-align: left; padding: 7px 10px; border: 0; border-radius: 7px; background: none; color: #f3f4f6; font-size: 13px; }
-.dn-menu button:hover { background: rgba(255,255,255,.06); }
+.dn-menu { position: absolute; right: 0; top: 38px; z-index: 10; min-width: 190px; padding: 5px; border-radius: 6px; background: #1f2937; border: 1px solid #374151; box-shadow: 0 16px 40px rgba(0,0,0,.6); }
+.dn-menu button { display: block; width: 100%; text-align: left; padding: 7px 10px; border: 0; border-radius: 4px; background: none; color: #f3f4f6; font-size: 12px; }
+.dn-menu button:hover { background: #374151; }
 .dn-menu button.danger { color: #f87171; }
-.dn-menu hr { border: 0; border-top: 1px solid rgba(255,255,255,.07); margin: 4px 0; }
+.dn-menu hr { border: 0; border-top: 1px solid #374151; margin: 4px 0; }

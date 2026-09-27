@@ -1,13 +1,13 @@
 /* Desktop Sleep tab — Garmin sleep in Glimpse's desktop palette */
 .sl { display: grid; gap: 14px; color: #f3f4f6; font-size: 13px; }
 .sl-empty { color: #6b7280; padding: 60px 0; text-align: center; }
-.sl-card { background: #0e0f11; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+.sl-card { background: #1f2937; border-radius: 8px; padding: 16px; min-width: 0; }
 .sl-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .sl-head h2 { font-size: 13px; font-weight: 600; margin: 0; }
 .sl-push { margin-left: auto; }
 .sl-sub { color: #6b7280; font-size: 12px; }
 .sl-label { font-size: 11px; color: #6b7280; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; }
-.sl .dn-btn.sl-on { color: #f3f4f6; border-color: rgba(34,211,238,.5); }
+.sl .dn-btn.sl-on { background: #2563eb; color: #fff; }
 .sl, .sl-kpi, .sl-debt, .sl-big { font-variant-numeric: tabular-nums; }
 
 .sl-row1 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; }
@@ -18,7 +18,7 @@
 .sl-donut > span { position: absolute; inset: 0; display: grid; place-items: center; }
 .sl-big { font-size: 34px; font-weight: 700; letter-spacing: -.02em; }
 
-.sl-hero { display: grid; grid-template-columns: auto auto 1fr; gap: 22px; align-items: center; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.sl-hero { display: grid; grid-template-columns: auto auto 1fr; gap: 22px; align-items: center; padding-bottom: 16px; border-bottom: 1px solid #374151; }
 .sl-verdict { font-weight: 600; margin: 1px 0 2px; }
 .sl-debt { font-size: 24px; font-weight: 700; letter-spacing: -.01em; margin: 2px 0 8px; }
 .sl-debt span { font-size: 13px; font-weight: 500; color: #9ca3af; margin-left: 6px; }
@@ -32,7 +32,7 @@
 .sl-ring span { font-size: 11px; color: #6b7280; }
 
 .sl-links { display: grid; gap: 10px; }
-.sl-link { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 11px 12px; border-radius: 9px; background: #15171a; border: 1px solid rgba(255,255,255,.07); }
+.sl-link { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 11px 12px; border-radius: 8px; background: rgba(17,24,39,.6); }
 .sl-link p { margin: 0; }
 .sl-link b { font-weight: 600; }
 .sl-n { color: #6b7280; font-size: 11px; grid-column: 1; }
@@ -41,9 +41,9 @@
 .sl-foot { color: #6b7280; font-size: 11px; margin-top: 10px; }
 
 .sl-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
-.sl-kpi { font: inherit; color: inherit; cursor: pointer; text-align: left; padding: 11px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.07); background: #0e0f11; display: grid; gap: 2px; min-width: 0; transition: border-color .15s; }
-.sl-kpi:hover { border-color: rgba(255,255,255,.12); }
-.sl-kpi.on { border-color: #8b5cf6; background: linear-gradient(rgba(139,92,246,.16), transparent 70%), #0e0f11; }
+.sl-kpi { font: inherit; color: inherit; cursor: pointer; text-align: left; padding: 12px; border-radius: 8px; border: 1px solid transparent; background: #1f2937; display: grid; gap: 2px; min-width: 0; transition: border-color .15s; }
+.sl-kpi:hover { background: #253144; }
+.sl-kpi.on { border-color: #10b981; background: #111827; }
 .sl-kpi-t { font-size: 11px; color: #9ca3af; display: flex; justify-content: space-between; gap: 4px; white-space: nowrap; }
 .sl-kpi-v { font-size: 19px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
 .sl-kpi-v small { font-size: 11px; font-weight: 500; color: #9ca3af; margin-left: 2px; }

@@ -826,7 +826,7 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        background: '#08090A',
+        background: isDesktop ? '#111827' : '#08090A',
         boxShadow: !isDesktop && window.innerWidth > 500 ? '0 0 40px rgba(0,0,0,0.5)' : 'none',
       }}
     >
@@ -893,9 +893,9 @@ function App() {
           WebkitOverflowScrolling: 'touch',
         }}>
           <div style={{
-            maxWidth: showInsights ? '1800px' : '1400px',
+            maxWidth: '1152px', // one width for every desktop view, matching the Garmin dashboard
             margin: '0 auto',
-            padding: '20px 24px',
+            padding: '16px',
             paddingBottom: '80px',
           }}>
             {showSleep && sleepAvailable ? (

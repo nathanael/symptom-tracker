@@ -16,7 +16,7 @@ import {
 
 const PRESETS = ['7d', '14d', '30d', '3mo', '1y', 'all'];
 const MODES = [['days', 'Days'], ['weeks', 'Weeks'], ['months', 'Months']];
-const TIP = { background: '#15171a', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, fontSize: 12 };
+const TIP = { background: '#1f2937', border: '1px solid #374151', borderRadius: 6, fontSize: 12 };
 const AXIS = { fill: '#6b7280', fontSize: 11 };
 const hm = (min) => (min == null ? '—' : `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`);
 const shortDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -41,7 +41,7 @@ function Donut({ size, stroke, pct, color, children }) {
   return (
     <div className="sl-donut" style={{ width: size, height: size }}>
       <svg width={size} height={size}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#23252a" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#374151" strokeWidth={stroke} />
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={`${c * pct} ${c}`} />
       </svg>
       <span>{children}</span>
