@@ -102,7 +102,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
     return map;
   }, [days, symptoms, entries, trackingMode]);
 
-  // Chart rows (aggregated for weeks/months), with a 7-point rolling average
+  // Chart rows (aggregated for weeks/months), with a straight least-squares trend line
   const chartRows = useMemo(() => {
     const rows = withGaps(aggregate(visible, mode), mode, range).map((d) => ({
       missing: !!d.missing,
@@ -113,10 +113,15 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
         return vals.length ? Math.round(mean(vals)) : null;
       })(),
     }));
-    return rows.map((r, i) => {
-      const win = rows.slice(Math.max(0, i - 6), i + 1).map((x) => x.value).filter((v) => v != null);
-      return { ...r, rolling: win.length ? +mean(win).toFixed(1) : null };
-    });
+    const pts = rows.map((r, i) => [i, r.value]).filter(([, v]) => v != null);
+    let slope = 0, icept = null;
+    if (pts.length >= 2) {
+      const mx = mean(pts.map(([x]) => x)), my = mean(pts.map(([, y]) => y));
+      const den = pts.reduce((a, [x]) => a + (x - mx) ** 2, 0);
+      slope = den ? pts.reduce((a, [x, y]) => a + (x - mx) * (y - my), 0) / den : 0;
+      icept = my - slope * mx;
+    }
+    return rows.map((r, i) => ({ ...r, trend: icept == null ? null : +(icept + slope * i).toFixed(1) }));
   }, [visible, mode, metric, healthByDate, range]);
 
   const stageRows = useMemo(() => withGaps(aggregate(visible, mode), mode, range).map((d) => ({
@@ -367,10 +372,10 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
               {overlay && <YAxis yAxisId="h" orientation="right" domain={[0, 100]} tick={{ ...AXIS, fill: '#22d3ee' }} stroke="rgba(255,255,255,.1)" />}
               <Tooltip contentStyle={TIP} labelStyle={{ color: '#9ca3af' }} cursor={{ fill: 'rgba(255,255,255,.04)' }}
                 labelFormatter={(d) => (chartRows.find((r) => r.date === d)?.missing ? `${d} · no data recorded` : d)}
-                formatter={(v, name) => [v, name === 'value' ? `${metric.chart}${unitOf(metric) ? ` (${unitOf(metric)})` : ''}` : name === 'rolling' ? '7-point avg' : 'Health score']} />
+                formatter={(v, name) => [v, name === 'value' ? `${metric.chart}${unitOf(metric) ? ` (${unitOf(metric)})` : ''}` : name === 'trend' ? 'Trend' : 'Health score']} />
               {metric.ref != null && <ReferenceLine yAxisId="m" y={metric.ref} stroke="#6b7280" strokeDasharray="5 5" />}
               <Bar yAxisId="m" dataKey="value" fill={metric.color} fillOpacity={0.55} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-              <Line yAxisId="m" dataKey="rolling" stroke="rgba(255,255,255,.75)" strokeWidth={2} strokeDasharray="6 4" dot={false} isAnimationActive={false} connectNulls />
+              <Line yAxisId="m" type="linear" dataKey="trend" stroke="#fff" strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={false} isAnimationActive={false} connectNulls />
               {overlay && <Line yAxisId="h" dataKey="health" stroke="#22d3ee" strokeWidth={2} dot={{ r: 2.5, fill: '#22d3ee' }} isAnimationActive={false} connectNulls />}
               {chartRows.filter((r) => r.missing).map((r) => (
                 <ReferenceArea key={r.date} yAxisId="m" x1={r.date} x2={r.date} fill="rgba(255,255,255,.05)" label={{ value: 'no data', fill: '#6b7280', fontSize: 10, position: 'insideTop' }} />
@@ -382,7 +387,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
         </div>
         <div className="sl-legend">
           <span><i style={{ background: metric.color }} />{mode === 'days' ? 'Night' : mode === 'weeks' ? 'Week avg' : 'Month avg'}</span>
-          <span><i style={{ background: 'rgba(255,255,255,.75)' }} />7-point average</span>
+          <span><i style={{ background: '#fff' }} />Trend</span>
           {overlay && <span><i style={{ background: '#22d3ee' }} />Glimpse Health score (right axis)</span>}
         </div>
         <div className="sl-hint">
