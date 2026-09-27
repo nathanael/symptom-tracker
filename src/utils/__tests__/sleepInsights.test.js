@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sleepBalance, symptomLinks, supplementLinks, contributorStanding, CONTRIBUTORS, pearson, shiftDate } from '../sleepInsights';
+import { sleepBalance, symptomLinks, supplementLinks, contributorStanding, CONTRIBUTORS, pearson, shiftDate, gapRuns, gapLabel } from '../sleepInsights';
 
 const dates = Array.from({ length: 30 }, (_, i) => shiftDate('2026-09-01', i));
 
@@ -63,4 +63,19 @@ describe('contributorStanding', () => {
 
 it('pearson is 1 for a perfect line', () => {
   expect(pearson([1, 2, 3, 4], [2, 4, 6, 8])).toBeCloseTo(1);
+});
+
+describe('gap runs', () => {
+  const rows = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((date, i) => ({ date, missing: [1, 2, 3, 5].includes(i) }));
+  it('merges consecutive missing nights into one run', () => {
+    expect(gapRuns(rows)).toEqual([
+      { start: 'b', end: 'd', endIdx: 3, n: 3 },
+      { start: 'f', end: 'f', endIdx: 5, n: 1 },
+    ]);
+  });
+  it('labels only what fits', () => {
+    expect(gapLabel({ n: 6 }, 20).value).toBe('no data · 6 nights');
+    expect(gapLabel({ n: 1 }, 60).value).toBe('no data');
+    expect(gapLabel({ n: 1 }, 12)).toBeUndefined();
+  });
 });

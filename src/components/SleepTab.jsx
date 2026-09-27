@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ComposedChart, BarChart, LineChart, Bar, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea,
@@ -9,7 +9,7 @@ import { aggregate, rangeForPreset, previousPeriodOf, priorYearPeriodOf, alignBy
 import { computeHealthScore } from '../utils/healthScore';
 import {
   CONTRIBUTORS, contributorStanding, sleepBalance, scoreVerdict, asleepMinutes,
-  symptomLinks, supplementLinks, pearson, mean, shiftDate,
+  symptomLinks, supplementLinks, pearson, mean, shiftDate, gapRuns, gapLabel,
 } from '../utils/sleepInsights';
 
 const RANGE_PRESETS = [['7d', 'Last 7 nights'], ['14d', 'Last 14 nights'], ['30d', 'Last 30 nights'], ['3mo', 'Last 3 months'], ['6mo', 'Last 6 months'], ['1y', 'Last year'], ['all', 'All nights']];
@@ -20,6 +20,26 @@ const hm = (min) => (min == null ? '—' : `${Math.floor(min / 60)}h ${String(Ma
 const shortDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
 // In daily view, add an empty row for each night Garmin didn't record so the gap shows
+function GapAreas({ rows, width, yAxisId }) {
+  const px = rows.length ? width / rows.length : 0;
+  return gapRuns(rows).map((g) => (
+    <ReferenceArea key={g.start} {...(yAxisId ? { yAxisId } : {})} x1={g.start} x2={g.end} fill="rgba(255,255,255,.05)" label={gapLabel(g, px)} />
+  ));
+}
+
+// Callback ref so the width survives the trend chart unmounting while comparing
+function useWidth(fallback) {
+  const [el, setEl] = useState(null);
+  const [width, setWidth] = useState(fallback);
+  useEffect(() => {
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [el]);
+  return [setEl, width];
+}
+
 function withGaps(rows, mode, range) {
   if (mode !== 'days' || !range) return rows;
   const have = new Map(rows.map((r) => [r.date, r]));
@@ -72,6 +92,8 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
   const [compareTo, setCompareTo] = useState('previous');
   const [drag, setDrag] = useState(null); // { a, b } dates while selecting
   const [selection, setSelection] = useState(null);
+  const [chartBox, chartW] = useWidth(1080);
+  const plotW = Math.max(0, chartW - 60); // minus axes
 
   const metric = TILES.find((t) => t.key === active) || TILES[0];
 
@@ -364,7 +386,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
           <span className="sl-sub">{range && `${shortDate(range.start)} – ${shortDate(range.end)} · ${visible.length} of ${windowNights(range)} nights recorded · ${mode === 'days' ? 'daily' : mode === 'weeks' ? 'weekly' : 'monthly'}`}</span>
           <button className={`dn-btn sl-push ${overlay ? 'sl-on' : ''}`} onClick={() => setOverlay((o) => !o)}>Overlay Health score</button>
         </div>
-        <div className="sl-chart" style={{ height: 280 }}>
+        <div className="sl-chart" ref={chartBox} style={{ height: 280 }}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartRows} accessibilityLayer={false} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}
               onMouseDown={(e) => e?.activeLabel && setDrag({ a: e.activeLabel, b: e.activeLabel })}
@@ -381,9 +403,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
               <Bar yAxisId="m" dataKey="value" fill={metric.color} fillOpacity={0.55} radius={[3, 3, 0, 0]} isAnimationActive={false} />
               <Line yAxisId="m" type="linear" dataKey="trend" stroke={chartRows.trendColor} strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={false} isAnimationActive={false} connectNulls />
               {overlay && <Line yAxisId="h" dataKey="health" stroke="#22d3ee" strokeWidth={2} dot={{ r: 2.5, fill: '#22d3ee' }} isAnimationActive={false} connectNulls />}
-              {chartRows.filter((r) => r.missing).map((r) => (
-                <ReferenceArea key={r.date} yAxisId="m" x1={r.date} x2={r.date} fill="rgba(255,255,255,.05)" label={{ value: 'no data', fill: '#6b7280', fontSize: 10, position: 'insideTop' }} />
-              ))}
+              {GapAreas({ rows: chartRows, width: plotW, yAxisId: 'm' })}
               {drag && drag.a !== drag.b && <ReferenceArea yAxisId="m" x1={drag.a} x2={drag.b} fill="rgba(139,92,246,.15)" />}
               {selection && !drag && <ReferenceArea yAxisId="m" x1={selection.s} x2={selection.e} fill="rgba(139,92,246,.12)" stroke="rgba(139,92,246,.5)" />}
             </ComposedChart>
@@ -412,9 +432,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
                 <YAxis tick={AXIS} stroke="rgba(255,255,255,.1)" />
                 <Tooltip contentStyle={TIP} labelStyle={{ color: '#9ca3af' }} cursor={{ fill: 'rgba(255,255,255,.04)' }}
                   labelFormatter={(d) => (stageRows.find((r) => r.date === d)?.missing ? `${d} · no data recorded` : d)} />
-                {stageRows.filter((r) => r.missing).map((r) => (
-                  <ReferenceArea key={r.date} x1={r.date} x2={r.date} fill="rgba(255,255,255,.05)" label={{ value: 'no data', fill: '#6b7280', fontSize: 10, position: 'insideTop' }} />
-                ))}
+                {GapAreas({ rows: stageRows, width: plotW })}
                 <Bar dataKey="Deep" stackId="s" fill="#6d28d9" isAnimationActive={false} />
                 <Bar dataKey="REM" stackId="s" fill="#a78bfa" isAnimationActive={false} />
                 <Bar dataKey="Light" stackId="s" fill="#3f3f55" isAnimationActive={false} />

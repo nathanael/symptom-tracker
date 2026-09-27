@@ -186,4 +186,23 @@ export function supplementLinks(sleepRows, stackItems, stackEntries, { limit = 2
   return [...best.values()].sort((x, y) => y.rel - x.rel).slice(0, limit);
 }
 
+// Consecutive missing nights become one run, so a week off shows as one block with one label
+export function gapRuns(rows) {
+  const runs = [];
+  rows.forEach((r, i) => {
+    if (!r.missing) return;
+    const last = runs[runs.length - 1];
+    if (last && last.endIdx === i - 1) { last.end = r.date; last.endIdx = i; last.n++; }
+    else runs.push({ start: r.date, end: r.date, endIdx: i, n: 1 });
+  });
+  return runs;
+}
+
+// Label a gap only when it has room: "no data · 6 nights", then "no data", then nothing
+export function gapLabel(run, pxPerNight) {
+  const w = run.n * pxPerNight;
+  const value = run.n > 1 && w >= 104 ? `no data · ${run.n} nights` : w >= 46 ? 'no data' : null;
+  return value ? { value, fill: '#6b7280', fontSize: 10, position: 'insideTop' } : undefined;
+}
+
 export { DAY_MS };
