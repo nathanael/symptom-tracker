@@ -9,7 +9,7 @@ const NUMERIC_FIELDS = [
   'sleepScore', 'deepSleepSeconds', 'lightSleepSeconds', 'remSleepSeconds',
   'awakeSleepSeconds', 'averageRespiration', 'lowestRespiration',
   'avgSleepStress', 'averageSpo2', 'lowestSpo2', 'hrvOvernight',
-  'hrvWeeklyAvg', 'restingHr',
+  'hrvWeeklyAvg', 'restingHr', 'bodyBatteryHigh', 'sleepNeedMinutes',
 ];
 
 function bucketKey(dateStr, mode) {

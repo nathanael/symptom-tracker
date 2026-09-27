@@ -68,6 +68,7 @@ import { mealKey, mealDateKey } from './food/mealKey';
 import { mergeBackupMeals } from './food/mealBackup';
 import Calendar from './components/Calendar';
 import Insights from './components/Insights';
+import SleepTab from './components/SleepTab';
 import Settings from './components/Settings';
 import Export from './components/Export';
 import NoteModal from './components/NoteModal';
@@ -195,6 +196,7 @@ function App() {
   // View state
   const [showCalendar, setShowCalendar] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
+  const [showSleep, setShowSleep] = useState(false); // desktop-only Garmin Sleep tab
   const [insightsSubtab, setInsightsSubtab] = useState('studio');
   const [showSettings, setShowSettings] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -272,6 +274,8 @@ function App() {
   const garminSync = useGarminSync(firebase.user);
   // Keeps the local Garmin cache current on every device for Copy for AI / CSV / backup
   const { days: garminSleepDays } = useGarminSleep(GARMIN_SYNC_ENABLED ? firebase.user : null);
+  // The Sleep tab exists only once Garmin nights have synced to this account
+  const sleepAvailable = GARMIN_SYNC_ENABLED && garminSleepDays.length > 0;
 
   // Refs
   const justLoggedRef = useRef(false);
@@ -599,8 +603,8 @@ function App() {
       if (listOwnsKeys && !e.shiftKey && /^[0-5]$/.test(e.key)) return;
       if (listOwnsKeys && trackingMode === 'ampm' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return;
 
-      const tabKey = e.shiftKey && /^Digit[123]$/.test(e.code) ? e.code.slice(-1) : e.key;
-      if (/^[123]$/.test(tabKey)) setShowSettings(false);
+      const tabKey = e.shiftKey && /^Digit[1234]$/.test(e.code) ? e.code.slice(-1) : e.key;
+      if (/^[123]$/.test(tabKey) || (tabKey === '4' && sleepAvailable)) { setShowSettings(false); setShowSleep(false); }
       if (tabKey === '1') {
         setShowInsights(false);
         setAppMode('symptoms');
@@ -609,6 +613,9 @@ function App() {
         setAppMode('protocol');
       } else if (tabKey === '3') {
         setShowInsights(true);
+      } else if (tabKey === '4' && sleepAvailable) {
+        setShowInsights(false);
+        setShowSleep(true);
       } else if (e.key === 'ArrowLeft' || e.key === '[') {
         e.preventDefault();
         changeDate(-1);
@@ -625,12 +632,13 @@ function App() {
         else if (showCalendar) setShowCalendar(false);
         else if (showExport) setShowExport(false);
         else if (showNoteModal) setShowNoteModal(false);
+        else if (showSleep) setShowSleep(false);
         else if (showInsights) setShowInsights(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDesktop, listKeyboardEnabled, appMode, symptomEditMode, trackingMode, showSettings, showCalendar, showExport, showNoteModal, showSymptomGraph, showSupplementGraph, showInsights]);
+  }, [isDesktop, listKeyboardEnabled, appMode, symptomEditMode, trackingMode, showSettings, showCalendar, showExport, showNoteModal, showSymptomGraph, showSupplementGraph, showInsights, showSleep, sleepAvailable]);
 
   // Handlers
   const changeDate = useCallback((days) => {
@@ -854,6 +862,9 @@ function App() {
           onOpenSettings={() => setShowSettings((open) => !open)}
           garminSync={GARMIN_SYNC_ENABLED ? garminSync : null}
           garminSleepDays={garminSleepDays}
+          showSleep={showSleep && sleepAvailable}
+          setShowSleep={setShowSleep}
+          sleepAvailable={sleepAvailable}
         />
       )}
 
@@ -887,7 +898,17 @@ function App() {
             padding: '20px 24px',
             paddingBottom: '80px',
           }}>
-            {showInsights ? (
+            {showSleep && sleepAvailable ? (
+              <SleepTab
+                days={garminSleepDays}
+                symptoms={liveSymptoms}
+                entries={deferredEntries}
+                stackItems={liveStackItems}
+                stackEntries={deferredStackEntries}
+                trackingMode={trackingMode}
+                barSlot={navSlot}
+              />
+            ) : showInsights ? (
               <Insights
                 user={firebase.user}
                 entries={deferredEntries}

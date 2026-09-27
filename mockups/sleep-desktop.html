@@ -1,0 +1,430 @@
+<title>Glimpse Sleep Tab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #08090a; --panel: #0e0f11; --raise: #15171a; --line: rgba(255,255,255,.07); --line2: rgba(255,255,255,.12);
+    --text: #f3f4f6; --mute: #9ca3af; --dim: #6b7280; --violet: #8b5cf6; --violet-soft: rgba(139,92,246,.16);
+    --green: #4ade80; --amber: #fbbf24; --red: #f87171; --cyan: #22d3ee;
+    --deep: #6d28d9; --rem: #a78bfa; --light: #3f3f55; --awake: #b45309;
+    --ground: #050506;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--text); font: 14px/1.45 Inter, system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; padding-inline: 16px; padding-block: 28px 48px; }
+  button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; }
+  button:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  .intro { max-width: 1180px; margin: 0 auto 18px; }
+  .intro h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .intro p { margin: 4px 0 0; color: var(--mute); font-size: 13px; max-width: 70ch; }
+
+  .window { max-width: 1180px; margin: 0 auto; border: 1px solid var(--line2); border-radius: 14px; overflow: hidden; background: var(--bg); box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .chrome { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 12px; background: #111214; border-bottom: 1px solid var(--line); }
+  .chrome i { width: 10px; height: 10px; border-radius: 50%; background: #2a2c30; }
+  .chrome span { margin-left: 10px; color: var(--dim); font-size: 11px; }
+
+  .wrap { padding-inline: 20px; }
+  .top { border-bottom: 1px solid var(--line); }
+  .top .wrap { min-height: 54px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding-block: 8px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; }
+  .logo { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg, #a78bfa, #6d28d9); display: grid; place-items: center; }
+  .logo svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; }
+  .seg { display: inline-flex; padding: 3px; gap: 2px; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 10px; flex-wrap: wrap; }
+  .seg button { padding: 5px 13px; border-radius: 7px; color: var(--mute); font-weight: 500; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+  .seg button:hover { color: var(--text); }
+  .seg button.on { background: var(--raise); color: var(--text); box-shadow: 0 0 0 1px var(--line2), 0 1px 2px rgba(0,0,0,.5); }
+  .seg.sm button { padding: 3px 9px; font-size: 12px; }
+  .new { font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--violet); background: var(--violet-soft); padding: 1px 5px; border-radius: 4px; }
+  .right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pill { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .pill small { font-size: 11px; font-weight: 500; color: var(--mute); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+  .ring-mini { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(var(--green) 72%, rgba(255,255,255,.08) 0); display: grid; place-items: center; }
+  .ring-mini::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); }
+  .icon { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; color: var(--mute); }
+  .icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+  .ctx { border-bottom: 1px solid var(--line); background: rgba(255,255,255,.012); }
+  .ctx .wrap { min-height: 50px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 8px; }
+  .step { display: flex; align-items: center; gap: 2px; }
+  .step button.arrow { width: 28px; height: 28px; border-radius: 8px; color: var(--mute); display: grid; place-items: center; }
+  .step button.arrow:hover { background: rgba(255,255,255,.06); color: var(--text); }
+  .step button.arrow:disabled { opacity: .3; cursor: default; }
+  .step svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+  .when { padding: 0 8px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
+  .when small { color: var(--dim); font-weight: 500; font-size: 12px; }
+  .btn { height: 30px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line); color: var(--mute); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .btn:hover, .btn.on { border-color: var(--line2); background: rgba(255,255,255,.04); color: var(--text); }
+  .btn.on { box-shadow: inset 0 0 0 1px var(--violet); }
+  .label { font-size: 11px; color: var(--dim); letter-spacing: .05em; text-transform: uppercase; font-weight: 600; }
+
+  main { padding: 20px; display: grid; gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+  .card h2 { font-size: 13px; font-weight: 600; margin: 0; }
+  .card .sub { color: var(--dim); font-size: 12px; }
+  .head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .head .right { gap: 6px; }
+
+  .row1 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; }
+  .hero { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .score-ring { position: relative; width: 112px; height: 112px; }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; font-weight: 700; letter-spacing: -.02em; }
+  .verdict { font-weight: 600; color: var(--amber); }
+  .debt-val { font-size: 24px; font-weight: 700; letter-spacing: -.01em; margin: 2px 0 8px; }
+  .debt-val span { font-size: 13px; font-weight: 500; color: var(--mute); margin-left: 6px; }
+  .debt { display: flex; gap: 3px; height: 26px; }
+  .debt i { flex: 1; border-radius: 3px; }
+  .rings { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; padding-top: 14px; }
+  .donut { display: grid; justify-items: center; gap: 4px; text-align: center; }
+  .donut svg { transform: rotate(-90deg); }
+  .donut .v { font-size: 13px; font-weight: 600; }
+  .donut .l { font-size: 11px; color: var(--dim); }
+  .basis { margin-left: auto; }
+
+  .links { display: grid; gap: 10px; }
+  .link { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 11px 12px; border-radius: 9px; background: var(--raise); border: 1px solid var(--line); }
+  .link p { margin: 0; font-size: 13px; }
+  .link p b { font-weight: 600; }
+  .link .n { color: var(--dim); font-size: 11px; grid-column: 1; }
+  .effect { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-weight: 600; font-size: 13px; }
+  .tag { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--amber); border: 1px solid rgba(251,191,36,.3); padding: 1px 6px; border-radius: 4px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
+  .kpi { text-align: left; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); display: grid; gap: 2px; min-width: 0; }
+  .kpi:hover { border-color: var(--line2); }
+  .kpi.on { border-color: var(--violet); background: linear-gradient(var(--violet-soft), transparent 70%), var(--panel); }
+  .kpi .t { font-size: 11px; color: var(--mute); display: flex; justify-content: space-between; gap: 4px; white-space: nowrap; }
+  .kpi .t > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+  .kpi .val { font-size: 19px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
+  .kpi .val small { font-size: 11px; font-weight: 500; color: var(--mute); margin-left: 2px; }
+  .kpi .rng { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .up { color: var(--green); } .down { color: var(--red); } .flat { color: var(--dim); }
+
+  .chart-box { overflow-x: auto; }
+  .chart-box svg { display: block; width: 100%; min-width: 560px; height: auto; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--mute); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+  .hint { color: var(--dim); font-size: 12px; text-align: center; margin-top: 6px; }
+
+  .row3 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+
+  .notes { max-width: 1180px; margin: 22px auto 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .note { border-top: 1px solid var(--line2); padding-top: 10px; }
+  .note h3 { font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+  .note ul { margin: 0; padding-left: 16px; color: var(--mute); font-size: 13px; display: grid; gap: 4px; }
+
+  @media (max-width: 1000px) {
+    .row1, .row3 { grid-template-columns: 1fr; }
+    .notes { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .rings { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 12px; }
+    .hero { grid-template-columns: 1fr; }
+    main, .wrap { padding-inline: 12px; }
+  }
+  @media (prefers-reduced-motion: no-preference) { .kpi, .btn, .seg button { transition: .15s; } }
+</style>
+
+<div class="intro">
+  <h1>Sleep, inside Glimpse (desktop)</h1>
+  <p>A fourth desktop tab that brings the Garmin Sleep Love dashboard into Glimpse's layout. The tab only appears while the Garmin pill is green. Numbers are sample data shaped like your real Garmin export. Click the metric tiles to switch the chart.</p>
+</div>
+
+<div class="window">
+  <div class="chrome"><i></i><i></i><i></i><span>glimpse — Sleep</span></div>
+
+  <!-- Layer 1: identical to today, plus the Sleep tab -->
+  <div class="top"><div class="wrap">
+    <div class="brand"><span class="logo"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="15.5" cy="11" r="3" fill="#fff"/></svg></span>Glimpse</div>
+    <div class="seg" role="tablist">
+      <button>Symptoms</button><button>Protocol</button><button>Progress</button>
+      <button class="on">Sleep <span class="new">Garmin</span></button>
+    </div>
+    <div class="right">
+      <button class="pill" title="Garmin: newest night 2026-09-27 · synced 4m ago"><span class="dot"></span>Garmin<small>Last night</small></button>
+      <div class="pill"><span class="ring-mini"></span>72%<small class="up">▲ 4</small></div>
+      <span class="icon"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>
+      <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span>
+    </div>
+  </div></div>
+
+  <!-- Layer 2: same shape as the Symptoms date stepper -->
+  <div class="ctx"><div class="wrap">
+    <div class="step">
+      <button class="arrow" aria-label="Previous night"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <div class="when">Last night <small>Sat 26 → Sun 27 Sep</small></div>
+      <button class="arrow" aria-label="Next night" disabled><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+    </div>
+    <div class="right">
+      <span class="label">Window</span>
+      <div class="seg sm" id="range"><button>7d</button><button class="on">14d</button><button>30d</button><button>3mo</button><button>1y</button><button>All</button></div>
+      <div class="seg sm"><button class="on">Days</button><button>Weeks</button><button>Months</button></div>
+      <button class="btn" id="cmpBtn">Compare</button>
+    </div>
+  </div></div>
+
+  <main>
+    <div class="row1">
+      <!-- Last night: hero + balance + contributors -->
+      <section class="card">
+        <div class="hero">
+          <div class="score-ring">
+            <svg width="112" height="112"><circle cx="56" cy="56" r="48" fill="none" stroke="#23252a" stroke-width="11"/><circle cx="56" cy="56" r="48" fill="none" stroke="#fbbf24" stroke-width="11" stroke-linecap="round" stroke-dasharray="223.2 301.6"/></svg>
+            <b class="num">74</b>
+          </div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center">
+            <div>
+              <div class="label">Sleep score</div>
+              <div class="verdict">Fair</div>
+              <div class="sub num">7h 08m asleep · 39m awake</div>
+              <div class="sub num">Need 7h 50m</div>
+            </div>
+            <div>
+              <div class="label">Balance · last 14 nights</div>
+              <div class="debt-val num" style="color:var(--amber)">3h 10m<span>short</span></div>
+              <div class="debt" id="debt"></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:12px">
+          <span class="label">Contributors</span>
+          <div class="seg sm basis" title="Baseline: against your own last 30 nights · Targets: fixed guidelines"><button class="on">vs my baseline</button><button>vs targets</button></div>
+        </div>
+        <div class="rings" id="rings"></div>
+      </section>
+
+      <!-- The Glimpse-only part: sleep joined to symptoms -->
+      <section class="card">
+        <div class="head">
+          <h2>Sleep and your symptoms</h2>
+          <span class="tag">Example findings</span>
+          <span class="sub" style="margin-left:auto">next-day effect · 90 nights</span>
+        </div>
+        <div class="links">
+          <div class="link"><p>Under <b>55 min deep sleep</b> → <b>Fatigue</b> the next day</p><span class="n">22 nights · avg 3.4 vs 2.1</span><span class="effect down num">+1.3</span></div>
+          <div class="link"><p><b>HRV below 35 ms</b> → <b>Brain fog</b> the next day</p><span class="n">14 nights · avg 2.9 vs 1.8</span><span class="effect down num">+1.1</span></div>
+          <div class="link"><p><b>Magnesium</b> taken → <b>deep sleep</b> that night</p><span class="n">41 of 60 nights · 68 vs 57 min</span><span class="effect up num">+11m</span></div>
+          <div class="link"><p>Sleep score vs next-day <b>Health score</b></p><span class="n">moderate link · r = 0.42</span><span class="effect up num">r .42</span></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Period summary: the Garmi tiles, tightened into one row -->
+    <div class="kpis" id="kpis"></div>
+
+    <!-- Trend -->
+    <section class="card">
+      <div class="head">
+        <h2 id="chartTitle">REM trend</h2>
+        <span class="sub num">14–27 Sep · 14 nights · daily</span>
+        <div class="right">
+          <button class="btn on" id="ovl">Overlay Health score</button>
+        </div>
+      </div>
+      <div class="chart-box"><svg id="trend" viewBox="0 0 860 260" role="img" aria-label="Nightly trend chart"></svg></div>
+      <div class="legend">
+        <span><i style="background:var(--violet)"></i>Night</span>
+        <span><i style="background:#fff;opacity:.7"></i>7-night average</span>
+        <span><i style="background:var(--dim)"></i><span id="tgtLbl">Target 90 min</span></span>
+        <span id="hsLeg"><i style="background:var(--cyan)"></i>Glimpse Health score (right axis)</span>
+      </div>
+      <div class="hint">Drag across the chart to summarise a stretch of nights</div>
+    </section>
+
+    <div class="row3">
+      <section class="card">
+        <div class="head"><h2>Stages</h2><span class="sub">minutes per night</span></div>
+        <div class="chart-box"><svg id="stages" viewBox="0 0 520 220" role="img" aria-label="Sleep stage breakdown"></svg></div>
+        <div class="legend">
+          <span><i style="background:var(--deep)"></i>Deep</span><span><i style="background:var(--rem)"></i>REM</span><span><i style="background:var(--light)"></i>Light</span><span><i style="background:var(--awake)"></i>Awake</span>
+        </div>
+      </section>
+      <section class="card">
+        <div class="head"><h2>Compare</h2><span class="sub num">REM · 31 Aug–13 Sep vs 14–27 Sep</span></div>
+        <div class="chart-box"><svg id="compare" viewBox="0 0 520 220" role="img" aria-label="Two periods overlaid"></svg></div>
+        <div class="legend">
+          <span><i style="background:var(--dim)"></i>Previous 14 nights · avg 58 min</span>
+          <span><i style="background:var(--violet)"></i>These 14 nights · avg 71 min</span>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="notes">
+  <div class="note"><h3>Where it lives</h3><ul>
+    <li>A fourth tab, Sleep, in the desktop toolbar. Mobile stays unchanged.</li>
+    <li>Shown only when Garmin is connected and at least one night has synced. Otherwise the tab is hidden.</li>
+    <li>Clicking the Garmin pill opens this tab.</li>
+  </ul></div>
+  <div class="note"><h3>What changed from Garmi</h3><ul>
+    <li>Glimpse's two-layer toolbar replaces Garmi's header. Its night stepper works like the Symptoms date stepper.</li>
+    <li>Blue/Tailwind styling becomes Glimpse's neutrals and violet accent.</li>
+    <li>The 8 metric tiles and the metric tabs merge into one row. Clicking a tile switches the chart.</li>
+    <li>"WHOOP / Garmin" becomes "vs my baseline / vs targets".</li>
+  </ul></div>
+  <div class="note"><h3>New because it's Glimpse</h3><ul>
+    <li>Sleep and your symptoms: next-day links between sleep, symptoms and supplements.</li>
+    <li>Your Health score overlaid on any sleep chart.</li>
+    <li>Garmi's login, upload and saved-file panels are dropped. The sync already handles them.</li>
+  </ul></div>
+</div>
+
+<script>
+  // Sample nights, 14–27 Sep, shaped like the Garmin export
+  const N = [
+    { d: '14', score: 68, dur: 412, rem: 52, deep: 61, light: 299, awake: 30, resp: 16.2, spo2: 87, stress: 24, hrv: 41, rhr: 58, bb: 60, need: 470, hs: 64 },
+    { d: '15', score: 81, dur: 468, rem: 94, deep: 72, light: 302, awake: 21, resp: 15.8, spo2: 90, stress: 18, hrv: 46, rhr: 56, bb: 78, need: 465, hs: 75 },
+    { d: '16', score: 59, dur: 371, rem: 48, deep: 44, light: 279, awake: 52, resp: 16.9, spo2: 86, stress: 31, hrv: 34, rhr: 60, bb: 49, need: 480, hs: 58 },
+    { d: '17', score: 63, dur: 395, rem: 57, deep: 52, light: 286, awake: 44, resp: 16.5, spo2: 88, stress: 27, hrv: 37, rhr: 59, bb: 55, need: 480, hs: 61 },
+    { d: '18', score: 77, dur: 451, rem: 83, deep: 66, light: 302, awake: 25, resp: 16.0, spo2: 89, stress: 20, hrv: 44, rhr: 57, bb: 71, need: 470, hs: 70 },
+    { d: '19', score: 84, dur: 489, rem: 101, deep: 78, light: 310, awake: 18, resp: 15.6, spo2: 91, stress: 16, hrv: 49, rhr: 55, bb: 82, need: 460, hs: 78 },
+    { d: '20', score: 72, dur: 433, rem: 69, deep: 58, light: 306, awake: 33, resp: 16.1, spo2: 88, stress: 22, hrv: 42, rhr: 57, bb: 66, need: 465, hs: 69 },
+    { d: '21', score: 55, dur: 352, rem: 41, deep: 39, light: 272, awake: 61, resp: 17.2, spo2: 85, stress: 34, hrv: 31, rhr: 61, bb: 43, need: 485, hs: 52 },
+    { d: '22', score: 70, dur: 427, rem: 74, deep: 55, light: 298, awake: 36, resp: 16.3, spo2: 88, stress: 23, hrv: 40, rhr: 58, bb: 63, need: 475, hs: 66 },
+    { d: '23', score: 79, dur: 462, rem: 92, deep: 69, light: 301, awake: 24, resp: 15.9, spo2: 90, stress: 19, hrv: 45, rhr: 56, bb: 74, need: 465, hs: 74 },
+    { d: '24', score: 66, dur: 404, rem: 63, deep: 50, light: 291, awake: 41, resp: 16.6, spo2: 87, stress: 26, hrv: 38, rhr: 59, bb: 57, need: 475, hs: 62 },
+    { d: '25', score: 80, dur: 474, rem: 88, deep: 74, light: 312, awake: 22, resp: 15.7, spo2: 90, stress: 17, hrv: 47, rhr: 56, bb: 76, need: 465, hs: 77 },
+    { d: '26', score: 73, dur: 441, rem: 77, deep: 60, light: 304, awake: 30, resp: 16.2, spo2: 89, stress: 21, hrv: 43, rhr: 57, bb: 69, need: 470, hs: 71 },
+    { d: '27', score: 74, dur: 428, rem: 62, deep: 49, light: 317, awake: 39, resp: 16.0, spo2: 88, stress: 20, hrv: 39, rhr: 57, bb: 67, need: 470, hs: 72 },
+  ];
+  const PREV = [48, 71, 55, 39, 66, 52, 60, 44, 73, 58, 50, 67, 62, 57];
+
+  const METRICS = [
+    { k: 'score', t: 'Score', u: '', good: 1, prev: 67 },
+    { k: 'dur', t: 'Asleep', u: 'h', good: 1, prev: 437, fmt: v => (v / 60).toFixed(1) },
+    { k: 'rem', t: 'REM', u: 'min', good: 1, prev: 58, target: 90 },
+    { k: 'deep', t: 'Deep', u: 'min', good: 1, prev: 64, target: 60 },
+    { k: 'resp', t: 'Resp', u: 'brpm', good: -1, prev: 16.4, dp: 1 },
+    { k: 'spo2', t: 'SpO2 low', u: '%', good: 1, prev: 87.3, target: 90 },
+    { k: 'stress', t: 'Stress', u: '', good: -1, prev: 29 },
+    { k: 'hrv', t: 'HRV', u: 'ms', good: 1, prev: 38 },
+  ];
+  const avg = k => N.reduce((s, n) => s + n[k], 0) / N.length;
+  const fmt = (m, v) => m.fmt ? m.fmt(v) : (m.dp ? v.toFixed(m.dp) : Math.round(v));
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const a in attrs) e.setAttribute(a, attrs[a]); parent && parent.appendChild(e); return e; };
+
+  // Balance strip
+  const debt = document.getElementById('debt');
+  N.forEach(n => {
+    const r = n.dur / n.need, i = document.createElement('i');
+    i.style.background = r >= 1 ? '#22c55e' : r >= .88 ? '#eab308' : '#ef4444';
+    i.title = `${n.d} Sep: ${Math.floor(n.dur / 60)}h ${n.dur % 60}m of ${Math.floor(n.need / 60)}h ${n.need % 60}m`;
+    debt.appendChild(i);
+  });
+
+  // Contributor rings, judged against the sample baseline
+  const last = N[N.length - 1];
+  const RINGS = [
+    { l: 'Duration', v: '7h 08m', pct: .91, c: '#eab308' },
+    { l: 'REM', v: '62m', pct: .72, c: '#eab308' },
+    { l: 'Deep', v: '49m', pct: .66, c: '#f87171' },
+    { l: 'SpO2', v: '96%', pct: .96, c: '#4ade80' },
+    { l: 'Resp', v: '16.0', pct: .9, c: '#4ade80' },
+    { l: 'RHR', v: '57', pct: .88, c: '#4ade80' },
+    { l: 'HRV', v: '39ms', pct: .78, c: '#eab308' },
+  ];
+  const rings = document.getElementById('rings');
+  RINGS.forEach(r => {
+    const d = document.createElement('div'); d.className = 'donut';
+    const C = 2 * Math.PI * 21;
+    d.innerHTML = `<svg width="54" height="54"><circle cx="27" cy="27" r="21" fill="none" stroke="#23252a" stroke-width="6"/><circle cx="27" cy="27" r="21" fill="none" stroke="${r.c}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(C * r.pct).toFixed(1)} ${C.toFixed(1)}"/></svg><span class="v num">${r.v}</span><span class="l">${r.l}</span>`;
+    rings.appendChild(d);
+  });
+
+  // Metric tiles
+  let active = 'rem';
+  const kpis = document.getElementById('kpis');
+  function drawKpis() {
+    kpis.innerHTML = '';
+    METRICS.forEach(m => {
+      const a = avg(m.k), pc = (a - m.prev) / m.prev * 100;
+      const better = Math.abs(pc) < 1 ? 'flat' : (pc > 0) === (m.good > 0) ? 'up' : 'down';
+      const b = document.createElement('button');
+      b.className = 'kpi' + (m.k === active ? ' on' : '');
+      b.innerHTML = `<span class="t"><span>${m.t}</span><span class="${better} num">${pc > 0 ? '↗' : '↘'} ${Math.abs(pc).toFixed(0)}%</span></span><span class="val num">${fmt(m, a)}<small>${m.u}</small></span><span class="rng num">${fmt(m, m.prev)} → ${fmt(m, a)} vs prior 14</span>`;
+      b.onclick = () => { active = m.k; drawKpis(); drawTrend(); };
+      kpis.appendChild(b);
+    });
+  }
+
+  // Trend chart
+  let overlay = true;
+  const trend = document.getElementById('trend');
+  function nice(max) { const s = [5, 10, 20, 25, 50, 100, 200]; const step = s.find(x => max / x <= 5) || 200; return { step, top: Math.ceil(max / step) * step }; }
+  function drawTrend() {
+    const m = METRICS.find(x => x.k === active);
+    document.getElementById('chartTitle').textContent = `${m.t} trend`;
+    document.getElementById('tgtLbl').parentElement.style.display = m.target ? '' : 'none';
+    if (m.target) document.getElementById('tgtLbl').textContent = `Target ${m.target}${m.u === 'min' ? ' min' : m.u}`;
+    document.getElementById('hsLeg').style.display = overlay ? '' : 'none';
+    trend.innerHTML = '';
+    const L = 48, R = 812, T = 14, B = 226, W = R - L, H = B - T;
+    const vals = N.map(n => m.k === 'dur' ? n.dur / 60 : n[m.k]);
+    const tgt = m.target && (m.k === 'dur' ? m.target / 60 : m.target);
+    const { step, top } = nice(Math.max(...vals, tgt || 0) * 1.08);
+    const y = v => B - v / top * H;
+    for (let v = 0; v <= top; v += step) {
+      el('line', { x1: L, x2: R, y1: y(v), y2: y(v), stroke: 'rgba(255,255,255,.06)' }, trend);
+      el('text', { x: L - 8, y: y(v) + 4, 'text-anchor': 'end', fill: '#6b7280', 'font-size': 11 }, trend).textContent = v;
+    }
+    const bw = W / N.length;
+    vals.forEach((v, i) => {
+      el('rect', { x: L + i * bw + bw * .18, y: y(v), width: bw * .64, height: B - y(v), rx: 3, fill: i === N.length - 1 ? '#8b5cf6' : 'rgba(139,92,246,.38)' }, trend);
+      el('text', { x: L + i * bw + bw / 2, y: B + 18, 'text-anchor': 'middle', fill: '#6b7280', 'font-size': 11 }, trend).textContent = N[i].d;
+    });
+    if (tgt) el('line', { x1: L, x2: R, y1: y(tgt), y2: y(tgt), stroke: '#6b7280', 'stroke-dasharray': '5 5' }, trend);
+    const roll = vals.map((_, i) => { const s = vals.slice(Math.max(0, i - 6), i + 1); return s.reduce((a, b) => a + b, 0) / s.length; });
+    el('path', { d: roll.map((v, i) => `${i ? 'L' : 'M'}${(L + i * bw + bw / 2).toFixed(1)},${y(v).toFixed(1)}`).join(''), fill: 'none', stroke: 'rgba(255,255,255,.75)', 'stroke-width': 2, 'stroke-dasharray': '6 4' }, trend);
+    if (overlay) {
+      const yh = v => B - v / 100 * H;
+      [0, 50, 100].forEach(v => el('text', { x: R + 8, y: yh(v) + 4, fill: '#22d3ee', 'font-size': 11, opacity: .8 }, trend).textContent = v);
+      el('path', { d: N.map((n, i) => `${i ? 'L' : 'M'}${(L + i * bw + bw / 2).toFixed(1)},${yh(n.hs).toFixed(1)}`).join(''), fill: 'none', stroke: '#22d3ee', 'stroke-width': 2 }, trend);
+      N.forEach((n, i) => el('circle', { cx: L + i * bw + bw / 2, cy: yh(n.hs), r: i === N.length - 1 ? 4 : 2.5, fill: '#22d3ee' }, trend));
+    }
+  }
+  document.getElementById('ovl').onclick = e => { overlay = !overlay; e.currentTarget.classList.toggle('on', overlay); drawTrend(); };
+
+  // Stage stack
+  (function () {
+    const s = document.getElementById('stages');
+    const L = 34, R = 510, T = 10, B = 196, H = B - T, top = 600, bw = (R - L) / N.length;
+    const y = v => B - v / top * H;
+    [0, 200, 400, 600].forEach(v => { el('line', { x1: L, x2: R, y1: y(v), y2: y(v), stroke: 'rgba(255,255,255,.06)' }, s); el('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', fill: '#6b7280', 'font-size': 10 }, s).textContent = v; });
+    N.forEach((n, i) => {
+      let acc = 0;
+      [['deep', '#6d28d9'], ['rem', '#a78bfa'], ['light', '#3f3f55'], ['awake', '#b45309']].forEach(([k, c]) => {
+        el('rect', { x: L + i * bw + bw * .2, y: y(acc + n[k]), width: bw * .6, height: n[k] / top * H, fill: c }, s);
+        acc += n[k];
+      });
+      el('text', { x: L + i * bw + bw / 2, y: B + 16, 'text-anchor': 'middle', fill: '#6b7280', 'font-size': 10 }, s).textContent = n.d;
+    });
+  })();
+
+  // Period overlay
+  (function () {
+    const s = document.getElementById('compare');
+    const L = 34, R = 510, T = 10, B = 196, H = B - T, top = 120, st = (R - L) / 13;
+    const y = v => B - v / top * H;
+    [0, 30, 60, 90, 120].forEach(v => { el('line', { x1: L, x2: R, y1: y(v), y2: y(v), stroke: 'rgba(255,255,255,.06)' }, s); el('text', { x: L - 6, y: y(v) + 4, 'text-anchor': 'end', fill: '#6b7280', 'font-size': 10 }, s).textContent = v; });
+    const line = (arr, c, w) => el('path', { d: arr.map((v, i) => `${i ? 'L' : 'M'}${(L + i * st).toFixed(1)},${y(v).toFixed(1)}`).join(''), fill: 'none', stroke: c, 'stroke-width': w, 'stroke-linejoin': 'round' }, s);
+    line(PREV, '#6b7280', 2);
+    line(N.map(n => n.rem), '#8b5cf6', 2.5);
+    for (let i = 0; i < 14; i += 1) el('text', { x: L + i * st, y: B + 16, 'text-anchor': 'middle', fill: '#6b7280', 'font-size': 10 }, s).textContent = i + 1;
+    el('line', { x1: L, x2: R, y1: y(90), y2: y(90), stroke: '#6b7280', 'stroke-dasharray': '5 5', opacity: .6 }, s);
+  })();
+
+  // Visual-only toggles
+  document.querySelectorAll('.seg').forEach(g => g.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || g.getAttribute('role') === 'tablist') return;
+    g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  }));
+  document.getElementById('cmpBtn').onclick = e => e.currentTarget.classList.toggle('on');
+
+  drawKpis(); drawTrend();
+</script>

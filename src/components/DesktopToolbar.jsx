@@ -61,10 +61,13 @@ export default function DesktopToolbar({
   entries,
   garminSync,
   garminSleepDays,
+  showSleep,
+  setShowSleep,
+  sleepAvailable,
 }) {
   const searchRef = useRef(null);
   const isToday = selectedDate.toDateString() === new Date().toDateString();
-  const activeTab = showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'stack';
+  const activeTab = showSleep ? 'sleep' : showInsights ? 'insights' : appMode === 'symptoms' ? 'symptoms' : 'stack';
 
   const { score, delta, rollingAvg } = useHealthScore(selectedDate, { symptoms, entries, trackingMode });
   const scoreValue = score !== null ? score : rollingAvg;
@@ -72,7 +75,10 @@ export default function DesktopToolbar({
 
   const handleTabClick = (tab) => {
     onCloseSettings?.();
-    if (tab === 'insights') {
+    setShowSleep?.(tab === 'sleep');
+    if (tab === 'sleep') {
+      setShowInsights(false);
+    } else if (tab === 'insights') {
       setShowInsights(true);
     } else {
       setShowInsights(false);
@@ -107,7 +113,7 @@ export default function DesktopToolbar({
           </div>
 
           <div className="dn-seg" role="tablist">
-            {TABS.map((tab) => (
+            {(sleepAvailable ? [...TABS, { id: 'sleep', label: 'Sleep' }] : TABS).map((tab) => (
               <button key={tab.id} role="tab" aria-selected={!settingsOpen && activeTab === tab.id} className={!settingsOpen && activeTab === tab.id ? 'on' : ''} onClick={() => handleTabClick(tab.id)}>
                 {tab.label}
               </button>
@@ -115,7 +121,7 @@ export default function DesktopToolbar({
           </div>
 
           <div className="dn-right">
-            {activeTab !== 'insights' && !settingsOpen && (
+            {activeTab !== 'insights' && activeTab !== 'sleep' && !settingsOpen && (
               <label className="dn-search">
                 <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
                 <input
@@ -142,7 +148,7 @@ export default function DesktopToolbar({
             {garminSync && (() => {
               const g = garminStatus(garminSync, garminSleepDays || []);
               return (
-                <button className={`dn-garmin ${g.tone}${garminSync.syncing ? ' syncing' : ''}`} data-tip={garminSync.syncing ? 'Garmin: syncing…' : g.tip} aria-label={g.tip} onClick={onOpenSettings}>
+                <button className={`dn-garmin ${g.tone}${garminSync.syncing ? ' syncing' : ''}`} data-tip={garminSync.syncing ? 'Garmin: syncing…' : g.tip} aria-label={g.tip} onClick={() => (sleepAvailable ? handleTabClick('sleep') : onOpenSettings())}>
                   <span className="dn-dot" />Garmin<small>{garminSync.syncing ? 'Syncing…' : g.label}</small>
                 </button>
               );
@@ -160,7 +166,7 @@ export default function DesktopToolbar({
       {/* Layer 2: what am I looking at (left) → what can I do (right) */}
       <div className="dn-context">
         <div className="dn-wrap">
-          {activeTab !== 'insights' && (
+          {activeTab !== 'insights' && activeTab !== 'sleep' && (
             <>
               <div className="dn-step">
                 <button aria-label="Previous day" onClick={() => changeDate(-1)}><Chevron points="15 18 9 12 15 6" /></button>
