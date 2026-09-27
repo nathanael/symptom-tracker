@@ -18,11 +18,6 @@ const TIP = { background: '#1f2937', border: '1px solid #374151', borderRadius: 
 const AXIS = { fill: '#6b7280', fontSize: 11 };
 const hm = (min) => (min == null ? '—' : `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`);
 const shortDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-const LS_BASIS = 'sleepRingBasis';
-
-function readBasis() {
-  try { return localStorage.getItem(LS_BASIS) === 'targets' ? 'targets' : 'baseline'; } catch { return 'baseline'; }
-}
 
 const plain = (v) => (v == null ? '—' : Number.isInteger(v) ? String(v) : v.toFixed(1));
 const mins = (sec) => (sec != null ? sec / 60 : null);
@@ -63,14 +58,12 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
   const [rangeMenu, setRangeMenu] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [mode, setMode] = useState('days');
-  const [basis, setBasis] = useState(readBasis);
   const [active, setActive] = useState('score');
   const [overlay, setOverlay] = useState(true);
   const [compareTo, setCompareTo] = useState('previous');
   const [drag, setDrag] = useState(null); // { a, b } dates while selecting
   const [selection, setSelection] = useState(null);
 
-  const chooseBasis = (b) => { setBasis(b); try { localStorage.setItem(LS_BASIS, b); } catch { /* non-fatal */ } };
   const metric = TILES.find((t) => t.key === active) || TILES[0];
 
   const minDate = days[0]?.date, maxDate = days[days.length - 1]?.date;
@@ -143,7 +136,6 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
 
   // Balance is a rolling 14-night figure and, as on the Garmin dashboard, ignores the night stepper
   const balance = useMemo(() => sleepBalance(days.slice(-14)), [days]);
-  const baselineRows = days.slice(Math.max(0, nightIdx - 30), nightIdx);
   const verdict = scoreVerdict(row.sleepScore);
   const asleep = asleepMinutes(row);
 
@@ -212,14 +204,11 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
           </div>
           <div className="sl-contrib-head">
             <span className="sl-label">Contributors</span>
-            <div className="dn-seg sm" title="Baseline: against your previous 30 nights · Targets: fixed guidelines">
-              <button className={basis === 'baseline' ? 'on' : ''} onClick={() => chooseBasis('baseline')}>vs my baseline</button>
-              <button className={basis === 'targets' ? 'on' : ''} onClick={() => chooseBasis('targets')}>vs targets</button>
-            </div>
+            <span className="sl-sub">Green meets the guideline · amber is close · red is well short</span>
           </div>
           <div className="sl-rings">
             {CONTRIBUTORS.map((c) => {
-              const st = contributorStanding(c, row, baselineRows, basis);
+              const st = contributorStanding(c, row, [], 'targets');
               return (
                 <div key={c.key} className="sl-ring" title={st ? st.tip : 'No data for this night'}>
                   <Donut size={54} stroke={6} pct={st ? st.pct : 0} color={st ? st.color : '#374151'} />
@@ -267,7 +256,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
         </section>
       </div>
 
-      <section className="sl-card sl-tiles">
+      <section className="sl-card sl-main">
         <div className="sl-bar">
           <div className="sl-range">
             <button className="sl-range-step" title="Previous period" disabled={!canBack} onClick={() => stepPeriod(-1)}>‹</button>
@@ -312,10 +301,9 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
             );
           })}
         </div>
-      </section>
 
       {compareMode ? (
-        <section className="sl-card">
+        <div className="sl-panel">
           <div className="sl-head">
             <h2 className="sl-trend-title">{metric.chart} — Period Overlay</h2>
             <div className="dn-seg sm sl-push">
@@ -346,9 +334,9 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
               </div>
             </>
           ) : <div className="sl-sub" style={{ padding: '24px 0' }}>No synced nights in that earlier period.</div>}
-        </section>
+        </div>
       ) : (
-      <section className="sl-card">
+      <div className="sl-panel">
         <div className="sl-head">
           <h2 className="sl-trend-title">{metric.chart} Trend</h2>
           <span className="sl-sub">{range && `${shortDate(range.start)} – ${shortDate(range.end)} · ${visible.length} nights · ${mode === 'days' ? 'daily' : mode === 'weeks' ? 'weekly' : 'monthly'}`}</span>
@@ -385,11 +373,11 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
             ? <>{shortDate(selection.s)} – {shortDate(selection.e)} · {selection.n} points · avg <b>{plain(+selection.avg.toFixed(1))}</b> · min {plain(selection.min)} · max {plain(selection.max)} <button className="sl-clear" onClick={() => setSelection(null)}>Clear</button></>
             : 'Drag across the chart to summarise a stretch of nights'}
         </div>
-      </section>
+      </div>
       )}
 
-        <section className="sl-card">
-          <div className="sl-head"><h2>Stages</h2><span className="sl-sub">minutes per {mode === 'days' ? 'night' : 'night, averaged'}</span></div>
+        <div className="sl-panel">
+          <div className="sl-head"><h2 className="sl-trend-title">Sleep Architecture</h2><span className="sl-sub">minutes per {mode === 'days' ? 'night' : 'night, averaged'}</span></div>
           <div className="sl-chart" style={{ height: 220 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stageRows} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
@@ -408,8 +396,8 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
             <span><i style={{ background: '#6d28d9' }} />Deep</span><span><i style={{ background: '#a78bfa' }} />REM</span>
             <span><i style={{ background: '#3f3f55' }} />Light</span><span><i style={{ background: '#b45309' }} />Awake</span>
           </div>
-        </section>
-
+        </div>
+      </section>
     </div>
   );
 }

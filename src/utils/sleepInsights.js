@@ -44,19 +44,19 @@ const clamp01 = (v) => Math.max(0.04, Math.min(1, v));
 
 // Each contributor: how to read it off a row, which way is better, and a fixed guideline.
 export const CONTRIBUTORS = [
-  { key: 'duration', label: 'Duration', get: asleepMinutes, dir: 1, fmt: (v) => `${Math.floor(v / 60)}h ${String(Math.round(v % 60)).padStart(2, '0')}m`,
+  { key: 'duration', label: 'Duration', guide: 'your sleep need', get: asleepMinutes, dir: 1, fmt: (v) => `${Math.floor(v / 60)}h ${String(Math.round(v % 60)).padStart(2, '0')}m`,
     target: (v, row) => { const need = row.sleepNeedMinutes || 480; const r = v / need; return { pct: r, color: r >= 1 ? GOOD : r >= 0.88 ? OK : BAD }; } },
-  { key: 'rem', label: 'REM', get: (d) => (d.remSleepSeconds != null ? Math.round(d.remSleepSeconds / 60) : null), dir: 1, fmt: (v) => `${v}m`,
+  { key: 'rem', label: 'REM', guide: '90 min', get: (d) => (d.remSleepSeconds != null ? Math.round(d.remSleepSeconds / 60) : null), dir: 1, fmt: (v) => `${v}m`,
     target: (v) => ({ pct: v / 90, color: v >= 90 ? GOOD : v >= 60 ? OK : BAD }) },
-  { key: 'deep', label: 'Deep', get: (d) => (d.deepSleepSeconds != null ? Math.round(d.deepSleepSeconds / 60) : null), dir: 1, fmt: (v) => `${v}m`,
+  { key: 'deep', label: 'Deep', guide: '60 min', get: (d) => (d.deepSleepSeconds != null ? Math.round(d.deepSleepSeconds / 60) : null), dir: 1, fmt: (v) => `${v}m`,
     target: (v) => ({ pct: v / 60, color: v >= 60 ? GOOD : v >= 45 ? OK : BAD }) },
-  { key: 'spo2', label: 'SpO2', get: (d) => d.averageSpo2 ?? null, dir: 1, fmt: (v) => `${Math.round(v)}%`,
+  { key: 'spo2', label: 'SpO2', guide: '95% or higher', get: (d) => d.averageSpo2 ?? null, dir: 1, fmt: (v) => `${Math.round(v)}%`,
     target: (v) => ({ pct: (v - 85) / 10, color: v >= 95 ? GOOD : v >= 92 ? OK : BAD }) },
-  { key: 'resp', label: 'Resp', get: (d) => d.averageRespiration ?? null, dir: -1, fmt: (v) => v.toFixed(1),
+  { key: 'resp', label: 'Resp', guide: '12–20 breaths/min', get: (d) => d.averageRespiration ?? null, dir: -1, fmt: (v) => v.toFixed(1),
     target: (v) => ({ pct: v >= 12 && v <= 20 ? 0.9 : 0.5, color: v >= 12 && v <= 20 ? GOOD : BAD }) },
-  { key: 'rhr', label: 'RHR', get: (d) => d.restingHr ?? null, dir: -1, fmt: (v) => `${v}`,
+  { key: 'rhr', label: 'RHR', guide: '60 bpm or lower', get: (d) => d.restingHr ?? null, dir: -1, fmt: (v) => `${v}`,
     target: (v) => ({ pct: Math.min(1, 60 / v), color: v <= 60 ? GOOD : v <= 70 ? OK : BAD }) },
-  { key: 'hrv', label: 'HRV', get: (d) => d.hrvOvernight ?? null, dir: 1, fmt: (v) => `${v}ms`,
+  { key: 'hrv', label: 'HRV', guide: "Garmin's status: balanced", get: (d) => d.hrvOvernight ?? null, dir: 1, fmt: (v) => `${v}ms`,
     target: (v, row) => {
       const s = row.hrvStatus;
       return { pct: s === 'BALANCED' ? 0.9 : s ? 0.5 : 0.7, color: s === 'BALANCED' ? GOOD : s === 'UNBALANCED' ? OK : s ? BAD : OK };
@@ -76,7 +76,7 @@ export function contributorStanding(c, row, baselineRows, basis) {
     }
   }
   const t = c.target(v, row);
-  return { value: v, pct: clamp01(t.pct), color: t.color, tip: c.fmt(v) };
+  return { value: v, pct: clamp01(t.pct), color: t.color, tip: `${c.fmt(v)} · guideline ${c.guide}` };
 }
 
 // Net minutes short (positive) or ahead (negative) across the given nights.
