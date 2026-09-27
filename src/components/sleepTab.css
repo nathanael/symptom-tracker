@@ -88,3 +88,7 @@
 .sl-menu button:hover { background: #374151; }
 .sl-menu button.on { color: #60a5fa; }
 .sl .dn-btn.sl-comparing { background: #9333ea; color: #fff; }
+
+/* Clicking a chart must not leave a focus or selection outline */
+.sl-chart .recharts-wrapper, .sl-chart .recharts-surface, .sl-chart svg *:focus { outline: none; }
+.sl-chart svg { -webkit-tap-highlight-color: transparent; }

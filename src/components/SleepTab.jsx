@@ -121,7 +121,12 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
       slope = den ? pts.reduce((a, [x, y]) => a + (x - mx) * (y - my), 0) / den : 0;
       icept = my - slope * mx;
     }
-    return rows.map((r, i) => ({ ...r, trend: icept == null ? null : +(icept + slope * i).toFixed(1) }));
+    const out = rows.map((r, i) => ({ ...r, trend: icept == null ? null : +(icept + slope * i).toFixed(1) }));
+    // Change across the window as a share of the average, signed so positive = better
+    const avg = pts.length ? mean(pts.map(([, y]) => y)) : 0;
+    const change = avg ? (slope * Math.max(0, rows.length - 1)) / Math.abs(avg) * (metric.up ? 1 : -1) : 0;
+    out.trendColor = change >= 0 ? '#86efac' : change > -0.08 ? '#fdba74' : '#fca5a5';
+    return out;
   }, [visible, mode, metric, healthByDate, range]);
 
   const stageRows = useMemo(() => withGaps(aggregate(visible, mode), mode, range).map((d) => ({
@@ -334,7 +339,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
             <>
               <div className="sl-chart" style={{ height: 280 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={compare.rows} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+                  <LineChart data={compare.rows} accessibilityLayer={false} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
                     <CartesianGrid stroke="rgba(255,255,255,.06)" vertical={false} />
                     <XAxis dataKey="n" tick={AXIS} stroke="rgba(255,255,255,.1)" minTickGap={8} />
                     <YAxis tick={AXIS} stroke="rgba(255,255,255,.1)" />
@@ -362,7 +367,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
         </div>
         <div className="sl-chart" style={{ height: 280 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartRows} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}
+            <ComposedChart data={chartRows} accessibilityLayer={false} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}
               onMouseDown={(e) => e?.activeLabel && setDrag({ a: e.activeLabel, b: e.activeLabel })}
               onMouseMove={(e) => drag && e?.activeLabel && setDrag((d) => ({ ...d, b: e.activeLabel }))}
               onMouseUp={endDrag} onMouseLeave={() => drag && endDrag()}>
@@ -375,7 +380,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
                 formatter={(v, name) => [v, name === 'value' ? `${metric.chart}${unitOf(metric) ? ` (${unitOf(metric)})` : ''}` : name === 'trend' ? 'Trend' : 'Health score']} />
               {metric.ref != null && <ReferenceLine yAxisId="m" y={metric.ref} stroke="#6b7280" strokeDasharray="5 5" />}
               <Bar yAxisId="m" dataKey="value" fill={metric.color} fillOpacity={0.55} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-              <Line yAxisId="m" type="linear" dataKey="trend" stroke="#fff" strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={false} isAnimationActive={false} connectNulls />
+              <Line yAxisId="m" type="linear" dataKey="trend" stroke={chartRows.trendColor} strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={false} isAnimationActive={false} connectNulls />
               {overlay && <Line yAxisId="h" dataKey="health" stroke="#22d3ee" strokeWidth={2} dot={{ r: 2.5, fill: '#22d3ee' }} isAnimationActive={false} connectNulls />}
               {chartRows.filter((r) => r.missing).map((r) => (
                 <ReferenceArea key={r.date} yAxisId="m" x1={r.date} x2={r.date} fill="rgba(255,255,255,.05)" label={{ value: 'no data', fill: '#6b7280', fontSize: 10, position: 'insideTop' }} />
@@ -387,7 +392,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
         </div>
         <div className="sl-legend">
           <span><i style={{ background: metric.color }} />{mode === 'days' ? 'Night' : mode === 'weeks' ? 'Week avg' : 'Month avg'}</span>
-          <span><i style={{ background: '#fff' }} />Trend</span>
+          <span><i style={{ background: chartRows.trendColor }} />Trend</span>
           {overlay && <span><i style={{ background: '#22d3ee' }} />Glimpse Health score (right axis)</span>}
         </div>
         <div className="sl-hint">
@@ -402,7 +407,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
           <div className="sl-head"><h2 className="sl-trend-title">Sleep Architecture</h2><span className="sl-sub">minutes per {mode === 'days' ? 'night' : 'night, averaged'}</span></div>
           <div className="sl-chart" style={{ height: 220 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stageRows} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+              <BarChart data={stageRows} accessibilityLayer={false} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
                 <CartesianGrid stroke="rgba(255,255,255,.06)" vertical={false} />
                 <XAxis dataKey="date" tick={AXIS} tickFormatter={(d) => (mode === 'months' ? d : d.slice(5))} stroke="rgba(255,255,255,.1)" minTickGap={12} />
                 <YAxis tick={AXIS} stroke="rgba(255,255,255,.1)" />
