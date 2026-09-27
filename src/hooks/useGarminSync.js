@@ -144,10 +144,29 @@ export function useGarminSync(user) {
     }
   }, [bridgeToFirestore]);
 
+  // Hand this signed-in session to the Mac's Garmin service so its scheduled
+  // sync can write nights to the account even when Glimpse is closed.
+  const handedTokenRef = useRef(null);
+  const handOffSignIn = useCallback(async () => {
+    const token = user?.refreshToken;
+    if (!user?.uid || !token || handedTokenRef.current === token) return;
+    try {
+      const res = await fetchWithTimeout(
+        `${GARMY_BASE}/api/glimpse/token`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: user.uid, refreshToken: token }) },
+        15000
+      );
+      if (res.ok) handedTokenRef.current = token;
+    } catch {
+      // Older garmy server without the endpoint, or offline — the in-app bridge still works
+    }
+  }, [user]);
+
   // Auto-sync: only bridge recent data, skip Garmin pull
   const autoSync = useCallback(async () => {
     // Callers check server status first (state from checkServer may not have rendered yet)
     if (syncingRef.current || !user?.uid) return;
+    handOffSignIn();
     syncingRef.current = true;
     setSyncing(true);
     setError(null);
@@ -168,7 +187,7 @@ export function useGarminSync(user) {
       setSyncing(false);
       syncingRef.current = false;
     }
-  }, [user, bridgeToFirestore]);
+  }, [user, bridgeToFirestore, handOffSignIn]);
 
   // autoSync closes over server state set by checkServer; call the latest one
   const autoSyncRef = useRef(autoSync);
