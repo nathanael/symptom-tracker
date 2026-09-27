@@ -37,6 +37,17 @@
 .dn-ring::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #08090a; }
 .dn-score small { font-size: 11px; font-weight: 500; }
 
+/* Garmin sync pill */
+.dn-garmin { position: relative; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,.07); background: none; color: #f3f4f6; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.dn-garmin:hover { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.12); }
+.dn-garmin small { font-size: 11px; font-weight: 500; color: #9ca3af; }
+.dn-dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+.dn-garmin.ok .dn-dot { background: #22c55e; }
+.dn-garmin.warn .dn-dot { background: #f59e0b; }
+.dn-garmin.syncing .dn-dot { background: #8b5cf6; animation: dn-pulse 1s ease-in-out infinite; }
+@keyframes dn-pulse { 50% { opacity: .3; } }
+.dn-garmin[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: 38px; right: 0; z-index: 5; white-space: nowrap; font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 6px; background: #1c1e22; border: 1px solid rgba(255,255,255,.12); color: #f3f4f6; }
+
 /* Buttons */
 .dn-icon { position: relative; width: 32px; height: 32px; flex: none; border: 0; border-radius: 9px; background: none; color: #9ca3af; display: grid; place-items: center; }
 .dn-icon:hover, .dn-icon.on { background: rgba(255,255,255,.06); color: #f3f4f6; }

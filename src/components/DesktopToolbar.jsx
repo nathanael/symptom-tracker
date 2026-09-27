@@ -10,6 +10,27 @@ const TABS = [
   { id: 'insights', label: 'Progress' },
 ];
 
+const DAY_MS = 86400000;
+
+// Garmin sync pill: dot colour tracks how fresh the newest night is
+function garminStatus(sync, days) {
+  const latest = days.reduce((max, d) => (d.date > max ? d.date : max), '');
+  const ago = (iso) => {
+    const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    return m < 1 ? 'just now' : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
+  };
+  if (!latest) {
+    return { tone: 'off', label: 'No data', tip: sync.serverAvailable ? 'Garmin: nothing synced yet' : 'Garmin: server not detected on this machine' };
+  }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const nights = Math.round((today - new Date(latest + 'T00:00:00')) / DAY_MS);
+  const label = nights <= 0 ? 'Last night' : nights === 1 ? '1 night behind' : `${nights} nights behind`;
+  const parts = [`Garmin: newest night ${latest}`];
+  if (sync.lastSync) parts.push(`synced ${ago(sync.lastSync)}`);
+  if (sync.error) parts.push(sync.error);
+  return { tone: sync.error ? 'warn' : nights <= 0 ? 'ok' : 'warn', label, tip: parts.join(' · ') };
+}
+
 const Chevron = ({ points }) => <svg viewBox="0 0 24 24"><polyline points={points} /></svg>;
 
 export default function DesktopToolbar({
@@ -38,6 +59,8 @@ export default function DesktopToolbar({
   copyDays,
   symptoms,
   entries,
+  garminSync,
+  garminSleepDays,
 }) {
   const searchRef = useRef(null);
   const isToday = selectedDate.toDateString() === new Date().toDateString();
@@ -116,6 +139,14 @@ export default function DesktopToolbar({
                 )}
               </div>
             )}
+            {garminSync && (() => {
+              const g = garminStatus(garminSync, garminSleepDays || []);
+              return (
+                <button className={`dn-garmin ${g.tone}${garminSync.syncing ? ' syncing' : ''}`} data-tip={garminSync.syncing ? 'Garmin: syncing…' : g.tip} aria-label={g.tip} onClick={onOpenSettings}>
+                  <span className="dn-dot" />Garmin<small>{garminSync.syncing ? 'Syncing…' : g.label}</small>
+                </button>
+              );
+            })()}
             <button className="dn-icon" data-tip={`Copy last ${copyDays} days of data`} aria-label={`Copy last ${copyDays} days of data`} onClick={onCopyData}>
               <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
             </button>

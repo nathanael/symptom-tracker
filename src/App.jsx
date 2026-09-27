@@ -852,6 +852,8 @@ function App() {
           settingsOpen={showSettings}
           onCloseSettings={() => setShowSettings(false)}
           onOpenSettings={() => setShowSettings((open) => !open)}
+          garminSync={GARMIN_SYNC_ENABLED ? garminSync : null}
+          garminSleepDays={garminSleepDays}
         />
       )}
 
