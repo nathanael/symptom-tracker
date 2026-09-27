@@ -81,7 +81,7 @@ export default function QuickActionsMenu({
         {tab !== 'insights' && tab !== 'home' && (
           <>
             <hr />
-            {tab === 'protocol' && <Item icon="note" label="Day notes" onClick={onEditNote} />}
+            <Item icon="note" label="Day notes" onClick={onEditNote} />
             {tab === 'symptoms' && <Item icon="bolt" label="Rapid entry" primary onClick={onRapidEntry} />}
           </>
         )}

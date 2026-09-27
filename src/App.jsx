@@ -952,7 +952,6 @@ function App() {
                 setSymptomSearch={setSymptomSearch}
                 onOpenGraph={setShowSymptomGraph}
                 onEditNote={() => setShowNoteModal(true)}
-                onTalkMode={openTalkMode}
                 onClearDay={clearSymptomDay}
                 onDeleteSymptom={(symptom) => softDeleteItem('symptom', symptom)}
                 editing={symptomEditMode}
@@ -1035,7 +1034,6 @@ function App() {
                 setSymptomSearch={setSymptomSearch}
                 onOpenGraph={openSymptomInInsights}
                 onEditNote={() => setShowNoteModal(true)}
-                onTalkMode={openTalkMode}
                 onClearDay={clearSymptomDay}
                 onDeleteSymptom={(symptom) => softDeleteItem('symptom', symptom)}
                 editing={symptomEditMode}

@@ -40,7 +40,6 @@ export default function SymptomRows({
   setSymptomSearch,
   onOpenGraph,
   onEditNote,
-  onTalkMode,
   onClearDay,
   onDeleteSymptom,
   editing,
@@ -519,7 +518,6 @@ export default function SymptomRows({
       <span className="lr-spacer" />
       {editing && <button className={`dn-btn ${proposal ? 'on' : ''}`} onClick={() => (proposal ? setProposal(null) : openProposal())}>Suggest grouping</button>}
       {isDesktop && !editing && hasEntriesToday && <button className="dn-btn ghost" onClick={onClearDay}>Clear day</button>}
-      {isDesktop && !editing && activeSymptoms.length > 0 && <button className="dn-btn" onClick={onTalkMode}>Talk me through it</button>}
       {isDesktop && !editing && <button className="dn-btn" onClick={onEditNote}>Day notes</button>}
       {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={toggleEdit}>{editing ? 'Done' : 'Edit symptoms'}</button>}
     </>,
