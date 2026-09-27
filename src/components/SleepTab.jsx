@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   ComposedChart, BarChart, LineChart, Bar, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea,
@@ -13,7 +12,7 @@ import {
   symptomLinks, supplementLinks, pearson, mean, shiftDate,
 } from '../utils/sleepInsights';
 
-const PRESETS = ['7d', '14d', '30d', '3mo', '1y', 'all'];
+const RANGE_PRESETS = [['7d', 'Last 7 days'], ['14d', 'Last 14 days'], ['30d', 'Last 30 days'], ['3mo', 'Last 3 months'], ['6mo', 'Last 6 months'], ['1y', 'Last year'], ['all', 'All time']];
 const MODES = [['days', 'Days'], ['weeks', 'Weeks'], ['months', 'Months']];
 const TIP = { background: '#1f2937', border: '1px solid #374151', borderRadius: 6, fontSize: 12 };
 const AXIS = { fill: '#6b7280', fontSize: 11 };
@@ -57,9 +56,12 @@ function Donut({ size, stroke, pct, color, children }) {
   );
 }
 
-export default function SleepTab({ days, symptoms, entries, stackItems, stackEntries, trackingMode, barSlot }) {
+export default function SleepTab({ days, symptoms, entries, stackItems, stackEntries, trackingMode }) {
   const [night, setNight] = useState(0); // 0 = newest night
+  const [customRange, setCustomRange] = useState(null); // null = follow the preset
   const [preset, setPreset] = useState('14d');
+  const [rangeMenu, setRangeMenu] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
   const [mode, setMode] = useState('days');
   const [basis, setBasis] = useState(readBasis);
   const [active, setActive] = useState('score');
@@ -78,14 +80,14 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
   // Window + the equal-length period before it
   const { visible, prior, range } = useMemo(() => {
     if (!days.length) return { visible: [], prior: [], range: null };
-    const r = rangeForPreset(preset, minDate, maxDate);
+    const r = customRange || rangeForPreset(preset || '14d', minDate, maxDate);
     const p = previousPeriodOf(r);
     return {
       range: r,
       visible: days.filter((d) => d.date >= r.start && d.date <= r.end),
       prior: days.filter((d) => d.date >= p.start && d.date <= p.end),
     };
-  }, [days, preset, minDate, maxDate]);
+  }, [days, preset, customRange, minDate, maxDate]);
 
   const healthByDate = useMemo(() => {
     const map = new Map();
@@ -139,7 +141,8 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
     return { sym, sup, r, rN: pairs.length, nights: recent.length };
   }, [days, symptoms, entries, trackingMode, stackItems, stackEntries, healthByDate]);
 
-  const balance = useMemo(() => sleepBalance(days.slice(Math.max(0, nightIdx - 13), nightIdx + 1)), [days, nightIdx]);
+  // Balance is a rolling 14-night figure and, as on the Garmin dashboard, ignores the night stepper
+  const balance = useMemo(() => sleepBalance(days.slice(-14)), [days]);
   const baselineRows = days.slice(Math.max(0, nightIdx - 30), nightIdx);
   const verdict = scoreVerdict(row.sleepScore);
   const asleep = asleepMinutes(row);
@@ -153,38 +156,41 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
     setDrag(null);
   };
 
-  const bar = barSlot && createPortal(
-    <>
-      <div className="dn-step">
-        <button aria-label="Previous night" disabled={nightIdx === 0} onClick={() => setNight((n) => n + 1)}><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg></button>
-        <button className="dn-date" title="Back to the newest night" onClick={() => setNight(0)}>
-          {night === 0 ? 'Last night' : shortDate(row.date)}
-          {row.date && <small>{shortDate(shiftDate(row.date, -1))} → {shortDate(row.date)}</small>}
-        </button>
-        <button aria-label="Next night" disabled={night === 0} onClick={() => setNight((n) => Math.max(0, n - 1))}><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg></button>
-      </div>
-      <span className="lr-spacer" />
-      <div className="dn-seg sm">{PRESETS.map((p) => <button key={p} className={preset === p ? 'on' : ''} onClick={() => { setPreset(p); setSelection(null); }}>{p === 'all' ? 'All' : p}</button>)}</div>
-      <div className="dn-seg sm">{MODES.map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} onClick={() => { setMode(k); setSelection(null); }}>{l}</button>)}</div>
-    </>,
-    barSlot,
-  );
+  // Garmin-dashboard range control: ‹ step back · N nights ▾ presets · step forward ›
+  const applyPreset = (p) => { setPreset(p); setCustomRange(null); setRangeMenu(false); setSelection(null); };
+  const stepPeriod = (dir) => {
+    if (!range) return;
+    const len = Math.round((new Date(range.end) - new Date(range.start)) / 86400000) + 1;
+    const start = dir < 0 ? shiftDate(range.start, -len) : shiftDate(range.end, 1);
+    const end = shiftDate(start, len - 1);
+    if (dir < 0 && end < minDate) return;
+    if (dir > 0 && start > maxDate) return;
+    setCustomRange({ start, end });
+    setPreset(null);
+    setSelection(null);
+  };
+  const canBack = range && range.start > minDate;
+  const canForward = range && range.end < maxDate;
 
   if (!days.length) {
-    return <>{bar}<div className="sl-empty">No Garmin nights synced yet.</div></>;
+    return <div className="sl-empty">No Garmin nights synced yet.</div>;
   }
 
   const hasLinks = links.sym.length || links.sup.length || links.r != null;
 
   return (
     <div className="sl">
-      {bar}
       <div className="sl-row1">
         <section className="sl-card">
           <div className="sl-hero">
             <Donut size={112} stroke={11} pct={(row.sleepScore || 0) / 100} color={verdict.color}><b className="sl-big">{row.sleepScore ?? '—'}</b></Donut>
             <div>
-              <div className="sl-label">Sleep score</div>
+              <div className="sl-night">
+                <button aria-label="Previous night" disabled={nightIdx === 0} onClick={() => setNight((n) => n + 1)}>‹</button>
+                <button aria-label="Back to the newest night" disabled={night === 0} onClick={() => setNight(0)}>●</button>
+                <button aria-label="Next night" disabled={night === 0} onClick={() => setNight((n) => Math.max(0, n - 1))}>›</button>
+              </div>
+              <div className="sl-label">{night === 0 ? 'Last night' : new Date(row.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</div>
               <div className="sl-verdict" style={{ color: verdict.color }}>{verdict.label}</div>
               <div className="sl-sub">{hm(asleep)} asleep · {hm(row.awakeSleepSeconds != null ? row.awakeSleepSeconds / 60 : null)} awake</div>
               {row.sleepNeedMinutes && <div className="sl-sub">Need {hm(row.sleepNeedMinutes)}</div>}
@@ -262,6 +268,35 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
       </div>
 
       <section className="sl-card sl-tiles">
+        <div className="sl-bar">
+          <div className="sl-range">
+            <button className="sl-range-step" title="Previous period" disabled={!canBack} onClick={() => stepPeriod(-1)}>‹</button>
+            <div className="sl-range-wrap">
+              <button className="sl-range-btn" onClick={() => setRangeMenu((o) => !o)}>
+                <b>{visible.length} nights</b>
+                <span>{range && `${shortDate(range.start)} – ${shortDate(range.end)}`}</span>
+                <i>▾</i>
+              </button>
+              {rangeMenu && (
+                <>
+                  <div className="sl-scrim" onClick={() => setRangeMenu(false)} />
+                  <div className="sl-menu">
+                    {RANGE_PRESETS.map(([k, label]) => (
+                      <button key={k} className={preset === k ? 'on' : ''} onClick={() => applyPreset(k)}>
+                        <span>{label}</span>{preset === k && <span>✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <button className="sl-range-step" title="Next period" disabled={!canForward} onClick={() => stepPeriod(1)}>›</button>
+          </div>
+          {!compareMode && (
+            <div className="dn-seg">{MODES.map(([k, l]) => <button key={k} className={mode === k ? 'on' : ''} onClick={() => { setMode(k); setSelection(null); }}>{l}</button>)}</div>
+          )}
+          <button className={`dn-btn sl-push ${compareMode ? 'sl-comparing' : ''}`} onClick={() => setCompareMode((c) => !c)}>{compareMode ? '✓ Comparing' : 'Compare'}</button>
+        </div>
         <div className="sl-kpis">
           {TILES.map((t) => {
             const cur = mean(visible.map(t.get).filter((v) => v != null));
@@ -279,6 +314,40 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
         </div>
       </section>
 
+      {compareMode ? (
+        <section className="sl-card">
+          <div className="sl-head">
+            <h2 className="sl-trend-title">{metric.chart} — Period Overlay</h2>
+            <div className="dn-seg sm sl-push">
+              <button className={compareTo === 'previous' ? 'on' : ''} onClick={() => setCompareTo('previous')}>Previous period</button>
+              <button className={compareTo === 'year' ? 'on' : ''} onClick={() => setCompareTo('year')}>A year ago</button>
+            </div>
+          </div>
+          <div className="sl-sub" style={{ marginTop: -6, marginBottom: 10 }}>Night-by-night overlay aligned from the start of each period. Switch metrics with the cards above.</div>
+          {compare?.hasA ? (
+            <>
+              <div className="sl-chart" style={{ height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={compare.rows} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+                    <CartesianGrid stroke="rgba(255,255,255,.06)" vertical={false} />
+                    <XAxis dataKey="n" tick={AXIS} stroke="rgba(255,255,255,.1)" minTickGap={8} />
+                    <YAxis tick={AXIS} stroke="rgba(255,255,255,.1)" />
+                    <Tooltip contentStyle={TIP} labelStyle={{ color: '#9ca3af' }} labelFormatter={(n) => `Night ${n}`}
+                      formatter={(v, name) => [v, name === 'aValue' ? 'Then' : 'Now']} />
+                    {metric.ref != null && <ReferenceLine y={metric.ref} stroke="#6b7280" strokeDasharray="5 5" />}
+                    <Line type="monotone" dataKey="aValue" stroke="#6366f1" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+                    <Line type="monotone" dataKey="bValue" stroke="#22d3ee" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="sl-legend">
+                <span><i style={{ background: '#6366f1' }} />{shortDate(compare.p.start)} – {shortDate(compare.p.end)} · avg {plain(compare.aAvg != null ? +compare.aAvg.toFixed(1) : null)}</span>
+                <span><i style={{ background: '#22d3ee' }} />{shortDate(range.start)} – {shortDate(range.end)} · avg {plain(compare.bAvg != null ? +compare.bAvg.toFixed(1) : null)}</span>
+              </div>
+            </>
+          ) : <div className="sl-sub" style={{ padding: '24px 0' }}>No synced nights in that earlier period.</div>}
+        </section>
+      ) : (
       <section className="sl-card">
         <div className="sl-head">
           <h2 className="sl-trend-title">{metric.chart} Trend</h2>
@@ -317,8 +386,8 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
             : 'Drag across the chart to summarise a stretch of nights'}
         </div>
       </section>
+      )}
 
-      <div className="sl-row3">
         <section className="sl-card">
           <div className="sl-head"><h2>Stages</h2><span className="sl-sub">minutes per {mode === 'days' ? 'night' : 'night, averaged'}</span></div>
           <div className="sl-chart" style={{ height: 220 }}>
@@ -341,38 +410,6 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
           </div>
         </section>
 
-        <section className="sl-card">
-          <div className="sl-head">
-            <h2>Compare</h2>
-            <span className="sl-sub">{metric.chart} by night</span>
-            <div className="dn-seg sm sl-push">
-              <button className={compareTo === 'previous' ? 'on' : ''} onClick={() => setCompareTo('previous')}>Previous period</button>
-              <button className={compareTo === 'year' ? 'on' : ''} onClick={() => setCompareTo('year')}>A year ago</button>
-            </div>
-          </div>
-          {compare?.hasA ? (
-            <>
-              <div className="sl-chart" style={{ height: 220 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={compare.rows} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
-                    <CartesianGrid stroke="rgba(255,255,255,.06)" vertical={false} />
-                    <XAxis dataKey="n" tick={AXIS} stroke="rgba(255,255,255,.1)" minTickGap={8} />
-                    <YAxis tick={AXIS} stroke="rgba(255,255,255,.1)" />
-                    <Tooltip contentStyle={TIP} labelStyle={{ color: '#9ca3af' }} labelFormatter={(n) => `Night ${n}`}
-                      formatter={(v, name) => [v, name === 'aValue' ? 'Then' : 'Now']} />
-                    <Line dataKey="aValue" stroke="#6b7280" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-                    <Line dataKey="bValue" stroke={metric.color} strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="sl-legend">
-                <span><i style={{ background: '#6b7280' }} />{shortDate(compare.p.start)} – {shortDate(compare.p.end)} · avg {plain(compare.aAvg != null ? +compare.aAvg.toFixed(1) : null)}</span>
-                <span><i style={{ background: metric.color }} />{shortDate(range.start)} – {shortDate(range.end)} · avg {plain(compare.bAvg != null ? +compare.bAvg.toFixed(1) : null)}</span>
-              </div>
-            </>
-          ) : <div className="sl-sub" style={{ padding: '24px 0' }}>No synced nights in that earlier period.</div>}
-        </section>
-      </div>
     </div>
   );
 }

@@ -11,7 +11,6 @@
 .sl, .sl-kpi, .sl-debt, .sl-big { font-variant-numeric: tabular-nums; }
 
 .sl-row1 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; }
-.sl-row3 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
 
 .sl-donut { position: relative; flex: none; }
 .sl-donut svg { transform: rotate(-90deg); display: block; }
@@ -58,6 +57,33 @@
 .sl-clear { font: inherit; background: none; border: 0; color: #a78bfa; cursor: pointer; margin-left: 6px; }
 
 @media (max-width: 1100px) {
-  .sl-row1, .sl-row3 { grid-template-columns: 1fr; }
+  .sl-row1 { grid-template-columns: 1fr; }
 }
 .sl-head h2.sl-trend-title { font-size: 18px; color: #93c5fd; }
+
+/* Night stepper inside the last-night card */
+.sl-night { display: flex; gap: 8px; margin-bottom: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.sl-night button { background: none; border: 0; padding: 0; color: #4b5563; cursor: pointer; font: inherit; }
+.sl-night button:hover:not(:disabled) { color: #d1d5db; }
+.sl-night button:disabled { color: #374151; cursor: default; }
+
+/* Controls bar that drives the cards, trend and stages below it */
+.sl-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.sl-range { display: flex; align-items: center; }
+.sl-range-step, .sl-range-btn { height: 32px; background: #374151; border: 0; color: #d1d5db; cursor: pointer; font: inherit; }
+.sl-range-step { padding: 0 8px; font-size: 14px; }
+.sl-range-step:first-child { border-radius: 4px 0 0 4px; border-right: 1px solid #1f2937; }
+.sl-range-step:last-child { border-radius: 0 4px 4px 0; border-left: 1px solid #1f2937; }
+.sl-range-step:hover:not(:disabled), .sl-range-btn:hover { background: #4b5563; }
+.sl-range-step:disabled { color: #4b5563; cursor: default; }
+.sl-range-wrap { position: relative; }
+.sl-range-btn { display: flex; align-items: center; gap: 8px; padding: 0 12px; font-size: 14px; color: #f3f4f6; }
+.sl-range-btn b { font-weight: 500; }
+.sl-range-btn span { color: #9ca3af; font-size: 12px; }
+.sl-range-btn i { color: #6b7280; font-size: 10px; font-style: normal; }
+.sl-scrim { position: fixed; inset: 0; z-index: 40; }
+.sl-menu { position: absolute; left: 0; top: 36px; z-index: 50; width: 176px; padding: 4px 0; background: #1f2937; border: 1px solid #374151; border-radius: 4px; box-shadow: 0 10px 25px rgba(0,0,0,.5); }
+.sl-menu button { width: 100%; display: flex; justify-content: space-between; padding: 6px 12px; background: none; border: 0; color: #d1d5db; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.sl-menu button:hover { background: #374151; }
+.sl-menu button.on { color: #60a5fa; }
+.sl .dn-btn.sl-comparing { background: #9333ea; color: #fff; }

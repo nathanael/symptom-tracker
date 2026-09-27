@@ -162,8 +162,9 @@ export default function DesktopToolbar({
         </div>
       </div>
 
-      {/* Layer 2: what am I looking at (left) → what can I do (right) */}
-      <div className="dn-context">
+      {/* Layer 2: what am I looking at (left) → what can I do (right).
+          Sleep carries its own controls inside its cards, like the Garmin dashboard. */}
+      {activeTab !== 'sleep' && <div className="dn-context">
         <div className="dn-wrap">
           {activeTab !== 'insights' && activeTab !== 'sleep' && (
             <>
@@ -199,7 +200,7 @@ export default function DesktopToolbar({
           )}
           <div className="dn-slot" ref={slotRef} />
         </div>
-      </div>
+      </div>}
     </>
   );
 }

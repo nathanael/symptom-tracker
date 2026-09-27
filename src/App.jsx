@@ -906,7 +906,6 @@ function App() {
                 stackItems={liveStackItems}
                 stackEntries={deferredStackEntries}
                 trackingMode={trackingMode}
-                barSlot={navSlot}
               />
             ) : showInsights ? (
               <Insights
