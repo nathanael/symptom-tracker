@@ -306,7 +306,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
             <button className="sl-range-step" title="Previous period" disabled={!canBack} onClick={() => stepPeriod(-1)}>‹</button>
             <div className="sl-range-wrap">
               <button className="sl-range-btn" onClick={() => setRangeMenu((o) => !o)}>
-                <b>{visible.length < windowNights(range) ? `${visible.length} of ${windowNights(range)} nights` : `${visible.length} nights`}</b>
+                <b>{windowNights(range)} nights</b>
                 <span>{range && `${shortDate(range.start)} – ${shortDate(range.end)}`}</span>
                 <i>▾</i>
               </button>
