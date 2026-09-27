@@ -610,7 +610,7 @@ function App() {
         setAppMode('symptoms');
       } else if (tabKey === '2') {
         setShowInsights(false);
-        setAppMode('protocol');
+        setAppMode('stack');
       } else if (tabKey === '3') {
         setShowInsights(true);
       } else if (tabKey === '4' && sleepAvailable) {

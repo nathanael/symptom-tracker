@@ -16,7 +16,7 @@ const icons = {
 };
 
 // The one mobile overflow. Ordered for the thumb: rare and destructive at the top,
-// the actions used most (rapid entry, day notes) at the bottom next to the ⋯ button.
+// the actions used most (rapid entry, notes) at the bottom next to the ⋯ button.
 export default function QuickActionsMenu({
   appMode,
   showInsights,
@@ -81,7 +81,7 @@ export default function QuickActionsMenu({
         {tab !== 'insights' && tab !== 'home' && (
           <>
             <hr />
-            <Item icon="note" label="Day notes" onClick={onEditNote} />
+            <Item icon="note" label="Notes" onClick={onEditNote} />
             {tab === 'symptoms' && <Item icon="bolt" label="Rapid entry" primary onClick={onRapidEntry} />}
           </>
         )}

@@ -531,7 +531,7 @@ export default function SymptomRows({
       <span className="lr-spacer" />
       {editing && <button className={`dn-btn ${proposal ? 'on' : ''}`} onClick={() => (proposal ? setProposal(null) : openProposal())}>Suggest grouping</button>}
       {isDesktop && !editing && hasEntriesToday && <button className="dn-btn ghost" onClick={onClearDay}>Clear day</button>}
-      {isDesktop && !editing && <button className="dn-btn" onClick={onEditNote}>Day notes</button>}
+      {isDesktop && !editing && <button className="dn-btn" onClick={onEditNote}>Notes</button>}
       {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={toggleEdit}>{editing ? 'Done' : 'Edit symptoms'}</button>}
     </>,
     barSlot

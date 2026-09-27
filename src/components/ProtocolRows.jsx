@@ -21,7 +21,7 @@ import {
 } from '../utils/protocolHistory';
 import { matchSupplementCategory } from '../utils/supplementLookup';
 import SchedulePicker, { formatSchedule } from './SchedulePicker';
-import { isTyping, DraftInput, useReorderDrag, ChangeLog, BarMenu } from './listParts';
+import { isTyping, DraftInput, useReorderDrag, ChangeLog } from './listParts';
 
 const UNITS = ['mg', 'mcg', 'g', 'IU', 'ml', 'drops', 'caps'];
 const VERDICTS = [
@@ -429,30 +429,20 @@ export default function ProtocolRows({
 
   // Scope + actions live in the nav's context bar (desktop) or the second row of the mobile top bar
   const totalCount = dueItems.length + factors.length;
+  // Desktop bar mirrors Symptoms: nothing on the left, actions on the right with Edit last
   const bar = barSlot ? createPortal(
     <>
-      {editing ? <span className="dn-progress"><b>{activeSupplements.length + activeFactors.length}</b> active</span> : (
+      {editing ? <span className="dn-progress"><b>{activeSupplements.length + activeFactors.length}</b> active</span> : !isDesktop && (
         <span className="dn-progress">
           Logged <b>{takenCount + loggedCount}/{totalCount}</b>
           <i style={{ '--p': `${totalCount ? ((takenCount + loggedCount) / totalCount) * 100 : 0}%` }} />
         </span>
       )}
       <span className="lr-spacer" />
+      {isDesktop && !editing && hasAnyToday && <button className="dn-btn ghost" onClick={onClearDay}>Clear day</button>}
+      {isDesktop && !editing && <button className="dn-btn" onClick={onMatchYesterday}>Match yesterday</button>}
+      {!editing && <button className={`dn-btn ${isDesktop ? '' : 'primary'}`} onClick={onCheckAll}>Check all</button>}
       {(isDesktop || editing) && <button className={`dn-btn ${editing ? 'primary' : ''}`} onClick={() => { setEditing(!editing); setExpandedId(null); }}>{editing ? 'Done' : 'Edit protocol'}</button>}
-      {!editing && (isDesktop ? (
-        <span className="dn-split">
-          <button className="dn-btn primary" onClick={onCheckAll}>Check all</button>
-          <BarMenu
-            className="dn-btn primary caret"
-            ariaLabel="More bulk actions"
-            label={<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9" /></svg>}
-            items={[
-              { label: 'Match yesterday', onClick: onMatchYesterday },
-              hasAnyToday && { label: 'Clear day', danger: true, onClick: onClearDay },
-            ]}
-          />
-        </span>
-      ) : <button className="dn-btn primary" onClick={onCheckAll}>Check all</button>)}
     </>,
     barSlot
   ) : null;
