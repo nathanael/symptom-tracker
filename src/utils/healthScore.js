@@ -1,8 +1,10 @@
 import { getDailyValue } from './chartHelpers';
+import { SLEEP_ENABLED } from './constants';
 
 const SLEEP_WEIGHT = 0.10; // sleep score is 10% of health score when available
 
 function getSleepScoreForDate(dateStr) {
+  if (!SLEEP_ENABLED) return null;
   try {
     if (typeof localStorage === 'undefined') return null;
     const raw = localStorage.getItem('garminSleepCache');

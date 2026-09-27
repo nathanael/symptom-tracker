@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getFirebaseDb } from '../utils/firebase';
-import { SLEEP_ENABLED } from '../utils/constants';
+import { GARMIN_SYNC_ENABLED } from '../utils/constants';
 
 const GARMY_BASE = 'http://localhost:8484';
 const SYNC_INTERVAL = 10 * 60 * 1000; // 10 minutes
@@ -24,6 +24,8 @@ function transformRecord(record) {
     hrvWeeklyAvg: record.hrvWeeklyAvg ?? null,
     hrvStatus: record.hrvStatus ?? null,
     restingHr: record.restingHr ?? null,
+    bodyBatteryHigh: record.bodyBatteryHigh ?? null,
+    sleepNeedMinutes: record.sleepNeedMinutes ?? null,
     syncedAt: new Date(),
   };
 }
@@ -77,17 +79,19 @@ export function useGarminSync(user) {
     const records = await res.json();
     if (!records.length) return;
 
-    // 2. Query Firestore for existing dates
+    // 2. Query Firestore for what's already stored
     const collection = db.collection('users').doc(user.uid).collection('garminSleep');
     const snap = await collection.get();
-    const existingDates = new Set(snap.docs.map(d => d.data().date));
+    const existing = new Map(snap.docs.map(d => [d.data().date, d.data()]));
 
-    // 3. Filter to new records only
+    // 3. Keep new nights, plus nights whose metrics changed since the last
+    //    bridge (Garmin fills in HRV/SpO2/score after the first pull)
+    const changed = (rec, prev) => Object.keys(rec).some(k => k !== 'syncedAt' && (rec[k] ?? null) !== (prev[k] ?? null));
     const newRecords = records
       .map(transformRecord)
-      .filter(r => r.date && !existingDates.has(r.date));
+      .filter(r => r.date && (!existing.has(r.date) || changed(r, existing.get(r.date))));
 
-    if (!newRecords.length) return;
+    if (!newRecords.length) return 0;
 
     // 4. Batch write to Firestore (max 500 per batch)
     for (let i = 0; i < newRecords.length; i += 500) {
@@ -99,6 +103,7 @@ export function useGarminSync(user) {
       }
       await batch.commit();
     }
+    return newRecords.length;
   }, [user]);
 
   // Full sync: trigger garmy pull, then bridge to Firestore
@@ -141,17 +146,21 @@ export function useGarminSync(user) {
 
   // Auto-sync: only bridge recent data, skip Garmin pull
   const autoSync = useCallback(async () => {
-    if (syncingRef.current || !serverAvailable || !authenticated || !user?.uid) return;
+    // Callers check server status first (state from checkServer may not have rendered yet)
+    if (syncingRef.current || !user?.uid) return;
     syncingRef.current = true;
     setSyncing(true);
     setError(null);
     try {
-      await bridgeToFirestore(14);
-      localStorage.removeItem('garminSleepCache');
+      // First bridge on this device sends the full history, then the last two weeks
+      const written = await bridgeToFirestore(localStorage.getItem('garminLastSync') ? 14 : null);
       const now = new Date().toISOString();
       setLastSync(now);
       localStorage.setItem('garminLastSync', now);
-      window.dispatchEvent(new Event('garmin-sleep-synced'));
+      if (written) {
+        localStorage.removeItem('garminSleepCache');
+        window.dispatchEvent(new Event('garmin-sleep-synced'));
+      }
     } catch (e) {
       console.warn('[useGarminSync] auto-sync failed:', e);
       setError(e.message || 'Auto-sync failed');
@@ -159,7 +168,11 @@ export function useGarminSync(user) {
       setSyncing(false);
       syncingRef.current = false;
     }
-  }, [serverAvailable, authenticated, user, bridgeToFirestore]);
+  }, [user, bridgeToFirestore]);
+
+  // autoSync closes over server state set by checkServer; call the latest one
+  const autoSyncRef = useRef(autoSync);
+  autoSyncRef.current = autoSync;
 
   // Auth methods
   const login = useCallback(async (email, password) => {
@@ -212,16 +225,20 @@ export function useGarminSync(user) {
     localStorage.removeItem('garminLastSync');
   }, []);
 
-  // Check server on mount
-  useEffect(() => { if (SLEEP_ENABLED) checkServer(); }, [checkServer]);
+  // Check server on mount and bridge right away when it's up
+  useEffect(() => {
+    if (!GARMIN_SYNC_ENABLED) return;
+    checkServer().then(status => { if (status.available && status.authenticated) autoSyncRef.current(); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkServer, user?.uid]);
 
   // Auto-sync interval (check server + sync every 10 min)
   useEffect(() => {
-    if (!SLEEP_ENABLED) return;
+    if (!GARMIN_SYNC_ENABLED) return;
     const id = setInterval(async () => {
       const status = await checkServer();
       if (status.available && status.authenticated && user?.uid) {
-        autoSync();
+        autoSyncRef.current();
       }
     }, SYNC_INTERVAL);
     return () => clearInterval(id);

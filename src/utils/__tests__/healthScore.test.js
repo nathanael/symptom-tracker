@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from 'vitest';
+
+vi.mock('../constants', async (importOriginal) => ({ ...(await importOriginal()), SLEEP_ENABLED: true }));
 import { computeHealthScore, computeRollingAvg, getScoreColor } from '../healthScore';
 import { getHealthScoreSeries } from '../correlationHelpers';
 

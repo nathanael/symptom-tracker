@@ -1,4 +1,4 @@
-import { trackingModes, severityColors, NA_SEVERITY, SLEEP_ENABLED } from './constants';
+import { trackingModes, severityColors, NA_SEVERITY, GARMIN_SYNC_ENABLED } from './constants';
 import { computeHealthScore } from './healthScore';
 import { METRICS as SLEEP_METRICS, valueForRow } from './sleepMetrics';
 
@@ -9,8 +9,19 @@ export function noteText(note) {
   return typeof note.text === 'string' ? note.text : '';
 }
 
+// Extra Garmin fields for exports only (not charted in the app).
+const SLEEP_EXPORT_EXTRAS = [
+  { key: 'averageSpo2', label: 'Avg SpO2', unit: '%' },
+  { key: 'restingHr', label: 'Resting HR', unit: 'bpm' },
+  { key: 'hrvWeeklyAvg', label: 'HRV 7d', unit: 'ms' },
+  { key: 'hrvStatus', label: 'HRV Status', unit: '' },
+  { key: 'bodyBatteryHigh', label: 'Body Battery', unit: '' },
+  { key: 'sleepNeedMinutes', label: 'Sleep Need', unit: 'min' },
+];
+const SLEEP_EXPORT_METRICS = [...SLEEP_METRICS, ...SLEEP_EXPORT_EXTRAS];
+
 function readSleepCache() {
-  if (!SLEEP_ENABLED) return [];
+  if (!GARMIN_SYNC_ENABLED) return [];
   try {
     const raw = localStorage.getItem('garminSleepCache');
     if (!raw) return [];
@@ -458,7 +469,7 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
   const sleepDays = readSleepCache();
   if (sleepDays.length > 0) {
     const sleepByDate = new Map(sleepDays.map(d => [d.date, d]));
-    const sleepHeaders = ['Date', ...SLEEP_METRICS.map(m => `${m.label}${m.unit ? ` (${m.unit})` : ''}`)];
+    const sleepHeaders = ['Date', ...SLEEP_EXPORT_METRICS.map(m => `${m.label}${m.unit ? ` (${m.unit})` : ''}`)];
 
     output.push('\n### Sleep Data (Garmin)');
     output.push('| ' + sleepHeaders.join(' | ') + ' |');
@@ -472,7 +483,7 @@ export const generateAIDataExport = (days, entries, symptoms, stackItems, stackE
       if (!row) continue;
 
       const cells = [formatTableDate(dateKey)];
-      SLEEP_METRICS.forEach(metric => {
+      SLEEP_EXPORT_METRICS.forEach(metric => {
         const val = valueForRow(metric, row);
         cells.push(val != null ? String(val) : '-');
       });
@@ -895,7 +906,7 @@ export const buildCSVText = (days, entries, symptoms, trackingMode) => {
       const row = sleepByDate.get(dateKey);
       if (!row) continue;
 
-      SLEEP_METRICS.forEach(metric => {
+      SLEEP_EXPORT_METRICS.forEach(metric => {
         const val = valueForRow(metric, row);
         if (val != null) {
           const label = `Sleep ${metric.label}`;

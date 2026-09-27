@@ -114,3 +114,7 @@ export const SWIPE_TIME_LIMIT = 300;
 // Sleep / Garmin integration is switched off for now. Flip to true to restore
 // the Sleep view, chart metrics, Settings integration, export rows and sync polling.
 export const SLEEP_ENABLED = false;
+
+// Garmin sleep sync runs independently of the Sleep UI: the garmy server's
+// data is bridged to Firestore and included in Copy for AI, CSV and backups.
+export const GARMIN_SYNC_ENABLED = true;

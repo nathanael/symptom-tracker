@@ -4,6 +4,7 @@ import { useFirebase } from './hooks/useFirebase';
 import { useSyncEngine } from './hooks/useSyncEngine';
 import { useDesktopMode } from './hooks/useMediaQuery';
 import { useGarminSync } from './hooks/useGarminSync';
+import { useGarminSleep } from './hooks/useGarminSleep';
 import { detectDataShrink, restoreSnapshot } from './utils/snapshots';
 import {
   STORAGE_KEY_SYMPTOMS,
@@ -26,6 +27,7 @@ import {
   defaultStackItems,
   SWIPE_THRESHOLD,
   SWIPE_TIME_LIMIT,
+  GARMIN_SYNC_ENABLED,
 } from './utils/constants';
 import {
   getDateKey,
@@ -268,6 +270,8 @@ function App() {
   }, [scrollToMeals, appMode]);
 
   const garminSync = useGarminSync(firebase.user);
+  // Keeps the local Garmin cache current on every device for Copy for AI / CSV / backup
+  const { days: garminSleepDays } = useGarminSleep(GARMIN_SYNC_ENABLED ? firebase.user : null);
 
   // Refs
   const justLoggedRef = useRef(false);
@@ -1484,6 +1488,7 @@ function App() {
           setShowSettings={setShowSettings}
           isDesktop={isDesktop}
           garminSync={garminSync}
+          garminSleepDays={garminSleepDays}
           onForcePush={() => sync.forcePush({
             symptoms,
             entries,

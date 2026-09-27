@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import './desktopNav.css';
 import './settings.css';
 import { isDeleted, liveItems, countEntriesFor, daysUntilPurge, RETENTION_DAYS } from '../utils/softDelete';
-import { trackingModes, SLEEP_ENABLED } from '../utils/constants';
+import { trackingModes, GARMIN_SYNC_ENABLED } from '../utils/constants';
 import { isStandalone, getDateKey, haptic, generateAIDataExport, updateApp } from '../utils/helpers';
 import { mergeSupplements, previewMerge } from '../utils/supplementTools';
 import { listSnapshots, restoreSnapshot, saveSnapshot } from '../utils/snapshots';
@@ -76,6 +76,7 @@ export default function Settings({
   setShowSettings,
   isDesktop,
   garminSync,
+  garminSleepDays = [],
   onForcePush,
   onRestoreDeleted,
   onDeleteNow,
@@ -233,6 +234,7 @@ export default function Settings({
       inputItems,
       inputEntries,
       meals,
+      garminSleep: garminSleepDays,
     };
 
     const json = JSON.stringify(backup, null, 2);
@@ -524,7 +526,7 @@ export default function Settings({
   );
 
   const garminConnected = garminSync.serverAvailable && garminSync.authenticated && !garminSync.mfaRequired;
-  const integrations = SLEEP_ENABLED && (
+  const integrations = GARMIN_SYNC_ENABLED && (
     <section className="st-section" id="st-integrations">
       <h3>Integrations</h3><p>Sources that feed Progress.</p>
       <div className="st-group">
@@ -677,7 +679,7 @@ export default function Settings({
     ['st-account', 'Account & sync', <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>],
     ['st-integrations', 'Integrations', <path d="M9 7V2M15 7V2M6 7h12v5a6 6 0 0 1-12 0zM12 18v4" />],
     ['st-data', 'Data', <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></>],
-  ].filter(([id]) => SLEEP_ENABLED || id !== 'st-integrations');
+  ].filter(([id]) => GARMIN_SYNC_ENABLED || id !== 'st-integrations');
   const pageTitle = { main: 'Settings', data: 'Data', recovery: 'Recovery tools' }[page];
   const onBack = () => (isDesktop || page === 'main' ? setShowSettings(false) : setPage('main'));
 
