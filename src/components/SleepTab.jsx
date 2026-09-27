@@ -6,7 +6,6 @@ import {
 } from 'recharts';
 import './desktopNav.css';
 import './sleepTab.css';
-import { METRICS, valueForRow } from '../utils/sleepMetrics';
 import { aggregate, rangeForPreset, previousPeriodOf, priorYearPeriodOf, alignByIndex } from '../utils/garminSleepCache';
 import { computeHealthScore } from '../utils/healthScore';
 import {
@@ -26,15 +25,24 @@ function readBasis() {
   try { return localStorage.getItem(LS_BASIS) === 'targets' ? 'targets' : 'baseline'; } catch { return 'baseline'; }
 }
 
-function fmtMetric(m, v) {
-  if (v == null) return '—';
-  if (m.key === 'duration') return (v / 60).toFixed(1);
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
-}
 const plain = (v) => (v == null ? '—' : Number.isInteger(v) ? String(v) : v.toFixed(1));
-// Charts plot time asleep in hours; everything else as sleepMetrics defines it
-const chartValue = (m, d) => { const v = valueForRow(m, d); return m.key === 'duration' && v != null ? +(v / 60).toFixed(1) : v; };
-const unitOf = (m) => (m.key === 'duration' ? 'h' : m.unit);
+const mins = (sec) => (sec != null ? sec / 60 : null);
+
+// Stat tiles, copied from the Garmin dashboard: title, averaged value, chart colour and guideline
+const TILES = [
+  { key: 'score', title: 'Sleep Score', chart: 'Sleep Score', get: (d) => d.sleepScore ?? null, dec: 0, unit: '', up: true, color: '#10b981', ref: 80 },
+  { key: 'duration', title: 'Duration', chart: 'Duration', get: (d) => { const m = asleepMinutes(d); return m != null ? m / 60 : null; }, dec: 1, unit: ' hrs', up: true, color: '#6ee7b7', ref: 8 },
+  { key: 'rem', title: 'REM Sleep', chart: 'REM Sleep', get: (d) => mins(d.remSleepSeconds), dec: 1, unit: ' min', up: true, color: '#8b5cf6', ref: 90 },
+  { key: 'deep', title: 'Deep Sleep', chart: 'Deep Sleep', get: (d) => mins(d.deepSleepSeconds), dec: 1, unit: ' min', up: true, color: '#3b82f6', ref: 60 },
+  { key: 'respiration', title: 'Respiration', chart: 'Respiration Rate', get: (d) => d.averageRespiration ?? null, dec: 1, unit: ' brpm', up: false, color: '#f59e0b', ref: 14 },
+  { key: 'spo2', title: 'SpO2 Low', chart: 'SpO2 (Lowest)', get: (d) => d.lowestSpo2 ?? null, dec: 1, unit: '%', up: true, color: '#06b6d4', ref: 92 },
+  { key: 'stress', title: 'Stress', chart: 'Sleep Stress', get: (d) => d.avgSleepStress ?? null, dec: 1, unit: '', up: false, color: '#ef4444', ref: 20 },
+  { key: 'hrv', title: 'HRV', chart: 'HRV (Overnight)', get: (d) => d.hrvOvernight ?? null, dec: 0, unit: ' ms', up: true, color: '#a78bfa', ref: null },
+  { key: 'bodyBattery', title: 'Body Battery', chart: 'Body Battery', get: (d) => d.bodyBatteryHigh ?? null, dec: 0, unit: '', up: true, color: '#22c55e', ref: 75 },
+];
+const tileValue = (t, v) => (v == null ? '-' : `${v.toFixed(t.dec)}${t.unit}`);
+const chartValue = (t, d) => { const v = t.get(d); return v == null ? null : +v.toFixed(1); };
+const unitOf = (t) => t.unit.trim();
 
 function Donut({ size, stroke, pct, color, children }) {
   const r = (size - stroke) / 2, c = 2 * Math.PI * r;
@@ -54,14 +62,14 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
   const [preset, setPreset] = useState('14d');
   const [mode, setMode] = useState('days');
   const [basis, setBasis] = useState(readBasis);
-  const [active, setActive] = useState('remSleepSeconds');
+  const [active, setActive] = useState('score');
   const [overlay, setOverlay] = useState(true);
   const [compareTo, setCompareTo] = useState('previous');
   const [drag, setDrag] = useState(null); // { a, b } dates while selecting
   const [selection, setSelection] = useState(null);
 
   const chooseBasis = (b) => { setBasis(b); try { localStorage.setItem(LS_BASIS, b); } catch { /* non-fatal */ } };
-  const metric = METRICS.find((m) => m.key === active) || METRICS[0];
+  const metric = TILES.find((t) => t.key === active) || TILES[0];
 
   const minDate = days[0]?.date, maxDate = days[days.length - 1]?.date;
   const nightIdx = Math.max(0, days.length - 1 - night);
@@ -253,25 +261,27 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
         </section>
       </div>
 
-      <div className="sl-kpis">
-        {METRICS.map((m) => {
-          const cur = mean(visible.map((d) => valueForRow(m, d)).filter((v) => v != null));
-          const prev = mean(prior.map((d) => valueForRow(m, d)).filter((v) => v != null));
-          const pc = cur != null && prev ? ((cur - prev) / prev) * 100 : null;
-          const tone = pc == null || Math.abs(pc) < 1 ? 'flat' : (pc > 0) === m.higherIsBetter ? 'good' : 'bad';
-          return (
-            <button key={m.key} className={`sl-kpi ${active === m.key ? 'on' : ''}`} onClick={() => { setActive(m.key); setSelection(null); }}>
-              <span className="sl-kpi-t"><span>{m.key === 'duration' ? 'Asleep' : m.label}</span>{pc != null && <span className={tone}>{pc > 0 ? '↗' : '↘'} {Math.abs(pc).toFixed(0)}%</span>}</span>
-              <span className="sl-kpi-v">{fmtMetric(m, cur != null ? +cur.toFixed(1) : null)}<small>{unitOf(m)}</small></span>
-              <span className="sl-kpi-r">{prev != null ? `${fmtMetric(m, +prev.toFixed(1))} → ${fmtMetric(m, cur != null ? +cur.toFixed(1) : null)}` : 'no prior period'}</span>
-            </button>
-          );
-        })}
-      </div>
+      <section className="sl-card sl-tiles">
+        <div className="sl-kpis">
+          {TILES.map((t) => {
+            const cur = mean(visible.map(t.get).filter((v) => v != null));
+            const prev = mean(prior.map(t.get).filter((v) => v != null));
+            const pc = cur != null && prev ? ((cur - prev) / prev) * 100 : null;
+            const tone = pc == null || Math.abs(pc) < 1 ? 'flat' : (pc > 0) === t.up ? 'good' : 'bad';
+            const on = active === t.key;
+            return (
+              <button key={t.key} className={`sl-kpi ${on ? 'on' : ''}`} style={on ? { borderColor: t.color } : undefined} onClick={() => { setActive(t.key); setSelection(null); }}>
+                <span className="sl-kpi-t"><span>{t.title}</span>{pc != null && Math.abs(pc) >= 1 && <span className={tone}>{pc > 0 ? '↗' : '↘'} {Math.abs(pc).toFixed(0)}%</span>}</span>
+                <span className="sl-kpi-v">{tileValue(t, cur)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="sl-card">
         <div className="sl-head">
-          <h2>{metric.key === 'duration' ? 'Time asleep' : metric.label} trend</h2>
+          <h2 className="sl-trend-title">{metric.chart} Trend</h2>
           <span className="sl-sub">{range && `${shortDate(range.start)} – ${shortDate(range.end)} · ${visible.length} nights · ${mode === 'days' ? 'daily' : mode === 'weeks' ? 'weekly' : 'monthly'}`}</span>
           <button className={`dn-btn sl-push ${overlay ? 'sl-on' : ''}`} onClick={() => setOverlay((o) => !o)}>Overlay Health score</button>
         </div>
@@ -286,9 +296,9 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
               <YAxis yAxisId="m" tick={AXIS} stroke="rgba(255,255,255,.1)" />
               {overlay && <YAxis yAxisId="h" orientation="right" domain={[0, 100]} tick={{ ...AXIS, fill: '#22d3ee' }} stroke="rgba(255,255,255,.1)" />}
               <Tooltip contentStyle={TIP} labelStyle={{ color: '#9ca3af' }} cursor={{ fill: 'rgba(255,255,255,.04)' }}
-                formatter={(v, name) => [v, name === 'value' ? `${metric.label}${unitOf(metric) ? ` (${unitOf(metric)})` : ''}` : name === 'rolling' ? '7-point avg' : 'Health score']} />
-              {(metric.refs || []).map((r) => <ReferenceLine key={r.y} yAxisId="m" y={r.y} stroke={r.color} strokeDasharray="5 5" strokeOpacity={0.6} />)}
-              <Bar yAxisId="m" dataKey="value" fill="rgba(139,92,246,.45)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                formatter={(v, name) => [v, name === 'value' ? `${metric.chart}${unitOf(metric) ? ` (${unitOf(metric)})` : ''}` : name === 'rolling' ? '7-point avg' : 'Health score']} />
+              {metric.ref != null && <ReferenceLine yAxisId="m" y={metric.ref} stroke="#6b7280" strokeDasharray="5 5" />}
+              <Bar yAxisId="m" dataKey="value" fill={metric.color} fillOpacity={0.55} radius={[3, 3, 0, 0]} isAnimationActive={false} />
               <Line yAxisId="m" dataKey="rolling" stroke="rgba(255,255,255,.75)" strokeWidth={2} strokeDasharray="6 4" dot={false} isAnimationActive={false} connectNulls />
               {overlay && <Line yAxisId="h" dataKey="health" stroke="#22d3ee" strokeWidth={2} dot={{ r: 2.5, fill: '#22d3ee' }} isAnimationActive={false} connectNulls />}
               {drag && drag.a !== drag.b && <ReferenceArea yAxisId="m" x1={drag.a} x2={drag.b} fill="rgba(139,92,246,.15)" />}
@@ -297,7 +307,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
           </ResponsiveContainer>
         </div>
         <div className="sl-legend">
-          <span><i style={{ background: '#8b5cf6' }} />{mode === 'days' ? 'Night' : mode === 'weeks' ? 'Week avg' : 'Month avg'}</span>
+          <span><i style={{ background: metric.color }} />{mode === 'days' ? 'Night' : mode === 'weeks' ? 'Week avg' : 'Month avg'}</span>
           <span><i style={{ background: 'rgba(255,255,255,.75)' }} />7-point average</span>
           {overlay && <span><i style={{ background: '#22d3ee' }} />Glimpse Health score (right axis)</span>}
         </div>
@@ -334,7 +344,7 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
         <section className="sl-card">
           <div className="sl-head">
             <h2>Compare</h2>
-            <span className="sl-sub">{metric.key === 'duration' ? 'Time asleep' : metric.label} by night</span>
+            <span className="sl-sub">{metric.chart} by night</span>
             <div className="dn-seg sm sl-push">
               <button className={compareTo === 'previous' ? 'on' : ''} onClick={() => setCompareTo('previous')}>Previous period</button>
               <button className={compareTo === 'year' ? 'on' : ''} onClick={() => setCompareTo('year')}>A year ago</button>
@@ -351,13 +361,13 @@ export default function SleepTab({ days, symptoms, entries, stackItems, stackEnt
                     <Tooltip contentStyle={TIP} labelStyle={{ color: '#9ca3af' }} labelFormatter={(n) => `Night ${n}`}
                       formatter={(v, name) => [v, name === 'aValue' ? 'Then' : 'Now']} />
                     <Line dataKey="aValue" stroke="#6b7280" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
-                    <Line dataKey="bValue" stroke="#8b5cf6" strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
+                    <Line dataKey="bValue" stroke={metric.color} strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
               <div className="sl-legend">
                 <span><i style={{ background: '#6b7280' }} />{shortDate(compare.p.start)} – {shortDate(compare.p.end)} · avg {plain(compare.aAvg != null ? +compare.aAvg.toFixed(1) : null)}</span>
-                <span><i style={{ background: '#8b5cf6' }} />{shortDate(range.start)} – {shortDate(range.end)} · avg {plain(compare.bAvg != null ? +compare.bAvg.toFixed(1) : null)}</span>
+                <span><i style={{ background: metric.color }} />{shortDate(range.start)} – {shortDate(range.end)} · avg {plain(compare.bAvg != null ? +compare.bAvg.toFixed(1) : null)}</span>
               </div>
             </>
           ) : <div className="sl-sub" style={{ padding: '24px 0' }}>No synced nights in that earlier period.</div>}
